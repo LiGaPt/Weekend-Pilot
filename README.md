@@ -33,6 +33,16 @@ If default ports conflict, override them when running Compose:
 POSTGRES_PORT=15432 REDIS_PORT=16379 docker compose up -d postgres redis
 ```
 
+## Database Migrations
+
+Start PostgreSQL, then apply the Alembic migrations:
+
+```bash
+docker compose up -d postgres
+python -m alembic upgrade head
+python -m alembic current
+```
+
 ## Run The API
 
 ```bash

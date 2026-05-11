@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     app_env: str = "local"
     app_version: str = "0.1.0"
     log_level: str = "INFO"
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/weekend_pilot"
+    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/weekend_pilot"
     redis_url: str = "redis://localhost:6379/0"
     langsmith_project: str = "weekend-pilot"
     langchain_tracing_v2: bool = False
