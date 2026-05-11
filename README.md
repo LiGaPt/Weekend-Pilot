@@ -82,6 +82,14 @@ docker compose up -d redis
 python -m pytest tests/integration/test_redis_runtime.py -v
 ```
 
+Tool Gateway integration tests require both PostgreSQL and Redis, with migrations applied:
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+python -m pytest tests/integration/test_tool_gateway.py -v
+```
+
 ```bash
 python -m pytest
 ```
