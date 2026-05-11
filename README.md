@@ -68,6 +68,13 @@ Expected response:
 
 ## Tests
 
+Repository integration tests require PostgreSQL to be running with migrations applied:
+
+```bash
+docker compose up -d postgres
+python -m alembic upgrade head
+```
+
 ```bash
 python -m pytest
 ```
