@@ -75,6 +75,13 @@ docker compose up -d postgres
 python -m alembic upgrade head
 ```
 
+Redis runtime integration tests require Redis to be running:
+
+```bash
+docker compose up -d redis
+python -m pytest tests/integration/test_redis_runtime.py -v
+```
+
 ```bash
 python -m pytest
 ```
