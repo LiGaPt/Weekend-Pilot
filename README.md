@@ -13,6 +13,30 @@ python -m pip install -e ".[dev]"
 
 The `.env` file is optional for the scaffold because local defaults are provided. Do not commit `.env`, API keys, tokens, or secrets.
 
+## AMAP Read Provider
+
+AMAP support is optional and currently covers read tools only: `search_poi`, `get_poi_detail`, `check_route`, and `check_weather`.
+Set the key in local `.env` only:
+
+```bash
+AMAP_MAPS_API_KEY=your-local-key
+```
+
+Default tests do not call live AMAP APIs:
+
+```bash
+python -m pytest
+```
+
+Optional live smoke tests require `RUN_AMAP_LIVE_TESTS=1` and `AMAP_MAPS_API_KEY`:
+
+```bash
+$env:RUN_AMAP_LIVE_TESTS="1"
+python -m pytest tests/integration/test_amap_live.py -v
+```
+
+Mock World remains a follow-up provider for deterministic benchmark fixtures and write-tool simulation.
+
 ## Infrastructure
 
 Start PostgreSQL and Redis:
