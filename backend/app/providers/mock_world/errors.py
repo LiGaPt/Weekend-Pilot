@@ -1,0 +1,2 @@
+class MockWorldError(ValueError):
+    pass
