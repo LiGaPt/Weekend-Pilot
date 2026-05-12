@@ -35,7 +35,17 @@ $env:RUN_AMAP_LIVE_TESTS="1"
 python -m pytest tests/integration/test_amap_live.py -v
 ```
 
-Mock World remains a follow-up provider for deterministic benchmark fixtures and write-tool simulation.
+## Mock World Provider
+
+Mock World is the deterministic default provider for benchmark-style local-life tests. It covers canonical read tools, availability checks, and simulated write tools without external APIs or secrets.
+
+Focused Mock World tests require PostgreSQL and Redis:
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+python -m pytest tests/test_mock_world_loader.py tests/test_mock_world_provider.py tests/integration/test_mock_world_gateway.py -v
+```
 
 ## Infrastructure
 

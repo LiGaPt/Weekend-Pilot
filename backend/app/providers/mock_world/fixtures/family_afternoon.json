@@ -1,0 +1,316 @@
+{
+  "profile": "family_afternoon",
+  "location": {
+    "city": "Shanghai",
+    "area": "Xuhui"
+  },
+  "pois": [
+    {
+      "poi_id": "activity_museum_001",
+      "name": "Xuhui Family Science Museum",
+      "category": "activity",
+      "address": "100 Family Science Road, Xuhui, Shanghai",
+      "location": {
+        "lat": 31.1901,
+        "lng": 121.4362
+      },
+      "tags": ["child_friendly", "indoor", "museum", "educational"],
+      "description": "Hands-on exhibits suitable for a five-year-old child.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "13:00",
+            "end": "17:30"
+          }
+        ],
+        "last_entry": "16:45"
+      },
+      "sort_order": 10
+    },
+    {
+      "poi_id": "activity_playground_001",
+      "name": "Riverside Parent Child Playground",
+      "category": "activity",
+      "address": "28 Riverside Path, Xuhui, Shanghai",
+      "location": {
+        "lat": 31.1848,
+        "lng": 121.4461
+      },
+      "tags": ["child_friendly", "outdoor", "playground"],
+      "description": "Outdoor playground with shaded seating for parents.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "12:00",
+            "end": "18:30"
+          }
+        ],
+        "last_entry": "18:00"
+      },
+      "sort_order": 20
+    },
+    {
+      "poi_id": "activity_walk_001",
+      "name": "Wukang Family City Walk",
+      "category": "activity",
+      "address": "Wukang Road, Xuhui, Shanghai",
+      "location": {
+        "lat": 31.2045,
+        "lng": 121.4387
+      },
+      "tags": ["child_friendly", "outdoor", "citywalk", "light_activity"],
+      "description": "Short tree-lined walking route with cafes and rest spots.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "00:00",
+            "end": "23:59"
+          }
+        ],
+        "last_entry": null
+      },
+      "sort_order": 30
+    },
+    {
+      "poi_id": "restaurant_light_001",
+      "name": "Green Bowl Family Bistro",
+      "category": "dining",
+      "address": "66 Healthy Lane, Xuhui, Shanghai",
+      "location": {
+        "lat": 31.1926,
+        "lng": 121.4419
+      },
+      "tags": ["lighter_options", "child_friendly", "quiet", "vegetable_forward"],
+      "description": "Light meals, steamed dishes, and kid-friendly rice bowls.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:00",
+            "end": "20:30"
+          }
+        ],
+        "last_entry": "20:00"
+      },
+      "sort_order": 40
+    },
+    {
+      "poi_id": "restaurant_family_001",
+      "name": "Sunny Family Kitchen",
+      "category": "dining",
+      "address": "18 Weekend Street, Xuhui, Shanghai",
+      "location": {
+        "lat": 31.1873,
+        "lng": 121.4434
+      },
+      "tags": ["child_friendly", "family_tables", "balanced_menu"],
+      "description": "Reliable family restaurant with high chairs and mild dishes.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "10:30",
+            "end": "21:00"
+          }
+        ],
+        "last_entry": "20:30"
+      },
+      "sort_order": 50
+    },
+    {
+      "poi_id": "restaurant_noodle_001",
+      "name": "Simple Noodle House",
+      "category": "dining",
+      "address": "8 Noodle Alley, Xuhui, Shanghai",
+      "location": {
+        "lat": 31.1985,
+        "lng": 121.4344
+      },
+      "tags": ["quick_meal", "child_friendly", "simple"],
+      "description": "Simple noodle and wonton options for a fast dinner.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "10:00",
+            "end": "21:30"
+          }
+        ],
+        "last_entry": "21:00"
+      },
+      "sort_order": 60
+    },
+    {
+      "poi_id": "addon_drinks_001",
+      "name": "Little Hydration Stand",
+      "category": "addon",
+      "address": "Near Riverside Path Gate 2, Xuhui, Shanghai",
+      "location": {
+        "lat": 31.185,
+        "lng": 121.4457
+      },
+      "tags": ["drinks", "snacks", "family"],
+      "description": "Small drink and snack stand near the playground.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "12:00",
+            "end": "19:00"
+          }
+        ],
+        "last_entry": "18:50"
+      },
+      "sort_order": 70
+    }
+  ],
+  "routes": [
+    {
+      "origin_id": "activity_museum_001",
+      "destination_id": "restaurant_light_001",
+      "mode": "walking",
+      "distance_meters": 850,
+      "duration_minutes": 12,
+      "summary": "Short stroller-friendly walk through quiet streets."
+    },
+    {
+      "origin_id": "activity_museum_001",
+      "destination_id": "restaurant_family_001",
+      "mode": "walking",
+      "distance_meters": 1200,
+      "duration_minutes": 17,
+      "summary": "Flat walk with two signal crossings."
+    },
+    {
+      "origin_id": "activity_museum_001",
+      "destination_id": "restaurant_noodle_001",
+      "mode": "walking",
+      "distance_meters": 980,
+      "duration_minutes": 14,
+      "summary": "Direct walk along neighborhood streets."
+    },
+    {
+      "origin_id": "activity_playground_001",
+      "destination_id": "restaurant_family_001",
+      "mode": "walking",
+      "distance_meters": 700,
+      "duration_minutes": 10,
+      "summary": "Easy walk from playground gate to restaurant."
+    },
+    {
+      "origin_id": "activity_walk_001",
+      "destination_id": "restaurant_light_001",
+      "mode": "walking",
+      "distance_meters": 1100,
+      "duration_minutes": 16,
+      "summary": "Tree-lined walk ending near the bistro."
+    },
+    {
+      "origin_id": "restaurant_light_001",
+      "destination_id": "addon_drinks_001",
+      "mode": "walking",
+      "distance_meters": 900,
+      "duration_minutes": 13,
+      "summary": "Optional post-meal drink stop near the park."
+    },
+    {
+      "origin_id": "activity_museum_001",
+      "destination_id": "restaurant_light_001",
+      "mode": "driving",
+      "distance_meters": 1300,
+      "duration_minutes": 8,
+      "summary": "Short local drive with predictable traffic."
+    }
+  ],
+  "weather": {
+    "location": "Xuhui",
+    "date": "2026-05-16",
+    "condition": "cloudy",
+    "temperature_c": 23,
+    "precipitation_chance": 0.15,
+    "advisory": "Comfortable for family outdoor walking."
+  },
+  "queues": {
+    "queue_restaurant_light_001": {
+      "queue_id": "queue_restaurant_light_001",
+      "poi_id": "restaurant_light_001",
+      "status": "open",
+      "wait_minutes": 10,
+      "parties_ahead": 2
+    },
+    "queue_restaurant_family_001": {
+      "queue_id": "queue_restaurant_family_001",
+      "poi_id": "restaurant_family_001",
+      "status": "open",
+      "wait_minutes": 20,
+      "parties_ahead": 5
+    },
+    "queue_restaurant_noodle_001": {
+      "queue_id": "queue_restaurant_noodle_001",
+      "poi_id": "restaurant_noodle_001",
+      "status": "open",
+      "wait_minutes": 5,
+      "parties_ahead": 1
+    }
+  },
+  "table_availability": {
+    "restaurant_light_001": {
+      "restaurant_id": "restaurant_light_001",
+      "available": true,
+      "time_slots": ["17:30", "18:00", "18:30"],
+      "max_party_size": 4,
+      "notes": "Quiet corner tables available."
+    },
+    "restaurant_family_001": {
+      "restaurant_id": "restaurant_family_001",
+      "available": true,
+      "time_slots": ["17:45", "18:15", "18:45"],
+      "max_party_size": 6,
+      "notes": "High chairs available."
+    },
+    "restaurant_noodle_001": {
+      "restaurant_id": "restaurant_noodle_001",
+      "available": true,
+      "time_slots": ["17:00", "17:30", "18:00", "18:30"],
+      "max_party_size": 4,
+      "notes": "Walk-in friendly."
+    }
+  },
+  "ticket_availability": {
+    "activity_museum_001": {
+      "poi_id": "activity_museum_001",
+      "available": true,
+      "time_slots": ["13:30", "14:00", "14:30"],
+      "remaining": 42,
+      "price_cents": 6000
+    },
+    "activity_playground_001": {
+      "poi_id": "activity_playground_001",
+      "available": true,
+      "time_slots": ["14:00", "15:00", "16:00"],
+      "remaining": 80,
+      "price_cents": 0
+    }
+  },
+  "addons": [
+    {
+      "vendor_id": "addon_drinks_001",
+      "menu": [
+        {
+          "sku": "water",
+          "name": "Bottled Water",
+          "price_cents": 600
+        },
+        {
+          "sku": "fruit_cup",
+          "name": "Fruit Cup",
+          "price_cents": 1800
+        }
+      ]
+    }
+  ],
+  "message_recipients": ["wife", "self"]
+}
