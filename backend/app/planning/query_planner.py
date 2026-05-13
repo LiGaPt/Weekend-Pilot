@@ -55,7 +55,7 @@ class DeterministicQueryPlanner:
                 tool_name="search_poi",
                 provider=provider_profile,
                 payload={
-                    "query": self._activity_query(intent),
+                    "query": self._mock_world_activity_query(intent),
                     "category": "activity",
                     "tags": activity_tags,
                     "limit": 5,
@@ -65,7 +65,7 @@ class DeterministicQueryPlanner:
                 tool_name="search_poi",
                 provider=provider_profile,
                 payload={
-                    "query": self._dining_query(intent),
+                    "query": self._mock_world_dining_query(intent),
                     "category": "dining",
                     "tags": dining_tags,
                     "limit": 5,
@@ -176,3 +176,15 @@ class DeterministicQueryPlanner:
         if intent.constraints.child_friendly:
             return "family dining"
         return "local dining"
+
+    def _mock_world_activity_query(self, intent: LocalLifeIntent) -> str:
+        if intent.constraints.child_friendly:
+            return "child_friendly"
+        return "activity"
+
+    def _mock_world_dining_query(self, intent: LocalLifeIntent) -> str:
+        if "lighter_options" in intent.dining_preferences:
+            return "lighter_options"
+        if intent.constraints.child_friendly:
+            return "child_friendly"
+        return "restaurant"

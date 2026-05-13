@@ -47,6 +47,16 @@ python -m alembic upgrade head
 python -m pytest tests/test_mock_world_loader.py tests/test_mock_world_provider.py tests/integration/test_mock_world_gateway.py -v
 ```
 
+## Query Plan Execution
+
+Focused query-plan execution tests require PostgreSQL and Redis for the gateway integration path:
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+python -m pytest tests/test_query_plan_execution.py tests/integration/test_query_plan_execution_gateway.py -v
+```
+
 ## Infrastructure
 
 Start PostgreSQL and Redis:

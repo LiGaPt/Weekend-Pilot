@@ -4,3 +4,7 @@ class IntentParseError(ValueError):
 
 class QueryPlanError(ValueError):
     pass
+
+
+class QueryExecutionError(ValueError):
+    pass
