@@ -150,6 +150,20 @@ class DeterministicQueryPlanner:
         ]
 
     def _build_route_templates(self, provider_profile: str) -> list[ToolCallTemplate]:
+        if provider_profile == "amap":
+            return [
+                ToolCallTemplate(
+                    tool_name="check_route",
+                    provider=provider_profile,
+                    required_inputs=["origin", "destination"],
+                    payload_template={
+                        "origin": "{origin}",
+                        "destination": "{destination}",
+                        "mode": "walking",
+                    },
+                )
+            ]
+
         return [
             ToolCallTemplate(
                 tool_name="check_route",

@@ -57,6 +57,16 @@ python -m alembic upgrade head
 python -m pytest tests/test_query_plan_execution.py tests/integration/test_query_plan_execution_gateway.py -v
 ```
 
+## Candidate Enrichment
+
+Focused candidate enrichment and route matrix tests require PostgreSQL and Redis for the gateway integration path:
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+python -m pytest tests/test_candidate_enrichment.py tests/integration/test_candidate_enrichment_gateway.py -v
+```
+
 ## Infrastructure
 
 Start PostgreSQL and Redis:
