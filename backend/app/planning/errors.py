@@ -8,3 +8,7 @@ class QueryPlanError(ValueError):
 
 class QueryExecutionError(ValueError):
     pass
+
+
+class CandidateEnrichmentError(ValueError):
+    pass

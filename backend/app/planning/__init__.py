@@ -1,5 +1,17 @@
 from backend.app.planning.candidates import Candidate, CandidateCollectionResult, InitialToolExecutionResult
-from backend.app.planning.errors import IntentParseError, QueryExecutionError, QueryPlanError
+from backend.app.planning.enriched_candidates import (
+    CandidateEnrichmentResult,
+    EnrichedCandidate,
+    EnrichmentToolResult,
+    RouteMatrixEntry,
+)
+from backend.app.planning.enrichment import CandidateEnricher
+from backend.app.planning.errors import (
+    CandidateEnrichmentError,
+    IntentParseError,
+    QueryExecutionError,
+    QueryPlanError,
+)
 from backend.app.planning.execution import QueryPlanExecutor
 from backend.app.planning.intent_parser import DeterministicIntentParser
 from backend.app.planning.query_planner import DeterministicQueryPlanner
@@ -15,9 +27,14 @@ from backend.app.planning.schemas import (
 
 __all__ = [
     "Candidate",
+    "CandidateEnricher",
+    "CandidateEnrichmentError",
+    "CandidateEnrichmentResult",
     "CandidateCollectionResult",
     "DeterministicIntentParser",
     "DeterministicQueryPlanner",
+    "EnrichedCandidate",
+    "EnrichmentToolResult",
     "InitialToolExecutionResult",
     "IntentConstraints",
     "IntentParseError",
@@ -28,6 +45,7 @@ __all__ = [
     "QueryPlan",
     "QueryPlanExecutor",
     "QueryPlanError",
+    "RouteMatrixEntry",
     "TimeWindow",
     "ToolCallTemplate",
 ]
