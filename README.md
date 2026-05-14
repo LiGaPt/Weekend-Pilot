@@ -67,6 +67,16 @@ python -m alembic upgrade head
 python -m pytest tests/test_candidate_enrichment.py tests/integration/test_candidate_enrichment_gateway.py -v
 ```
 
+## Itinerary Draft Generation
+
+Focused itinerary draft tests require PostgreSQL and Redis for the gateway integration path:
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+python -m pytest tests/test_itinerary_generation.py tests/integration/test_itinerary_generation_gateway.py -v
+```
+
 ## Infrastructure
 
 Start PostgreSQL and Redis:
