@@ -87,6 +87,16 @@ python -m alembic upgrade head
 python -m pytest tests/test_final_review_gate.py tests/integration/test_final_review_gate_gateway.py -v
 ```
 
+## Reviewed Plan Persistence
+
+Focused reviewed plan persistence tests require PostgreSQL and Redis for the upstream gateway integration path:
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+python -m pytest tests/test_plan_persistence.py tests/integration/test_plan_persistence_gateway.py -v
+```
+
 ## Infrastructure
 
 Start PostgreSQL and Redis:
