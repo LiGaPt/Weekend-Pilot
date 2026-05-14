@@ -70,6 +70,22 @@ class PlanRepository:
         self.session.refresh(plan)
         return plan
 
+    def update_status_and_plan_json(
+        self,
+        plan_id: UUID,
+        status: str,
+        plan_json: dict[str, Any],
+    ) -> Plan | None:
+        plan = self.get_by_id(plan_id)
+        if plan is None:
+            return None
+
+        plan.status = status
+        plan.plan_json = plan_json
+        self.session.flush()
+        self.session.refresh(plan)
+        return plan
+
     def get_selected_for_run(self, run_id: UUID) -> Plan | None:
         statement = select(Plan).where(
             Plan.run_id == run_id,
