@@ -1,0 +1,2 @@
+class ExecutionWorkflowError(ValueError):
+    pass

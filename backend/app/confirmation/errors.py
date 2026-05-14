@@ -1,0 +1,2 @@
+class PlanConfirmationError(ValueError):
+    pass

@@ -97,6 +97,26 @@ python -m alembic upgrade head
 python -m pytest tests/test_plan_persistence.py tests/integration/test_plan_persistence_gateway.py -v
 ```
 
+## Human Confirmation Boundary
+
+Focused human confirmation tests require PostgreSQL and Redis for the upstream gateway integration path:
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+python -m pytest tests/test_human_confirmation.py tests/integration/test_human_confirmation_gateway.py -v
+```
+
+## Deterministic Execution Workflow
+
+Focused execution workflow tests require PostgreSQL and Redis for the gateway integration path:
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+python -m pytest tests/test_execution_workflow.py tests/integration/test_execution_workflow_gateway.py -v
+```
+
 ## Infrastructure
 
 Start PostgreSQL and Redis:
