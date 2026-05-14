@@ -56,6 +56,27 @@ class PlanRepository:
         self.session.refresh(plan)
         return plan
 
+    def update_plan_json(
+        self,
+        plan_id: UUID,
+        plan_json: dict[str, Any],
+    ) -> Plan | None:
+        plan = self.get_by_id(plan_id)
+        if plan is None:
+            return None
+
+        plan.plan_json = plan_json
+        self.session.flush()
+        self.session.refresh(plan)
+        return plan
+
+    def get_selected_for_run(self, run_id: UUID) -> Plan | None:
+        statement = select(Plan).where(
+            Plan.run_id == run_id,
+            Plan.selected.is_(True),
+        )
+        return self.session.scalar(statement)
+
     def select_for_run(self, run_id: UUID, plan_id: UUID) -> Plan | None:
         target = self.get_by_id(plan_id)
         if target is None or target.run_id != run_id:
