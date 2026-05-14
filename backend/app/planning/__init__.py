@@ -14,6 +14,17 @@ from backend.app.planning.errors import (
 )
 from backend.app.planning.execution import QueryPlanExecutor
 from backend.app.planning.intent_parser import DeterministicIntentParser
+from backend.app.planning.itinerary_drafts import (
+    FeasibilitySummary,
+    ItineraryCandidateRef,
+    ItineraryDraft,
+    ItineraryDraftResult,
+    ItineraryFailureReason,
+    ItineraryRouteRef,
+    ProposedAction,
+    TimelineItem,
+)
+from backend.app.planning.itinerary_generation import DeterministicItineraryGenerator
 from backend.app.planning.query_planner import DeterministicQueryPlanner
 from backend.app.planning.schemas import (
     IntentConstraints,
@@ -32,20 +43,29 @@ __all__ = [
     "CandidateEnrichmentResult",
     "CandidateCollectionResult",
     "DeterministicIntentParser",
+    "DeterministicItineraryGenerator",
     "DeterministicQueryPlanner",
     "EnrichedCandidate",
     "EnrichmentToolResult",
+    "FeasibilitySummary",
     "InitialToolExecutionResult",
     "IntentConstraints",
     "IntentParseError",
+    "ItineraryCandidateRef",
+    "ItineraryDraft",
+    "ItineraryDraftResult",
+    "ItineraryFailureReason",
+    "ItineraryRouteRef",
     "LocalLifeIntent",
     "ParticipantProfile",
     "PlannedToolCall",
+    "ProposedAction",
     "QueryExecutionError",
     "QueryPlan",
     "QueryPlanExecutor",
     "QueryPlanError",
     "RouteMatrixEntry",
+    "TimelineItem",
     "TimeWindow",
     "ToolCallTemplate",
 ]
