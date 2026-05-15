@@ -156,6 +156,16 @@ python -m alembic upgrade head
 python -m pytest tests/test_benchmark_harness.py tests/integration/test_benchmark_harness_gateway.py -v
 ```
 
+## LangGraph Workflow Skeleton
+
+The workflow package provides the shared product route for the deterministic Mock World flow. It pauses before write-tool execution unless `auto_confirm=True` is supplied by a test or demo caller.
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+python -m pytest tests/test_langgraph_workflow.py tests/integration/test_langgraph_workflow_gateway.py -v
+```
+
 ## Infrastructure
 
 Start PostgreSQL and Redis:
