@@ -146,6 +146,16 @@ LANGSMITH_API_KEY=your-local-key
 LOCAL_TRACE_BUFFER_PATH=var/traces/weekendpilot-traces.jsonl
 ```
 
+## LocalLife-Bench Harness
+
+The v0 benchmark harness runs deterministic Mock World cases and writes local JSON reports. It does not require LangSmith credentials or live provider access.
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+python -m pytest tests/test_benchmark_harness.py tests/integration/test_benchmark_harness_gateway.py -v
+```
+
 ## Infrastructure
 
 Start PostgreSQL and Redis:

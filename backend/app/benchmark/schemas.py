@@ -1,0 +1,76 @@
+from __future__ import annotations
+
+from decimal import Decimal
+from typing import Any, Literal
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+
+BenchmarkCaseStatus = Literal["passed", "failed", "error"]
+
+
+class BenchmarkMemoryItem(BaseModel):
+    memory_type: str
+    key: str
+    value_json: dict[str, Any]
+    text: str | None = None
+    confidence: Decimal = Decimal("1.0")
+    status: str = "active"
+
+
+class BenchmarkExpectedOutcome(BaseModel):
+    required_tool_names: list[str]
+    min_tool_event_count: int
+    min_action_count: int
+    expected_execution_status: str = "succeeded"
+    expected_feedback_status: str = "completed"
+
+
+class BenchmarkCase(BaseModel):
+    case_id: str
+    title: str
+    user_input: str
+    agent_version: str = "agent-v1"
+    prompt_version: str = "prompt-v1"
+    tool_profile: str = "mock_world"
+    world_profile: str = "family_afternoon"
+    failure_profile: str | None = None
+    memory_items: list[BenchmarkMemoryItem] = Field(default_factory=list)
+    expected: BenchmarkExpectedOutcome
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class BenchmarkScore(BaseModel):
+    name: str
+    score: float
+    passed: bool
+    reason: str
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class BenchmarkCaseResult(BaseModel):
+    schema_version: str = "weekendpilot_benchmark_case_result_v1"
+    case_id: str
+    status: BenchmarkCaseStatus
+    run_id: UUID | None = None
+    trace_id: str | None = None
+    scores: list[BenchmarkScore]
+    overall_score: float
+    tool_event_count: int
+    action_count: int
+    plan_status: str | None = None
+    feedback_status: str | None = None
+    observability_status: str | None = None
+    failure_reasons: list[str] = Field(default_factory=list)
+    report_path: str | None = None
+
+
+class BenchmarkRunReport(BaseModel):
+    schema_version: str = "weekendpilot_benchmark_run_v1"
+    run_status: Literal["passed", "failed", "error"]
+    case_results: list[BenchmarkCaseResult]
+    passed_count: int
+    failed_count: int
+    error_count: int
+    overall_score: float
