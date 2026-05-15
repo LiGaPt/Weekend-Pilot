@@ -166,6 +166,16 @@ python -m alembic upgrade head
 python -m pytest tests/test_langgraph_workflow.py tests/integration/test_langgraph_workflow_gateway.py -v
 ```
 
+## Bounded Agent Contracts
+
+Task 020 adds deterministic bounded-agent adapters for Supervisor, Discovery, Dining, Itinerary Planner, and Validator/Recovery. These adapters do not call LLMs and do not execute write tools.
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+python -m pytest tests/test_agents.py tests/integration/test_workflow_agents_gateway.py -v
+```
+
 ## Infrastructure
 
 Start PostgreSQL and Redis:
