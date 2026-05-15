@@ -8,6 +8,16 @@ from uuid import UUID, uuid4
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from backend.app.agents import (
+    AgentInvocationContext,
+    AgentResult,
+    DeterministicDiningAgent,
+    DeterministicDiscoveryAgent,
+    DeterministicItineraryPlannerAgent,
+    DeterministicSupervisorAgent,
+    DeterministicValidatorRecoveryAgent,
+    sanitized_agent_payload,
+)
 from backend.app.confirmation import HumanConfirmationService
 from backend.app.execution import DeterministicExecutionWorkflow
 from backend.app.feedback import DeterministicFeedbackWriter
@@ -16,7 +26,6 @@ from backend.app.observability import LocalTraceBuffer, ObservabilityRecorder
 from backend.app.planning import (
     CandidateEnricher,
     DeterministicIntentParser,
-    DeterministicItineraryGenerator,
     DeterministicQueryPlanner,
     QueryPlanExecutor,
 )
@@ -30,7 +39,6 @@ from backend.app.repositories import (
     ToolEventRepository,
     UserRepository,
 )
-from backend.app.review import FinalReviewGate
 from backend.app.tool_gateway import ToolGateway
 from backend.app.workflow.dependencies import WeekendPilotWorkflowDependencies
 from backend.app.workflow.errors import WorkflowError
@@ -58,6 +66,11 @@ class WeekendPilotWorkflowNodes:
             plans=self.repositories.plans,
             local_buffer=LocalTraceBuffer(self._trace_path(dependencies.trace_buffer_path)),
         )
+        self.supervisor_agent = DeterministicSupervisorAgent()
+        self.discovery_agent = DeterministicDiscoveryAgent()
+        self.dining_agent = DeterministicDiningAgent()
+        self.itinerary_planner_agent = DeterministicItineraryPlannerAgent()
+        self.validator_recovery_agent = DeterministicValidatorRecoveryAgent()
 
     def initialize_run(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         user = self._get_or_create_user(
@@ -109,7 +122,19 @@ class WeekendPilotWorkflowNodes:
             self._required_value(state, "parsed_intent"),
             provider_profile=self._required_text(state, "tool_profile"),
         )
-        return self._updates(state, "build_query_plan", query_plan=query_plan)
+        agent_result, assignment_plan = self.supervisor_agent.assign(
+            query_plan,
+            context=self._agent_context(state, "supervisor"),
+        )
+        agent_results = self._append_agent_result(state, agent_result)
+        self._persist_agent_metadata(self._required_uuid(state, "run_id"), agent_results)
+        return self._updates(
+            state,
+            "build_query_plan",
+            query_plan=query_plan,
+            supervisor_assignment_plan=assignment_plan,
+            agent_results=agent_results,
+        )
 
     def collect_candidates(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         collection = QueryPlanExecutor(self.gateway).execute_initial_calls(
@@ -125,24 +150,60 @@ class WeekendPilotWorkflowNodes:
             self._required_value(state, "candidate_collection"),
             langsmith_trace_id=state.get("trace_id"),
         )
-        return self._updates(state, "enrich_candidates", enrichment_result=enrichment)
+        discovery_result = self.discovery_agent.summarize(
+            self._required_value(state, "query_plan"),
+            self._required_value(state, "candidate_collection"),
+            enrichment,
+            context=self._agent_context(state, "discovery"),
+        )
+        dining_result = self.dining_agent.summarize(
+            self._required_value(state, "query_plan"),
+            self._required_value(state, "candidate_collection"),
+            enrichment,
+            context=self._agent_context(state, "dining"),
+        )
+        agent_results = self._append_agent_result(state, discovery_result, dining_result)
+        self._persist_agent_metadata(self._required_uuid(state, "run_id"), agent_results)
+        return self._updates(
+            state,
+            "enrich_candidates",
+            enrichment_result=enrichment,
+            agent_results=agent_results,
+        )
 
     def generate_itinerary(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
-        drafts = DeterministicItineraryGenerator().generate(
+        agent_result, drafts = self.itinerary_planner_agent.generate(
             self._required_value(state, "query_plan"),
             self._required_value(state, "enrichment_result"),
+            context=self._agent_context(state, "itinerary_planner"),
         )
-        return self._updates(state, "generate_itinerary", itinerary_drafts=drafts)
+        agent_results = self._append_agent_result(state, agent_result)
+        self._persist_agent_metadata(self._required_uuid(state, "run_id"), agent_results)
+        return self._updates(
+            state,
+            "generate_itinerary",
+            itinerary_drafts=drafts,
+            agent_results=agent_results,
+        )
 
     def final_review(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         run_id = self._required_uuid(state, "run_id")
-        review = FinalReviewGate().review(
+        agent_result, review, recovery_decision = self.validator_recovery_agent.review(
             self._required_value(state, "query_plan"),
             self._required_value(state, "enrichment_result"),
             self._required_value(state, "itinerary_drafts"),
             pre_confirmation_action_count=self._action_count(run_id),
+            context=self._agent_context(state, "validator_recovery"),
         )
-        return self._updates(state, "final_review", final_review_result=review)
+        agent_results = self._append_agent_result(state, agent_result)
+        self._persist_agent_metadata(run_id, agent_results)
+        return self._updates(
+            state,
+            "final_review",
+            final_review_result=review,
+            recovery_decision=recovery_decision,
+            agent_results=agent_results,
+        )
 
     def persist_and_select_plan(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         review = self._required_value(state, "final_review_result")
@@ -201,6 +262,7 @@ class WeekendPilotWorkflowNodes:
         selected_plan_id = self._required_uuid(state, "selected_plan_id")
         if not state.get("auto_confirm"):
             self.repositories.runs.update_status(run_id, "awaiting_confirmation")
+            self._persist_agent_metadata(run_id, self._agent_results(state))
             return self._updates(
                 state,
                 "wait_confirmation",
@@ -263,6 +325,11 @@ class WeekendPilotWorkflowNodes:
         except Exception as exc:
             error_json = self._error_json("observability_failed", str(exc), exc)
             self._record_observability_error(state, error_json)
+            if state.get("run_id") is not None:
+                self._persist_agent_metadata(
+                    self._required_uuid(state, "run_id"),
+                    self._agent_results(state),
+                )
             return self._updates(
                 state,
                 "record_observability",
@@ -271,6 +338,7 @@ class WeekendPilotWorkflowNodes:
             )
 
         status = "recorded" if observability.local_buffer_written else observability.status
+        self._persist_agent_metadata(self._required_uuid(state, "run_id"), self._agent_results(state))
         return self._updates(
             state,
             "record_observability",
@@ -298,6 +366,45 @@ class WeekendPilotWorkflowNodes:
             "node_history": [*state.get("node_history", []), node_name],
             **updates,
         }
+
+    def _agent_context(
+        self,
+        state: WeekendPilotWorkflowState,
+        role: str,
+    ) -> AgentInvocationContext:
+        return AgentInvocationContext(
+            run_id=self._required_uuid(state, "run_id"),
+            trace_id=state.get("trace_id"),
+            role=role,
+            agent_version=self._required_text(state, "agent_version"),
+            prompt_version=self._required_text(state, "prompt_version"),
+            tool_profile=self._required_text(state, "tool_profile"),
+            world_profile=self._required_text(state, "world_profile"),
+        )
+
+    def _append_agent_result(
+        self,
+        state: WeekendPilotWorkflowState,
+        *results: AgentResult,
+    ) -> list[AgentResult]:
+        return [*self._agent_results(state), *results]
+
+    def _agent_results(self, state: WeekendPilotWorkflowState) -> list[AgentResult]:
+        parsed = []
+        for result in state.get("agent_results", []) or []:
+            if isinstance(result, AgentResult):
+                parsed.append(result)
+            elif isinstance(result, dict):
+                parsed.append(AgentResult.model_validate(result))
+        return parsed
+
+    def _persist_agent_metadata(self, run_id: UUID, agent_results: list[AgentResult]) -> None:
+        run = self.repositories.runs.get_by_id(run_id)
+        if run is None:
+            return
+        metadata = deepcopy(run.metadata_json) if isinstance(run.metadata_json, dict) else {}
+        metadata["agents"] = sanitized_agent_payload(agent_results)
+        self.repositories.runs.update_metadata_json(run_id, metadata)
 
     def _fail(
         self,

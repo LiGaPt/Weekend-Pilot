@@ -6,6 +6,8 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
+from backend.app.agents import AgentResult
+
 
 WorkflowStatus = Literal[
     "awaiting_confirmation",
@@ -40,6 +42,7 @@ class WeekendPilotWorkflowResult(BaseModel):
     execution_status: str | None = None
     feedback_status: str | None = None
     observability_status: str | None = None
+    agent_results: list[AgentResult] = Field(default_factory=list)
     error_json: dict[str, Any] | None = None
 
 
@@ -66,6 +69,9 @@ class WeekendPilotWorkflowState(TypedDict, total=False):
     enrichment_result: Any
     itinerary_drafts: Any
     final_review_result: Any
+    agent_results: list[Any]
+    supervisor_assignment_plan: Any
+    recovery_decision: Any
     persisted_plans: list[Any]
     selected_plan_id: UUID | None
     confirmation_result: Any

@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 
+from backend.app.agents import AgentResult
 from backend.app.models.runtime import ActionLedger, ToolEvent
 from backend.app.workflow.dependencies import WeekendPilotWorkflowDependencies
 from backend.app.workflow.graph import build_weekend_pilot_graph
@@ -107,6 +108,7 @@ class WeekendPilotWorkflowRunner:
             execution_status=self._text_or_none(state.get("execution_status")),
             feedback_status=self._text_or_none(state.get("feedback_status")),
             observability_status=self._text_or_none(state.get("observability_status")),
+            agent_results=self._agent_results(state.get("agent_results")),
             error_json=state.get("error_json") if isinstance(state.get("error_json"), dict) else None,
         )
 
@@ -140,3 +142,14 @@ class WeekendPilotWorkflowRunner:
 
     def _text_or_none(self, value: Any) -> str | None:
         return value if isinstance(value, str) else None
+
+    def _agent_results(self, value: Any) -> list[AgentResult]:
+        results = []
+        if not isinstance(value, list):
+            return results
+        for item in value:
+            if isinstance(item, AgentResult):
+                results.append(item)
+            elif isinstance(item, dict):
+                results.append(AgentResult.model_validate(item))
+        return results
