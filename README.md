@@ -117,6 +117,16 @@ python -m alembic upgrade head
 python -m pytest tests/test_execution_workflow.py tests/integration/test_execution_workflow_gateway.py -v
 ```
 
+## Deterministic Feedback Writer
+
+Focused feedback writer tests require PostgreSQL and Redis for the upstream gateway integration path:
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+python -m pytest tests/test_feedback_writer.py tests/integration/test_feedback_writer_gateway.py -v
+```
+
 ## Infrastructure
 
 Start PostgreSQL and Redis:
