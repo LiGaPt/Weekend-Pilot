@@ -38,6 +38,7 @@ class DeterministicExecutionWorkflow:
         self,
         run_id: UUID,
         plan_id: UUID,
+        langsmith_trace_id: str | None = None,
     ) -> ExecutionWorkflowResult:
         started_at = datetime.now(UTC)
         plan = self._load_executable_plan(run_id, plan_id)
@@ -69,6 +70,7 @@ class DeterministicExecutionWorkflow:
                     user_confirmed=True,
                     target_id=action["target_id"],
                     idempotency_key=action["idempotency_key"],
+                    langsmith_trace_id=langsmith_trace_id,
                 )
             )
             if gateway_result.status not in self._ALLOWED_GATEWAY_STATUSES:

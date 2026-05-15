@@ -127,6 +127,35 @@ python -m alembic upgrade head
 python -m pytest tests/test_feedback_writer.py tests/integration/test_feedback_writer_gateway.py -v
 ```
 
+## LangSmith Observability Baseline
+
+Default observability tests use a local JSONL trace buffer and do not require LangSmith credentials or live uploads.
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+python -m pytest tests/test_observability.py tests/integration/test_observability_gateway.py -v
+```
+
+Optional LangSmith tracing can be enabled locally with `.env` values only:
+
+```bash
+LANGSMITH_TRACING=true
+LANGSMITH_PROJECT=weekend-pilot
+LANGSMITH_API_KEY=your-local-key
+LOCAL_TRACE_BUFFER_PATH=var/traces/weekendpilot-traces.jsonl
+```
+
+## LocalLife-Bench Harness
+
+The v0 benchmark harness runs deterministic Mock World cases and writes local JSON reports. It does not require LangSmith credentials or live provider access.
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+python -m pytest tests/test_benchmark_harness.py tests/integration/test_benchmark_harness_gateway.py -v
+```
+
 ## Infrastructure
 
 Start PostgreSQL and Redis:

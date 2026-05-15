@@ -1,0 +1,51 @@
+{
+  "case_id": "family_afternoon_v1",
+  "title": "Family afternoon local-life plan",
+  "user_input": "This afternoon I want to go out with my wife and child for a few hours. Not too far. My child is 5, and my wife is trying to eat lighter.",
+  "agent_version": "agent-v1",
+  "prompt_version": "prompt-v1",
+  "tool_profile": "mock_world",
+  "world_profile": "family_afternoon",
+  "failure_profile": null,
+  "memory_items": [
+    {
+      "memory_type": "family",
+      "key": "child_age",
+      "value_json": {
+        "age": 5
+      },
+      "text": "The child is 5 years old.",
+      "confidence": "1.0",
+      "status": "active"
+    },
+    {
+      "memory_type": "preference",
+      "key": "spouse_lighter_meals",
+      "value_json": {
+        "preference": "lighter meals"
+      },
+      "text": "The spouse prefers lighter meals.",
+      "confidence": "1.0",
+      "status": "active"
+    }
+  ],
+  "expected": {
+    "required_tool_names": [
+      "search_poi",
+      "check_weather",
+      "get_poi_detail",
+      "check_opening_hours",
+      "check_queue",
+      "check_table_availability",
+      "check_ticket_availability",
+      "check_route"
+    ],
+    "min_tool_event_count": 8,
+    "min_action_count": 1,
+    "expected_execution_status": "succeeded",
+    "expected_feedback_status": "completed"
+  },
+  "metadata": {
+    "suite": "locallife_bench_v0"
+  }
+}

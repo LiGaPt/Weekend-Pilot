@@ -26,6 +26,7 @@ class QueryPlanExecutor:
         plan: QueryPlan,
         run_id: UUID,
         fail_fast: bool = False,
+        langsmith_trace_id: str | None = None,
     ) -> CandidateCollectionResult:
         self._reject_initial_write_tools(plan)
         collection = CandidateCollectionResult(
@@ -42,6 +43,7 @@ class QueryPlanExecutor:
                     payload=call.payload,
                     provider=call.provider,
                     user_confirmed=False,
+                    langsmith_trace_id=langsmith_trace_id,
                 )
             )
 

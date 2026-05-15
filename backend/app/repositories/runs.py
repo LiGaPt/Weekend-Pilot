@@ -50,3 +50,13 @@ class AgentRunRepository:
         self.session.flush()
         self.session.refresh(run)
         return run
+
+    def update_metadata_json(self, run_id: UUID, metadata_json: dict[str, Any]) -> AgentRun | None:
+        run = self.get_by_id(run_id)
+        if run is None:
+            return None
+
+        run.metadata_json = metadata_json
+        self.session.flush()
+        self.session.refresh(run)
+        return run
