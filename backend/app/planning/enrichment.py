@@ -55,6 +55,7 @@ class CandidateEnricher:
         plan: QueryPlan,
         collection: CandidateCollectionResult,
         fail_fast: bool = False,
+        langsmith_trace_id: str | None = None,
     ) -> CandidateEnrichmentResult:
         self._reject_write_templates(plan)
 
@@ -81,15 +82,39 @@ class CandidateEnricher:
         }
 
         result.enriched_activity_candidates = [
-            self._enrich_candidate(candidate, templates_by_tool, self._ACTIVITY_TOOL_ORDER, plan, result, fail_fast)
+            self._enrich_candidate(
+                candidate,
+                templates_by_tool,
+                self._ACTIVITY_TOOL_ORDER,
+                plan,
+                result,
+                fail_fast,
+                langsmith_trace_id,
+            )
             for candidate in activity_candidates
         ]
         result.enriched_dining_candidates = [
-            self._enrich_candidate(candidate, templates_by_tool, self._DINING_TOOL_ORDER, plan, result, fail_fast)
+            self._enrich_candidate(
+                candidate,
+                templates_by_tool,
+                self._DINING_TOOL_ORDER,
+                plan,
+                result,
+                fail_fast,
+                langsmith_trace_id,
+            )
             for candidate in dining_candidates
         ]
         result.enriched_other_candidates = [
-            self._enrich_candidate(candidate, templates_by_tool, self._OTHER_TOOL_ORDER, plan, result, fail_fast)
+            self._enrich_candidate(
+                candidate,
+                templates_by_tool,
+                self._OTHER_TOOL_ORDER,
+                plan,
+                result,
+                fail_fast,
+                langsmith_trace_id,
+            )
             for candidate in other_candidates
         ]
 
@@ -102,6 +127,7 @@ class CandidateEnricher:
                 collection,
                 result,
                 fail_fast,
+                langsmith_trace_id,
             )
 
         return result
@@ -122,6 +148,7 @@ class CandidateEnricher:
         plan: QueryPlan,
         result: CandidateEnrichmentResult,
         fail_fast: bool,
+        langsmith_trace_id: str | None,
     ) -> EnrichedCandidate:
         enriched = EnrichedCandidate(candidate=candidate)
         for tool_name in tool_order:
@@ -148,6 +175,7 @@ class CandidateEnricher:
                     provider=template.provider,
                     payload=payload,
                     user_confirmed=False,
+                    langsmith_trace_id=langsmith_trace_id,
                 )
             )
             tool_result = self._tool_result_from_gateway(
@@ -174,6 +202,7 @@ class CandidateEnricher:
         collection: CandidateCollectionResult,
         result: CandidateEnrichmentResult,
         fail_fast: bool,
+        langsmith_trace_id: str | None,
     ) -> None:
         for activity in activity_candidates:
             for dining in dining_candidates:
@@ -208,6 +237,7 @@ class CandidateEnricher:
                         provider=template.provider,
                         payload=payload,
                         user_confirmed=False,
+                        langsmith_trace_id=langsmith_trace_id,
                     )
                 )
                 tool_result = self._tool_result_from_gateway(

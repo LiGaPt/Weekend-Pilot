@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/weekend_pilot"
     redis_url: str = "redis://localhost:6379/0"
     langsmith_project: str = "weekend-pilot"
+    langsmith_tracing: bool = False
+    langsmith_endpoint: str | None = None
+    local_trace_buffer_path: str = "var/traces/weekendpilot-traces.jsonl"
     langchain_tracing_v2: bool = False
     openai_api_key: SecretStr | None = None
     langsmith_api_key: SecretStr | None = None
