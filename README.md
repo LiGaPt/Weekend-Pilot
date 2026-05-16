@@ -229,6 +229,46 @@ Expected response:
 }
 ```
 
+## Web Demo API
+
+The Web demo API starts the official workflow, pauses before write tools, and continues execution only after explicit confirmation.
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+uvicorn backend.app.main:app --reload
+```
+
+Start a run:
+
+```bash
+curl -X POST http://127.0.0.1:8000/demo/runs \
+  -H "Content-Type: application/json" \
+  -d "{\"user_input\":\"This afternoon I want to go out with my wife and child for a few hours. Not too far. My child is 5, and my wife is trying to eat lighter.\"}"
+```
+
+Read status:
+
+```bash
+curl http://127.0.0.1:8000/demo/runs/<run_id>
+```
+
+Confirm the selected plan:
+
+```bash
+curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/confirm \
+  -H "Content-Type: application/json" \
+  -d "{\"confirmed_by\":\"web-demo-user\"}"
+```
+
+Decline the selected plan:
+
+```bash
+curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/decline \
+  -H "Content-Type: application/json" \
+  -d "{\"declined_by\":\"web-demo-user\",\"reason\":\"User chose not to continue.\"}"
+```
+
 ## Tests
 
 Repository integration tests require PostgreSQL to be running with migrations applied:
