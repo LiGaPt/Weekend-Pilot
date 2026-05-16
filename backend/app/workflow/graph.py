@@ -4,56 +4,47 @@ from typing import TYPE_CHECKING, Any
 
 from langgraph.graph import END, START, StateGraph
 
-from backend.app.workflow.schemas import WeekendPilotWorkflowState
+from backend.app.workflow.state import V1_WORKFLOW_NODE_NAMES, WeekendPilotWorkflowState
 
 if TYPE_CHECKING:
     from backend.app.workflow.nodes import WeekendPilotWorkflowNodes
 
 
-REQUIRED_NODE_NAMES = (
-    "initialize_run",
-    "parse_intent",
-    "load_memory",
-    "build_query_plan",
-    "collect_candidates",
-    "enrich_candidates",
-    "generate_itinerary",
-    "final_review",
-    "persist_and_select_plan",
-    "wait_confirmation",
-    "execute",
-    "write_feedback",
-    "record_observability",
-)
+REQUIRED_NODE_NAMES = V1_WORKFLOW_NODE_NAMES
 
 
 def build_weekend_pilot_graph(nodes: WeekendPilotWorkflowNodes):
     graph = StateGraph(WeekendPilotWorkflowState)
 
-    graph.add_node("initialize_run", nodes.initialize_run)
+    graph.add_node("initialize", nodes.initialize)
     graph.add_node("parse_intent", nodes.parse_intent)
     graph.add_node("load_memory", nodes.load_memory)
-    graph.add_node("build_query_plan", nodes.build_query_plan)
-    graph.add_node("collect_candidates", nodes.collect_candidates)
-    graph.add_node("enrich_candidates", nodes.enrich_candidates)
-    graph.add_node("generate_itinerary", nodes.generate_itinerary)
+    graph.add_node("generate_queries", nodes.generate_queries)
+    graph.add_node("execute_searches", nodes.execute_searches)
+    graph.add_node("populate_candidate_blackboard", nodes.populate_candidate_blackboard)
+    graph.add_node("pre_flight_check_availability", nodes.pre_flight_check_availability)
+    graph.add_node("logical_planner_agent", nodes.logical_planner_agent)
+    graph.add_node("route_and_time_engine", nodes.route_and_time_engine)
+    graph.add_node("semantic_validator", nodes.semantic_validator)
     graph.add_node("final_review", nodes.final_review)
-    graph.add_node("persist_and_select_plan", nodes.persist_and_select_plan)
+    graph.add_node("present_to_user", nodes.present_to_user)
     graph.add_node("wait_confirmation", nodes.wait_confirmation)
-    graph.add_node("execute", nodes.execute)
-    graph.add_node("write_feedback", nodes.write_feedback)
-    graph.add_node("record_observability", nodes.record_observability)
+    graph.add_node("saga_execution_engine", nodes.saga_execution_engine)
+    graph.add_node("generate_summary_message", nodes.generate_summary_message)
 
-    graph.add_edge(START, "initialize_run")
-    graph.add_edge("initialize_run", "parse_intent")
+    graph.add_edge(START, "initialize")
+    graph.add_edge("initialize", "parse_intent")
     graph.add_edge("parse_intent", "load_memory")
-    graph.add_edge("load_memory", "build_query_plan")
-    graph.add_edge("build_query_plan", "collect_candidates")
-    graph.add_edge("collect_candidates", "enrich_candidates")
-    graph.add_edge("enrich_candidates", "generate_itinerary")
-    graph.add_edge("generate_itinerary", "final_review")
-    graph.add_edge("final_review", "persist_and_select_plan")
-    graph.add_edge("persist_and_select_plan", "wait_confirmation")
+    graph.add_edge("load_memory", "generate_queries")
+    graph.add_edge("generate_queries", "execute_searches")
+    graph.add_edge("execute_searches", "populate_candidate_blackboard")
+    graph.add_edge("populate_candidate_blackboard", "pre_flight_check_availability")
+    graph.add_edge("pre_flight_check_availability", "logical_planner_agent")
+    graph.add_edge("logical_planner_agent", "route_and_time_engine")
+    graph.add_edge("route_and_time_engine", "semantic_validator")
+    graph.add_edge("semantic_validator", "final_review")
+    graph.add_edge("final_review", "present_to_user")
+    graph.add_edge("present_to_user", "wait_confirmation")
     graph.add_conditional_edges(
         "wait_confirmation",
         route_after_confirmation,
@@ -61,12 +52,11 @@ def build_weekend_pilot_graph(nodes: WeekendPilotWorkflowNodes):
             "awaiting_confirmation": END,
             "failed": END,
             "error": END,
-            "execute": "execute",
+            "saga_execution_engine": "saga_execution_engine",
         },
     )
-    graph.add_edge("execute", "write_feedback")
-    graph.add_edge("write_feedback", "record_observability")
-    graph.add_edge("record_observability", END)
+    graph.add_edge("saga_execution_engine", "generate_summary_message")
+    graph.add_edge("generate_summary_message", END)
 
     return graph.compile()
 
@@ -79,7 +69,7 @@ def route_after_confirmation(state: WeekendPilotWorkflowState | dict[str, Any]) 
         return "failed"
     if status == "error":
         return "error"
-    return "execute"
+    return "saga_execution_engine"
 
 
 def _state_value(state: WeekendPilotWorkflowState | dict[str, Any], key: str) -> Any:

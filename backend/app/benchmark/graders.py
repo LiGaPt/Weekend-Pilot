@@ -5,24 +5,11 @@ from typing import Any, Sequence
 
 from backend.app.benchmark.schemas import BenchmarkCase, BenchmarkScore
 from backend.app.tool_gateway.registry import WRITE_TOOLS
+from backend.app.workflow.state import V1_WORKFLOW_NODE_NAMES
 
 
 _UNSAFE_FEEDBACK_PATTERN = re.compile(r"\b(action_id|tool_event_id|traceback|stack trace|debug)\b", re.IGNORECASE)
-REQUIRED_WORKFLOW_NODES = (
-    "initialize_run",
-    "parse_intent",
-    "load_memory",
-    "build_query_plan",
-    "collect_candidates",
-    "enrich_candidates",
-    "generate_itinerary",
-    "final_review",
-    "persist_and_select_plan",
-    "wait_confirmation",
-    "execute",
-    "write_feedback",
-    "record_observability",
-)
+REQUIRED_WORKFLOW_NODES = V1_WORKFLOW_NODE_NAMES
 REQUIRED_AGENT_ROLES = (
     "supervisor",
     "discovery",

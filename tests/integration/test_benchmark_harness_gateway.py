@@ -95,8 +95,8 @@ def test_benchmark_harness_runs_full_mock_world_case(
     assert result.action_count >= case.expected.min_action_count
     assert result.feedback_status == "completed"
     assert result.workflow_status == "completed"
-    assert "initialize_run" in result.workflow_node_history
-    assert "record_observability" in result.workflow_node_history
+    assert "initialize" in result.workflow_node_history
+    assert "generate_summary_message" in result.workflow_node_history
     assert set(result.agent_roles) == EXPECTED_AGENT_ROLES
     assert result.report_path is not None
 
@@ -105,8 +105,8 @@ def test_benchmark_harness_runs_full_mock_world_case(
     assert report_payload["case_id"] == case.case_id
     assert report_payload["status"] == "passed"
     assert report_payload["workflow_status"] == "completed"
-    assert "initialize_run" in report_payload["workflow_node_history"]
-    assert "record_observability" in report_payload["workflow_node_history"]
+    assert "initialize" in report_payload["workflow_node_history"]
+    assert "generate_summary_message" in report_payload["workflow_node_history"]
     assert set(report_payload["agent_roles"]) == EXPECTED_AGENT_ROLES
 
     serialized_report = json.dumps(report_payload, sort_keys=True)

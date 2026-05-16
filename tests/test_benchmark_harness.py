@@ -24,23 +24,10 @@ from backend.app.benchmark.schemas import (
     BenchmarkExpectedOutcome,
     BenchmarkScore,
 )
+from backend.app.workflow.state import V1_WORKFLOW_NODE_NAMES
 
 
-REQUIRED_WORKFLOW_NODES = (
-    "initialize_run",
-    "parse_intent",
-    "load_memory",
-    "build_query_plan",
-    "collect_candidates",
-    "enrich_candidates",
-    "generate_itinerary",
-    "final_review",
-    "persist_and_select_plan",
-    "wait_confirmation",
-    "execute",
-    "write_feedback",
-    "record_observability",
-)
+REQUIRED_WORKFLOW_NODES = V1_WORKFLOW_NODE_NAMES
 REQUIRED_AGENT_ROLES = (
     "supervisor",
     "discovery",
@@ -134,13 +121,13 @@ def test_workflow_path_grader_passes_for_completed_required_nodes() -> None:
 def test_workflow_path_grader_fails_when_required_node_missing() -> None:
     grader = getattr(benchmark_graders, "grade_workflow_path", None)
     assert callable(grader)
-    workflow_result = SimpleNamespace(status="completed", node_history=["initialize_run"])
+    workflow_result = SimpleNamespace(status="completed", node_history=["initialize"])
 
     score = grader(workflow_result)
 
     assert score.name == "workflow_path"
     assert score.passed is False
-    assert "record_observability" in score.reason
+    assert "generate_summary_message" in score.reason
 
 
 def test_agent_coverage_grader_passes_for_all_required_roles() -> None:
