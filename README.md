@@ -269,6 +269,27 @@ curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/decline \
   -d "{\"declined_by\":\"web-demo-user\",\"reason\":\"User chose not to continue.\"}"
 ```
 
+## Minimal Web UI Demo
+
+Run the backend first:
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+uvicorn backend.app.main:app --reload
+```
+
+Run the frontend:
+
+```bash
+npm --prefix frontend install
+npm --prefix frontend run dev
+```
+
+Open `http://127.0.0.1:5173`.
+
+The frontend defaults to `http://127.0.0.1:8000` for the API. To override it locally, set `VITE_API_BASE_URL` in `frontend/.env`.
+
 ## Tests
 
 Repository integration tests require PostgreSQL to be running with migrations applied:
