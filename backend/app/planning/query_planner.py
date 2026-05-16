@@ -74,7 +74,7 @@ class DeterministicQueryPlanner:
             PlannedToolCall(
                 tool_name="check_weather",
                 provider=provider_profile,
-                payload={"location": intent.origin_text or "Xuhui"},
+                payload={"location": intent.origin_text or "徐汇"},
             ),
         ]
 

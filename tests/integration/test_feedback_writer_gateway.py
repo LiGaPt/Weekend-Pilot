@@ -151,8 +151,8 @@ def test_feedback_writer_persists_user_safe_feedback_after_mock_world_execution(
 
     assert feedback.status == "completed"
     assert feedback.run_status == "completed"
-    assert f"{len(execution.action_results)} actions completed" in feedback.message
-    assert "0 actions need attention" in feedback.message
+    assert f"{len(execution.action_results)}项操作已完成" in feedback.message
+    assert "0项需要处理" in feedback.message
     assert AgentRunRepository(db_session).get_by_id(run.run_id).status == "completed"
     assert _count_rows(db_session, ActionLedger, run.run_id) == action_ledger_count_before_feedback
     assert _count_rows(db_session, ToolEvent, run.run_id) == tool_event_count_before_feedback

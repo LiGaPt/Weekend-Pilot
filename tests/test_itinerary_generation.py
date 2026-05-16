@@ -77,7 +77,7 @@ def _tool_result(
 def _activity(
     candidate_id: str = "activity_museum_001",
     *,
-    name: str = "Xuhui Family Science Museum",
+    name: str = "徐汇亲子科学馆",
     ticket_available: bool | None = True,
     tool_event_ids: list[UUID] | None = None,
 ) -> EnrichedCandidate:
@@ -115,7 +115,7 @@ def _activity(
 def _dining(
     candidate_id: str = "restaurant_light_001",
     *,
-    name: str = "Green Bowl Family Bistro",
+    name: str = "绿碗家庭轻食",
     table_available: bool | None = True,
     queue_status: str | None = "open",
     queue_wait_minutes: int | None = 10,
@@ -175,7 +175,7 @@ def _route(
         provider="mock_world",
         mode="walking",
         status=status,
-        route_json={"summary": "Short stroller-friendly walk through quiet streets."},
+        route_json={"summary": "穿过安静街区的短途步行路线，适合推童车。"},
         distance_meters=distance_meters,
         duration_minutes=duration_minutes,
         tool_event_id=tool_event_id or uuid4(),
@@ -254,15 +254,25 @@ def test_generator_creates_draft_with_refs_timeline_feasibility_and_actions() ->
     assert draft.route is not None
     assert draft.route.tool_event_id == route_event_id
     assert draft.route.duration_minutes == 12
+    assert draft.title == "徐汇亲子科学馆 + 绿碗家庭轻食"
+    assert "清淡晚餐" in draft.summary
     assert [item.item_type for item in draft.timeline] == ["activity", "transfer", "dining", "buffer"]
+    assert [item.title for item in draft.timeline] == [
+        "体验徐汇亲子科学馆",
+        "前往绿碗家庭轻食",
+        "在绿碗家庭轻食用餐",
+        "缓冲和返程准备",
+    ]
     assert sum(item.duration_minutes for item in draft.timeline) == draft.feasibility.total_duration_minutes
     assert 240 <= draft.feasibility.total_duration_minutes <= 360
     assert draft.feasibility.is_feasible is True
-    assert draft.feasibility.reasons == ["activity_selected", "dining_selected", "route_verified"]
+    assert draft.feasibility.reasons == ["已选择亲子活动", "已选择清淡用餐", "活动到餐厅路线已验证"]
     assert [action.action_type for action in draft.proposed_actions] == [
         "book_ticket",
         "reserve_restaurant",
     ]
+    assert draft.proposed_actions[0].reason == "票务可用，确认后可提前锁定入场名额。"
+    assert draft.proposed_actions[1].reason == "餐厅有可订桌位，确认后可提前锁定晚餐座位。"
     assert all(action.requires_confirmation for action in draft.proposed_actions)
     assert "idempotency_key" not in draft.proposed_actions[0].payload
     assert draft.evidence["planner_version"] == "test-planner"
@@ -280,7 +290,7 @@ def test_timeline_uses_requested_start_label_and_warns_when_window_is_exceeded()
 
     draft = result.drafts[0]
     assert draft.timeline[0].start_label == "15:00"
-    assert "timeline_exceeds_requested_window" in draft.feasibility.warnings
+    assert "行程可能超过用户给定时间窗" in draft.feasibility.warnings
 
 
 def test_ticket_table_and_queue_actions_follow_availability_rules() -> None:
@@ -384,7 +394,7 @@ def test_long_queue_wait_is_usable_but_warned_and_deprioritized() -> None:
         "restaurant_short_queue",
         "restaurant_long_queue",
     ]
-    assert "long_queue_wait" in result.drafts[1].feasibility.warnings
+    assert "餐厅排队等待较长" in result.drafts[1].feasibility.warnings
 
 
 def test_generator_preserves_route_and_enrichment_tool_event_ids() -> None:

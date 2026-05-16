@@ -1,21 +1,21 @@
 {
   "profile": "family_afternoon",
   "location": {
-    "city": "Shanghai",
-    "area": "Xuhui"
+    "city": "上海",
+    "area": "徐汇"
   },
   "pois": [
     {
       "poi_id": "activity_museum_001",
-      "name": "Xuhui Family Science Museum",
+      "name": "徐汇亲子科学馆",
       "category": "activity",
-      "address": "100 Family Science Road, Xuhui, Shanghai",
+      "address": "上海市徐汇区亲子科普路100号",
       "location": {
         "lat": 31.1901,
         "lng": 121.4362
       },
       "tags": ["child_friendly", "indoor", "museum", "educational"],
-      "description": "Hands-on exhibits suitable for a five-year-old child.",
+      "description": "适合5岁孩子动手体验的亲子科普展馆。",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -30,15 +30,15 @@
     },
     {
       "poi_id": "activity_playground_001",
-      "name": "Riverside Parent Child Playground",
+      "name": "滨江亲子乐园",
       "category": "activity",
-      "address": "28 Riverside Path, Xuhui, Shanghai",
+      "address": "上海市徐汇区滨江步道28号",
       "location": {
         "lat": 31.1848,
         "lng": 121.4461
       },
       "tags": ["child_friendly", "outdoor", "playground"],
-      "description": "Outdoor playground with shaded seating for parents.",
+      "description": "带遮阴休息区的户外亲子游乐场，家长陪同更轻松。",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -53,15 +53,15 @@
     },
     {
       "poi_id": "activity_walk_001",
-      "name": "Wukang Family City Walk",
+      "name": "武康路亲子Citywalk",
       "category": "activity",
-      "address": "Wukang Road, Xuhui, Shanghai",
+      "address": "上海市徐汇区武康路",
       "location": {
         "lat": 31.2045,
         "lng": 121.4387
       },
       "tags": ["child_friendly", "outdoor", "citywalk", "light_activity"],
-      "description": "Short tree-lined walking route with cafes and rest spots.",
+      "description": "树荫充足的短距离漫步路线，沿途有咖啡店和休息点。",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -76,15 +76,15 @@
     },
     {
       "poi_id": "restaurant_light_001",
-      "name": "Green Bowl Family Bistro",
+      "name": "绿碗家庭轻食",
       "category": "dining",
-      "address": "66 Healthy Lane, Xuhui, Shanghai",
+      "address": "上海市徐汇区健康弄66号",
       "location": {
         "lat": 31.1926,
         "lng": 121.4419
       },
       "tags": ["lighter_options", "child_friendly", "quiet", "vegetable_forward"],
-      "description": "Light meals, steamed dishes, and kid-friendly rice bowls.",
+      "description": "提供清淡套餐、蒸菜和儿童友好的米饭套餐。",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -99,15 +99,15 @@
     },
     {
       "poi_id": "restaurant_family_001",
-      "name": "Sunny Family Kitchen",
+      "name": "晴天家庭厨房",
       "category": "dining",
-      "address": "18 Weekend Street, Xuhui, Shanghai",
+      "address": "上海市徐汇区周末路18号",
       "location": {
         "lat": 31.1873,
         "lng": 121.4434
       },
       "tags": ["child_friendly", "family_tables", "balanced_menu"],
-      "description": "Reliable family restaurant with high chairs and mild dishes.",
+      "description": "稳定的家庭餐厅，有儿童椅和口味温和的家常菜。",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -122,15 +122,15 @@
     },
     {
       "poi_id": "restaurant_noodle_001",
-      "name": "Simple Noodle House",
+      "name": "简单面馆",
       "category": "dining",
-      "address": "8 Noodle Alley, Xuhui, Shanghai",
+      "address": "上海市徐汇区面香弄8号",
       "location": {
         "lat": 31.1985,
         "lng": 121.4344
       },
       "tags": ["quick_meal", "child_friendly", "simple"],
-      "description": "Simple noodle and wonton options for a fast dinner.",
+      "description": "面条和小馄饨选择简单，适合快速解决晚餐。",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -145,15 +145,15 @@
     },
     {
       "poi_id": "addon_drinks_001",
-      "name": "Little Hydration Stand",
+      "name": "小水分补给站",
       "category": "addon",
-      "address": "Near Riverside Path Gate 2, Xuhui, Shanghai",
+      "address": "上海市徐汇区滨江步道2号门附近",
       "location": {
         "lat": 31.185,
         "lng": 121.4457
       },
       "tags": ["drinks", "snacks", "family"],
-      "description": "Small drink and snack stand near the playground.",
+      "description": "靠近乐园的小型饮品和零食摊，适合活动后补水。",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -174,7 +174,7 @@
       "mode": "walking",
       "distance_meters": 850,
       "duration_minutes": 12,
-      "summary": "Short stroller-friendly walk through quiet streets."
+      "summary": "穿过安静街区的短途步行路线，适合推童车。"
     },
     {
       "origin_id": "activity_museum_001",
@@ -182,7 +182,7 @@
       "mode": "walking",
       "distance_meters": 1200,
       "duration_minutes": 17,
-      "summary": "Flat walk with two signal crossings."
+      "summary": "路面平缓，中途有两处红绿灯路口。"
     },
     {
       "origin_id": "activity_museum_001",
@@ -190,7 +190,7 @@
       "mode": "walking",
       "distance_meters": 980,
       "duration_minutes": 14,
-      "summary": "Direct walk along neighborhood streets."
+      "summary": "沿社区道路直达，路线简单。"
     },
     {
       "origin_id": "activity_playground_001",
@@ -198,7 +198,7 @@
       "mode": "walking",
       "distance_meters": 700,
       "duration_minutes": 10,
-      "summary": "Easy walk from playground gate to restaurant."
+      "summary": "从乐园门口步行到餐厅，距离短、强度低。"
     },
     {
       "origin_id": "activity_walk_001",
@@ -206,7 +206,7 @@
       "mode": "walking",
       "distance_meters": 1100,
       "duration_minutes": 16,
-      "summary": "Tree-lined walk ending near the bistro."
+      "summary": "沿树荫道路步行，终点靠近轻食餐厅。"
     },
     {
       "origin_id": "restaurant_light_001",
@@ -214,7 +214,7 @@
       "mode": "walking",
       "distance_meters": 900,
       "duration_minutes": 13,
-      "summary": "Optional post-meal drink stop near the park."
+      "summary": "餐后可顺路去公园附近买饮品。"
     },
     {
       "origin_id": "activity_museum_001",
@@ -222,16 +222,16 @@
       "mode": "driving",
       "distance_meters": 1300,
       "duration_minutes": 8,
-      "summary": "Short local drive with predictable traffic."
+      "summary": "短途市内驾车，路况相对可控。"
     }
   ],
   "weather": {
-    "location": "Xuhui",
+    "location": "徐汇",
     "date": "2026-05-16",
-    "condition": "cloudy",
+    "condition": "多云",
     "temperature_c": 23,
     "precipitation_chance": 0.15,
-    "advisory": "Comfortable for family outdoor walking."
+    "advisory": "天气适合亲子户外步行，建议随身带水。"
   },
   "queues": {
     "queue_restaurant_light_001": {
@@ -262,21 +262,21 @@
       "available": true,
       "time_slots": ["17:30", "18:00", "18:30"],
       "max_party_size": 4,
-      "notes": "Quiet corner tables available."
+      "notes": "有安静角落桌位可订。"
     },
     "restaurant_family_001": {
       "restaurant_id": "restaurant_family_001",
       "available": true,
       "time_slots": ["17:45", "18:15", "18:45"],
       "max_party_size": 6,
-      "notes": "High chairs available."
+      "notes": "可提供儿童椅。"
     },
     "restaurant_noodle_001": {
       "restaurant_id": "restaurant_noodle_001",
       "available": true,
       "time_slots": ["17:00", "17:30", "18:00", "18:30"],
       "max_party_size": 4,
-      "notes": "Walk-in friendly."
+      "notes": "适合直接到店，翻台较快。"
     }
   },
   "ticket_availability": {
@@ -301,12 +301,12 @@
       "menu": [
         {
           "sku": "water",
-          "name": "Bottled Water",
+          "name": "瓶装水",
           "price_cents": 600
         },
         {
           "sku": "fruit_cup",
-          "name": "Fruit Cup",
+          "name": "水果杯",
           "price_cents": 1800
         }
       ]

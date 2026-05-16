@@ -80,10 +80,25 @@ describe("demo API client", () => {
         body: JSON.stringify({
           plan_id: "plan-1",
           declined_by: "web-demo-user",
-          reason: "User chose not to continue.",
+          reason: "用户选择暂不继续。",
         }),
       }),
     );
+  });
+
+  it("throws DemoApiError with localized message for connection failures", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("connect ECONNREFUSED 127.0.0.1:8000");
+      }),
+    );
+
+    await expect(getRun("run-1")).rejects.toMatchObject({
+      name: "DemoApiError",
+      status: 0,
+      message: "无法连接演示服务，请确认后端正在运行。",
+    } satisfies Partial<DemoApiError>);
   });
 
   it("throws DemoApiError with backend detail for non-2xx responses", async () => {
@@ -95,7 +110,7 @@ describe("demo API client", () => {
     await expect(getRun("missing")).rejects.toMatchObject({
       name: "DemoApiError",
       status: 404,
-      message: "Run not found.",
+      message: "未找到对应的演示运行。",
     } satisfies Partial<DemoApiError>);
   });
 });

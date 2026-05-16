@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Web demo is the primary MVP review path for WeekendPilot. It runs the React/Vite frontend against the FastAPI demo API, uses the Mock World provider only, pauses before write tools, and continues execution only after explicit confirmation.
+The Web demo is the primary MVP review path for WeekendPilot. It runs the React/Vite frontend against the FastAPI demo API, uses the Mock World provider only, pauses before write tools, and continues execution only after explicit confirmation. The visible demo copy and Mock World family-afternoon content are localized in Chinese for competition review.
 
 No external local-life provider, map provider, LangSmith upload, API key, token, or secret is required.
 
@@ -73,12 +73,12 @@ Do not commit local `.env` files.
 ### Happy Path
 
 1. Open `http://127.0.0.1:5173`.
-2. Keep the default family afternoon request or enter an equivalent request.
-3. Click `Start planning`.
+2. Keep the default Chinese family afternoon request or enter an equivalent request.
+3. Click `开始规划`.
 4. Confirm the run reaches `awaiting_confirmation`.
 5. Confirm the action count is `0`.
 6. Review the selected plan, timeline, route, feasibility, and proposed actions.
-7. Click `Confirm selected plan`.
+7. Click `确认所选方案`.
 8. Confirm the run reaches `completed`.
 9. Confirm execution and feedback are visible.
 10. Confirm the action count is greater than `0`.
@@ -87,16 +87,16 @@ Do not commit local `.env` files.
 
 1. Start a fresh run.
 2. Wait for `awaiting_confirmation`.
-3. Click `Decline`.
+3. Click `暂不继续`.
 4. Confirm the run reaches `declined`.
-5. Confirm `Confirm selected plan` is no longer available.
+5. Confirm `确认所选方案` is no longer available.
 6. Confirm the action count remains `0`.
 
 ### Refresh Path
 
 1. Start a run.
 2. Copy or inspect the visible run ID.
-3. Click `Refresh status`.
+3. Click `刷新状态`.
 4. Confirm the same run ID remains visible.
 5. Confirm the run still shows the expected status.
 

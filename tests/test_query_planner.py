@@ -39,7 +39,8 @@ def test_mock_world_query_plan_includes_initial_read_calls() -> None:
     assert activity_calls[0].payload["tags"] == ["child_friendly"]
     assert "lighter_options" in dining_calls[0].payload["tags"]
     assert "child_friendly" in dining_calls[0].payload["tags"]
-    assert any(call.tool_name == "check_weather" for call in plan.initial_tool_calls)
+    weather_call = next(call for call in plan.initial_tool_calls if call.tool_name == "check_weather")
+    assert weather_call.payload["location"] == "徐汇"
     assert all(call.tool_name not in WRITE_TOOLS for call in plan.initial_tool_calls)
 
 

@@ -84,7 +84,7 @@ def test_executor_invokes_gateway_once_per_initial_call() -> None:
             PlannedToolCall(
                 tool_name="check_weather",
                 provider="mock_world",
-                payload={"location": "Xuhui"},
+                payload={"location": "徐汇"},
             ),
         ]
     )
@@ -206,17 +206,17 @@ def test_weather_response_is_captured_separately() -> None:
             _gateway_result(
                 "check_weather",
                 "mock_world",
-                response_json={"weather": {"location": "Xuhui", "condition": "cloudy"}},
+                response_json={"weather": {"location": "徐汇", "condition": "cloudy"}},
             )
         ]
     )
     plan = _plan(
-        [PlannedToolCall(tool_name="check_weather", provider="mock_world", payload={"location": "Xuhui"})]
+        [PlannedToolCall(tool_name="check_weather", provider="mock_world", payload={"location": "徐汇"})]
     )
 
     result = QueryPlanExecutor(gateway).execute_initial_calls(plan, uuid4())
 
-    assert result.weather == {"location": "Xuhui", "condition": "cloudy"}
+    assert result.weather == {"location": "徐汇", "condition": "cloudy"}
     assert result.activity_candidates == []
     assert result.dining_candidates == []
 
@@ -232,7 +232,7 @@ def test_failed_gateway_result_is_collected_when_fail_fast_is_false() -> None:
     plan = _plan(
         [
             PlannedToolCall(tool_name="search_poi", provider="mock_world", payload={"category": "activity"}),
-            PlannedToolCall(tool_name="check_weather", provider="mock_world", payload={"location": "Xuhui"}),
+            PlannedToolCall(tool_name="check_weather", provider="mock_world", payload={"location": "徐汇"}),
         ]
     )
 

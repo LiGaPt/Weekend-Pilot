@@ -86,15 +86,15 @@ def _reviewed_plan_json(
         "draft": {
             "draft_id": "draft_1",
             "status": "draft",
-            "title": "Family afternoon",
-            "summary": "A reviewed family afternoon plan.",
+            "title": "徐汇亲子轻松下午",
+            "summary": "一条已审核的亲子半日方案。",
             "activity": {
                 "candidate_id": "activity_museum_001",
-                "name": "City Science Museum",
+                "name": "徐汇亲子科学馆",
             },
             "dining": {
                 "candidate_id": "restaurant_light_001",
-                "name": "Green Bowl Cafe",
+                "name": "绿碗家庭轻食",
             },
             "proposed_actions": [],
         },
@@ -170,12 +170,13 @@ def test_successful_execution_creates_completed_feedback_and_run_status(db_sessi
 
     assert result.status == "completed"
     assert result.run_status == "completed"
-    assert result.headline == "Plan completed."
-    assert "1 actions completed" in result.message
-    assert "0 actions need attention" in result.message
+    assert result.headline == "安排已完成"
+    assert "1项操作已完成" in result.message
+    assert "0项需要处理" in result.message
     assert len(result.completed_actions) == 1
-    assert result.completed_actions[0].target_label == "City Science Museum"
+    assert result.completed_actions[0].target_label == "徐汇亲子科学馆"
     assert result.completed_actions[0].status == "completed"
+    assert result.completed_actions[0].message == "已为徐汇亲子科学馆完成订票。"
     assert result.failed_actions == []
     assert AgentRunRepository(db_session).get_by_id(run.run_id).status == "completed"
 
@@ -186,7 +187,7 @@ def test_successful_execution_creates_completed_feedback_and_run_status(db_sessi
     assert feedback["writer_version"] == "deterministic_feedback_writer_v1"
     assert feedback["status"] == "completed"
     assert feedback["run_status"] == "completed"
-    assert feedback["completed_actions"][0]["target_label"] == "City Science Museum"
+    assert feedback["completed_actions"][0]["target_label"] == "徐汇亲子科学馆"
 
 
 def test_partial_execution_groups_completed_replayed_and_failed_actions(db_session: Session) -> None:
@@ -225,11 +226,11 @@ def test_partial_execution_groups_completed_replayed_and_failed_actions(db_sessi
 
     assert result.status == "partially_completed"
     assert result.run_status == "partially_completed"
-    assert result.headline == "Plan partially completed."
-    assert "2 actions completed" in result.message
-    assert "1 actions need attention" in result.message
+    assert result.headline == "部分安排已完成"
+    assert "2项操作已完成" in result.message
+    assert "1项需要处理" in result.message
     assert [item.status for item in result.completed_actions] == ["completed", "already_completed"]
-    assert [item.target_label for item in result.completed_actions] == ["City Science Museum", "Green Bowl Cafe"]
+    assert [item.target_label for item in result.completed_actions] == ["徐汇亲子科学馆", "绿碗家庭轻食"]
     assert len(result.failed_actions) == 1
     assert result.failed_actions[0].status == "failed"
     assert result.failed_actions[0].target_label == "queue_123"
@@ -263,8 +264,8 @@ def test_failed_execution_creates_failed_feedback(db_session: Session) -> None:
     assert result.run_status == "failed"
     assert result.completed_actions == []
     assert [item.status for item in result.failed_actions] == ["blocked", "rate_limited"]
-    assert "0 actions completed" in result.message
-    assert "2 actions need attention" in result.message
+    assert "0项操作已完成" in result.message
+    assert "2项需要处理" in result.message
     assert AgentRunRepository(db_session).get_by_id(run.run_id).status == "failed"
 
 
@@ -284,7 +285,7 @@ def test_skipped_execution_creates_skipped_feedback_without_action_summaries(db_
     assert result.completed_actions == []
     assert result.failed_actions == []
     assert result.next_steps
-    assert "0 actions completed" in result.message
+    assert "0项操作已完成" in result.message
     assert AgentRunRepository(db_session).get_by_id(run.run_id).status == "skipped"
 
 
