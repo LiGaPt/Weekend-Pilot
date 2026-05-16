@@ -15,6 +15,13 @@ from backend.app.runtime import FixedWindowRateLimiter, JsonRedisCache, RedisKey
 
 
 TEST_PREFIX = "weekendpilot:test:benchmark-harness"
+EXPECTED_AGENT_ROLES = {
+    "supervisor",
+    "discovery",
+    "dining",
+    "itinerary_planner",
+    "validator_recovery",
+}
 
 
 @pytest.fixture()
@@ -87,12 +94,20 @@ def test_benchmark_harness_runs_full_mock_world_case(
     assert result.tool_event_count >= case.expected.min_tool_event_count
     assert result.action_count >= case.expected.min_action_count
     assert result.feedback_status == "completed"
+    assert result.workflow_status == "completed"
+    assert "initialize_run" in result.workflow_node_history
+    assert "record_observability" in result.workflow_node_history
+    assert set(result.agent_roles) == EXPECTED_AGENT_ROLES
     assert result.report_path is not None
 
     report_path = Path(result.report_path)
     report_payload = json.loads(report_path.read_text(encoding="utf-8"))
     assert report_payload["case_id"] == case.case_id
     assert report_payload["status"] == "passed"
+    assert report_payload["workflow_status"] == "completed"
+    assert "initialize_run" in report_payload["workflow_node_history"]
+    assert "record_observability" in report_payload["workflow_node_history"]
+    assert set(report_payload["agent_roles"]) == EXPECTED_AGENT_ROLES
 
     serialized_report = json.dumps(report_payload, sort_keys=True)
     for forbidden in ("action_id", "tool_event_id", "api_key", "token", "secret", "debug_trace"):
@@ -108,4 +123,9 @@ def test_benchmark_harness_runs_full_mock_world_case(
     assert run.case_id == case.case_id
     assert run.metadata_json["benchmark"]["case_id"] == case.case_id
     assert run.metadata_json["benchmark"]["benchmark_harness_version"] == "locallife_bench_harness_v0"
+    assert run.metadata_json["benchmark"]["workflow_backed"] is True
+    assert run.metadata_json["workflow"]["source"] == "langgraph-workflow"
+    assert "agents" in run.metadata_json
+    assert {entry["role"] for entry in run.metadata_json["agents"]["results"]} == EXPECTED_AGENT_ROLES
+    assert "observability" in run.metadata_json
     assert run.metadata_json["observability"]["trace_id"] == result.trace_id

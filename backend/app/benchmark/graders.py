@@ -8,6 +8,28 @@ from backend.app.tool_gateway.registry import WRITE_TOOLS
 
 
 _UNSAFE_FEEDBACK_PATTERN = re.compile(r"\b(action_id|tool_event_id|traceback|stack trace|debug)\b", re.IGNORECASE)
+REQUIRED_WORKFLOW_NODES = (
+    "initialize_run",
+    "parse_intent",
+    "load_memory",
+    "build_query_plan",
+    "collect_candidates",
+    "enrich_candidates",
+    "generate_itinerary",
+    "final_review",
+    "persist_and_select_plan",
+    "wait_confirmation",
+    "execute",
+    "write_feedback",
+    "record_observability",
+)
+REQUIRED_AGENT_ROLES = (
+    "supervisor",
+    "discovery",
+    "dining",
+    "itinerary_planner",
+    "validator_recovery",
+)
 
 
 def grade_trajectory(case: BenchmarkCase, tool_events: Sequence[Any]) -> BenchmarkScore:
@@ -54,14 +76,65 @@ def grade_plan_quality(selected_plan: Any) -> BenchmarkScore:
     )
 
 
+def grade_workflow_path(workflow_result: Any) -> BenchmarkScore:
+    status = _value(workflow_result, "status")
+    node_history = [str(node) for node in (_value(workflow_result, "node_history", []) or [])]
+    missing = sorted(set(REQUIRED_WORKFLOW_NODES) - set(node_history))
+    passed = status == "completed" and not missing
+    reason = "Workflow completed through the required product path."
+    if status != "completed":
+        reason = f"Workflow status {status!r} did not match expected 'completed'."
+    elif missing:
+        reason = f"Missing required workflow nodes: {', '.join(missing)}"
+    return BenchmarkScore(
+        name="workflow_path",
+        score=1.0 if passed else 0.0,
+        passed=passed,
+        reason=reason,
+        details={
+            "workflow_status": status,
+            "required_node_names": list(REQUIRED_WORKFLOW_NODES),
+            "node_history": node_history,
+            "missing_node_names": missing,
+        },
+    )
+
+
+def grade_agent_coverage(workflow_result: Any) -> BenchmarkScore:
+    agent_results = _value(workflow_result, "agent_results", []) or []
+    observed_roles = [
+        str(role)
+        for role in (_value(agent, "role") for agent in agent_results)
+        if role
+    ]
+    missing = sorted(set(REQUIRED_AGENT_ROLES) - set(observed_roles))
+    passed = not missing
+    return BenchmarkScore(
+        name="agent_coverage",
+        score=1.0 if passed else 0.0,
+        passed=passed,
+        reason=(
+            "All required bounded agent roles were present."
+            if passed
+            else f"Missing required agent roles: {', '.join(missing)}"
+        ),
+        details={
+            "required_agent_roles": list(REQUIRED_AGENT_ROLES),
+            "observed_agent_roles": observed_roles,
+            "missing_agent_roles": missing,
+        },
+    )
+
+
 def grade_execution_safety(case: BenchmarkCase, execution_result: Any) -> BenchmarkScore:
-    status = getattr(execution_result, "status", None)
-    action_results = list(getattr(execution_result, "action_results", []) or [])
+    status = _value(execution_result, "status")
+    action_results = list(_value(execution_result, "action_results", []) or [])
+    write_tools = [_value(action, "tool_name") for action in action_results]
     unsafe_tools = sorted(
         {
-            str(getattr(action, "tool_name", ""))
-            for action in action_results
-            if getattr(action, "tool_name", None) not in WRITE_TOOLS
+            str(tool_name or "")
+            for tool_name in write_tools
+            if tool_name not in WRITE_TOOLS
         }
     )
     enough_actions = len(action_results) >= case.expected.min_action_count
@@ -84,19 +157,22 @@ def grade_execution_safety(case: BenchmarkCase, execution_result: Any) -> Benchm
         details={
             "execution_status": status,
             "action_count": len(action_results),
-            "write_tools": [getattr(action, "tool_name", None) for action in action_results],
+            "write_tools": write_tools,
         },
     )
 
 
 def grade_feedback(case: BenchmarkCase, feedback_result: Any) -> BenchmarkScore:
-    status = getattr(feedback_result, "status", None)
+    status = _value(feedback_result, "status")
+    next_steps = _value(feedback_result, "next_steps", []) or []
+    if not isinstance(next_steps, list):
+        next_steps = [next_steps]
     text = " ".join(
         str(value or "")
         for value in (
-            getattr(feedback_result, "headline", None),
-            getattr(feedback_result, "message", None),
-            " ".join(getattr(feedback_result, "next_steps", []) or []),
+            _value(feedback_result, "headline"),
+            _value(feedback_result, "message"),
+            " ".join(str(step or "") for step in next_steps),
         )
     )
     user_safe = _UNSAFE_FEEDBACK_PATTERN.search(text) is None
@@ -113,6 +189,12 @@ def grade_feedback(case: BenchmarkCase, feedback_result: Any) -> BenchmarkScore:
         reason=reason,
         details={"feedback_status": status, "user_safe": user_safe},
     )
+
+
+def _value(source: Any, key: str, default: Any = None) -> Any:
+    if isinstance(source, dict):
+        return source.get(key, default)
+    return getattr(source, key, default)
 
 
 def combine_scores(scores: Sequence[BenchmarkScore]) -> tuple[str, float, list[str]]:

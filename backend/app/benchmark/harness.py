@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 from statistics import mean
-from typing import Sequence
+from typing import Any, Sequence
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -11,27 +12,16 @@ from sqlalchemy.orm import Session
 from backend.app.benchmark.errors import BenchmarkHarnessError
 from backend.app.benchmark.graders import (
     combine_scores,
+    grade_agent_coverage,
     grade_execution_safety,
     grade_feedback,
     grade_plan_quality,
     grade_trajectory,
+    grade_workflow_path,
 )
 from backend.app.benchmark.reporting import write_case_report
 from backend.app.benchmark.schemas import BenchmarkCase, BenchmarkCaseResult, BenchmarkRunReport
-from backend.app.confirmation import HumanConfirmationService
-from backend.app.execution import DeterministicExecutionWorkflow
-from backend.app.feedback import DeterministicFeedbackWriter
 from backend.app.models.runtime import ActionLedger
-from backend.app.observability import LocalTraceBuffer, ObservabilityRecorder
-from backend.app.planning import (
-    CandidateEnricher,
-    DeterministicIntentParser,
-    DeterministicItineraryGenerator,
-    DeterministicQueryPlanner,
-    QueryPlanExecutor,
-)
-from backend.app.plans import ReviewedPlanPersistenceService
-from backend.app.providers.mock_world import build_mock_world_registry
 from backend.app.repositories import (
     ActionLedgerRepository,
     AgentRunRepository,
@@ -40,9 +30,13 @@ from backend.app.repositories import (
     ToolEventRepository,
     UserRepository,
 )
-from backend.app.review import FinalReviewGate
 from backend.app.runtime import FixedWindowRateLimiter, JsonRedisCache
-from backend.app.tool_gateway import ToolGateway
+from backend.app.workflow import (
+    WeekendPilotWorkflowDependencies,
+    WeekendPilotWorkflowRequest,
+    WeekendPilotWorkflowResult,
+    WeekendPilotWorkflowRunner,
+)
 
 
 class BenchmarkHarness:
@@ -115,29 +109,13 @@ class BenchmarkHarness:
             return result.model_copy(update={"report_path": str(report_path)})
 
         repositories = _Repositories(self.session)
-        user = repositories.users.create(
-            external_id=f"benchmark-{case.case_id}-{uuid4()}",
-            display_name=f"Benchmark {case.case_id}",
-        )
-        run = repositories.runs.create(
-            user_id=user.user_id,
-            case_id=case.case_id,
-            agent_version=case.agent_version,
-            prompt_version=case.prompt_version,
-            tool_profile=case.tool_profile,
-            world_profile=case.world_profile,
-            failure_profile=case.failure_profile,
-            status="running",
-            metadata_json={
-                "benchmark": {
-                    "case_id": case.case_id,
-                    "title": case.title,
-                    "benchmark_harness_version": self.harness_version,
-                    "harness_version": self.harness_version,
-                    "metadata": case.metadata,
-                }
-            },
-        )
+        external_user_id = f"benchmark-{case.case_id}-{uuid4()}"
+        user = repositories.users.get_by_external_id(external_user_id)
+        if user is None:
+            user = repositories.users.create(
+                external_id=external_user_id,
+                display_name=f"Benchmark {case.case_id}",
+            )
         for item in case.memory_items:
             repositories.memory.create(
                 user_id=user.user_id,
@@ -146,73 +124,76 @@ class BenchmarkHarness:
                 value_json=item.value_json,
                 text=item.text,
                 confidence=item.confidence,
-                source_run_id=run.run_id,
+                source_run_id=None,
                 source_langsmith_trace_id=None,
                 expires_at=None,
                 status=item.status,
             )
 
-        gateway = ToolGateway(
-            registry=build_mock_world_registry(case.world_profile),
-            tool_events=repositories.tool_events,
-            action_ledger=repositories.action_ledger,
-            cache=self.cache,
-            rate_limiter=self.rate_limiter,
+        workflow_result = WeekendPilotWorkflowRunner(
+            WeekendPilotWorkflowDependencies(
+                session=self.session,
+                cache=self.cache,
+                rate_limiter=self.rate_limiter,
+                trace_buffer_path=self._trace_path(case.case_id),
+            )
+        ).run(
+            WeekendPilotWorkflowRequest(
+                user_input=case.user_input,
+                external_user_id=external_user_id,
+                display_name=f"Benchmark {case.case_id}",
+                case_id=case.case_id,
+                agent_version=case.agent_version,
+                prompt_version=case.prompt_version,
+                tool_profile=case.tool_profile,
+                world_profile=case.world_profile,
+                failure_profile=case.failure_profile,
+                auto_confirm=True,
+                selected_plan_index=0,
+            )
         )
-        recorder = ObservabilityRecorder(
-            runs=repositories.runs,
-            tool_events=repositories.tool_events,
-            action_ledger=repositories.action_ledger,
-            plans=repositories.plans,
-            local_buffer=LocalTraceBuffer(self._trace_path(case.case_id)),
-        )
-        trace_context = recorder.build_context(run.run_id)
 
-        intent = DeterministicIntentParser().parse(case.user_input)
-        query_plan = DeterministicQueryPlanner().build(intent, provider_profile=case.tool_profile)
-        collection = QueryPlanExecutor(gateway).execute_initial_calls(
-            query_plan,
-            run.run_id,
-            langsmith_trace_id=trace_context.trace_id,
-        )
-        enrichment = CandidateEnricher(gateway).enrich(
-            query_plan,
-            collection,
-            langsmith_trace_id=trace_context.trace_id,
-        )
-        drafts = DeterministicItineraryGenerator().generate(query_plan, enrichment)
-        review = FinalReviewGate().review(
-            query_plan,
-            enrichment,
-            drafts,
-            pre_confirmation_action_count=self._action_count(run.run_id),
-        )
-        persistence = ReviewedPlanPersistenceService(repositories.plans)
-        persisted = persistence.persist_reviewed_drafts(review, drafts)
-        if not persisted.persisted_plans:
-            raise RuntimeError("No reviewed plans were persisted for benchmark case.")
+        if workflow_result.run_id is None:
+            result = self._workflow_error_result(case, workflow_result)
+            report_path = write_case_report(result, self.report_dir)
+            return result.model_copy(update={"report_path": str(report_path)})
 
-        selected = persistence.select_plan(run.run_id, persisted.persisted_plans[0].plan_id)
-        HumanConfirmationService(repositories.plans).confirm_plan(
-            run.run_id,
-            selected.plan_id,
-            confirmed_by="benchmark",
-            source="locallife-bench",
-        )
-        execution = DeterministicExecutionWorkflow(repositories.plans, gateway).execute_confirmed_plan(
-            run.run_id,
-            selected.plan_id,
-            langsmith_trace_id=trace_context.trace_id,
-        )
-        feedback = DeterministicFeedbackWriter(
-            plans=repositories.plans,
-            runs=repositories.runs,
-        ).write_execution_feedback(run.run_id, selected.plan_id)
-        observability = recorder.record_run_summary(trace_context)
+        run = repositories.runs.get_by_id(workflow_result.run_id)
+        if run is None:
+            result = BenchmarkCaseResult(
+                case_id=case.case_id,
+                status="error",
+                run_id=workflow_result.run_id,
+                trace_id=workflow_result.trace_id,
+                scores=[],
+                overall_score=0.0,
+                tool_event_count=workflow_result.tool_event_count,
+                action_count=workflow_result.action_count,
+                feedback_status=workflow_result.feedback_status,
+                observability_status=workflow_result.observability_status,
+                workflow_status=workflow_result.status,
+                workflow_node_history=list(workflow_result.node_history),
+                agent_roles=self._agent_roles(workflow_result),
+                failure_reasons=["Workflow run was not persisted."],
+            )
+            report_path = write_case_report(result, self.report_dir)
+            return result.model_copy(update={"report_path": str(report_path)})
+
+        self._record_benchmark_metadata(repositories, run.run_id, case)
+
+        if workflow_result.status == "error":
+            result = self._workflow_error_result(case, workflow_result)
+            report_path = write_case_report(result, self.report_dir)
+            return result.model_copy(update={"report_path": str(report_path)})
 
         tool_events = repositories.tool_events.list_for_run(run.run_id)
         selected_plan = repositories.plans.get_selected_for_run(run.run_id)
+        plan_json = selected_plan.plan_json if selected_plan is not None and isinstance(selected_plan.plan_json, dict) else {}
+        execution = plan_json.get("execution") if isinstance(plan_json, dict) else None
+        feedback = plan_json.get("feedback") if isinstance(plan_json, dict) else None
         scores = [
+            grade_workflow_path(workflow_result),
+            grade_agent_coverage(workflow_result),
             grade_trajectory(case, tool_events),
             grade_plan_quality(selected_plan),
             grade_execution_safety(case, execution),
@@ -223,18 +204,92 @@ class BenchmarkHarness:
             case_id=case.case_id,
             status=status,
             run_id=run.run_id,
-            trace_id=trace_context.trace_id,
+            trace_id=workflow_result.trace_id,
             scores=scores,
             overall_score=overall,
             tool_event_count=len(tool_events),
             action_count=self._action_count(run.run_id),
             plan_status=getattr(selected_plan, "status", None),
-            feedback_status=feedback.status,
-            observability_status="recorded" if observability.local_buffer_written else observability.status,
+            feedback_status=workflow_result.feedback_status or self._metadata_status(feedback),
+            observability_status=workflow_result.observability_status,
+            workflow_status=workflow_result.status,
+            workflow_node_history=list(workflow_result.node_history),
+            agent_roles=self._agent_roles(workflow_result),
             failure_reasons=failure_reasons,
         )
         report_path = write_case_report(result, self.report_dir)
         return result.model_copy(update={"report_path": str(report_path)})
+
+    def _workflow_error_result(
+        self,
+        case: BenchmarkCase,
+        workflow_result: WeekendPilotWorkflowResult,
+    ) -> BenchmarkCaseResult:
+        return BenchmarkCaseResult(
+            case_id=case.case_id,
+            status="error",
+            run_id=workflow_result.run_id,
+            trace_id=workflow_result.trace_id,
+            scores=[],
+            overall_score=0.0,
+            tool_event_count=workflow_result.tool_event_count,
+            action_count=workflow_result.action_count,
+            feedback_status=workflow_result.feedback_status,
+            observability_status=workflow_result.observability_status,
+            workflow_status=workflow_result.status,
+            workflow_node_history=list(workflow_result.node_history),
+            agent_roles=self._agent_roles(workflow_result),
+            failure_reasons=[self._workflow_failure_reason(workflow_result)],
+        )
+
+    def _record_benchmark_metadata(
+        self,
+        repositories: "_Repositories",
+        run_id,
+        case: BenchmarkCase,
+    ) -> None:
+        run = repositories.runs.get_by_id(run_id)
+        if run is None:
+            return
+        metadata = deepcopy(run.metadata_json) if isinstance(run.metadata_json, dict) else {}
+        metadata["benchmark"] = {
+            "case_id": case.case_id,
+            "title": case.title,
+            "benchmark_harness_version": self.harness_version,
+            "harness_version": self.harness_version,
+            "metadata": case.metadata,
+            "workflow_backed": True,
+        }
+        repositories.runs.update_metadata_json(run_id, metadata)
+
+    def _workflow_failure_reason(self, workflow_result: WeekendPilotWorkflowResult) -> str:
+        error_json = workflow_result.error_json
+        if not isinstance(error_json, dict):
+            return f"Workflow returned status {workflow_result.status!r}."
+        error_type = error_json.get("error_type")
+        message = error_json.get("message")
+        if error_type and message:
+            return f"{error_type}: {message}"
+        if message:
+            return str(message)
+        if error_type:
+            return str(error_type)
+        return f"Workflow returned status {workflow_result.status!r}."
+
+    def _agent_roles(self, workflow_result: WeekendPilotWorkflowResult) -> list[str]:
+        return sorted(
+            {
+                str(agent.role)
+                for agent in workflow_result.agent_results
+                if getattr(agent, "role", None)
+            }
+        )
+
+    def _metadata_status(self, metadata: Any) -> str | None:
+        if isinstance(metadata, dict):
+            status = metadata.get("status")
+            return status if isinstance(status, str) else None
+        return None
 
     def _trace_path(self, case_id: str) -> Path:
         if self.trace_buffer_path is not None:
