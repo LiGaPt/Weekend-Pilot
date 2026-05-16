@@ -290,6 +290,8 @@ Open `http://127.0.0.1:5173`.
 
 The frontend defaults to `http://127.0.0.1:8000` for the API. To override it locally, set `VITE_API_BASE_URL` in `frontend/.env`.
 
+For the full Web demo runbook, see `docs/WEB_DEMO_README.md`.
+
 ## Tests
 
 Repository integration tests require PostgreSQL to be running with migrations applied:
