@@ -22,6 +22,7 @@ from backend.app.planning import (
 )
 from backend.app.plans.schemas import PersistedPlan
 from backend.app.review.schemas import FinalReviewResult
+from backend.app.workflow.recovery import RecoveryAttempt
 
 
 WorkflowStatus = Literal[
@@ -115,6 +116,9 @@ class WeekendPilotWorkflowState(TypedDict, total=False):
     agent_results: list[AgentResult]
     supervisor_assignment_plan: SupervisorAssignmentPlan
     recovery_decision: RecoveryDecision
+    recovery_attempts: list[RecoveryAttempt]
+    max_recovery_attempts: int
+    active_recovery_route: str | None
     persisted_plans: list[PersistedPlan]
     selected_plan_id: UUID | None
     confirmation_result: ConfirmationResult

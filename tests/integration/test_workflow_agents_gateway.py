@@ -7,8 +7,10 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from backend.app.agents import AgentResult, DeterministicValidatorRecoveryAgent, RecoveryDecision
 from backend.app.db.session import SessionLocal
 from backend.app.models.runtime import ActionLedger, AgentRun
+from backend.app.review.schemas import FinalReviewResult, ReviewCheck
 from backend.app.runtime import FixedWindowRateLimiter, JsonRedisCache, RedisKeyBuilder, get_redis_client
 from backend.app.workflow import (
     WeekendPilotWorkflowDependencies,
@@ -160,3 +162,73 @@ def test_workflow_auto_confirm_returns_agent_results_and_keeps_execution_path(
     assert agents["version"] == "bounded_agents_v1"
     assert {entry["role"] for entry in agents["results"]} == EXPECTED_ROLES
     assert "observability" in run.metadata_json
+
+
+def test_workflow_recovery_metadata_is_sanitized(
+    db_session: Session,
+    redis_runtime,
+    trace_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _blocked_review(self, plan, enrichment, drafts, pre_confirmation_action_count=0, context=None):
+        del self, plan, enrichment, pre_confirmation_action_count, context
+        failed_check = ReviewCheck(
+            check_name="route_verified",
+            status="failed",
+            severity="error",
+            message="Route cannot be verified.",
+        )
+        review = FinalReviewResult(
+            run_id=drafts.run_id,
+            provider_profile=drafts.provider_profile,
+            decision="blocked",
+            safe_to_present=False,
+            checks=[failed_check],
+            errors=[failed_check],
+            gate_version="test-gate",
+        )
+        decision = RecoveryDecision(
+            verdict="failed",
+            error_type="route_verified",
+            recovery_action="stop_safely",
+            retry_budget=0,
+            reason="Stop safely without leaking debug_trace or secrets.",
+        )
+        return (
+            AgentResult(
+                role="validator_recovery",
+                status="blocked",
+                summary="Blocked by test gate.",
+                adapter_version="test-validator",
+                output_json={"recovery_decision": decision.model_dump(mode="json")},
+            ),
+            review,
+            decision,
+        )
+
+    monkeypatch.setattr(DeterministicValidatorRecoveryAgent, "review", _blocked_review)
+    runner = _build_runner(db_session, redis_runtime, trace_path)
+
+    result = runner.run(
+        WeekendPilotWorkflowRequest(
+            user_input=USER_INPUT,
+            external_user_id=f"workflow-recovery-metadata-{uuid4()}",
+            display_name="Workflow Recovery Metadata Tester",
+            case_id="case-workflow-recovery-metadata",
+            auto_confirm=False,
+        )
+    )
+
+    assert result.status == "failed"
+    assert result.run_id is not None
+    assert {agent.role for agent in result.agent_results} == EXPECTED_ROLES
+
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    assert "recovery" in run.metadata_json["workflow"]
+    metadata_text = _metadata_text(run.metadata_json["workflow"]["recovery"])
+    assert "action_id" not in metadata_text
+    assert "tool_event_id" not in metadata_text
+    assert "api_key" not in metadata_text
+    assert "token" not in metadata_text
+    assert "secret" not in metadata_text

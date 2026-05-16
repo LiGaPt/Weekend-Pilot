@@ -42,6 +42,7 @@ from backend.app.repositories import (
 from backend.app.tool_gateway import ToolGateway
 from backend.app.workflow.dependencies import WeekendPilotWorkflowDependencies
 from backend.app.workflow.errors import WorkflowError
+from backend.app.workflow.recovery import RecoveryAttempt, resolve_recovery_route
 from backend.app.workflow.state import (
     CandidateBlackboard,
     CandidateBlackboardEntry,
@@ -51,8 +52,23 @@ from backend.app.workflow.state import (
 )
 
 
+_RECOVERY_SENSITIVE_FRAGMENTS = (
+    "api_key",
+    "apikey",
+    "token",
+    "secret",
+    "password",
+    "authorization",
+    "prompt",
+    "debug_trace",
+    "tool_event_id",
+    "action_id",
+    "traceback",
+)
+
+
 class WeekendPilotWorkflowNodes:
-    workflow_version = "v1_workflow_state_dag_alignment"
+    workflow_version = "recovery_routing_v0"
 
     def __init__(self, dependencies: WeekendPilotWorkflowDependencies) -> None:
         self.dependencies = dependencies
@@ -233,6 +249,41 @@ class WeekendPilotWorkflowNodes:
             final_review_result=review,
             recovery_decision=recovery_decision,
             agent_results=agent_results,
+        )
+
+    def apply_recovery(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
+        run_id = self._required_uuid(state, "run_id")
+        attempts = self._recovery_attempts(state)
+        route_result = resolve_recovery_route(
+            state.get("recovery_decision"),
+            attempt_count=len(attempts),
+            max_attempts=int(state.get("max_recovery_attempts") or 1),
+        )
+        updated_attempts = [*attempts]
+        if route_result.attempt is not None:
+            updated_attempts.append(route_result.attempt)
+
+        self._persist_recovery_metadata(
+            run_id,
+            updated_attempts,
+            int(state.get("max_recovery_attempts") or 1),
+        )
+        if route_result.route_to in {"generate_queries", "execute_searches", "logical_planner_agent"}:
+            return self._updates(
+                state,
+                "apply_recovery",
+                recovery_attempts=updated_attempts,
+                active_recovery_route=route_result.route_to,
+            )
+
+        self.repositories.runs.update_status(run_id, "failed")
+        return self._updates(
+            state,
+            "apply_recovery",
+            status="failed",
+            recovery_attempts=updated_attempts,
+            active_recovery_route=None,
+            error_json=self._recovery_error_json(route_result),
         )
 
     def final_review(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
@@ -444,6 +495,28 @@ class WeekendPilotWorkflowNodes:
         metadata["agents"] = sanitized_agent_payload(agent_results)
         self.repositories.runs.update_metadata_json(run_id, metadata)
 
+    def _persist_recovery_metadata(
+        self,
+        run_id: UUID,
+        recovery_attempts: list[RecoveryAttempt],
+        max_attempts: int,
+    ) -> None:
+        run = self.repositories.runs.get_by_id(run_id)
+        if run is None:
+            return
+        metadata = deepcopy(run.metadata_json) if isinstance(run.metadata_json, dict) else {}
+        workflow = metadata.get("workflow")
+        if not isinstance(workflow, dict):
+            workflow = {}
+        workflow["workflow_version"] = self.workflow_version
+        workflow["recovery"] = self._sanitize_recovery_metadata({
+            "attempt_count": len(recovery_attempts),
+            "max_attempts": max_attempts,
+            "attempts": [attempt.model_dump(mode="json") for attempt in recovery_attempts],
+        })
+        metadata["workflow"] = workflow
+        self.repositories.runs.update_metadata_json(run_id, metadata)
+
     def _fail(
         self,
         state: WeekendPilotWorkflowState,
@@ -590,6 +663,46 @@ class WeekendPilotWorkflowNodes:
             return None
         code = error_json.get("error_type") or error_json.get("code")
         return str(code) if code else None
+
+    def _recovery_attempts(self, state: WeekendPilotWorkflowState) -> list[RecoveryAttempt]:
+        attempts = []
+        for attempt in state.get("recovery_attempts", []) or []:
+            if isinstance(attempt, RecoveryAttempt):
+                attempts.append(attempt)
+            elif isinstance(attempt, dict):
+                attempts.append(RecoveryAttempt.model_validate(attempt))
+        return attempts
+
+    def _recovery_error_json(self, route_result: Any) -> dict[str, Any]:
+        attempt = route_result.attempt
+        details = (
+            self._sanitize_recovery_metadata(attempt.model_dump(mode="json"))
+            if attempt is not None
+            else {}
+        )
+        return {
+            "error_type": route_result.error_type or "recovery_stopped",
+            "message": route_result.message or "Recovery stopped safely.",
+            "details": details,
+        }
+
+    def _sanitize_recovery_metadata(self, value: Any) -> Any:
+        if isinstance(value, dict):
+            sanitized = {}
+            for key, child in value.items():
+                if isinstance(key, str) and self._is_sensitive_recovery_text(key):
+                    continue
+                sanitized[key] = self._sanitize_recovery_metadata(child)
+            return sanitized
+        if isinstance(value, list):
+            return [self._sanitize_recovery_metadata(item) for item in value]
+        if isinstance(value, str) and self._is_sensitive_recovery_text(value):
+            return "[redacted]"
+        return value
+
+    def _is_sensitive_recovery_text(self, value: str) -> bool:
+        normalized = value.casefold()
+        return any(fragment in normalized for fragment in _RECOVERY_SENSITIVE_FRAGMENTS)
 
     def _required_uuid(self, state: WeekendPilotWorkflowState, key: str) -> UUID:
         value = state.get(key)
