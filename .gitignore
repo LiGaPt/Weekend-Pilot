@@ -17,6 +17,9 @@ env/
 node_modules/
 dist/
 build/
+frontend/playwright-report/
+frontend/test-results/
+frontend/blob-report/
 
 *.log
 

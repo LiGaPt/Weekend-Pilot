@@ -216,11 +216,11 @@ function RunInspector({
         <h2 id="run-title">Run metadata</h2>
       </div>
       <dl className="metadata-list">
-        <MetaItem label="Run status" value={run?.status} />
-        <MetaItem label="Run ID" value={run?.run_id} mono />
+        <MetaItem label="Run status" value={run?.status} testId="run-status" />
+        <MetaItem label="Run ID" value={run?.run_id} mono testId="run-id" />
         <MetaItem label="Trace ID" value={run?.trace_id} mono />
         <MetaItem label="Tool events" value={numberValue(run?.tool_event_count)} />
-        <MetaItem label="Actions" value={numberValue(run?.action_count)} />
+        <MetaItem label="Actions" value={numberValue(run?.action_count)} testId="action-count" />
         <MetaItem label="Execution" value={run?.execution_status} />
         <MetaItem label="Feedback" value={run?.feedback_status} />
         <MetaItem label="Observability" value={run?.observability_status} />
@@ -239,7 +239,13 @@ function RunInspector({
           )}
         </ol>
       </div>
-      <button className="secondary-button full-width" type="button" onClick={onRefresh} disabled={!canRefresh}>
+      <button
+        className="secondary-button full-width"
+        type="button"
+        onClick={onRefresh}
+        disabled={!canRefresh}
+        data-testid="refresh-button"
+      >
         {requestState === "refreshing" ? <Loader2 className="spin" size={17} /> : <RefreshCw size={17} />}
         <span>{requestState === "refreshing" ? "Refreshing" : "Refresh status"}</span>
       </button>
@@ -425,11 +431,23 @@ function ConfirmationControls({
       </div>
       {run.status === "awaiting_confirmation" ? (
         <div className="button-row align-end">
-          <button className="primary-button" type="button" onClick={onConfirm} disabled={!canConfirm}>
+          <button
+            className="primary-button"
+            type="button"
+            onClick={onConfirm}
+            disabled={!canConfirm}
+            data-testid="confirm-button"
+          >
             {requestState === "confirming" ? <Loader2 className="spin" size={17} /> : <CheckCircle2 size={17} />}
             <span>{requestState === "confirming" ? "Confirming" : "Confirm selected plan"}</span>
           </button>
-          <button className="danger-button" type="button" onClick={onDecline} disabled={!canDecline}>
+          <button
+            className="danger-button"
+            type="button"
+            onClick={onDecline}
+            disabled={!canDecline}
+            data-testid="decline-button"
+          >
             {requestState === "declining" ? <Loader2 className="spin" size={17} /> : <XCircle size={17} />}
             <span>{requestState === "declining" ? "Declining" : "Decline"}</span>
           </button>
@@ -517,11 +535,23 @@ function TextList({ title, items }: { title: string; items?: string[] }) {
   );
 }
 
-function MetaItem({ label, value, mono = false }: { label: string; value?: string | number | null; mono?: boolean }) {
+function MetaItem({
+  label,
+  value,
+  mono = false,
+  testId,
+}: {
+  label: string;
+  value?: string | number | null;
+  mono?: boolean;
+  testId?: string;
+}) {
   return (
     <div>
       <dt>{label}</dt>
-      <dd className={mono ? "mono" : undefined}>{display(value)}</dd>
+      <dd className={mono ? "mono" : undefined} data-testid={testId}>
+        {display(value)}
+      </dd>
     </div>
   );
 }
