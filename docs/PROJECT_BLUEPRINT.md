@@ -15,7 +15,7 @@ understand request -> search candidates -> verify feasibility -> generate plans
 
 The competition topic is "local exploration: weekend idle-time activity planning." The required deliverables are:
 
-- A runnable demo, either CLI or Web UI.
+- A runnable demo through a minimal Web UI.
 - Complete tool implementation code, including Mock API calls.
 - A short design document describing the planning strategy, tool call chain, and exception handling mechanism.
 
@@ -35,7 +35,7 @@ The expected system should plan a 4-6 hour afternoon route, including activities
 - Human confirmation before any write tool.
 - Action Ledger for all side-effect actions.
 - Basic LocalLife-Bench cases for happy path and fallback path.
-- CLI demo or a minimal Web UI.
+- Minimal Web UI as the first demo surface. CLI is optional developer tooling, not the MVP demo path.
 
 ### V1
 
@@ -43,7 +43,7 @@ The expected system should plan a 4-6 hour afternoon route, including activities
 - Long-term memory governance.
 - Failure injection and replay harness.
 - LocalLife-Bench L1-L3 cases.
-- Web UI with planning, confirmation, execution timeline, and trace summaries.
+- Richer Web UI with planning, explicit confirmation, execution timeline, trace summaries, benchmark reports, and recovery visualization.
 
 ### V2
 
@@ -78,9 +78,9 @@ Planned stack:
 - Pydantic
 - pytest
 - Docker Compose
-- Optional React or a simpler UI layer for the demo
+- React/Vite Web UI for the demo, with FastAPI serving workflow APIs.
 
-The first implementation can prioritize backend, CLI, fixtures, and benchmark harness before investing heavily in frontend polish.
+The first implementation should prioritize backend workflow, benchmark harness, and a minimal Web UI before frontend polish. CLI can be deferred unless needed for developer tooling.
 
 ## 6. Agent Architecture
 
@@ -182,6 +182,79 @@ Dynamic recovery routing is allowed only through structured decisions from Valid
 ```
 
 No recovery loop should be unbounded.
+
+## 8.1 Workflow State and Node Separation
+
+LangGraph should use a strict typed global state. State should store structured domain models, not raw dictionaries, whenever project schemas exist.
+
+Preferred state values include:
+
+- `user_request`
+- `parsed_intent` as `LocalLifeIntent`
+- `user_memory` as structured memory records
+- `query_plan` as `QueryPlan`
+- `candidate_blackboard` as structured candidate/evidence records
+- `screened_candidate_ids`
+- `logical_plan` as a bounded semantic plan proposal
+- `final_itinerary` as deterministic itinerary output
+- `validation_errors`
+- `action_ledger_plan` or confirmed action specs
+
+Nodes should be separated by responsibility:
+
+Deterministic nodes own:
+
+- memory retrieval
+- query planning in the MVP
+- tool execution through Tool Gateway
+- pre-flight availability checks
+- route and time calculation
+- final itinerary timestamp compilation
+- confirmation boundary
+- execution workflow
+- feedback writing
+- benchmark grading
+
+Bounded semantic agent nodes may own:
+
+- candidate scoring
+- logical planning
+- semantic validation
+- supervisor coordination
+- discovery and dining interpretation
+
+LLM-backed nodes must stay behind typed contracts, must not call raw providers, and must not execute write tools.
+
+### V1 Optimized Workflow Target
+
+The V1 workflow should evolve toward this DAG:
+
+```text
+initialize
+-> parse_intent
+-> load_memory
+-> generate_queries
+-> execute_searches
+-> populate_candidate_blackboard
+-> pre_flight_check_availability
+-> logical_planner_agent
+-> route_and_time_engine
+-> semantic_validator
+-> final_review
+-> present_to_user
+-> wait_confirmation
+-> saga_execution_engine
+-> generate_summary_message
+```
+
+Key design rules:
+
+- Pre-flight checks should filter closed, full, unavailable, or obviously unsuitable POIs before planning.
+- Logical planning should decide sequence and rationale, not exact timestamps.
+- Route and time calculation should be deterministic.
+- If route/time math is impossible, later recovery routing may loop back to planning with an explicit retry budget.
+- Semantic validation may detect constraint misses, but recovery loops must remain bounded.
+- Execution remains deterministic and writes to Action Ledger.
 
 ## 9. Tool Gateway
 
@@ -571,15 +644,24 @@ Suggested first tasks:
 14. Add Execution Workflow.
 15. Add LangSmith observability.
 16. Add LocalLife-Bench harness.
-17. Add CLI or Web demo.
-18. Add end-to-end tests and README.
+17. Add Web demo API surface.
+18. Add minimal Web UI demo.
+19. Add Web end-to-end tests and demo README.
+20. Add V1 workflow state and DAG optimization.
+21. Add recovery routing v0.
+22. Expand LocalLife-Bench cases.
 
 ## 21. Open Questions
 
-- Should MVP start with CLI only, or include a minimal Web UI?
-- Should MVP use a real map provider, or remain fully Mock World until the first demo is stable?
-- How many benchmark cases should be included in the first version: 5, 10, or 20?
-- Should the frontend be React, Streamlit, Gradio, or deferred until the backend stabilizes?
-- Should all LLM agents be implemented immediately, or should some start as deterministic/prompt-function stubs?
-- How much of the PostgreSQL schema should be included before the first workflow runs?
+Resolved decisions:
 
+- MVP starts with a minimal Web UI, not CLI.
+- CLI is deferred unless needed as developer tooling.
+- First demo remains fully Mock World until the Web path is stable.
+- V1 workflow optimization should happen after the first Web demo is usable.
+
+Remaining open questions:
+
+- How many benchmark cases should be included in the first expanded suite: 5, 10, or 20?
+- Which bounded agent should become LLM-backed first after deterministic adapters are stable?
+- How much recovery routing should be implemented before adding real provider support?
