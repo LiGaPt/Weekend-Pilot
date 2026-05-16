@@ -214,7 +214,7 @@ def test_demo_run_decline_creates_no_actions_and_blocks_later_confirm(client) ->
 
     decline_response = test_client.post(
         f"/demo/runs/{run_id}/decline",
-        json={"declined_by": "web-demo-user", "reason": "User chose not to continue."},
+        json={"declined_by": "web-demo-user", "reason": "用户选择暂不继续。"},
     )
 
     assert decline_response.status_code == 200

@@ -33,21 +33,23 @@ class DeterministicFeedbackWriter:
     }
     _COMPLETED_ACTION_STATUSES = {"completed", "already_completed"}
     _HEADLINES = {
-        "completed": "Plan completed.",
-        "partially_completed": "Plan partially completed.",
-        "failed": "Plan failed.",
-        "skipped": "Plan skipped.",
+        "completed": "安排已完成",
+        "partially_completed": "部分安排已完成",
+        "failed": "安排未完成",
+        "skipped": "未执行安排",
     }
     _NEXT_STEPS = {
-        "completed": [],
+        "completed": [
+            "按确认后的时间出发，出门前再看一眼天气和路况。",
+        ],
         "partially_completed": [
-            "Review the actions that need attention before retrying or changing the plan.",
+            "先查看未完成操作，再决定重试或调整方案。",
         ],
         "failed": [
-            "No confirmed actions completed. Review the failed actions before retrying.",
+            "本次确认操作没有完成，重试前请先查看失败原因。",
         ],
         "skipped": [
-            "No confirmed actions were available to execute. Select or confirm a plan with executable actions.",
+            "当前没有可执行的确认操作，请选择并确认包含订座、取号或订票的方案。",
         ],
     }
 
@@ -210,14 +212,24 @@ class DeterministicFeedbackWriter:
         target_label: str,
     ) -> str:
         if status == "completed":
-            return f"Completed {tool_name} for {target_label}."
+            return f"已为{target_label}完成{self._tool_label(tool_name)}。"
         if status == "already_completed":
-            return f"Already completed {tool_name} for {target_label}; no duplicate action was created."
+            return f"{target_label}的{self._tool_label(tool_name)}此前已完成，本次没有创建重复操作。"
         if status == "blocked":
-            return f"Blocked {tool_name} for {target_label}."
+            return f"{target_label}的{self._tool_label(tool_name)}已被阻止。"
         if status == "rate_limited":
-            return f"Rate limited while completing {tool_name} for {target_label}."
-        return f"Could not complete {tool_name} for {target_label}."
+            return f"{target_label}的{self._tool_label(tool_name)}触发限流，暂未完成。"
+        return f"未能为{target_label}完成{self._tool_label(tool_name)}。"
+
+    def _tool_label(self, tool_name: str) -> str:
+        labels = {
+            "book_ticket": "订票",
+            "reserve_restaurant": "订座",
+            "join_queue": "排队取号",
+            "order_addon": "加购点单",
+            "send_message": "发送消息",
+        }
+        return labels.get(tool_name, tool_name)
 
     def _error_code(self, raw_action: dict[str, Any]) -> str | None:
         error_json = raw_action.get("error_json")
@@ -228,8 +240,8 @@ class DeterministicFeedbackWriter:
 
     def _message(self, headline: str, completed_count: int, failed_count: int) -> str:
         return (
-            f"{headline} {completed_count} actions completed and "
-            f"{failed_count} actions need attention."
+            f"{headline}：{completed_count}项操作已完成，"
+            f"{failed_count}项需要处理。"
         )
 
     def _persist_feedback(

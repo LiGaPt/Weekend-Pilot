@@ -22,6 +22,12 @@ frontend/test-results/
 frontend/blob-report/
 
 *.log
+var/*.err
+var/**/*.err
+var/*.pid
+var/**/*.pid
+var/*.jsonl
+var/**/*.jsonl
 
 .DS_Store
 Thumbs.db

@@ -231,7 +231,7 @@ Expected response:
 
 ## Web Demo API
 
-The Web demo API starts the official workflow, pauses before write tools, and continues execution only after explicit confirmation.
+The Web demo API starts the official workflow, pauses before write tools, and continues execution only after explicit confirmation. The MVP review path uses Chinese Mock World demo content for the family afternoon scenario.
 
 ```bash
 docker compose up -d postgres redis
@@ -244,7 +244,7 @@ Start a run:
 ```bash
 curl -X POST http://127.0.0.1:8000/demo/runs \
   -H "Content-Type: application/json" \
-  -d "{\"user_input\":\"This afternoon I want to go out with my wife and child for a few hours. Not too far. My child is 5, and my wife is trying to eat lighter.\"}"
+  -d "{\"user_input\":\"今天下午想和爱人、5岁的孩子出门玩几个小时，别离家太远。孩子要适合亲子活动，爱人最近想吃清淡一点，帮我安排一下。\"}"
 ```
 
 Read status:
@@ -266,7 +266,7 @@ Decline the selected plan:
 ```bash
 curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/decline \
   -H "Content-Type: application/json" \
-  -d "{\"declined_by\":\"web-demo-user\",\"reason\":\"User chose not to continue.\"}"
+  -d "{\"declined_by\":\"web-demo-user\",\"reason\":\"用户选择暂不继续。\"}"
 ```
 
 ## Minimal Web UI Demo

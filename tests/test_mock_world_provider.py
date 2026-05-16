@@ -53,6 +53,8 @@ def test_get_poi_detail_returns_known_poi() -> None:
     result = provider.invoke("get_poi_detail", {"poi_id": "restaurant_light_001"})
 
     assert result["poi"]["poi_id"] == "restaurant_light_001"
+    assert result["poi"]["name"] == "绿碗家庭轻食"
+    assert result["poi"]["address"] == "上海市徐汇区健康弄66号"
     assert result["poi"]["category"] == "dining"
     assert "lighter_options" in result["poi"]["tags"]
 
@@ -73,6 +75,7 @@ def test_check_route_returns_deterministic_distance_and_duration() -> None:
     assert result["route"]["mode"] == "walking"
     assert result["route"]["distance_meters"] == 850
     assert result["route"]["duration_minutes"] == 12
+    assert result["route"]["summary"] == "穿过安静街区的短途步行路线，适合推童车。"
 
 
 def test_check_opening_hours_returns_open_closed_structure() -> None:
@@ -91,15 +94,15 @@ def test_check_opening_hours_returns_open_closed_structure() -> None:
 def test_check_weather_returns_deterministic_weather() -> None:
     provider = MockWorldProvider()
 
-    result = provider.invoke("check_weather", {"location": "Xuhui", "date": "2026-05-16"})
+    result = provider.invoke("check_weather", {"location": "徐汇", "date": "2026-05-16"})
 
     assert result["weather"] == {
-        "location": "Xuhui",
+        "location": "徐汇",
         "date": "2026-05-16",
-        "condition": "cloudy",
+        "condition": "多云",
         "temperature_c": 23,
         "precipitation_chance": 0.15,
-        "advisory": "Comfortable for family outdoor walking.",
+        "advisory": "天气适合亲子户外步行，建议随身带水。",
     }
 
 
@@ -120,6 +123,7 @@ def test_queue_table_and_ticket_availability_return_expected_structures() -> Non
     assert queue["queue"]["wait_minutes"] == 10
     assert table["table_availability"]["available"] is True
     assert table["table_availability"]["time_slots"] == ["17:30", "18:00", "18:30"]
+    assert table["table_availability"]["notes"] == "有安静角落桌位可订。"
     assert ticket["ticket_availability"]["available"] is True
     assert ticket["ticket_availability"]["remaining"] == 42
 

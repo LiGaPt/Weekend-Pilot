@@ -14,7 +14,7 @@ const forbiddenVisibleText = [
 
 async function startDemoRun(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: /start planning/i }).click();
+  await page.getByRole("button", { name: /开始规划/ }).click();
   await expect(page.getByTestId("run-status")).toHaveText("awaiting_confirmation", { timeout: 60_000 });
   await expect(page.getByTestId("action-count")).toHaveText("0");
 }
@@ -42,16 +42,16 @@ test.describe("desktop web demo", () => {
   test("starts a run, preserves confirmation boundary, confirms, and shows feedback", async ({ page }) => {
     await startDemoRun(page);
 
-    await expect(page.getByText("Selected plan", { exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Proposed actions" })).toBeVisible();
+    await expect(page.getByText("已选方案", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "时间安排" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "待确认操作" })).toBeVisible();
     expect(await visibleActionCount(page)).toBe(0);
 
     await page.getByTestId("confirm-button").click();
 
     await expect(page.getByTestId("run-status")).toHaveText("completed", { timeout: 60_000 });
-    await expect(page.getByText("Execution and feedback")).toBeVisible();
-    await expect(page.getByText("Completed actions")).toBeVisible();
+    await expect(page.getByText("执行与反馈")).toBeVisible();
+    await expect(page.getByText("已完成操作")).toBeVisible();
     expect(await visibleActionCount(page)).toBeGreaterThan(0);
     await expect(page.getByTestId("confirm-button")).toHaveCount(0);
   });
@@ -62,8 +62,8 @@ test.describe("desktop web demo", () => {
     await page.getByTestId("decline-button").click();
 
     await expect(page.getByTestId("run-status")).toHaveText("declined", { timeout: 60_000 });
-    await expect(page.getByRole("heading", { name: /^Declined$/ })).toBeVisible();
-    await expect(page.getByText("User chose not to continue.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^已取消$/ })).toBeVisible();
+    await expect(page.getByText("用户选择暂不继续。")).toBeVisible();
     await expect(page.getByTestId("confirm-button")).toHaveCount(0);
   });
 
@@ -96,8 +96,8 @@ test.describe("mobile web demo", () => {
   test("loads the main flow without document-level horizontal overflow", async ({ page }) => {
     await startDemoRun(page);
 
-    await expect(page.getByRole("button", { name: /confirm selected plan/i })).toBeVisible();
-    await expect(page.getByText("Selected plan", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /确认所选方案/ })).toBeVisible();
+    await expect(page.getByText("已选方案", { exact: true })).toBeVisible();
 
     const hasHorizontalOverflow = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,

@@ -39,7 +39,7 @@ export async function declineRun(runId: string, planId?: string | null): Promise
     body: JSON.stringify({
       plan_id: planId ?? null,
       declined_by: "web-demo-user",
-      reason: "User chose not to continue.",
+      reason: "用户选择暂不继续。",
     }),
   });
 }
@@ -67,24 +67,34 @@ async function responseMessage(response: Response): Promise<string> {
     if (isRecord(body)) {
       const detail = body.detail;
       if (typeof detail === "string" && detail.trim()) {
-        return detail;
+        return localizedResponseMessage(detail, response.status);
       }
       if (isRecord(detail) && typeof detail.message === "string" && detail.message.trim()) {
-        return detail.message;
+        return localizedResponseMessage(detail.message, response.status);
       }
     }
   } catch {
-    return `API request failed with status ${response.status}.`;
+    return statusFallbackMessage(response.status);
   }
 
-  return `API request failed with status ${response.status}.`;
+  return statusFallbackMessage(response.status);
 }
 
 function connectionMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) {
-    return `API connection failed: ${error.message}`;
-  }
-  return "API connection failed. Check that the backend is running at the configured URL.";
+  void error;
+  return "无法连接演示服务，请确认后端正在运行。";
+}
+
+function localizedResponseMessage(message: string, status: number): string {
+  const knownMessages: Record<string, string> = {
+    "Run not found.": "未找到对应的演示运行。",
+    "Demo run was not found.": "未找到对应的演示运行。",
+  };
+  return knownMessages[message] ?? statusFallbackMessage(status);
+}
+
+function statusFallbackMessage(status: number): string {
+  return `演示请求失败（HTTP ${status}）。`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

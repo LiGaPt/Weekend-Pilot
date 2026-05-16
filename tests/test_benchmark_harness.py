@@ -190,9 +190,9 @@ def test_feedback_grader_accepts_persisted_feedback_metadata_dict() -> None:
     case = _benchmark_case()
     feedback = {
         "status": "completed",
-        "headline": "Plan completed.",
-        "message": "Plan completed. 2 actions completed and 0 actions need attention.",
-        "next_steps": [],
+        "headline": "安排已完成",
+        "message": "安排已完成：2项操作已完成，0项需要处理。",
+        "next_steps": ["按确认后的时间出发，出门前再看一眼天气和路况。"],
     }
 
     score = grade_feedback(case, feedback)

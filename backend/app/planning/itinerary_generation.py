@@ -59,14 +59,14 @@ class DeterministicItineraryGenerator:
             result.failed_reasons.append(
                 self._failure(
                     "missing_activity_candidate",
-                    "No enriched activity candidates are available for itinerary generation.",
+                    "缺少可用于生成行程的活动候选。",
                 )
             )
         if not enrichment.enriched_dining_candidates:
             result.failed_reasons.append(
                 self._failure(
                     "missing_dining_candidate",
-                    "No enriched dining candidates are available for itinerary generation.",
+                    "缺少可用于生成行程的用餐候选。",
                 )
             )
         if result.failed_reasons:
@@ -77,7 +77,7 @@ class DeterministicItineraryGenerator:
             result.failed_reasons.append(
                 self._failure(
                     "missing_usable_route",
-                    "No usable activity-to-dining route is available for itinerary generation.",
+                    "没有可用于串联活动和用餐地点的路线。",
                     {
                         "route_count": len(enrichment.route_matrix),
                         "usable_route_statuses": sorted(self._USABLE_ROUTE_STATUSES),
@@ -169,7 +169,7 @@ class DeterministicItineraryGenerator:
             proposed_actions=proposed_actions,
             feasibility=FeasibilitySummary(
                 is_feasible=True,
-                reasons=["activity_selected", "dining_selected", "route_verified"],
+                reasons=["已选择亲子活动", "已选择清淡用餐", "活动到餐厅路线已验证"],
                 warnings=warnings,
                 total_duration_minutes=total_duration,
                 route_duration_minutes=pair.route.duration_minutes,
@@ -247,31 +247,31 @@ class DeterministicItineraryGenerator:
         blocks = [
             (
                 "activity",
-                f"Visit {pair.activity.candidate.name}",
+                f"体验{pair.activity.candidate.name}",
                 pair.activity.candidate.candidate_id,
                 self._ACTIVITY_DURATION_MINUTES,
-                ["Activity block selected from enriched candidate evidence."],
+                ["根据候选详情、营业时间和票务信息安排亲子活动。"],
             ),
             (
                 "transfer",
-                f"Transfer to {pair.dining.candidate.name}",
+                f"前往{pair.dining.candidate.name}",
                 None,
                 transfer_duration,
-                ["Route verified from activity to dining candidate."],
+                ["已验证活动地点到餐厅的路线和预计耗时。"],
             ),
             (
                 "dining",
-                f"Dine at {pair.dining.candidate.name}",
+                f"在{pair.dining.candidate.name}用餐",
                 pair.dining.candidate.candidate_id,
                 self._DINING_DURATION_MINUTES,
-                ["Dining block selected from enriched candidate evidence."],
+                ["结合清淡偏好、亲子友好度和桌位信息安排晚餐。"],
             ),
             (
                 "buffer",
-                "Buffer and wrap-up",
+                "缓冲和返程准备",
                 None,
                 buffer_duration,
-                ["Keeps the draft within the MVP afternoon planning target."],
+                ["预留缓冲时间，方便补水、整理物品和准备返程。"],
             ),
         ]
 
@@ -295,7 +295,7 @@ class DeterministicItineraryGenerator:
 
         requested_end = plan.intent.time_window.end_at
         if requested_end is not None and cursor > requested_end:
-            self._append_warning(warnings, "timeline_exceeds_requested_window")
+            self._append_warning(warnings, "行程可能超过用户给定时间窗")
         return timeline
 
     def _build_proposed_actions(
@@ -326,7 +326,7 @@ class DeterministicItineraryGenerator:
                     "book_ticket",
                     pair.activity.candidate.candidate_id,
                     payload,
-                    "Ticket availability is available.",
+                    "票务可用，确认后可提前锁定入场名额。",
                 )
             )
 
@@ -350,7 +350,7 @@ class DeterministicItineraryGenerator:
                     "reserve_restaurant",
                     pair.dining.candidate.candidate_id,
                     payload,
-                    "Table availability is available.",
+                    "餐厅有可订桌位，确认后可提前锁定晚餐座位。",
                 )
             )
             has_reservation_action = True
@@ -372,7 +372,7 @@ class DeterministicItineraryGenerator:
                     "join_queue",
                     queue_id or pair.dining.candidate.candidate_id,
                     payload,
-                    "Queue is open and no table reservation action was selected.",
+                    "当前可排队取号，且没有可用订座操作。",
                 )
             )
 
@@ -382,22 +382,22 @@ class DeterministicItineraryGenerator:
         del plan
         warnings = []
         if not self._has_available_ticket_evidence(pair.activity):
-            self._append_warning(warnings, "missing_ticket_availability")
+            self._append_warning(warnings, "活动票务信息不完整")
         if self._dining_availability_rank(pair.dining) == 2:
-            self._append_warning(warnings, "missing_table_or_queue_availability")
+            self._append_warning(warnings, "餐厅桌位或排队信息不完整")
         queue_wait = self._queue_wait_minutes(pair.dining)
         if queue_wait is not None and queue_wait > 30:
-            self._append_warning(warnings, "long_queue_wait")
+            self._append_warning(warnings, "餐厅排队等待较长")
         return warnings
 
     def _summary(self, pair: _DraftPair) -> str:
         if pair.route.duration_minutes is None:
-            route_text = "with a verified transfer route"
+            route_text = "路线已验证"
         else:
-            route_text = f"with a {pair.route.duration_minutes}-minute transfer"
+            route_text = f"中间步行约{pair.route.duration_minutes}分钟"
         return (
-            f"Visit {pair.activity.candidate.name}, then continue to "
-            f"{pair.dining.candidate.name} {route_text}."
+            f"先去{pair.activity.candidate.name}做亲子活动，再去"
+            f"{pair.dining.candidate.name}吃清淡晚餐，{route_text}。"
         )
 
     def _activity_is_usable(self, activity: EnrichedCandidate) -> bool:

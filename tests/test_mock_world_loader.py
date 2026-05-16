@@ -10,7 +10,7 @@ def test_default_fixture_loads_family_afternoon_profile() -> None:
     world = load_mock_world()
 
     assert world["profile"] == "family_afternoon"
-    assert world["location"] == {"city": "Shanghai", "area": "Xuhui"}
+    assert world["location"] == {"city": "上海", "area": "徐汇"}
 
 
 def test_default_fixture_has_required_top_level_keys() -> None:

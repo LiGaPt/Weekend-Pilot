@@ -82,8 +82,8 @@ def test_demo_run_summary_serializes_minimal_web_safe_payload() -> None:
                 "plan_id": plan_id,
                 "status": "selected",
                 "selected": True,
-                "title": "Family afternoon",
-                "summary": "A short reviewed plan.",
+                "title": "徐汇亲子轻松下午",
+                "summary": "一条适合亲子出行和清淡晚餐的方案。",
             }
         ],
         node_history=["initialize_run", "wait_confirmation"],

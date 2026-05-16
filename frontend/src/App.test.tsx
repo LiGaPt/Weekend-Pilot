@@ -22,24 +22,24 @@ const awaitingRun: DemoRunSummary = {
       plan_id: "plan-1",
       status: "reviewed",
       selected: true,
-      title: "Calm family afternoon",
-      summary: "A gentle activity followed by lighter dining.",
+      title: "徐汇亲子轻松下午",
+      summary: "先做亲子科学体验，再步行去吃清淡晚餐。",
       activity: {
-        name: "Riverside Children Museum",
-        category: "Family activity",
-        address: "88 Riverside Road",
-        tags: ["child-friendly", "indoor"],
+        name: "徐汇亲子科学馆",
+        category: "亲子活动",
+        address: "上海市徐汇区亲子科普路100号",
+        tags: ["亲子友好", "室内"],
       },
       dining: {
-        name: "Green Table",
-        category: "Light dining",
-        address: "12 Garden Lane",
-        tags: ["lighter meals"],
+        name: "绿碗家庭轻食",
+        category: "清淡餐厅",
+        address: "上海市徐汇区健康弄66号",
+        tags: ["清淡菜", "亲子友好"],
       },
       timeline: [
         {
           sequence: 1,
-          title: "Museum visit",
+          title: "参观科学馆",
           start_label: "14:00",
           end_label: "16:00",
           duration_minutes: 120,
@@ -49,11 +49,11 @@ const awaitingRun: DemoRunSummary = {
         mode: "driving",
         distance_meters: 3200,
         duration_minutes: 18,
-        summary: "Short drive between stops.",
+        summary: "两站之间步行很短，适合推童车。",
       },
       feasibility: {
         is_feasible: true,
-        reasons: ["Fits the afternoon window."],
+        reasons: ["符合下午出行时间窗。"],
         warnings: [],
         total_duration_minutes: 270,
         route_duration_minutes: 18,
@@ -64,7 +64,7 @@ const awaitingRun: DemoRunSummary = {
           action_type: "reserve_restaurant",
           target_id: "green-table",
           requires_confirmation: true,
-          reason: "Secure dinner table.",
+          reason: "提前锁定晚餐座位。",
         },
       ],
       confirmation: { status: "pending", action_count: 1 },
@@ -73,10 +73,10 @@ const awaitingRun: DemoRunSummary = {
       plan_id: "plan-2",
       status: "reviewed",
       selected: false,
-      title: "Park and cafe backup",
-      summary: "Outdoor activity with cafe fallback.",
-      activity: { name: "City Park", category: "Outdoor", address: "Park Road", tags: [] },
-      dining: { name: "Soft Spoon Cafe", category: "Cafe", address: "Cafe Street", tags: [] },
+      title: "公园和咖啡备选",
+      summary: "户外活动搭配咖啡简餐。",
+      activity: { name: "滨江亲子乐园", category: "户外活动", address: "滨江步道", tags: [] },
+      dining: { name: "软勺咖啡", category: "咖啡简餐", address: "咖啡街", tags: [] },
       timeline: [],
       route: null,
       feasibility: null,
@@ -112,11 +112,11 @@ const completedRun: DemoRunSummary = {
       },
       feedback: {
         status: "written",
-        headline: "Plan is ready",
-        message: "Reservation and message were completed.",
+        headline: "安排已完成",
+        message: "订座和消息通知已完成。",
         completed_actions: [{ action_type: "reserve_restaurant", status: "succeeded" }],
         failed_actions: [],
-        next_steps: ["Leave at 13:40."],
+        next_steps: ["13:40 出发。"],
       },
     },
   ],
@@ -132,7 +132,7 @@ const declinedRun: DemoRunSummary = {
       confirmation: {
         status: "declined",
         declined_by: "web-demo-user",
-        reason: "User chose not to continue.",
+        reason: "用户选择暂不继续。",
       },
     },
   ],
@@ -148,20 +148,20 @@ describe("App", () => {
   it("renders the default prompt and start button", () => {
     render(<App />);
 
-    expect(screen.getByRole("textbox", { name: /^request$/i })).toHaveValue(
-      "This afternoon I want to go out with my wife and child for a few hours. Not too far. My child is 5, and my wife is trying to eat lighter.",
+    expect(screen.getByRole("textbox", { name: /^需求$/ })).toHaveValue(
+      "今天下午想和爱人、5岁的孩子出门玩几个小时，别离家太远。孩子要适合亲子活动，爱人最近想吃清淡一点，帮我安排一下。",
     );
-    expect(screen.getByRole("button", { name: /start planning/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /开始规划/ })).toBeEnabled();
   });
 
   it("disables start when the request is empty", async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.clear(screen.getByRole("textbox", { name: /^request$/i }));
+    await user.clear(screen.getByRole("textbox", { name: /^需求$/ }));
 
-    expect(screen.getByRole("button", { name: /start planning/i })).toBeDisabled();
-    expect(screen.getByText(/enter a request/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /开始规划/ })).toBeDisabled();
+    expect(screen.getByText(/请输入需求/)).toBeInTheDocument();
   });
 
   it("renders awaiting-confirmation status and plan details after successful start", async () => {
@@ -169,13 +169,13 @@ describe("App", () => {
     vi.mocked(startRun).mockResolvedValue(awaitingRun);
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: /start planning/i }));
+    await user.click(screen.getByRole("button", { name: /开始规划/ }));
 
-    expect(await screen.findByRole("heading", { name: "Calm family afternoon" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "徐汇亲子轻松下午" })).toBeInTheDocument();
     expect(screen.getAllByText("awaiting_confirmation").length).toBeGreaterThan(0);
-    expect(screen.getByText("Riverside Children Museum")).toBeInTheDocument();
-    expect(screen.getByText("Green Table")).toBeInTheDocument();
-    expect(screen.getByText("Short drive between stops.")).toBeInTheDocument();
+    expect(screen.getByText("徐汇亲子科学馆")).toBeInTheDocument();
+    expect(screen.getByText("绿碗家庭轻食")).toBeInTheDocument();
+    expect(screen.getByText("两站之间步行很短，适合推童车。")).toBeInTheDocument();
   });
 
   it("switches plan tabs without calling the backend", async () => {
@@ -183,11 +183,11 @@ describe("App", () => {
     vi.mocked(startRun).mockResolvedValue(awaitingRun);
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: /start planning/i }));
-    await user.click(await screen.findByRole("tab", { name: /park and cafe backup/i }));
+    await user.click(screen.getByRole("button", { name: /开始规划/ }));
+    await user.click(await screen.findByRole("tab", { name: /公园和咖啡备选/ }));
 
-    expect(screen.getByText("City Park")).toBeInTheDocument();
-    expect(screen.queryByText("Riverside Children Museum")).not.toBeInTheDocument();
+    expect(screen.getByText("滨江亲子乐园")).toBeInTheDocument();
+    expect(screen.queryByText("徐汇亲子科学馆")).not.toBeInTheDocument();
   });
 
   it("confirms a selected plan and renders completed feedback", async () => {
@@ -196,12 +196,12 @@ describe("App", () => {
     vi.mocked(confirmRun).mockResolvedValue(completedRun);
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: /start planning/i }));
-    await user.click(await screen.findByRole("button", { name: /confirm selected plan/i }));
+    await user.click(screen.getByRole("button", { name: /开始规划/ }));
+    await user.click(await screen.findByRole("button", { name: /确认所选方案/ }));
 
     expect(confirmRun).toHaveBeenCalledWith("run-1", "plan-1");
-    expect(await screen.findByText("Plan is ready")).toBeInTheDocument();
-    expect(screen.getByText("Reservation and message were completed.")).toBeInTheDocument();
+    expect(await screen.findByText("安排已完成")).toBeInTheDocument();
+    expect(screen.getByText("订座和消息通知已完成。")).toBeInTheDocument();
   });
 
   it("declines a selected plan and hides confirm action", async () => {
@@ -210,12 +210,12 @@ describe("App", () => {
     vi.mocked(declineRun).mockResolvedValue(declinedRun);
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: /start planning/i }));
-    await user.click(await screen.findByRole("button", { name: /^decline$/i }));
+    await user.click(screen.getByRole("button", { name: /开始规划/ }));
+    await user.click(await screen.findByRole("button", { name: /^暂不继续$/ }));
 
     expect(declineRun).toHaveBeenCalledWith("run-1", "plan-1");
-    expect(await screen.findByText("User chose not to continue.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /confirm selected plan/i })).not.toBeInTheDocument();
+    expect(await screen.findByText("用户选择暂不继续。")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /确认所选方案/ })).not.toBeInTheDocument();
   });
 
   it("renders API errors in user-readable form", async () => {
@@ -223,9 +223,9 @@ describe("App", () => {
     vi.mocked(startRun).mockRejectedValue(new Error("API connection failed."));
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: /start planning/i }));
+    await user.click(screen.getByRole("button", { name: /开始规划/ }));
 
     const alert = await screen.findByRole("alert");
-    expect(within(alert).getByText("API connection failed.")).toBeInTheDocument();
+    expect(within(alert).getByText("演示请求失败，请稍后重试。")).toBeInTheDocument();
   });
 });

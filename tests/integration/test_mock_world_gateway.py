@@ -119,7 +119,7 @@ def test_check_weather_through_gateway_is_cached_on_second_call(
     request = ToolGatewayRequest(
         run_id=run.run_id,
         tool_name="check_weather",
-        payload={"location": "Xuhui", "date": "2026-05-16"},
+        payload={"location": "徐汇", "date": "2026-05-16"},
     )
 
     first = gateway.invoke(request)
