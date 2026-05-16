@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     langsmith_tracing: bool = False
     langsmith_endpoint: str | None = None
     local_trace_buffer_path: str = "var/traces/weekendpilot-traces.jsonl"
+    demo_cors_origins: list[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
     langchain_tracing_v2: bool = False
     openai_api_key: SecretStr | None = None
     langsmith_api_key: SecretStr | None = None
