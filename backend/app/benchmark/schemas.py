@@ -62,6 +62,9 @@ class BenchmarkCaseResult(BaseModel):
     plan_status: str | None = None
     feedback_status: str | None = None
     observability_status: str | None = None
+    workflow_status: str | None = None
+    workflow_node_history: list[str] = Field(default_factory=list)
+    agent_roles: list[str] = Field(default_factory=list)
     failure_reasons: list[str] = Field(default_factory=list)
     report_path: str | None = None
 

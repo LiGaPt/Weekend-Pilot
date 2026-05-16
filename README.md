@@ -148,7 +148,7 @@ LOCAL_TRACE_BUFFER_PATH=var/traces/weekendpilot-traces.jsonl
 
 ## LocalLife-Bench Harness
 
-The v0 benchmark harness runs deterministic Mock World cases and writes local JSON reports. It does not require LangSmith credentials or live provider access.
+The benchmark harness runs file-based cases through the official LangGraph workflow and bounded deterministic agent adapters, then writes local JSON reports. It does not require LangSmith credentials or live provider access.
 
 ```bash
 docker compose up -d postgres redis
