@@ -169,15 +169,14 @@ class DemoWorkflowService:
                 plan.plan_id,
                 langsmith_trace_id=trace_id,
             )
-            self._append_continuation_history(run_id, ["execute"])
+            self._append_continuation_history(run_id, ["saga_execution_engine"])
 
             DeterministicFeedbackWriter(
                 plans=plans,
                 runs=runs,
             ).write_execution_feedback(run_id, plan.plan_id)
-            self._append_continuation_history(run_id, ["write_feedback"])
+            self._append_continuation_history(run_id, ["generate_summary_message"])
             self._record_observability(run_id, trace_id)
-            self._append_continuation_history(run_id, ["record_observability"])
 
             if execution.status not in {"succeeded", "partially_succeeded", "failed", "skipped"}:
                 raise DemoServiceError(500, "Demo execution returned an unsupported status.")

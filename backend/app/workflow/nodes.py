@@ -42,11 +42,17 @@ from backend.app.repositories import (
 from backend.app.tool_gateway import ToolGateway
 from backend.app.workflow.dependencies import WeekendPilotWorkflowDependencies
 from backend.app.workflow.errors import WorkflowError
-from backend.app.workflow.schemas import WeekendPilotWorkflowState
+from backend.app.workflow.state import (
+    CandidateBlackboard,
+    CandidateBlackboardEntry,
+    RouteTimeSummary,
+    WeekendPilotWorkflowState,
+    WorkflowMemoryRecord,
+)
 
 
 class WeekendPilotWorkflowNodes:
-    workflow_version = "langgraph_workflow_skeleton_v1"
+    workflow_version = "v1_workflow_state_dag_alignment"
 
     def __init__(self, dependencies: WeekendPilotWorkflowDependencies) -> None:
         self.dependencies = dependencies
@@ -72,7 +78,7 @@ class WeekendPilotWorkflowNodes:
         self.itinerary_planner_agent = DeterministicItineraryPlannerAgent()
         self.validator_recovery_agent = DeterministicValidatorRecoveryAgent()
 
-    def initialize_run(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
+    def initialize(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         user = self._get_or_create_user(
             external_user_id=state.get("external_user_id"),
             display_name=state.get("display_name"),
@@ -98,7 +104,7 @@ class WeekendPilotWorkflowNodes:
         trace_context = self.recorder.build_context(run.run_id)
         return self._updates(
             state,
-            "initialize_run",
+            "initialize",
             run_id=run.run_id,
             user_id=user.user_id,
             trace_id=trace_context.trace_id,
@@ -112,12 +118,12 @@ class WeekendPilotWorkflowNodes:
     def load_memory(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         user_id = self._required_uuid(state, "user_id")
         memories = [
-            self._memory_json(memory)
+            self._memory_record(memory)
             for memory in self.repositories.memory.list_active_for_user(user_id)
         ]
         return self._updates(state, "load_memory", active_memories=memories)
 
-    def build_query_plan(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
+    def generate_queries(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         query_plan = DeterministicQueryPlanner().build(
             self._required_value(state, "parsed_intent"),
             provider_profile=self._required_text(state, "tool_profile"),
@@ -130,25 +136,37 @@ class WeekendPilotWorkflowNodes:
         self._persist_agent_metadata(self._required_uuid(state, "run_id"), agent_results)
         return self._updates(
             state,
-            "build_query_plan",
+            "generate_queries",
             query_plan=query_plan,
             supervisor_assignment_plan=assignment_plan,
             agent_results=agent_results,
         )
 
-    def collect_candidates(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
+    def execute_searches(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         collection = QueryPlanExecutor(self.gateway).execute_initial_calls(
             self._required_value(state, "query_plan"),
             self._required_uuid(state, "run_id"),
             langsmith_trace_id=state.get("trace_id"),
         )
-        return self._updates(state, "collect_candidates", candidate_collection=collection)
+        return self._updates(state, "execute_searches", candidate_collection=collection)
 
-    def enrich_candidates(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
+    def populate_candidate_blackboard(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
+        blackboard = self._candidate_blackboard(self._required_value(state, "candidate_collection"))
+        return self._updates(
+            state,
+            "populate_candidate_blackboard",
+            candidate_blackboard=blackboard,
+        )
+
+    def pre_flight_check_availability(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         enrichment = CandidateEnricher(self.gateway).enrich(
             self._required_value(state, "query_plan"),
             self._required_value(state, "candidate_collection"),
             langsmith_trace_id=state.get("trace_id"),
+        )
+        blackboard = self._screen_candidate_blackboard(
+            self._required_value(state, "candidate_blackboard"),
+            enrichment,
         )
         discovery_result = self.discovery_agent.summarize(
             self._required_value(state, "query_plan"),
@@ -166,12 +184,13 @@ class WeekendPilotWorkflowNodes:
         self._persist_agent_metadata(self._required_uuid(state, "run_id"), agent_results)
         return self._updates(
             state,
-            "enrich_candidates",
+            "pre_flight_check_availability",
             enrichment_result=enrichment,
+            candidate_blackboard=blackboard,
             agent_results=agent_results,
         )
 
-    def generate_itinerary(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
+    def logical_planner_agent(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         agent_result, drafts = self.itinerary_planner_agent.generate(
             self._required_value(state, "query_plan"),
             self._required_value(state, "enrichment_result"),
@@ -181,12 +200,23 @@ class WeekendPilotWorkflowNodes:
         self._persist_agent_metadata(self._required_uuid(state, "run_id"), agent_results)
         return self._updates(
             state,
-            "generate_itinerary",
+            "logical_planner_agent",
             itinerary_drafts=drafts,
             agent_results=agent_results,
         )
 
-    def final_review(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
+    def route_and_time_engine(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
+        summary = self._route_time_summary(
+            self._required_value(state, "enrichment_result"),
+            self._required_value(state, "itinerary_drafts"),
+        )
+        return self._updates(
+            state,
+            "route_and_time_engine",
+            route_time_summary=summary,
+        )
+
+    def semantic_validator(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         run_id = self._required_uuid(state, "run_id")
         agent_result, review, recovery_decision = self.validator_recovery_agent.review(
             self._required_value(state, "query_plan"),
@@ -199,13 +229,31 @@ class WeekendPilotWorkflowNodes:
         self._persist_agent_metadata(run_id, agent_results)
         return self._updates(
             state,
-            "final_review",
+            "semantic_validator",
             final_review_result=review,
             recovery_decision=recovery_decision,
             agent_results=agent_results,
         )
 
-    def persist_and_select_plan(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
+    def final_review(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
+        review = self._required_value(state, "final_review_result")
+        run_id = self._required_uuid(state, "run_id")
+        if review.safe_to_present:
+            return self._updates(state, "final_review")
+
+        error_type = review.errors[0].check_name if review.errors else "final_review_blocked"
+        return self._fail(
+            state,
+            "final_review",
+            run_id,
+            error_type,
+            "Final review blocked presentation for this run.",
+        )
+
+    def present_to_user(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
+        if state.get("status") in {"failed", "error"}:
+            return self._updates(state, "present_to_user")
+
         review = self._required_value(state, "final_review_result")
         drafts = self._required_value(state, "itinerary_drafts")
         run_id = self._required_uuid(state, "run_id")
@@ -216,7 +264,7 @@ class WeekendPilotWorkflowNodes:
         if not review.safe_to_present:
             return self._fail(
                 state,
-                "persist_and_select_plan",
+                "present_to_user",
                 run_id,
                 "final_review_blocked",
                 "Final review blocked presentation for this run.",
@@ -225,7 +273,7 @@ class WeekendPilotWorkflowNodes:
         if not persisted_plans:
             return self._fail(
                 state,
-                "persist_and_select_plan",
+                "present_to_user",
                 run_id,
                 "no_persisted_plans",
                 "No safe reviewed plans were persisted for this run.",
@@ -236,7 +284,7 @@ class WeekendPilotWorkflowNodes:
         if selected_plan_index >= len(persisted_plans):
             return self._fail(
                 state,
-                "persist_and_select_plan",
+                "present_to_user",
                 run_id,
                 "selected_plan_index_out_of_range",
                 "Selected plan index is outside the persisted plan list.",
@@ -248,7 +296,7 @@ class WeekendPilotWorkflowNodes:
         selected = persistence.select_plan(run_id, persisted_plans[selected_plan_index].plan_id)
         return self._updates(
             state,
-            "persist_and_select_plan",
+            "present_to_user",
             persisted_plans=persisted_plans,
             selected_plan_id=selected.plan_id,
         )
@@ -282,7 +330,7 @@ class WeekendPilotWorkflowNodes:
             confirmation_result=confirmation,
         )
 
-    def execute(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
+    def saga_execution_engine(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         run_id = self._required_uuid(state, "run_id")
         execution = DeterministicExecutionWorkflow(
             self.repositories.plans,
@@ -294,13 +342,13 @@ class WeekendPilotWorkflowNodes:
         )
         return self._updates(
             state,
-            "execute",
+            "saga_execution_engine",
             execution_result=execution,
             execution_status=execution.status,
             action_count=self._action_count(run_id),
         )
 
-    def write_feedback(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
+    def generate_summary_message(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         feedback = DeterministicFeedbackWriter(
             plans=self.repositories.plans,
             runs=self.repositories.runs,
@@ -309,15 +357,11 @@ class WeekendPilotWorkflowNodes:
             self._required_uuid(state, "selected_plan_id"),
         )
         workflow_status = "completed" if feedback.status == "completed" else "failed"
-        return self._updates(
-            state,
-            "write_feedback",
-            feedback_result=feedback,
-            feedback_status=feedback.status,
-            status=workflow_status,
-        )
-
-    def record_observability(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
+        updates: dict[str, Any] = {
+            "feedback_result": feedback,
+            "feedback_status": feedback.status,
+            "status": workflow_status,
+        }
         try:
             observability = self.recorder.record_run_summary(
                 self._required_value(state, "trace_context")
@@ -330,21 +374,15 @@ class WeekendPilotWorkflowNodes:
                     self._required_uuid(state, "run_id"),
                     self._agent_results(state),
                 )
-            return self._updates(
-                state,
-                "record_observability",
-                observability_status="observability_failed",
-                error_json=state.get("error_json") or {"observability": error_json},
-            )
+            updates["observability_status"] = "observability_failed"
+            updates["error_json"] = state.get("error_json") or {"observability": error_json}
+            return self._updates(state, "generate_summary_message", **updates)
 
         status = "recorded" if observability.local_buffer_written else observability.status
         self._persist_agent_metadata(self._required_uuid(state, "run_id"), self._agent_results(state))
-        return self._updates(
-            state,
-            "record_observability",
-            observability_result=observability,
-            observability_status=status,
-        )
+        updates["observability_result"] = observability
+        updates["observability_status"] = status
+        return self._updates(state, "generate_summary_message", **updates)
 
     def _get_or_create_user(self, external_user_id: str | None, display_name: str | None):
         if external_user_id:
@@ -461,19 +499,97 @@ class WeekendPilotWorkflowNodes:
             return Path(trace_buffer_path)
         return Path("var/traces") / f"weekendpilot-{uuid4()}.jsonl"
 
-    def _memory_json(self, memory: Any) -> dict[str, Any]:
-        return {
-            "memory_id": str(memory.memory_id),
-            "memory_type": memory.memory_type,
-            "key": memory.key,
-            "value_json": deepcopy(memory.value_json),
-            "text": memory.text,
-            "confidence": str(memory.confidence),
-            "source_run_id": str(memory.source_run_id) if memory.source_run_id else None,
-            "source_langsmith_trace_id": memory.source_langsmith_trace_id,
-            "expires_at": memory.expires_at.isoformat() if memory.expires_at else None,
-            "status": memory.status,
+    def _memory_record(self, memory: Any) -> WorkflowMemoryRecord:
+        return WorkflowMemoryRecord(
+            memory_id=memory.memory_id,
+            memory_type=memory.memory_type,
+            key=memory.key,
+            value_json=deepcopy(memory.value_json),
+            text=memory.text,
+            confidence=str(memory.confidence),
+            source_run_id=memory.source_run_id,
+            source_langsmith_trace_id=memory.source_langsmith_trace_id,
+            expires_at=memory.expires_at.isoformat() if memory.expires_at else None,
+            status=memory.status,
+        )
+
+    def _candidate_blackboard(self, collection: Any) -> CandidateBlackboard:
+        return CandidateBlackboard(
+            activity_candidates=[
+                CandidateBlackboardEntry(candidate=candidate)
+                for candidate in collection.activity_candidates
+            ],
+            dining_candidates=[
+                CandidateBlackboardEntry(candidate=candidate)
+                for candidate in collection.dining_candidates
+            ],
+            other_candidates=[
+                CandidateBlackboardEntry(candidate=candidate)
+                for candidate in collection.other_candidates
+            ],
+        )
+
+    def _screen_candidate_blackboard(
+        self,
+        blackboard: CandidateBlackboard,
+        enrichment: Any,
+    ) -> CandidateBlackboard:
+        enriched_by_id = {
+            item.candidate.candidate_id: item
+            for item in [
+                *enrichment.enriched_activity_candidates,
+                *enrichment.enriched_dining_candidates,
+                *enrichment.enriched_other_candidates,
+            ]
         }
+
+        def screen(entry: CandidateBlackboardEntry) -> CandidateBlackboardEntry:
+            enriched = enriched_by_id.get(entry.candidate.candidate_id)
+            if enriched is None:
+                return entry
+            failed_codes = [
+                self._tool_failure_code(tool_result.error_json)
+                for tool_result in enriched.failed_tool_results
+            ]
+            failed_codes = [code for code in failed_codes if code]
+            return entry.model_copy(
+                update={
+                    "suitability_status": "screened_out" if failed_codes else "screened_in",
+                    "evidence_tool_names": [
+                        tool_result.tool_name for tool_result in enriched.tool_results
+                    ],
+                    "risk_codes": failed_codes,
+                }
+            )
+
+        activity = [screen(entry) for entry in blackboard.activity_candidates]
+        dining = [screen(entry) for entry in blackboard.dining_candidates]
+        other = [screen(entry) for entry in blackboard.other_candidates]
+        return CandidateBlackboard(
+            activity_candidates=activity,
+            dining_candidates=dining,
+            other_candidates=other,
+            screened_candidate_ids=[
+                entry.candidate.candidate_id
+                for entry in [*activity, *dining, *other]
+                if entry.suitability_status == "screened_in"
+            ],
+        )
+
+    def _route_time_summary(self, enrichment: Any, drafts: Any) -> RouteTimeSummary:
+        feasible_count = sum(1 for draft in drafts.drafts if draft.feasibility.is_feasible)
+        return RouteTimeSummary(
+            route_count=len(enrichment.route_matrix),
+            feasible_draft_count=feasible_count,
+            infeasible_draft_count=max(len(drafts.drafts) - feasible_count, 0),
+            route_matrix=list(enrichment.route_matrix),
+        )
+
+    def _tool_failure_code(self, error_json: dict[str, Any] | None) -> str | None:
+        if not isinstance(error_json, dict):
+            return None
+        code = error_json.get("error_type") or error_json.get("code")
+        return str(code) if code else None
 
     def _required_uuid(self, state: WeekendPilotWorkflowState, key: str) -> UUID:
         value = state.get(key)

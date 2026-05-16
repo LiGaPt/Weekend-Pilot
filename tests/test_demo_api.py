@@ -86,7 +86,7 @@ def test_demo_run_summary_serializes_minimal_web_safe_payload() -> None:
                 "summary": "一条适合亲子出行和清淡晚餐的方案。",
             }
         ],
-        node_history=["initialize_run", "wait_confirmation"],
+        node_history=["initialize", "wait_confirmation"],
         tool_event_count=3,
         action_count=0,
         execution_status=None,

@@ -13,8 +13,8 @@ from backend.app.workflow.graph import REQUIRED_NODE_NAMES, build_weekend_pilot_
 
 
 class _StubNodes:
-    def initialize_run(self, state):
-        return self._append(state, "initialize_run")
+    def initialize(self, state):
+        return self._append(state, "initialize")
 
     def parse_intent(self, state):
         return self._append(state, "parse_intent")
@@ -22,23 +22,32 @@ class _StubNodes:
     def load_memory(self, state):
         return self._append(state, "load_memory")
 
-    def build_query_plan(self, state):
-        return self._append(state, "build_query_plan")
+    def generate_queries(self, state):
+        return self._append(state, "generate_queries")
 
-    def collect_candidates(self, state):
-        return self._append(state, "collect_candidates")
+    def execute_searches(self, state):
+        return self._append(state, "execute_searches")
 
-    def enrich_candidates(self, state):
-        return self._append(state, "enrich_candidates")
+    def populate_candidate_blackboard(self, state):
+        return self._append(state, "populate_candidate_blackboard")
 
-    def generate_itinerary(self, state):
-        return self._append(state, "generate_itinerary")
+    def pre_flight_check_availability(self, state):
+        return self._append(state, "pre_flight_check_availability")
+
+    def logical_planner_agent(self, state):
+        return self._append(state, "logical_planner_agent")
+
+    def route_and_time_engine(self, state):
+        return self._append(state, "route_and_time_engine")
+
+    def semantic_validator(self, state):
+        return self._append(state, "semantic_validator")
 
     def final_review(self, state):
         return self._append(state, "final_review")
 
-    def persist_and_select_plan(self, state):
-        return self._append(state, "persist_and_select_plan")
+    def present_to_user(self, state):
+        return self._append(state, "present_to_user")
 
     def wait_confirmation(self, state):
         updates = self._append(state, "wait_confirmation")
@@ -48,14 +57,11 @@ class _StubNodes:
             updates["status"] = "awaiting_confirmation"
         return updates
 
-    def execute(self, state):
-        return self._append(state, "execute")
+    def saga_execution_engine(self, state):
+        return self._append(state, "saga_execution_engine")
 
-    def write_feedback(self, state):
-        return self._append(state, "write_feedback")
-
-    def record_observability(self, state):
-        return self._append(state, "record_observability")
+    def generate_summary_message(self, state):
+        return self._append(state, "generate_summary_message")
 
     def _append(self, state, name: str):
         return {"node_history": [*state.get("node_history", []), name]}
@@ -82,7 +88,7 @@ def test_confirmation_route_stops_when_awaiting_confirmation() -> None:
 
 
 def test_confirmation_route_continues_to_execute_when_confirmed() -> None:
-    assert route_after_confirmation({"status": "completed", "auto_confirm": True}) == "execute"
+    assert route_after_confirmation({"status": "completed", "auto_confirm": True}) == "saga_execution_engine"
 
 
 def test_unsupported_profile_result_is_typed_and_does_not_raise() -> None:

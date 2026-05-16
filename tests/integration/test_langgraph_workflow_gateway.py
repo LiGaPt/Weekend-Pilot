@@ -110,7 +110,7 @@ def test_workflow_stops_at_confirmation_boundary_without_write_actions(
     assert result.action_count == 0
     assert _action_count(db_session, result.run_id) == 0
     assert "wait_confirmation" in result.node_history
-    assert "execute" not in result.node_history
+    assert "saga_execution_engine" not in result.node_history
 
 
 def test_workflow_auto_confirm_executes_feedback_and_observability(
@@ -138,7 +138,8 @@ def test_workflow_auto_confirm_executes_feedback_and_observability(
     assert result.feedback_status == "completed"
     assert result.observability_status is not None
     assert result.action_count > 0
-    assert "record_observability" in result.node_history
+    assert "saga_execution_engine" in result.node_history
+    assert "generate_summary_message" in result.node_history
 
     trace_ids = set(
         db_session.scalars(select(ToolEvent.langsmith_trace_id).where(ToolEvent.run_id == result.run_id)).all()

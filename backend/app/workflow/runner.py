@@ -13,9 +13,9 @@ from backend.app.workflow.nodes import WeekendPilotWorkflowNodes
 from backend.app.workflow.schemas import (
     WeekendPilotWorkflowRequest,
     WeekendPilotWorkflowResult,
-    WeekendPilotWorkflowState,
     WorkflowStatus,
 )
+from backend.app.workflow.state import CandidateBlackboard, RouteTimeSummary, WeekendPilotWorkflowState
 
 
 class WeekendPilotWorkflowRunner:
@@ -84,6 +84,9 @@ class WeekendPilotWorkflowRunner:
             trace_id=None,
             selected_plan_id=None,
             active_memories=[],
+            candidate_blackboard=CandidateBlackboard(),
+            route_time_summary=RouteTimeSummary(),
+            agent_results=[],
             persisted_plans=[],
             node_history=[],
             tool_event_count=0,
