@@ -22,6 +22,14 @@ EXPECTED_AGENT_ROLES = {
     "itinerary_planner",
     "validator_recovery",
 }
+DEFAULT_CASE_IDS = {
+    "family_afternoon_v1",
+    "family_indoor_light_meal_v1",
+    "family_outdoor_quick_dinner_v1",
+    "family_memory_override_v1",
+    "family_citywalk_addon_v1",
+}
+FORBIDDEN_REPORT_TEXT = ("action_id", "tool_event_id", "api_key", "token", "secret", "debug_trace")
 
 
 @pytest.fixture()
@@ -129,3 +137,55 @@ def test_benchmark_harness_runs_full_mock_world_case(
     assert {entry["role"] for entry in run.metadata_json["agents"]["results"]} == EXPECTED_AGENT_ROLES
     assert "observability" in run.metadata_json
     assert run.metadata_json["observability"]["trace_id"] == result.trace_id
+
+
+def test_benchmark_harness_runs_default_mock_world_suite(
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    cases = load_default_benchmark_cases()
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    report = harness.run_cases(cases)
+
+    assert {result.case_id for result in report.case_results} == DEFAULT_CASE_IDS
+    assert len(report.case_results) == 5
+    assert report.run_status == "passed"
+    assert report.passed_count == 5
+    assert report.failed_count == 0
+    assert report.error_count == 0
+
+    for result in report.case_results:
+        assert result.status == "passed"
+        assert result.run_id is not None
+        assert result.trace_id is not None
+        assert result.workflow_status == "completed"
+        assert result.feedback_status == "completed"
+        assert set(result.agent_roles) == EXPECTED_AGENT_ROLES
+        assert result.report_path is not None
+
+        report_path = Path(result.report_path)
+        assert report_path.exists()
+        report_payload = json.loads(report_path.read_text(encoding="utf-8"))
+        assert report_payload["case_id"] == result.case_id
+        assert report_payload["status"] == "passed"
+        serialized_report = json.dumps(report_payload, sort_keys=True)
+        for forbidden in FORBIDDEN_REPORT_TEXT:
+            assert forbidden not in serialized_report
+
+        run = db_session.get(AgentRun, result.run_id)
+        assert run is not None
+        assert run.case_id == result.case_id
+        assert run.metadata_json["benchmark"]["case_id"] == result.case_id
+        assert run.metadata_json["workflow"]["source"] == "langgraph-workflow"
+        assert {entry["role"] for entry in run.metadata_json["agents"]["results"]} == EXPECTED_AGENT_ROLES
+        assert run.metadata_json["observability"]["trace_id"] == result.trace_id

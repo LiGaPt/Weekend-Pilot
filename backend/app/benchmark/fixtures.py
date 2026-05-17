@@ -10,7 +10,13 @@ from backend.app.benchmark.errors import BenchmarkHarnessError
 from backend.app.benchmark.schemas import BenchmarkCase
 
 
-_DEFAULT_CASE_IDS = ("family_afternoon_v1",)
+_DEFAULT_CASE_IDS = (
+    "family_afternoon_v1",
+    "family_indoor_light_meal_v1",
+    "family_outdoor_quick_dinner_v1",
+    "family_memory_override_v1",
+    "family_citywalk_addon_v1",
+)
 
 
 def load_benchmark_case(case_id: str) -> BenchmarkCase:

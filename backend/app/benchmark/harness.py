@@ -134,7 +134,7 @@ class BenchmarkHarness:
             WeekendPilotWorkflowDependencies(
                 session=self.session,
                 cache=self.cache,
-                rate_limiter=self.rate_limiter,
+                rate_limiter=_BenchmarkCaseRateLimiter(self.rate_limiter, external_user_id),
                 trace_buffer_path=self._trace_path(case.case_id),
             )
         ).run(
@@ -309,3 +309,16 @@ class _Repositories:
         self.tool_events = ToolEventRepository(session)
         self.action_ledger = ActionLedgerRepository(session)
         self.plans = PlanRepository(session)
+
+
+class _BenchmarkCaseRateLimiter(FixedWindowRateLimiter):
+    def __init__(self, base: FixedWindowRateLimiter, namespace: str) -> None:
+        self._base = base
+        self._namespace = namespace
+
+    def allow(self, name: str, limit: int, window_seconds: int):
+        return self._base.allow(
+            f"benchmark:{self._namespace}:{name}",
+            limit=limit,
+            window_seconds=window_seconds,
+        )
