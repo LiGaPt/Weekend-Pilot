@@ -7,8 +7,10 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from backend.app.agents import AgentResult, DeterministicValidatorRecoveryAgent, RecoveryDecision
 from backend.app.db.session import SessionLocal
 from backend.app.models.runtime import ActionLedger, AgentRun, ToolEvent
+from backend.app.review.schemas import FinalReviewResult, ReviewCheck
 from backend.app.runtime import FixedWindowRateLimiter, JsonRedisCache, RedisKeyBuilder, get_redis_client
 from backend.app.workflow import (
     WeekendPilotWorkflowDependencies,
@@ -149,3 +151,160 @@ def test_workflow_auto_confirm_executes_feedback_and_observability(
     run = db_session.get(AgentRun, result.run_id)
     assert run is not None
     assert run.metadata_json["observability"]["trace_id"] == result.trace_id
+
+
+def test_workflow_recovery_stop_safely_records_metadata_without_actions(
+    db_session: Session,
+    redis_runtime,
+    trace_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _blocked_review(self, plan, enrichment, drafts, pre_confirmation_action_count=0, context=None):
+        del self, plan, enrichment, pre_confirmation_action_count, context
+        failed_check = ReviewCheck(
+            check_name="route_verified",
+            status="failed",
+            severity="error",
+            message="Route cannot be verified.",
+        )
+        review = FinalReviewResult(
+            run_id=drafts.run_id,
+            provider_profile=drafts.provider_profile,
+            decision="blocked",
+            safe_to_present=False,
+            checks=[failed_check],
+            errors=[failed_check],
+            gate_version="test-gate",
+        )
+        decision = RecoveryDecision(
+            verdict="failed",
+            error_type="route_verified",
+            recovery_action="stop_safely",
+            retry_budget=0,
+            reason="Route cannot be recovered safely.",
+        )
+        return (
+            AgentResult(
+                role="validator_recovery",
+                status="blocked",
+                summary="Blocked by test gate.",
+                adapter_version="test-validator",
+                output_json={"recovery_decision": decision.model_dump(mode="json")},
+            ),
+            review,
+            decision,
+        )
+
+    monkeypatch.setattr(DeterministicValidatorRecoveryAgent, "review", _blocked_review)
+    runner = _build_runner(db_session, redis_runtime, trace_path)
+
+    result = runner.run(
+        WeekendPilotWorkflowRequest(
+            user_input=USER_INPUT,
+            external_user_id=f"workflow-recovery-stop-{uuid4()}",
+            display_name="Workflow Recovery Stop Tester",
+            case_id="case-langgraph-recovery-stop",
+            auto_confirm=False,
+        )
+    )
+
+    assert result.status == "failed"
+    assert result.run_id is not None
+    assert result.error_json is not None
+    assert result.error_json["error_type"] == "recovery_stopped"
+    assert result.action_count == 0
+    assert _action_count(db_session, result.run_id) == 0
+    assert "apply_recovery" in result.node_history
+    assert "saga_execution_engine" not in result.node_history
+
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    recovery = run.metadata_json["workflow"]["recovery"]
+    assert recovery["attempt_count"] == 1
+    assert recovery["max_attempts"] == 1
+    assert recovery["attempts"][0]["status"] == "stopped"
+
+
+def test_workflow_recovery_retry_loops_once_and_pauses_without_actions(
+    db_session: Session,
+    redis_runtime,
+    trace_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_review = DeterministicValidatorRecoveryAgent.review
+    call_count = {"count": 0}
+
+    def _retry_then_pass(self, plan, enrichment, drafts, pre_confirmation_action_count=0, context=None):
+        call_count["count"] += 1
+        if call_count["count"] > 1:
+            return original_review(
+                self,
+                plan,
+                enrichment,
+                drafts,
+                pre_confirmation_action_count=pre_confirmation_action_count,
+                context=context,
+            )
+
+        failed_check = ReviewCheck(
+            check_name="route_infeasible",
+            status="failed",
+            severity="error",
+            message="Route needs a retry.",
+        )
+        review = FinalReviewResult(
+            run_id=drafts.run_id,
+            provider_profile=drafts.provider_profile,
+            decision="blocked",
+            safe_to_present=False,
+            checks=[failed_check],
+            errors=[failed_check],
+            gate_version="test-gate",
+        )
+        decision = RecoveryDecision(
+            verdict="failed",
+            error_type="route_infeasible",
+            recovery_action="retry",
+            route_to="execute_searches",
+            retry_budget=1,
+            reason="Retry deterministic reads once.",
+        )
+        return (
+            AgentResult(
+                role="validator_recovery",
+                status="blocked",
+                summary="Retry requested by test gate.",
+                adapter_version="test-validator",
+                output_json={"recovery_decision": decision.model_dump(mode="json")},
+            ),
+            review,
+            decision,
+        )
+
+    monkeypatch.setattr(DeterministicValidatorRecoveryAgent, "review", _retry_then_pass)
+    runner = _build_runner(db_session, redis_runtime, trace_path)
+
+    result = runner.run(
+        WeekendPilotWorkflowRequest(
+            user_input=USER_INPUT,
+            external_user_id=f"workflow-recovery-retry-{uuid4()}",
+            display_name="Workflow Recovery Retry Tester",
+            case_id="case-langgraph-recovery-retry",
+            auto_confirm=False,
+        )
+    )
+
+    assert result.status == "awaiting_confirmation"
+    assert result.run_id is not None
+    assert result.action_count == 0
+    assert _action_count(db_session, result.run_id) == 0
+    assert result.node_history.count("execute_searches") >= 2
+    assert result.node_history.count("apply_recovery") == 1
+    assert "saga_execution_engine" not in result.node_history
+
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    recovery = run.metadata_json["workflow"]["recovery"]
+    assert recovery["attempt_count"] == 1
+    assert recovery["attempts"][0]["status"] == "routed"
+    assert recovery["attempts"][0]["route_to"] == "execute_searches"

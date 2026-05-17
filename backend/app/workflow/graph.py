@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from langgraph.graph import END, START, StateGraph
 
+from backend.app.agents import RecoveryDecision
 from backend.app.workflow.state import V1_WORKFLOW_NODE_NAMES, WeekendPilotWorkflowState
 
 if TYPE_CHECKING:
@@ -26,6 +27,7 @@ def build_weekend_pilot_graph(nodes: WeekendPilotWorkflowNodes):
     graph.add_node("logical_planner_agent", nodes.logical_planner_agent)
     graph.add_node("route_and_time_engine", nodes.route_and_time_engine)
     graph.add_node("semantic_validator", nodes.semantic_validator)
+    graph.add_node("apply_recovery", nodes.apply_recovery)
     graph.add_node("final_review", nodes.final_review)
     graph.add_node("present_to_user", nodes.present_to_user)
     graph.add_node("wait_confirmation", nodes.wait_confirmation)
@@ -42,7 +44,25 @@ def build_weekend_pilot_graph(nodes: WeekendPilotWorkflowNodes):
     graph.add_edge("pre_flight_check_availability", "logical_planner_agent")
     graph.add_edge("logical_planner_agent", "route_and_time_engine")
     graph.add_edge("route_and_time_engine", "semantic_validator")
-    graph.add_edge("semantic_validator", "final_review")
+    graph.add_conditional_edges(
+        "semantic_validator",
+        route_after_validation,
+        {
+            "final_review": "final_review",
+            "apply_recovery": "apply_recovery",
+        },
+    )
+    graph.add_conditional_edges(
+        "apply_recovery",
+        route_after_recovery,
+        {
+            "generate_queries": "generate_queries",
+            "execute_searches": "execute_searches",
+            "logical_planner_agent": "logical_planner_agent",
+            "failed": END,
+            "error": END,
+        },
+    )
     graph.add_edge("final_review", "present_to_user")
     graph.add_edge("present_to_user", "wait_confirmation")
     graph.add_conditional_edges(
@@ -59,6 +79,29 @@ def build_weekend_pilot_graph(nodes: WeekendPilotWorkflowNodes):
     graph.add_edge("generate_summary_message", END)
 
     return graph.compile()
+
+
+def route_after_validation(state: WeekendPilotWorkflowState | dict[str, Any]) -> str:
+    decision = _state_value(state, "recovery_decision")
+    if isinstance(decision, dict):
+        decision = RecoveryDecision.model_validate(decision)
+    if isinstance(decision, RecoveryDecision) and (
+        decision.verdict == "passed" or decision.recovery_action == "none"
+    ):
+        return "final_review"
+    return "apply_recovery"
+
+
+def route_after_recovery(state: WeekendPilotWorkflowState | dict[str, Any]) -> str:
+    status = _state_value(state, "status")
+    if status == "error":
+        return "error"
+    if status == "failed":
+        return "failed"
+    route = _state_value(state, "active_recovery_route")
+    if route in {"generate_queries", "execute_searches", "logical_planner_agent"}:
+        return route
+    return "failed"
 
 
 def route_after_confirmation(state: WeekendPilotWorkflowState | dict[str, Any]) -> str:

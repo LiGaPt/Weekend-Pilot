@@ -2,6 +2,7 @@ from backend.app.workflow.dependencies import WeekendPilotWorkflowDependencies
 from backend.app.workflow.errors import WorkflowError
 from backend.app.workflow.runner import WeekendPilotWorkflowRunner
 from backend.app.workflow.schemas import WeekendPilotWorkflowRequest, WeekendPilotWorkflowResult
+from backend.app.workflow.recovery import RecoveryAttempt, RecoveryRouteResult
 from backend.app.workflow.state import (
     CandidateBlackboard,
     CandidateBlackboardEntry,
@@ -25,4 +26,6 @@ __all__ = [
     "CandidateBlackboardEntry",
     "RouteTimeSummary",
     "V1_WORKFLOW_NODE_NAMES",
+    "RecoveryAttempt",
+    "RecoveryRouteResult",
 ]

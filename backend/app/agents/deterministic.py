@@ -296,7 +296,7 @@ class DeterministicValidatorRecoveryAgent:
             error_type=error_type,
             recovery_action="stop_safely",
             retry_budget=0,
-            reason="Final review blocked presentation; Task 020 does not execute recovery routes.",
+            reason="Final review blocked presentation; recovery should stop safely.",
         )
 
 

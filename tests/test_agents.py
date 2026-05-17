@@ -36,6 +36,8 @@ from backend.app.planning import (
     TimeWindow,
     ToolCallTemplate,
 )
+from backend.app.review import FinalReviewGate
+from backend.app.review.schemas import FinalReviewResult, ReviewCheck
 from backend.app.tool_gateway.registry import WRITE_TOOLS
 
 
@@ -290,6 +292,43 @@ def test_validator_recovery_returns_passed_decision_for_safe_review() -> None:
     assert decision.verdict == "passed"
     assert decision.recovery_action == "none"
     assert decision.retry_budget == 0
+
+
+def test_validator_recovery_returns_stop_safely_for_blocked_review() -> None:
+    class _BlockedGate(FinalReviewGate):
+        def review(self, *args, **kwargs):
+            del args, kwargs
+            failed_check = ReviewCheck(
+                check_name="route_verified",
+                status="failed",
+                severity="error",
+                message="Route cannot be verified.",
+            )
+            return FinalReviewResult(
+                run_id=uuid4(),
+                provider_profile="mock_world",
+                decision="blocked",
+                safe_to_present=False,
+                checks=[failed_check],
+                errors=[failed_check],
+                gate_version="test-gate",
+            )
+
+    result, review, decision = DeterministicValidatorRecoveryAgent(gate=_BlockedGate()).review(
+        _plan(),
+        _enrichment(),
+        DeterministicItineraryGenerator().generate(_plan(), _enrichment()),
+        pre_confirmation_action_count=0,
+    )
+
+    assert result.role == "validator_recovery"
+    assert result.status == "blocked"
+    assert review.safe_to_present is False
+    assert decision.verdict == "failed"
+    assert decision.error_type == "route_verified"
+    assert decision.recovery_action == "stop_safely"
+    assert decision.retry_budget == 0
+    assert "does not execute recovery routes" not in decision.reason
 
 
 def test_sanitizer_removes_sensitive_keys_and_raw_ids() -> None:
