@@ -14,10 +14,16 @@ from backend.app.benchmark.graders import (
     combine_scores,
     grade_agent_coverage,
     grade_execution_safety,
+    grade_failure_injection,
     grade_feedback,
     grade_plan_quality,
+    grade_recovery_expectation,
     grade_trajectory,
     grade_workflow_path,
+)
+from backend.app.benchmark.failure_profiles import (
+    build_benchmark_failure_injector,
+    failure_profile_metadata,
 )
 from backend.app.benchmark.reporting import write_case_report
 from backend.app.benchmark.schemas import BenchmarkCase, BenchmarkCaseResult, BenchmarkRunReport
@@ -108,6 +114,7 @@ class BenchmarkHarness:
             report_path = write_case_report(result, self.report_dir)
             return result.model_copy(update={"report_path": str(report_path)})
 
+        failure_injector = build_benchmark_failure_injector(case.failure_profile)
         repositories = _Repositories(self.session)
         external_user_id = f"benchmark-{case.case_id}-{uuid4()}"
         user = repositories.users.get_by_external_id(external_user_id)
@@ -135,6 +142,7 @@ class BenchmarkHarness:
                 session=self.session,
                 cache=self.cache,
                 rate_limiter=_BenchmarkCaseRateLimiter(self.rate_limiter, external_user_id),
+                failure_injector=failure_injector,
                 trace_buffer_path=self._trace_path(case.case_id),
             )
         ).run(
@@ -180,6 +188,8 @@ class BenchmarkHarness:
             return result.model_copy(update={"report_path": str(report_path)})
 
         self._record_benchmark_metadata(repositories, run.run_id, case)
+        updated_run = repositories.runs.get_by_id(run.run_id)
+        run_metadata = updated_run.metadata_json if updated_run is not None else run.metadata_json
 
         if workflow_result.status == "error":
             result = self._workflow_error_result(case, workflow_result)
@@ -192,13 +202,17 @@ class BenchmarkHarness:
         execution = plan_json.get("execution") if isinstance(plan_json, dict) else None
         feedback = plan_json.get("feedback") if isinstance(plan_json, dict) else None
         scores = [
-            grade_workflow_path(workflow_result),
+            grade_workflow_path(workflow_result, case),
             grade_agent_coverage(workflow_result),
             grade_trajectory(case, tool_events),
-            grade_plan_quality(selected_plan),
+            grade_failure_injection(case, tool_events),
             grade_execution_safety(case, execution),
             grade_feedback(case, feedback),
         ]
+        if case.expected.expected_workflow_status == "completed":
+            scores.insert(3, grade_plan_quality(selected_plan))
+        if case.expected.expected_recovery_action is not None:
+            scores.append(grade_recovery_expectation(case, run_metadata))
         status, overall, failure_reasons = combine_scores(scores)
         result = BenchmarkCaseResult(
             case_id=case.case_id,
@@ -255,6 +269,8 @@ class BenchmarkHarness:
         metadata["benchmark"] = {
             "case_id": case.case_id,
             "title": case.title,
+            "failure_profile": case.failure_profile,
+            "failure_profile_metadata": failure_profile_metadata(case.failure_profile),
             "benchmark_harness_version": self.harness_version,
             "harness_version": self.harness_version,
             "metadata": case.metadata,

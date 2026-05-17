@@ -7,6 +7,7 @@ from backend.app.repositories import ActionLedgerRepository, ToolEventRepository
 from backend.app.runtime import FixedWindowRateLimiter, JsonRedisCache
 from backend.app.tool_gateway.cache_keys import build_tool_cache_key
 from backend.app.tool_gateway.errors import error_json
+from backend.app.tool_gateway.failure_injection import ToolFailureInjector
 from backend.app.tool_gateway.models import ToolDefinition, ToolGatewayRequest, ToolGatewayResult, ToolType
 from backend.app.tool_gateway.registry import ToolRegistry
 
@@ -19,12 +20,14 @@ class ToolGateway:
         action_ledger: ActionLedgerRepository,
         cache: JsonRedisCache,
         rate_limiter: FixedWindowRateLimiter,
+        failure_injector: ToolFailureInjector | None = None,
     ) -> None:
         self._registry = registry
         self._tool_events = tool_events
         self._action_ledger = action_ledger
         self._cache = cache
         self._rate_limiter = rate_limiter
+        self._failure_injector = failure_injector
 
     def invoke(self, request: ToolGatewayRequest) -> ToolGatewayResult:
         started_at = time.perf_counter()
@@ -64,6 +67,24 @@ class ToolGateway:
         provider: Any,
         started_at: float,
     ) -> ToolGatewayResult:
+        injected = (
+            self._failure_injector.maybe_inject(request, definition, provider_name)
+            if self._failure_injector is not None
+            else None
+        )
+        if injected is not None:
+            return self._record_result(
+                request=request,
+                definition=definition,
+                provider_name=provider_name,
+                status=injected.status,
+                response_json=injected.response_json,
+                error_json=injected.error_json,
+                cache_hit=False,
+                latency_ms=self._latency_ms(started_at),
+                action_id=None,
+            )
+
         rate_limited = self._check_rate_limit(definition, provider_name)
         if rate_limited is not None:
             return self._record_result(

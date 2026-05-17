@@ -14,7 +14,15 @@ from backend.app.repositories import (
     UserRepository,
 )
 from backend.app.runtime import FixedWindowRateLimiter, JsonRedisCache, RedisKeyBuilder, get_redis_client
-from backend.app.tool_gateway import ToolDefinition, ToolGateway, ToolGatewayRequest, ToolRateLimit, ToolRegistry
+from backend.app.tool_gateway import (
+    StaticToolFailureInjector,
+    ToolDefinition,
+    ToolFailureInjectionRule,
+    ToolGateway,
+    ToolGatewayRequest,
+    ToolRateLimit,
+    ToolRegistry,
+)
 
 
 TEST_PREFIX = "weekendpilot:test:gateway"
@@ -90,6 +98,7 @@ def build_gateway(
     provider: FakeProvider,
     cache: JsonRedisCache,
     rate_limiter: FixedWindowRateLimiter,
+    failure_injector=None,
 ) -> ToolGateway:
     registry = ToolRegistry()
     registry.register_tool(definition)
@@ -100,6 +109,7 @@ def build_gateway(
         action_ledger=ActionLedgerRepository(session),
         cache=cache,
         rate_limiter=rate_limiter,
+        failure_injector=failure_injector,
     )
 
 
@@ -201,6 +211,55 @@ def test_rate_limited_tool_blocks_provider_call(db_session: Session, redis_runti
     assert second.status == "rate_limited"
     assert second.error_json["code"] == "rate_limited"
     assert len(provider.calls) == 1
+
+
+def test_injected_read_failure_writes_failed_event_without_provider_call(
+    db_session: Session,
+    redis_runtime,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    provider = FakeProvider()
+    injector = StaticToolFailureInjector(
+        profile_id="route_unavailable_v0",
+        rules=[
+            ToolFailureInjectionRule(
+                rule_id="route_unavailable_v0.check_route",
+                tool_name="check_route",
+                injected_error_type="route_infeasible",
+            )
+        ],
+    )
+    gateway = build_gateway(
+        db_session,
+        ToolDefinition(name="check_route", tool_type="read", default_provider="fake"),
+        provider,
+        cache,
+        rate_limiter,
+        failure_injector=injector,
+    )
+    run = create_run(db_session)
+
+    result = gateway.invoke(
+        ToolGatewayRequest(
+            run_id=run.run_id,
+            tool_name="check_route",
+            payload={"origin_id": "activity", "destination_id": "dining"},
+        )
+    )
+
+    assert result.status == "failed"
+    assert result.response_json is None
+    assert result.cache_hit is False
+    assert result.action_id is None
+    assert result.error_json["error_type"] == "failure_injected"
+    assert result.error_json["details"]["profile_id"] == "route_unavailable_v0"
+    assert provider.calls == []
+
+    events = ToolEventRepository(db_session).list_for_run(run.run_id)
+    assert len(events) == 1
+    assert events[0].tool_name == "check_route"
+    assert events[0].status == "failed"
+    assert events[0].error_json["error_type"] == "failure_injected"
 
 
 def test_write_tool_is_blocked_before_confirmation(db_session: Session, redis_runtime) -> None:
