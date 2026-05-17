@@ -8,14 +8,21 @@ from uuid import uuid4
 
 import pytest
 
-from backend.app.benchmark import load_benchmark_case, load_default_benchmark_cases
+from backend.app.benchmark import (
+    load_benchmark_case,
+    load_default_benchmark_cases,
+    load_failure_benchmark_cases,
+)
 from backend.app.benchmark.errors import BenchmarkHarnessError
 import backend.app.benchmark.graders as benchmark_graders
 from backend.app.benchmark.graders import (
     combine_scores,
     grade_execution_safety,
+    grade_failure_injection,
     grade_feedback,
+    grade_recovery_expectation,
     grade_trajectory,
+    grade_workflow_path,
 )
 from backend.app.benchmark.reporting import write_case_report
 from backend.app.benchmark.schemas import (
@@ -42,6 +49,7 @@ DEFAULT_CASE_IDS = (
     "family_memory_override_v1",
     "family_citywalk_addon_v1",
 )
+FAILURE_CASE_IDS = ("family_route_failure_v1",)
 REQUIRED_CASE_TOOL_NAMES = {
     "search_poi",
     "check_weather",
@@ -60,6 +68,22 @@ def test_default_fixtures_load_as_ordered_benchmark_cases() -> None:
     assert [case.case_id for case in cases] == list(DEFAULT_CASE_IDS)
     assert len(cases) == 5
     assert all(isinstance(case, BenchmarkCase) for case in cases)
+
+
+def test_failure_fixtures_are_loadable_but_not_default() -> None:
+    default_cases = load_default_benchmark_cases()
+    failure_cases = load_failure_benchmark_cases()
+
+    assert [case.case_id for case in failure_cases] == list(FAILURE_CASE_IDS)
+    assert {case.case_id for case in default_cases}.isdisjoint(FAILURE_CASE_IDS)
+
+    case = load_benchmark_case("family_route_failure_v1")
+    assert case.case_id == "family_route_failure_v1"
+    assert case.failure_profile == "route_unavailable_v0"
+    assert case.expected.expected_workflow_status == "failed"
+    assert case.expected.expected_error_type == "recovery_stopped"
+    assert case.expected.expected_recovery_action == "stop_safely"
+    assert case.expected.min_injected_failure_count == 1
 
 
 def test_default_fixtures_can_be_loaded_individually() -> None:
@@ -162,6 +186,36 @@ def test_workflow_path_grader_passes_for_completed_required_nodes() -> None:
     assert score.score == 1.0
 
 
+def test_workflow_path_grader_passes_for_expected_safe_stop_failure() -> None:
+    case = BenchmarkCase(
+        case_id="family_route_failure_v1",
+        title="Route failure",
+        user_input="Plan an afternoon.",
+        failure_profile="route_unavailable_v0",
+        expected=BenchmarkExpectedOutcome(
+            required_tool_names=["check_route"],
+            min_tool_event_count=1,
+            min_action_count=0,
+            expected_workflow_status="failed",
+            expected_execution_status=None,
+            expected_feedback_status=None,
+            expected_error_type="recovery_stopped",
+        ),
+    )
+    workflow_result = SimpleNamespace(
+        status="failed",
+        error_json={"error_type": "recovery_stopped"},
+        node_history=["initialize", "apply_recovery"],
+    )
+
+    score = grade_workflow_path(workflow_result, case)
+
+    assert score.name == "workflow_path"
+    assert score.passed is True
+    assert score.score == 1.0
+    assert score.details["expected_workflow_status"] == "failed"
+
+
 def test_workflow_path_grader_fails_when_required_node_missing() -> None:
     grader = getattr(benchmark_graders, "grade_workflow_path", None)
     assert callable(grader)
@@ -217,6 +271,25 @@ def test_execution_safety_grader_accepts_persisted_execution_metadata_dict() -> 
     assert score.details["write_tools"] == ["reserve_restaurant", "book_ticket"]
 
 
+def test_execution_safety_grader_accepts_absent_execution_when_expected_is_none() -> None:
+    case = BenchmarkCase(
+        case_id="case",
+        title="Case",
+        user_input="Plan an afternoon.",
+        expected=BenchmarkExpectedOutcome(
+            required_tool_names=["search_poi"],
+            min_tool_event_count=1,
+            min_action_count=0,
+            expected_execution_status=None,
+        ),
+    )
+
+    score = grade_execution_safety(case, None)
+
+    assert score.passed is True
+    assert score.details["execution_status"] is None
+
+
 def test_feedback_grader_accepts_persisted_feedback_metadata_dict() -> None:
     case = _benchmark_case()
     feedback = {
@@ -230,6 +303,85 @@ def test_feedback_grader_accepts_persisted_feedback_metadata_dict() -> None:
 
     assert score.passed is True
     assert score.details["feedback_status"] == "completed"
+
+
+def test_feedback_grader_accepts_absent_feedback_when_expected_is_none() -> None:
+    case = BenchmarkCase(
+        case_id="case",
+        title="Case",
+        user_input="Plan an afternoon.",
+        expected=BenchmarkExpectedOutcome(
+            required_tool_names=["search_poi"],
+            min_tool_event_count=1,
+            min_action_count=0,
+            expected_feedback_status=None,
+        ),
+    )
+
+    score = grade_feedback(case, None)
+
+    assert score.passed is True
+    assert score.details["feedback_status"] is None
+
+
+def test_failure_injection_grader_requires_injected_failures() -> None:
+    case = BenchmarkCase(
+        case_id="case",
+        title="Case",
+        user_input="Plan an afternoon.",
+        expected=BenchmarkExpectedOutcome(
+            required_tool_names=["check_route"],
+            min_tool_event_count=1,
+            min_action_count=0,
+            min_injected_failure_count=1,
+        ),
+    )
+    tool_events = [
+        SimpleNamespace(
+            tool_name="check_route",
+            status="failed",
+            error_json={
+                "error_type": "failure_injected",
+                "details": {"profile_id": "route_unavailable_v0"},
+            },
+        )
+    ]
+
+    score = grade_failure_injection(case, tool_events)
+
+    assert score.passed is True
+    assert score.details["injected_failure_count"] == 1
+
+
+def test_recovery_expectation_grader_accepts_expected_recovery_action() -> None:
+    case = BenchmarkCase(
+        case_id="case",
+        title="Case",
+        user_input="Plan an afternoon.",
+        expected=BenchmarkExpectedOutcome(
+            required_tool_names=["check_route"],
+            min_tool_event_count=1,
+            min_action_count=0,
+            expected_recovery_action="stop_safely",
+        ),
+    )
+    run_metadata = {
+        "workflow": {
+            "recovery": {
+                "attempts": [
+                    {
+                        "recovery_action": "stop_safely",
+                        "status": "stopped",
+                    }
+                ]
+            }
+        }
+    }
+
+    score = grade_recovery_expectation(case, run_metadata)
+
+    assert score.passed is True
+    assert score.details["observed_recovery_actions"] == ["stop_safely"]
 
 
 def test_report_writer_creates_parent_directory_and_json_file() -> None:

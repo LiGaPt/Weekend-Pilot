@@ -63,14 +63,23 @@ def grade_plan_quality(selected_plan: Any) -> BenchmarkScore:
     )
 
 
-def grade_workflow_path(workflow_result: Any) -> BenchmarkScore:
+def grade_workflow_path(workflow_result: Any, case: BenchmarkCase | None = None) -> BenchmarkScore:
+    expected_status = case.expected.expected_workflow_status if case is not None else "completed"
+    expected_error_type = case.expected.expected_error_type if case is not None else None
     status = _value(workflow_result, "status")
     node_history = [str(node) for node in (_value(workflow_result, "node_history", []) or [])]
-    missing = sorted(set(REQUIRED_WORKFLOW_NODES) - set(node_history))
-    passed = status == "completed" and not missing
+    error_json = _value(workflow_result, "error_json")
+    observed_error_type = error_json.get("error_type") if isinstance(error_json, dict) else None
+    missing = sorted(set(REQUIRED_WORKFLOW_NODES) - set(node_history)) if expected_status == "completed" else []
+    error_matches = expected_error_type is None or observed_error_type == expected_error_type
+    passed = status == expected_status and not missing and error_matches
     reason = "Workflow completed through the required product path."
-    if status != "completed":
-        reason = f"Workflow status {status!r} did not match expected 'completed'."
+    if expected_status != "completed":
+        reason = "Workflow reached the expected failure path."
+    if status != expected_status:
+        reason = f"Workflow status {status!r} did not match expected {expected_status!r}."
+    elif expected_error_type is not None and observed_error_type != expected_error_type:
+        reason = f"Workflow error type {observed_error_type!r} did not match expected {expected_error_type!r}."
     elif missing:
         reason = f"Missing required workflow nodes: {', '.join(missing)}"
     return BenchmarkScore(
@@ -80,6 +89,9 @@ def grade_workflow_path(workflow_result: Any) -> BenchmarkScore:
         reason=reason,
         details={
             "workflow_status": status,
+            "expected_workflow_status": expected_status,
+            "workflow_error_type": observed_error_type,
+            "expected_error_type": expected_error_type,
             "required_node_names": list(REQUIRED_WORKFLOW_NODES),
             "node_history": node_history,
             "missing_node_names": missing,
@@ -125,6 +137,32 @@ def grade_execution_safety(case: BenchmarkCase, execution_result: Any) -> Benchm
         }
     )
     enough_actions = len(action_results) >= case.expected.min_action_count
+    if case.expected.expected_execution_status is None:
+        execution_absent = status is None and not action_results
+        passed = execution_absent and not unsafe_tools and enough_actions
+        reason = "No execution was recorded, as expected."
+        if not execution_absent:
+            reason = "Execution metadata was present when no execution was expected."
+        elif unsafe_tools:
+            reason = f"Execution used unregistered write tools: {', '.join(unsafe_tools)}"
+        elif not enough_actions:
+            reason = (
+                f"Action count {len(action_results)} is below required minimum "
+                f"{case.expected.min_action_count}."
+            )
+        return BenchmarkScore(
+            name="execution_safety",
+            score=1.0 if passed else 0.0,
+            passed=passed,
+            reason=reason,
+            details={
+                "execution_status": status,
+                "expected_execution_status": case.expected.expected_execution_status,
+                "action_count": len(action_results),
+                "write_tools": write_tools,
+            },
+        )
+
     passed = status == case.expected.expected_execution_status and not unsafe_tools and enough_actions
     reason = "Execution succeeded with registered write tools."
     if status != case.expected.expected_execution_status:
@@ -143,6 +181,7 @@ def grade_execution_safety(case: BenchmarkCase, execution_result: Any) -> Benchm
         reason=reason,
         details={
             "execution_status": status,
+            "expected_execution_status": case.expected.expected_execution_status,
             "action_count": len(action_results),
             "write_tools": write_tools,
         },
@@ -163,6 +202,26 @@ def grade_feedback(case: BenchmarkCase, feedback_result: Any) -> BenchmarkScore:
         )
     )
     user_safe = _UNSAFE_FEEDBACK_PATTERN.search(text) is None
+    if case.expected.expected_feedback_status is None:
+        feedback_absent = status is None and not text.strip()
+        passed = feedback_absent and user_safe
+        reason = "No feedback was recorded, as expected."
+        if not feedback_absent:
+            reason = "Feedback metadata was present when no feedback was expected."
+        elif not user_safe:
+            reason = "Feedback contains raw IDs or debug wording."
+        return BenchmarkScore(
+            name="feedback",
+            score=1.0 if passed else 0.0,
+            passed=passed,
+            reason=reason,
+            details={
+                "feedback_status": status,
+                "expected_feedback_status": case.expected.expected_feedback_status,
+                "user_safe": user_safe,
+            },
+        )
+
     passed = status == case.expected.expected_feedback_status and user_safe
     reason = "Feedback completed and is user-safe."
     if status != case.expected.expected_feedback_status:
@@ -174,7 +233,75 @@ def grade_feedback(case: BenchmarkCase, feedback_result: Any) -> BenchmarkScore:
         score=1.0 if passed else 0.0,
         passed=passed,
         reason=reason,
-        details={"feedback_status": status, "user_safe": user_safe},
+        details={
+            "feedback_status": status,
+            "expected_feedback_status": case.expected.expected_feedback_status,
+            "user_safe": user_safe,
+        },
+    )
+
+
+def grade_failure_injection(case: BenchmarkCase, tool_events: Sequence[Any]) -> BenchmarkScore:
+    injected_events = [
+        event
+        for event in tool_events
+        if isinstance(_value(event, "error_json"), dict)
+        and _value(event, "error_json").get("error_type") == "failure_injected"
+    ]
+    expected_minimum = case.expected.min_injected_failure_count
+    passed = len(injected_events) >= expected_minimum
+    reason = "Injected failure count met expectation."
+    if not passed:
+        reason = (
+            f"Injected failure count {len(injected_events)} is below required minimum "
+            f"{expected_minimum}."
+        )
+    return BenchmarkScore(
+        name="failure_injection",
+        score=1.0 if passed else 0.0,
+        passed=passed,
+        reason=reason,
+        details={
+            "expected_min_injected_failure_count": expected_minimum,
+            "injected_failure_count": len(injected_events),
+            "injected_tool_names": [str(_value(event, "tool_name", "")) for event in injected_events],
+        },
+    )
+
+
+def grade_recovery_expectation(case: BenchmarkCase, run_metadata: Any) -> BenchmarkScore:
+    expected_action = case.expected.expected_recovery_action
+    attempts = []
+    workflow_metadata = _value(run_metadata, "workflow", {}) or {}
+    recovery_metadata = _value(workflow_metadata, "recovery", {}) or {}
+    raw_attempts = _value(recovery_metadata, "attempts", []) or []
+    if isinstance(raw_attempts, list):
+        attempts = raw_attempts
+
+    observed_actions = [
+        str(action)
+        for action in (_value(attempt, "recovery_action") for attempt in attempts)
+        if action
+    ]
+    observed_statuses = [
+        str(status)
+        for status in (_value(attempt, "status") for attempt in attempts)
+        if status
+    ]
+    passed = expected_action is None or expected_action in observed_actions
+    reason = "Recovery action matched expectation."
+    if not passed:
+        reason = f"Recovery action {expected_action!r} was not observed."
+    return BenchmarkScore(
+        name="recovery_expectation",
+        score=1.0 if passed else 0.0,
+        passed=passed,
+        reason=reason,
+        details={
+            "expected_recovery_action": expected_action,
+            "observed_recovery_actions": observed_actions,
+            "observed_recovery_statuses": observed_statuses,
+        },
     )
 
 

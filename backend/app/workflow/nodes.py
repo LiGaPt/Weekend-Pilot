@@ -80,6 +80,7 @@ class WeekendPilotWorkflowNodes:
             action_ledger=self.repositories.action_ledger,
             cache=dependencies.cache,
             rate_limiter=dependencies.rate_limiter,
+            failure_injector=dependencies.failure_injector,
         )
         self.recorder = ObservabilityRecorder(
             runs=self.repositories.runs,

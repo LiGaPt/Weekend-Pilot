@@ -1,0 +1,36 @@
+{
+  "case_id": "family_route_failure_v1",
+  "title": "Family afternoon route failure safe stop",
+  "user_input": "This afternoon I want to go out with my wife and 5-year-old child for a few hours. Keep it close by and choose a lighter dinner.",
+  "agent_version": "agent-v1",
+  "prompt_version": "prompt-v1",
+  "tool_profile": "mock_world",
+  "world_profile": "family_afternoon",
+  "failure_profile": "route_unavailable_v0",
+  "memory_items": [],
+  "expected": {
+    "required_tool_names": [
+      "search_poi",
+      "check_weather",
+      "get_poi_detail",
+      "check_opening_hours",
+      "check_queue",
+      "check_table_availability",
+      "check_ticket_availability",
+      "check_route"
+    ],
+    "min_tool_event_count": 8,
+    "min_action_count": 0,
+    "expected_workflow_status": "failed",
+    "expected_execution_status": null,
+    "expected_feedback_status": null,
+    "expected_error_type": "recovery_stopped",
+    "expected_recovery_action": "stop_safely",
+    "min_injected_failure_count": 1
+  },
+  "metadata": {
+    "suite": "locallife_bench_v1",
+    "level": "L2",
+    "focus": "route_failure_safe_stop"
+  }
+}

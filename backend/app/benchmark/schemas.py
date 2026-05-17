@@ -23,8 +23,12 @@ class BenchmarkExpectedOutcome(BaseModel):
     required_tool_names: list[str]
     min_tool_event_count: int
     min_action_count: int
-    expected_execution_status: str = "succeeded"
-    expected_feedback_status: str = "completed"
+    expected_workflow_status: str = "completed"
+    expected_execution_status: str | None = "succeeded"
+    expected_feedback_status: str | None = "completed"
+    expected_error_type: str | None = None
+    expected_recovery_action: str | None = None
+    min_injected_failure_count: int = 0
 
 
 class BenchmarkCase(BaseModel):

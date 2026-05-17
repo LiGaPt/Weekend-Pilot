@@ -5,12 +5,17 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from backend.app.benchmark import BenchmarkHarness, load_default_benchmark_cases
+from backend.app.benchmark import (
+    BenchmarkHarness,
+    load_benchmark_case,
+    load_default_benchmark_cases,
+    load_failure_benchmark_cases,
+)
 from backend.app.db.session import SessionLocal
-from backend.app.models.runtime import AgentRun, ToolEvent
+from backend.app.models.runtime import ActionLedger, AgentRun, ToolEvent
 from backend.app.runtime import FixedWindowRateLimiter, JsonRedisCache, RedisKeyBuilder, get_redis_client
 
 
@@ -189,3 +194,61 @@ def test_benchmark_harness_runs_default_mock_world_suite(
         assert run.metadata_json["workflow"]["source"] == "langgraph-workflow"
         assert {entry["role"] for entry in run.metadata_json["agents"]["results"]} == EXPECTED_AGENT_ROLES
         assert run.metadata_json["observability"]["trace_id"] == result.trace_id
+
+
+def test_benchmark_harness_runs_route_failure_case_as_expected_safe_stop(
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    case = load_benchmark_case("family_route_failure_v1")
+    assert [item.case_id for item in load_failure_benchmark_cases()] == ["family_route_failure_v1"]
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    result = harness.run_case(case)
+
+    assert result.status == "passed"
+    assert result.run_id is not None
+    assert result.workflow_status == "failed"
+    assert result.action_count == 0
+    assert "apply_recovery" in result.workflow_node_history
+    assert "saga_execution_engine" not in result.workflow_node_history
+    assert result.report_path is not None
+
+    action_count = db_session.scalar(
+        select(func.count()).select_from(ActionLedger).where(ActionLedger.run_id == result.run_id)
+    )
+    assert action_count == 0
+
+    tool_events = db_session.scalars(select(ToolEvent).where(ToolEvent.run_id == result.run_id)).all()
+    injected_events = [
+        event
+        for event in tool_events
+        if event.tool_name == "check_route"
+        and isinstance(event.error_json, dict)
+        and event.error_json.get("error_type") == "failure_injected"
+    ]
+    assert injected_events
+    assert all(event.status == "failed" for event in injected_events)
+
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    assert run.failure_profile == "route_unavailable_v0"
+    assert run.metadata_json["benchmark"]["failure_profile"] == "route_unavailable_v0"
+    assert run.metadata_json["benchmark"]["failure_profile_metadata"]["profile_id"] == "route_unavailable_v0"
+    recovery = run.metadata_json["workflow"]["recovery"]
+    assert recovery["attempts"][0]["recovery_action"] == "stop_safely"
+    assert recovery["attempts"][0]["status"] == "stopped"
+
+    report_payload = json.loads(Path(result.report_path).read_text(encoding="utf-8"))
+    serialized_report = json.dumps(report_payload, sort_keys=True)
+    for forbidden in FORBIDDEN_REPORT_TEXT:
+        assert forbidden not in serialized_report

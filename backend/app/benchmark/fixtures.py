@@ -18,9 +18,11 @@ _DEFAULT_CASE_IDS = (
     "family_citywalk_addon_v1",
 )
 
+_FAILURE_CASE_IDS = ("family_route_failure_v1",)
+
 
 def load_benchmark_case(case_id: str) -> BenchmarkCase:
-    if case_id not in _DEFAULT_CASE_IDS:
+    if case_id not in (*_DEFAULT_CASE_IDS, *_FAILURE_CASE_IDS):
         raise BenchmarkHarnessError(f"Unknown benchmark case ID: {case_id}")
 
     path = resources.files("backend.app.benchmark").joinpath("cases", f"{case_id}.json")
@@ -37,3 +39,7 @@ def load_benchmark_case(case_id: str) -> BenchmarkCase:
 
 def load_default_benchmark_cases() -> list[BenchmarkCase]:
     return [load_benchmark_case(case_id) for case_id in _DEFAULT_CASE_IDS]
+
+
+def load_failure_benchmark_cases() -> list[BenchmarkCase]:
+    return [load_benchmark_case(case_id) for case_id in _FAILURE_CASE_IDS]

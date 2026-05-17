@@ -8,6 +8,12 @@ from backend.app.tool_gateway.models import (
     ToolRateLimit,
     ToolType,
 )
+from backend.app.tool_gateway.failure_injection import (
+    StaticToolFailureInjector,
+    ToolFailureInjectionDecision,
+    ToolFailureInjectionRule,
+    ToolFailureInjector,
+)
 from backend.app.tool_gateway.providers import ToolProvider
 from backend.app.tool_gateway.registry import READ_TOOLS, WRITE_TOOLS, ToolRegistry, build_default_registry
 
@@ -15,6 +21,9 @@ __all__ = [
     "GatewayStatus",
     "READ_TOOLS",
     "ToolDefinition",
+    "ToolFailureInjectionDecision",
+    "ToolFailureInjectionRule",
+    "ToolFailureInjector",
     "ToolGateway",
     "ToolGatewayRequest",
     "ToolGatewayResult",
@@ -23,6 +32,7 @@ __all__ = [
     "ToolRegistry",
     "ToolType",
     "WRITE_TOOLS",
+    "StaticToolFailureInjector",
     "build_default_registry",
     "build_tool_cache_key",
 ]
