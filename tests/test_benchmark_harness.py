@@ -35,15 +35,59 @@ REQUIRED_AGENT_ROLES = (
     "itinerary_planner",
     "validator_recovery",
 )
+DEFAULT_CASE_IDS = (
+    "family_afternoon_v1",
+    "family_indoor_light_meal_v1",
+    "family_outdoor_quick_dinner_v1",
+    "family_memory_override_v1",
+    "family_citywalk_addon_v1",
+)
+REQUIRED_CASE_TOOL_NAMES = {
+    "search_poi",
+    "check_weather",
+    "get_poi_detail",
+    "check_opening_hours",
+    "check_queue",
+    "check_table_availability",
+    "check_ticket_availability",
+    "check_route",
+}
 
 
-def test_default_fixture_loads_as_benchmark_case() -> None:
+def test_default_fixtures_load_as_ordered_benchmark_cases() -> None:
     cases = load_default_benchmark_cases()
 
-    assert len(cases) == 1
-    assert isinstance(cases[0], BenchmarkCase)
-    assert cases[0].case_id == "family_afternoon_v1"
-    assert cases[0].tool_profile == "mock_world"
+    assert [case.case_id for case in cases] == list(DEFAULT_CASE_IDS)
+    assert len(cases) == 5
+    assert all(isinstance(case, BenchmarkCase) for case in cases)
+
+
+def test_default_fixtures_can_be_loaded_individually() -> None:
+    for case_id in DEFAULT_CASE_IDS:
+        case = load_benchmark_case(case_id)
+
+        assert isinstance(case, BenchmarkCase)
+        assert case.case_id == case_id
+
+
+def test_default_fixtures_use_mock_world_family_profile() -> None:
+    cases = load_default_benchmark_cases()
+
+    assert {case.tool_profile for case in cases} == {"mock_world"}
+    assert {case.world_profile for case in cases} == {"family_afternoon"}
+
+
+def test_default_fixtures_include_v1_metadata_and_expected_tools() -> None:
+    cases = load_default_benchmark_cases()
+
+    for case in cases:
+        assert case.metadata["suite"] == "locallife_bench_v1"
+        assert case.metadata["level"] in {"L1", "L2"}
+        assert isinstance(case.metadata["focus"], str)
+        assert case.metadata["focus"]
+        assert set(case.expected.required_tool_names) == REQUIRED_CASE_TOOL_NAMES
+        assert case.expected.expected_execution_status == "succeeded"
+        assert case.expected.expected_feedback_status == "completed"
 
 
 def test_unknown_case_raises_benchmark_harness_error() -> None:

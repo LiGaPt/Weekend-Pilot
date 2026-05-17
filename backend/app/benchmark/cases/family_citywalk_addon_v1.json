@@ -1,7 +1,7 @@
 {
-  "case_id": "family_afternoon_v1",
-  "title": "Family afternoon local-life plan",
-  "user_input": "This afternoon I want to go out with my wife and child for a few hours. Not too far. My child is 5, and my wife is trying to eat lighter.",
+  "case_id": "family_citywalk_addon_v1",
+  "title": "Family citywalk afternoon with optional add-on",
+  "user_input": "This afternoon I want a light citywalk-style plan with my partner and 5-year-old, not too far from home, and include an easy drink or snack stop if it fits.",
   "agent_version": "agent-v1",
   "prompt_version": "prompt-v1",
   "tool_profile": "mock_world",
@@ -15,16 +15,6 @@
         "age": 5
       },
       "text": "The child is 5 years old.",
-      "confidence": "1.0",
-      "status": "active"
-    },
-    {
-      "memory_type": "preference",
-      "key": "spouse_lighter_meals",
-      "value_json": {
-        "preference": "lighter meals"
-      },
-      "text": "The spouse prefers lighter meals.",
       "confidence": "1.0",
       "status": "active"
     }
@@ -48,6 +38,6 @@
   "metadata": {
     "suite": "locallife_bench_v1",
     "level": "L1",
-    "focus": "baseline_family_afternoon"
+    "focus": "citywalk_and_optional_addon"
   }
 }
