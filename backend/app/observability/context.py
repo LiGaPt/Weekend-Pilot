@@ -114,6 +114,12 @@ class ObservabilityRecorder:
         selected_plan = self.plans.get_selected_for_run(context.run_id)
         plan_json = selected_plan.plan_json if selected_plan is not None and isinstance(selected_plan.plan_json, dict) else {}
         feedback = plan_json.get("feedback") if isinstance(plan_json, dict) else None
+        run = self.runs.get_by_id(context.run_id)
+        metadata = (
+            deepcopy(run.metadata_json)
+            if run is not None and isinstance(run.metadata_json, dict)
+            else deepcopy(context.metadata)
+        )
 
         return sanitize_trace_payload(
             {
@@ -132,7 +138,7 @@ class ObservabilityRecorder:
                     "posted": False,
                     "error": None,
                 },
-                "metadata": context.metadata,
+                "metadata": metadata,
             }
         )
 

@@ -11,14 +11,11 @@ from sqlalchemy.orm import Session
 from backend.app.agents import (
     AgentInvocationContext,
     AgentResult,
-    DeterministicDiningAgent,
-    DeterministicDiscoveryAgent,
-    DeterministicItineraryPlannerAgent,
-    DeterministicSupervisorAgent,
-    DeterministicValidatorRecoveryAgent,
     sanitized_agent_payload,
 )
+from backend.app.agents.factory import build_agent_adapters
 from backend.app.confirmation import HumanConfirmationService
+from backend.app.core.config import get_settings
 from backend.app.execution import DeterministicExecutionWorkflow
 from backend.app.feedback import DeterministicFeedbackWriter
 from backend.app.models.runtime import ActionLedger
@@ -89,11 +86,13 @@ class WeekendPilotWorkflowNodes:
             plans=self.repositories.plans,
             local_buffer=LocalTraceBuffer(self._trace_path(dependencies.trace_buffer_path)),
         )
-        self.supervisor_agent = DeterministicSupervisorAgent()
-        self.discovery_agent = DeterministicDiscoveryAgent()
-        self.dining_agent = DeterministicDiningAgent()
-        self.itinerary_planner_agent = DeterministicItineraryPlannerAgent()
-        self.validator_recovery_agent = DeterministicValidatorRecoveryAgent()
+        settings = dependencies.settings or get_settings()
+        agents = build_agent_adapters(settings, llm_client=dependencies.llm_client)
+        self.supervisor_agent = agents.supervisor
+        self.discovery_agent = agents.discovery
+        self.dining_agent = agents.dining
+        self.itinerary_planner_agent = agents.itinerary_planner
+        self.validator_recovery_agent = agents.validator_recovery
 
     def initialize(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         user = self._get_or_create_user(

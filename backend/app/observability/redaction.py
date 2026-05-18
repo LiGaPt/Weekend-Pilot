@@ -12,6 +12,13 @@ _SENSITIVE_KEY_PARTS = (
     "prompt",
     "debug_trace",
 )
+_DROP_KEYS = {
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+    "prompt_tokens_details",
+    "completion_tokens_details",
+}
 _REDACTED = "[REDACTED]"
 
 
@@ -19,6 +26,8 @@ def sanitize_trace_payload(value: Any) -> Any:
     if isinstance(value, dict):
         sanitized = {}
         for key, item in value.items():
+            if str(key).casefold() in _DROP_KEYS:
+                continue
             if _is_sensitive_key(key):
                 sanitized[key] = _REDACTED
             else:

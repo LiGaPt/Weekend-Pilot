@@ -156,6 +156,65 @@ def test_record_run_summary_writes_buffer_and_updates_run_metadata(db_session: S
     assert "tool_event_id" not in json.dumps(payload)
 
 
+def test_record_run_summary_uses_latest_sanitized_agent_metadata(
+    db_session: Session,
+    trace_path,
+) -> None:
+    run = _create_run(db_session, metadata_json={"workflow": {"source": "test"}})
+    recorder = _recorder(db_session, trace_path)
+    context = recorder.build_context(run.run_id)
+    AgentRunRepository(db_session).update_metadata_json(
+        run.run_id,
+        {
+            "workflow": {"source": "test"},
+            "agents": {
+                "version": "bounded_agents_v1",
+                "results": [
+                    {
+                        "role": "discovery",
+                        "status": "completed",
+                        "summary": "LLM discovery summary.",
+                        "adapter_version": "llm_discovery_v0",
+                        "tool_names_used": ["get_poi_detail"],
+                        "output_json": {
+                            "llm": {
+                                "provider_kind": "openai_compatible",
+                                "model_id": "qwen3.6-plus",
+                                "base_url_host": "dashscope.aliyuncs.com",
+                                "latency_ms": 12,
+                                "usage": {
+                                    "input_count": 3,
+                                    "output_count": 2,
+                                    "total_count": 5,
+                                },
+                                "status": "completed",
+                                "prompt_tokens": 3,
+                            }
+                        },
+                    }
+                ],
+            },
+        },
+    )
+
+    recorder.record_run_summary(context)
+
+    payload = json.loads(trace_path.read_text(encoding="utf-8").splitlines()[0])
+    llm = payload["metadata"]["agents"]["results"][0]["output_json"]["llm"]
+    assert llm["model_id"] == "qwen3.6-plus"
+    assert llm["usage"] == {
+        "input_count": 3,
+        "output_count": 2,
+        "total_count": 5,
+    }
+    serialized = json.dumps(payload, sort_keys=True)
+    assert "prompt_tokens" not in serialized
+    assert "completion_tokens" not in serialized
+    assert "total_tokens" not in serialized
+    assert "api_key" not in serialized
+    assert "authorization" not in serialized
+
+
 def test_agent_run_metadata_update_does_not_self_commit() -> None:
     session = SessionLocal()
     try:

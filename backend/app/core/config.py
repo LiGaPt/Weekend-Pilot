@@ -26,6 +26,11 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
     langchain_tracing_v2: bool = False
+    llm_enabled: bool = False
+    llm_api_key: SecretStr | None = None
+    llm_base_url: str | None = None
+    llm_model_id: str | None = None
+    llm_timeout: float = 10.0
     openai_api_key: SecretStr | None = None
     langsmith_api_key: SecretStr | None = None
     amap_maps_api_key: SecretStr | None = None

@@ -9,6 +9,8 @@ from backend.app.agents.deterministic import (
     sanitized_agent_payload,
 )
 from backend.app.agents.errors import AgentContractError, AgentPolicyError
+from backend.app.agents.factory import AgentAdapterSet, build_agent_adapters
+from backend.app.agents.llm_adapters import LLMDiningAgent, LLMDiscoveryAgent, LLMItineraryPlannerAgent
 from backend.app.agents.policies import (
     default_agent_policies,
     default_agent_policy,
@@ -34,14 +36,19 @@ __all__ = [
     "AgentRole",
     "AgentStatus",
     "AgentToolPolicy",
+    "AgentAdapterSet",
     "DeterministicDiningAgent",
     "DeterministicDiscoveryAgent",
     "DeterministicItineraryPlannerAgent",
     "DeterministicSupervisorAgent",
     "DeterministicValidatorRecoveryAgent",
+    "LLMDiningAgent",
+    "LLMDiscoveryAgent",
+    "LLMItineraryPlannerAgent",
     "RecoveryDecision",
     "SupervisorAssignment",
     "SupervisorAssignmentPlan",
+    "build_agent_adapters",
     "default_agent_policies",
     "default_agent_policy",
     "sanitize_agent_metadata",
