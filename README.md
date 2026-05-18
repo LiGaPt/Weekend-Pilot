@@ -176,6 +176,28 @@ python -m alembic upgrade head
 python -m pytest tests/test_agents.py tests/integration/test_workflow_agents_gateway.py -v
 ```
 
+## LLM-Backed Bounded Agents
+
+LLM-backed bounded agents are disabled by default. When enabled, v0 only replaces Discovery, Dining, and Itinerary Planner behind the existing typed contracts; Supervisor, Validator/Recovery, routing, confirmation, execution, benchmark grading, and replay stay deterministic.
+
+Set generic OpenAI-compatible values in local `.env` only:
+
+```bash
+LLM_ENABLED=true
+LLM_API_KEY=your-local-key
+LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+LLM_MODEL_ID=your-compatible-model
+LLM_TIMEOUT=10
+```
+
+Default tests use fake clients and do not call live LLM providers:
+
+```bash
+docker compose up -d postgres redis
+python -m alembic upgrade head
+python -m pytest tests/test_llm_client.py tests/test_llm_agents.py tests/integration/test_workflow_llm_agents_gateway.py -v
+```
+
 ## Infrastructure
 
 Start PostgreSQL and Redis:
