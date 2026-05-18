@@ -2,6 +2,8 @@
 
 WeekendPilot is a benchmark-driven local-life planning and execution system for short weekend activities.
 
+For the competition architecture and design overview, see `docs/COMPETITION_DESIGN_DOCUMENT.md`.
+
 ## Local Setup
 
 Create and activate a virtual environment, then install the backend with development dependencies:
