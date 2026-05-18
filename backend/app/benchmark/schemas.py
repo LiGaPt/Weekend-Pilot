@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 
 BenchmarkCaseStatus = Literal["passed", "failed", "error"]
+BenchmarkReplayStatus = Literal["passed", "failed", "error"]
 
 
 class BenchmarkMemoryItem(BaseModel):
@@ -81,3 +82,40 @@ class BenchmarkRunReport(BaseModel):
     failed_count: int
     error_count: int
     overall_score: float
+
+
+class BenchmarkReplaySummary(BaseModel):
+    status: str | None = None
+    workflow_status: str | None = None
+    observed_tool_names: list[str] = Field(default_factory=list)
+    action_count: int = 0
+    injected_failure_count: int = 0
+    recovery_actions: list[str] = Field(default_factory=list)
+
+
+class BenchmarkReplayMismatch(BaseModel):
+    field: str
+    source: Any
+    replay: Any
+
+
+class BenchmarkReplayCaseResult(BaseModel):
+    schema_version: str = "weekendpilot_benchmark_replay_case_v1"
+    case_id: str
+    status: BenchmarkReplayStatus
+    source: BenchmarkReplaySummary
+    replay: BenchmarkReplaySummary
+    mismatches: list[BenchmarkReplayMismatch] = Field(default_factory=list)
+    replay_benchmark_status: str | None = None
+    benchmark_report_path: str | None = None
+    replay_report_path: str | None = None
+    failure_reasons: list[str] = Field(default_factory=list)
+
+
+class BenchmarkReplayRunReport(BaseModel):
+    schema_version: str = "weekendpilot_benchmark_replay_run_v1"
+    run_status: BenchmarkReplayStatus
+    case_results: list[BenchmarkReplayCaseResult]
+    passed_count: int
+    failed_count: int
+    error_count: int
