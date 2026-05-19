@@ -277,6 +277,12 @@ Read status:
 curl http://127.0.0.1:8000/demo/runs/<run_id>
 ```
 
+Internal observability review:
+
+```bash
+curl http://127.0.0.1:8000/internal/runs/<run_id>/observability
+```
+
 Confirm the selected plan:
 
 ```bash
@@ -313,6 +319,8 @@ npm --prefix frontend run dev
 Open `http://127.0.0.1:5173`.
 
 The frontend defaults to `http://127.0.0.1:8000` for the API. To override it locally, set `VITE_API_BASE_URL` in `frontend/.env`.
+
+For internal review, open `http://127.0.0.1:5173/observability` and paste a `run_id` to inspect the internal run summary.
 
 For the full Web demo runbook, see `docs/WEB_DEMO_README.md`.
 

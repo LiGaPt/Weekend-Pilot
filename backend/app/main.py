@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.demo import router as demo_router
 from backend.app.api.health import router as health_router
+from backend.app.api.observability import router as observability_router
 from backend.app.core.config import get_settings
 
 
@@ -18,6 +19,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health_router)
     app.include_router(demo_router)
+    app.include_router(observability_router)
     return app
 
 

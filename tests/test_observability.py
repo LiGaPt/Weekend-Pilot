@@ -8,7 +8,10 @@ import pytest
 from sqlalchemy.orm import Session
 
 from backend.app.db.session import SessionLocal
+from backend.app.models.runtime import ActionLedger, ToolEvent
 from backend.app.observability import (
+    InternalObservabilityRunNotFoundError,
+    InternalObservabilityService,
     LangSmithRecorder,
     LocalTraceBuffer,
     ObservabilityError,
@@ -270,3 +273,139 @@ def test_agent_run_metadata_update_does_not_self_commit() -> None:
         assert AgentRunRepository(verification_session).get_by_id(run_id) is None
     finally:
         verification_session.close()
+
+
+def test_internal_observability_service_builds_sanitized_run_summary(db_session: Session) -> None:
+    run = _create_run(
+        db_session,
+        metadata_json={
+            "workflow": {
+                "timing": {
+                    "schema_version": "workflow_timing_summary_v1",
+                    "total_duration_ms": 42,
+                    "stage_count": 2,
+                    "stages": [
+                        {
+                            "node_name": "initialize",
+                            "attempt_count": 1,
+                            "total_duration_ms": 5,
+                        },
+                        {
+                            "node_name": "execute_searches",
+                            "attempt_count": 2,
+                            "total_duration_ms": 37,
+                        },
+                    ],
+                }
+            },
+            "observability": {
+                "trace_id": "trace-observability",
+                "status": "completed",
+                "local_buffer": {
+                    "written": True,
+                    "path": "var/traces/trace.jsonl",
+                    "error": {"api_key": "hide-me", "message": "buffer-failed"},
+                },
+                "langsmith": {
+                    "enabled": False,
+                    "posted": False,
+                    "error": "langsmith-down",
+                },
+            },
+            "agents": {
+                "results": [
+                    {"role": "supervisor"},
+                    {"role": "discovery"},
+                    {"role": "dining"},
+                ]
+            },
+            "demo": {
+                "trace_id": "trace-demo",
+                "initial_node_history": ["initialize", "wait_confirmation"],
+                "continuation_history": ["saga_execution_engine", "generate_summary_message"],
+            },
+        },
+    )
+    selected = PlanRepository(db_session).create(
+        run_id=run.run_id,
+        status="selected",
+        selected=True,
+        plan_json={
+            "execution": {"status": "succeeded", "action_id": "should-hide"},
+            "feedback": {"status": "completed", "token": "hide-me"},
+        },
+    )
+    ToolEventRepository(db_session).create(
+        run_id=run.run_id,
+        tool_name="search_poi",
+        tool_type="read",
+        provider="mock_world",
+        request_json={"query": "museum"},
+        response_json={"candidate_count": 3},
+        error_json=None,
+        status="completed",
+        cache_hit=False,
+        latency_ms=12,
+        langsmith_trace_id="trace-observability",
+    )
+    ActionLedgerRepository(db_session).create(
+        run_id=run.run_id,
+        action_type="reserve_restaurant",
+        target_id="green-table",
+        idempotency_key="reserve:1",
+        status="succeeded",
+        request_json={"plan_id": str(selected.plan_id)},
+        response_json={"reservation": "ok"},
+        error_json=None,
+    )
+
+    summary = InternalObservabilityService(db_session).get_run_summary(run.run_id)
+
+    assert str(summary.run_id) == str(run.run_id)
+    assert summary.status == "completed"
+    assert summary.trace_id == "trace-demo"
+    assert summary.case_id == "case-observability"
+    assert summary.tool_event_count == 1
+    assert summary.action_count == 1
+    assert summary.execution_status == "succeeded"
+    assert summary.feedback_status == "completed"
+    assert summary.observability_status == "completed"
+    assert summary.agent_roles == ["supervisor", "discovery", "dining"]
+    assert summary.node_history == [
+        "initialize",
+        "wait_confirmation",
+        "saga_execution_engine",
+        "generate_summary_message",
+    ]
+    assert summary.workflow_timing_summary is not None
+    assert summary.workflow_timing_summary.total_duration_ms == 42
+    assert summary.observability_summary.trace_id == "trace-observability"
+    assert summary.observability_summary.local_buffer_written is True
+    assert summary.observability_summary.local_buffer_error == {"api_key": "[REDACTED]", "message": "buffer-failed"}
+    assert summary.observability_summary.langsmith_error == "langsmith-down"
+
+
+def test_internal_observability_service_handles_missing_optional_metadata(db_session: Session) -> None:
+    run = _create_run(db_session, metadata_json={"safe": "value"})
+
+    summary = InternalObservabilityService(db_session).get_run_summary(run.run_id)
+
+    assert summary.trace_id is None
+    assert summary.execution_status is None
+    assert summary.feedback_status is None
+    assert summary.observability_status is None
+    assert summary.agent_roles == []
+    assert summary.node_history == []
+    assert summary.workflow_timing_summary is None
+    assert summary.observability_summary.trace_id is None
+    assert summary.observability_summary.status is None
+    assert summary.observability_summary.local_buffer_written is None
+    assert summary.observability_summary.langsmith_enabled is None
+    assert summary.observability_summary.langsmith_posted is None
+    assert summary.observability_summary.local_buffer_error is None
+    assert summary.observability_summary.langsmith_error is None
+
+
+def test_internal_observability_service_raises_for_missing_run(db_session: Session) -> None:
+    with pytest.raises(InternalObservabilityRunNotFoundError):
+        InternalObservabilityService(db_session).get_run_summary(uuid4())

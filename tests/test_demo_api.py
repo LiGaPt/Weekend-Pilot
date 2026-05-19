@@ -19,6 +19,7 @@ def test_create_app_includes_demo_routes() -> None:
     assert "/demo/runs/{run_id}" in paths
     assert "/demo/runs/{run_id}/confirm" in paths
     assert "/demo/runs/{run_id}/decline" in paths
+    assert "/internal/runs/{run_id}/observability" in paths
 
 
 def test_cors_preflight_allows_vite_localhost_origin() -> None:
