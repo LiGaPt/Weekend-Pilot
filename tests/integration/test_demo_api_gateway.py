@@ -244,3 +244,22 @@ def test_demo_run_unknown_run_returns_404(client) -> None:
     response = test_client.get(f"/demo/runs/{uuid4()}")
 
     assert response.status_code == 404
+
+
+def test_demo_run_status_route_keeps_public_shape_after_internal_route_addition(client) -> None:
+    test_client, case_ids, external_user_ids = client
+    start_response = test_client.post("/demo/runs", json=_start_payload(case_ids, external_user_ids))
+
+    assert start_response.status_code == 200
+    run_id = start_response.json()["run_id"]
+
+    status_response = test_client.get(f"/demo/runs/{run_id}")
+
+    assert status_response.status_code == 200
+    payload = status_response.json()
+    assert payload["run_id"] == run_id
+    assert "plans" in payload
+    assert "node_history" in payload
+    assert "agent_roles" in payload
+    assert "workflow_timing_summary" not in payload
+    _assert_no_forbidden_keys(payload)

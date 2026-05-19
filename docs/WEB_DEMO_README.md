@@ -68,6 +68,15 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 Do not commit local `.env` files.
 
+## Internal Review Surface
+
+The repository now includes a separate internal observability review page for reviewers and developers:
+
+- page: `http://127.0.0.1:5173/observability`
+- backend endpoint: `GET /internal/runs/{run_id}/observability`
+
+Paste a `run_id` from the public demo flow into `/observability` to inspect the internal workflow summary, including timing, node history, agent roles, and observability status. This page is internal-only and does not replace the customer-facing demo at `/`.
+
 ## Manual Demo Flow
 
 ### Happy Path

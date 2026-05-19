@@ -1,0 +1,127 @@
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DemoApiError } from "../api/demo";
+import { getObservabilityRun } from "./api";
+import { ObservabilityPage } from "./ObservabilityPage";
+import type { InternalObservabilityRunSummary } from "./types";
+
+vi.mock("./api", () => ({
+  getObservabilityRun: vi.fn(),
+}));
+
+const summary: InternalObservabilityRunSummary = {
+  schema_version: "weekendpilot_internal_observability_run_v1",
+  run_id: "run-1",
+  status: "completed",
+  trace_id: "trace-1",
+  case_id: "web-demo",
+  agent_version: "agent-v1",
+  prompt_version: "prompt-v1",
+  tool_profile: "mock_world",
+  world_profile: "family_afternoon",
+  failure_profile: null,
+  created_at: "2026-05-19T13:01:33+08:00",
+  updated_at: "2026-05-19T13:02:10+08:00",
+  tool_event_count: 4,
+  action_count: 1,
+  execution_status: "succeeded",
+  feedback_status: "completed",
+  observability_status: "completed",
+  agent_roles: ["supervisor", "discovery"],
+  node_history: ["initialize", "wait_confirmation"],
+  workflow_timing_summary: {
+    schema_version: "workflow_timing_summary_v1",
+    total_duration_ms: 42,
+    stage_count: 2,
+    stages: [
+      { node_name: "initialize", attempt_count: 1, total_duration_ms: 5 },
+      { node_name: "execute_searches", attempt_count: 2, total_duration_ms: 37 },
+    ],
+  },
+  observability_summary: {
+    trace_id: "trace-1",
+    status: "completed",
+    local_buffer_written: true,
+    langsmith_enabled: false,
+    langsmith_posted: false,
+    local_buffer_error: null,
+    langsmith_error: null,
+  },
+};
+
+describe("ObservabilityPage", () => {
+  beforeEach(() => {
+    vi.mocked(getObservabilityRun).mockReset();
+  });
+
+  it("renders the initial empty state", () => {
+    render(<ObservabilityPage />);
+
+    expect(screen.getByRole("heading", { name: "Internal Observability Review" })).toBeInTheDocument();
+    expect(screen.getByText("Paste a run ID to inspect the internal workflow summary.")).toBeInTheDocument();
+  });
+
+  it("validates empty run IDs before loading", async () => {
+    const user = userEvent.setup();
+    render(<ObservabilityPage />);
+
+    await user.click(screen.getByRole("button", { name: "Load Run" }));
+
+    expect(getObservabilityRun).not.toHaveBeenCalled();
+    expect(screen.getByText("Enter a run ID before loading.")).toBeInTheDocument();
+  });
+
+  it("loads and renders the internal observability summary", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getObservabilityRun).mockResolvedValue(summary);
+    render(<ObservabilityPage />);
+
+    await user.type(screen.getByRole("textbox", { name: "Run ID" }), "run-1");
+    await user.click(screen.getByRole("button", { name: "Load Run" }));
+
+    expect(await screen.findAllByText("trace-1")).toHaveLength(2);
+    expect(screen.getByText("execute_searches")).toBeInTheDocument();
+    expect(screen.getByText("supervisor")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Tool Events" })).toBeInTheDocument();
+    expect(screen.getByText("Detailed tool event inspection is not implemented in this task yet.")).toBeInTheDocument();
+  });
+
+  it("shows a neutral state when workflow timing is missing", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getObservabilityRun).mockResolvedValue({
+      ...summary,
+      workflow_timing_summary: null,
+    });
+    render(<ObservabilityPage />);
+
+    await user.type(screen.getByRole("textbox", { name: "Run ID" }), "run-1");
+    await user.click(screen.getByRole("button", { name: "Load Run" }));
+
+    expect(await screen.findByText("No workflow timing summary is available for this run yet.")).toBeInTheDocument();
+  });
+
+  it("renders not found errors from the backend", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getObservabilityRun).mockRejectedValue(new DemoApiError("未找到对应的内部观测运行。", 404));
+    render(<ObservabilityPage />);
+
+    await user.type(screen.getByRole("textbox", { name: "Run ID" }), "missing");
+    await user.click(screen.getByRole("button", { name: "Load Run" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByText("未找到对应的内部观测运行。")).toBeInTheDocument();
+  });
+
+  it("renders a generic error for unexpected failures", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getObservabilityRun).mockRejectedValue(new Error("boom"));
+    render(<ObservabilityPage />);
+
+    await user.type(screen.getByRole("textbox", { name: "Run ID" }), "run-1");
+    await user.click(screen.getByRole("button", { name: "Load Run" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByText("Internal observability request failed. Please try again.")).toBeInTheDocument();
+  });
+});

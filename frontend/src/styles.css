@@ -17,7 +17,8 @@ body {
 }
 
 button,
-textarea {
+textarea,
+input {
   font: inherit;
 }
 
@@ -74,6 +75,18 @@ button {
   gap: 16px;
 }
 
+.observability-grid,
+.observability-workspace,
+.observability-placeholder-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.observability-grid {
+  margin: 0 auto;
+  max-width: 1440px;
+}
+
 .side-rail {
   align-content: start;
 }
@@ -123,7 +136,18 @@ textarea {
   width: 100%;
 }
 
+.text-input {
+  background: #fbfcfd;
+  border: 1px solid #cbd5df;
+  border-radius: 7px;
+  color: #1f2933;
+  min-height: 40px;
+  padding: 10px 12px;
+  width: 100%;
+}
+
 textarea:focus,
+input:focus,
 button:focus-visible {
   outline: 3px solid #92c5ff;
   outline-offset: 2px;
@@ -222,6 +246,10 @@ button:disabled {
   margin: 0;
 }
 
+.observability-list {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
 .metadata-list div,
 .compact-list div {
   display: grid;
@@ -274,6 +302,36 @@ dd {
   gap: 5px;
   margin: 0;
   padding-left: 18px;
+}
+
+.observability-stage-list,
+.observability-chip-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.observability-stage-list li,
+.observability-chip-list li {
+  border: 1px solid #e1e8ef;
+  border-radius: 7px;
+  padding: 10px 12px;
+}
+
+.observability-stage-list li {
+  display: grid;
+  gap: 4px;
+}
+
+.observability-chip-list {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.observability-chip-list li {
+  color: #263645;
+  font-weight: 700;
 }
 
 .plan-tabs {
@@ -473,7 +531,8 @@ dd {
   .app-header,
   .app-grid,
   .plan-grid,
-  .action-panel {
+  .action-panel,
+  .observability-placeholder-grid {
     grid-template-columns: 1fr;
   }
 

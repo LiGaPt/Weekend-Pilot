@@ -5,14 +5,18 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.app.confirmation import HumanConfirmationService
+from backend.app.core.config import Settings, get_settings
 from backend.app.db.session import SessionLocal
+from backend.app.db.session import get_db
 from backend.app.execution import DeterministicExecutionWorkflow
 from backend.app.feedback import DeterministicFeedbackWriter
 from backend.app.models.runtime import ActionLedger, ToolEvent
+from backend.app.main import create_app
 from backend.app.observability import LocalTraceBuffer, ObservabilityRecorder
 from backend.app.planning import (
     CandidateEnricher,
@@ -200,3 +204,120 @@ def test_full_mock_world_flow_populates_tool_event_trace_ids_and_records_summary
     assert "api_key" in serialized
     assert "action_id" not in serialized
     assert "tool_event_id" not in serialized
+
+
+@pytest.fixture()
+def observability_client(redis_runtime, trace_path: Path):
+    app = create_app()
+    settings = Settings(
+        app_env=f"test-internal-observability-{uuid4()}",
+        local_trace_buffer_path=str(trace_path),
+        langsmith_tracing=False,
+    )
+
+    def override_db():
+        session = SessionLocal()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[get_settings] = lambda: settings
+
+    with TestClient(app) as test_client:
+        yield test_client
+
+    app.dependency_overrides.clear()
+
+
+def test_internal_observability_route_returns_sanitized_run_summary(
+    db_session: Session,
+    observability_client: TestClient,
+) -> None:
+    run = _create_run(db_session)
+    AgentRunRepository(db_session).update_metadata_json(
+        run.run_id,
+        {
+            "workflow": {
+                "timing": {
+                    "schema_version": "workflow_timing_summary_v1",
+                    "total_duration_ms": 25,
+                    "stage_count": 1,
+                    "stages": [
+                        {
+                            "node_name": "initialize",
+                            "attempt_count": 1,
+                            "total_duration_ms": 25,
+                        }
+                    ],
+                }
+            },
+            "observability": {
+                "trace_id": "trace-internal",
+                "status": "completed",
+                "local_buffer": {
+                    "written": True,
+                    "error": {"token": "hide-me", "message": "none"},
+                },
+                "langsmith": {
+                    "enabled": False,
+                    "posted": False,
+                    "error": None,
+                },
+            },
+            "agents": {"results": [{"role": "supervisor"}, {"role": "discovery"}]},
+            "demo": {"trace_id": "trace-demo", "initial_node_history": ["initialize", "wait_confirmation"]},
+        },
+    )
+    ToolEventRepository(db_session).create(
+        run_id=run.run_id,
+        tool_name="search_poi",
+        tool_type="read",
+        provider="mock_world",
+        request_json={"query": "museum"},
+        response_json={"candidate_count": 2},
+        error_json=None,
+        status="completed",
+        cache_hit=False,
+        latency_ms=10,
+        langsmith_trace_id="trace-internal",
+    )
+    ActionLedgerRepository(db_session).create(
+        run_id=run.run_id,
+        action_type="reserve_restaurant",
+        target_id="green-table",
+        idempotency_key=f"reserve:{run.run_id}",
+        status="succeeded",
+        request_json={"foo": "bar"},
+        response_json={"result": "ok"},
+        error_json=None,
+    )
+    db_session.commit()
+
+    response = observability_client.get(f"/internal/runs/{run.run_id}/observability")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["run_id"] == str(run.run_id)
+    assert payload["trace_id"] == "trace-demo"
+    assert payload["tool_event_count"] == 1
+    assert payload["action_count"] == 1
+    assert payload["workflow_timing_summary"]["total_duration_ms"] == 25
+    assert payload["observability_summary"]["trace_id"] == "trace-internal"
+    assert payload["observability_summary"]["local_buffer_error"] == {
+        "token": "[REDACTED]",
+        "message": "none",
+    }
+    serialized = json.dumps(payload, sort_keys=True)
+    assert "idempotency_key" not in serialized
+    assert "tool_event_id" not in serialized
+    assert "action_id" not in serialized
+
+
+def test_internal_observability_route_returns_404_for_missing_run(
+    observability_client: TestClient,
+) -> None:
+    response = observability_client.get(f"/internal/runs/{uuid4()}/observability")
+
+    assert response.status_code == 404
