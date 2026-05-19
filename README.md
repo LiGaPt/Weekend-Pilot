@@ -319,6 +319,7 @@ npm --prefix frontend run dev
 Open `http://127.0.0.1:5173`.
 
 The frontend defaults to `http://127.0.0.1:8000` for the API. To override it locally, set `VITE_API_BASE_URL` in `frontend/.env`.
+The public demo page only shows customer-safe run details. Internal trace and node history review lives at `http://127.0.0.1:5173/observability`.
 
 For internal review, open `http://127.0.0.1:5173/observability` and paste a `run_id` to inspect the internal run summary.
 
