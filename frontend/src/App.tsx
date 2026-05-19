@@ -217,27 +217,10 @@ function RunInspector({
       <dl className="metadata-list">
         <MetaItem label="运行状态" value={run?.status} testId="run-status" />
         <MetaItem label="运行 ID" value={run?.run_id} mono testId="run-id" />
-        <MetaItem label="Trace ID" value={run?.trace_id} mono />
-        <MetaItem label="工具事件" value={numberValue(run?.tool_event_count)} />
         <MetaItem label="已执行操作" value={numberValue(run?.action_count)} testId="action-count" />
         <MetaItem label="执行状态" value={run?.execution_status} />
         <MetaItem label="反馈状态" value={run?.feedback_status} />
-        <MetaItem label="观测状态" value={run?.observability_status} />
       </dl>
-      <div className="metadata-block">
-        <h3>Agent 角色</h3>
-        <p>{run?.agent_roles?.length ? run.agent_roles.join(", ") : "暂无"}</p>
-      </div>
-      <div className="metadata-block">
-        <h3>节点历史</h3>
-        <ol className="node-list">
-          {run?.node_history?.length ? (
-            run.node_history.map((node, index) => <li key={`${node}-${index}`}>{node}</li>)
-          ) : (
-            <li>暂无</li>
-          )}
-        </ol>
-      </div>
       <button
         className="secondary-button full-width"
         type="button"

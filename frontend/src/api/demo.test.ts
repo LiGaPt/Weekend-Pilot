@@ -4,17 +4,12 @@ import type { DemoRunSummary } from "../types/demo";
 
 const summary: DemoRunSummary = {
   run_id: "run-1",
-  trace_id: "trace-1",
   status: "awaiting_confirmation",
   selected_plan_id: "plan-1",
   plans: [],
-  node_history: [],
-  tool_event_count: 0,
   action_count: 0,
   execution_status: null,
   feedback_status: null,
-  observability_status: null,
-  agent_roles: [],
   error: null,
 };
 

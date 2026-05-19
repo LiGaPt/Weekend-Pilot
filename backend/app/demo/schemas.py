@@ -125,15 +125,10 @@ class DemoPlanPreview(BaseModel):
 
 class DemoRunSummary(BaseModel):
     run_id: UUID
-    trace_id: str | None = None
     status: str
     selected_plan_id: UUID | None = None
     plans: list[DemoPlanPreview] = Field(default_factory=list)
-    node_history: list[str] = Field(default_factory=list)
-    tool_event_count: int = 0
     action_count: int = 0
     execution_status: str | None = None
     feedback_status: str | None = None
-    observability_status: str | None = None
-    agent_roles: list[str] = Field(default_factory=list)
     error: dict[str, Any] | None = None

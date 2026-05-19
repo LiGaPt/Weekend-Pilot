@@ -14,7 +14,6 @@ vi.mock("./api/demo", () => ({
 
 const awaitingRun: DemoRunSummary = {
   run_id: "run-1",
-  trace_id: "trace-1",
   status: "awaiting_confirmation",
   selected_plan_id: "plan-1",
   plans: [
@@ -84,13 +83,9 @@ const awaitingRun: DemoRunSummary = {
       confirmation: { status: "pending", action_count: 0 },
     },
   ],
-  node_history: ["initialize_run", "wait_confirmation"],
-  tool_event_count: 7,
   action_count: 0,
   execution_status: null,
   feedback_status: null,
-  observability_status: "local_buffered",
-  agent_roles: ["supervisor", "discovery", "dining"],
   error: null,
 };
 
@@ -176,6 +171,13 @@ describe("App", () => {
     expect(screen.getByText("徐汇亲子科学馆")).toBeInTheDocument();
     expect(screen.getByText("绿碗家庭轻食")).toBeInTheDocument();
     expect(screen.getByText("两站之间步行很短，适合推童车。")).toBeInTheDocument();
+  });
+
+  it("does not render internal observability labels on the public page", async () => {
+    vi.mocked(startRun).mockResolvedValue(awaitingRun);
+    render(<App />);
+
+    expect(screen.queryByText("Trace ID")).not.toBeInTheDocument();
   });
 
   it("switches plan tabs without calling the backend", async () => {

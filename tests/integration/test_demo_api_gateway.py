@@ -33,6 +33,13 @@ FORBIDDEN_RESPONSE_KEYS = {
     "prompt",
     "debug_trace",
 }
+REDACTED_PUBLIC_RUN_FIELDS = {
+    "trace_id",
+    "tool_event_count",
+    "node_history",
+    "observability_status",
+    "agent_roles",
+}
 
 
 @pytest.fixture()
@@ -115,6 +122,17 @@ def _count_actions(session: Session, run_id: UUID) -> int:
     )
 
 
+def _demo_trace_id(session: Session, run_id: UUID) -> str | None:
+    run = session.get(AgentRun, run_id)
+    if run is None or not isinstance(run.metadata_json, dict):
+        return None
+    demo = run.metadata_json.get("demo")
+    if not isinstance(demo, dict):
+        return None
+    trace_id = demo.get("trace_id")
+    return trace_id if isinstance(trace_id, str) else None
+
+
 def _assert_no_forbidden_keys(value) -> None:
     if isinstance(value, dict):
         forbidden = FORBIDDEN_RESPONSE_KEYS.intersection(value)
@@ -126,6 +144,11 @@ def _assert_no_forbidden_keys(value) -> None:
             _assert_no_forbidden_keys(item)
 
 
+def _assert_public_run_redaction(payload: dict[str, object]) -> None:
+    for key in REDACTED_PUBLIC_RUN_FIELDS:
+        assert key not in payload
+
+
 def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
     test_client, case_ids, external_user_ids = client
 
@@ -134,8 +157,8 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
     assert start_response.status_code == 200
     start_body = start_response.json()
     _assert_no_forbidden_keys(start_body)
+    _assert_public_run_redaction(start_body)
     assert start_body["status"] == "awaiting_confirmation"
-    assert start_body["trace_id"]
     assert start_body["action_count"] == 0
     assert start_body["plans"]
     assert start_body["selected_plan_id"]
@@ -152,6 +175,7 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
 
     assert status_response.status_code == 200
     status_body = status_response.json()
+    _assert_public_run_redaction(status_body)
     assert status_body["run_id"] == str(run_id)
     assert status_body["selected_plan_id"] == start_body["selected_plan_id"]
     assert status_body["action_count"] == 0
@@ -164,8 +188,8 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
     assert confirm_response.status_code == 200
     confirm_body = confirm_response.json()
     _assert_no_forbidden_keys(confirm_body)
+    _assert_public_run_redaction(confirm_body)
     assert confirm_body["run_id"] == str(run_id)
-    assert confirm_body["trace_id"] == start_body["trace_id"]
     assert confirm_body["status"] == "completed"
     assert confirm_body["action_count"] > 0
     assert confirm_body["feedback_status"] == "completed"
@@ -177,6 +201,7 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
     db = SessionLocal()
     try:
         first_action_count = _count_actions(db, run_id)
+        demo_trace_id = _demo_trace_id(db, run_id)
         write_trace_ids = set(
             db.scalars(
                 select(ToolEvent.langsmith_trace_id).where(
@@ -186,7 +211,8 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
             ).all()
         )
         assert first_action_count == confirm_body["action_count"]
-        assert write_trace_ids == {start_body["trace_id"]}
+        assert demo_trace_id is not None
+        assert write_trace_ids == {demo_trace_id}
     finally:
         db.close()
 
@@ -259,7 +285,10 @@ def test_demo_run_status_route_keeps_public_shape_after_internal_route_addition(
     payload = status_response.json()
     assert payload["run_id"] == run_id
     assert "plans" in payload
-    assert "node_history" in payload
-    assert "agent_roles" in payload
+    assert "trace_id" not in payload
+    assert "tool_event_count" not in payload
+    assert "node_history" not in payload
+    assert "observability_status" not in payload
+    assert "agent_roles" not in payload
     assert "workflow_timing_summary" not in payload
     _assert_no_forbidden_keys(payload)

@@ -106,16 +106,11 @@ export type DemoPlanPreview = {
 
 export type DemoRunSummary = {
   run_id: string;
-  trace_id: string | null;
   status: string;
   selected_plan_id: string | null;
   plans: DemoPlanPreview[];
-  node_history: string[];
-  tool_event_count: number;
   action_count: number;
   execution_status: string | null;
   feedback_status: string | null;
-  observability_status: string | null;
-  agent_roles: string[];
   error: Record<string, unknown> | null;
 };

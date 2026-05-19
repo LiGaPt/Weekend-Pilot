@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from backend.app.confirmation import HumanConfirmationService, PlanConfirmationError
 from backend.app.execution import DeterministicExecutionWorkflow, ExecutionWorkflowError
 from backend.app.feedback import DeterministicFeedbackWriter, FeedbackWriterError
-from backend.app.models.runtime import ActionLedger, AgentRun, Plan, ToolEvent
+from backend.app.models.runtime import ActionLedger, AgentRun, Plan
 from backend.app.observability import LocalTraceBuffer, ObservabilityRecorder, RunTraceContext
 from backend.app.providers.mock_world import build_mock_world_registry
 from backend.app.repositories import (
@@ -223,17 +223,12 @@ class DemoWorkflowService:
 
         return DemoRunSummary(
             run_id=run.run_id,
-            trace_id=self._trace_id(run),
             status=run.status,
             selected_plan_id=selected_plan.plan_id if selected_plan is not None else None,
             plans=[self._plan_preview(plan) for plan in plan_rows],
-            node_history=self._node_history(run),
-            tool_event_count=self._tool_event_count(run_id),
             action_count=self._action_count(run_id),
             execution_status=execution.get("status") if isinstance(execution, dict) else None,
             feedback_status=feedback.get("status") if isinstance(feedback, dict) else None,
-            observability_status=self._observability_status(run),
-            agent_roles=self._agent_roles(run),
             error=self._error(run),
         )
 
@@ -398,57 +393,12 @@ class DemoWorkflowService:
             return observability["trace_id"]
         return None
 
-    def _node_history(self, run: AgentRun) -> list[str]:
-        metadata = self._metadata(run)
-        demo = metadata.get("demo")
-        if not isinstance(demo, dict):
-            return []
-        initial = demo.get("initial_node_history")
-        continuation = demo.get("continuation_history")
-        return [
-            item
-            for item in [
-                *(initial if isinstance(initial, list) else []),
-                *(continuation if isinstance(continuation, list) else []),
-            ]
-            if isinstance(item, str)
-        ]
-
-    def _agent_roles(self, run: AgentRun) -> list[str]:
-        metadata = self._metadata(run)
-        agents = metadata.get("agents")
-        if not isinstance(agents, dict):
-            return []
-        results = agents.get("results")
-        if not isinstance(results, list):
-            return []
-        roles = []
-        for result in results:
-            if isinstance(result, dict) and isinstance(result.get("role"), str):
-                roles.append(result["role"])
-        return roles
-
-    def _observability_status(self, run: AgentRun) -> str | None:
-        metadata = self._metadata(run)
-        observability = metadata.get("observability")
-        if isinstance(observability, dict) and isinstance(observability.get("status"), str):
-            return observability["status"]
-        return None
-
     def _error(self, run: AgentRun) -> dict[str, Any] | None:
         metadata = self._metadata(run)
         demo = metadata.get("demo")
         if isinstance(demo, dict) and isinstance(demo.get("initial_error"), dict):
             return sanitize_demo_payload(demo["initial_error"])
         return None
-
-    def _tool_event_count(self, run_id: UUID) -> int:
-        return int(
-            self.session.scalar(
-                select(func.count()).select_from(ToolEvent).where(ToolEvent.run_id == run_id)
-            )
-            or 0
-        )
 
     def _action_count(self, run_id: UUID) -> int:
         return int(

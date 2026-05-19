@@ -75,7 +75,6 @@ def test_demo_run_summary_serializes_minimal_web_safe_payload() -> None:
 
     summary = DemoRunSummary(
         run_id=run_id,
-        trace_id="trace-123",
         status="awaiting_confirmation",
         selected_plan_id=plan_id,
         plans=[
@@ -87,13 +86,9 @@ def test_demo_run_summary_serializes_minimal_web_safe_payload() -> None:
                 "summary": "一条适合亲子出行和清淡晚餐的方案。",
             }
         ],
-        node_history=["initialize", "wait_confirmation"],
-        tool_event_count=3,
         action_count=0,
         execution_status=None,
         feedback_status=None,
-        observability_status=None,
-        agent_roles=["supervisor", "discovery"],
         error=None,
     )
 
@@ -102,3 +97,8 @@ def test_demo_run_summary_serializes_minimal_web_safe_payload() -> None:
     assert dumped["run_id"] == str(run_id)
     assert dumped["selected_plan_id"] == str(plan_id)
     assert dumped["plans"][0]["plan_id"] == str(plan_id)
+    assert "trace_id" not in dumped
+    assert "tool_event_count" not in dumped
+    assert "node_history" not in dumped
+    assert "observability_status" not in dumped
+    assert "agent_roles" not in dumped
