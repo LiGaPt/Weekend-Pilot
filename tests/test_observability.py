@@ -18,6 +18,7 @@ from backend.app.observability import (
     ObservabilityRecorder,
     sanitize_trace_payload,
 )
+from backend.app.observability.summary import load_run_summary
 from backend.app.repositories import (
     ActionLedgerRepository,
     AgentRunRepository,
@@ -103,7 +104,7 @@ def test_sanitizer_redacts_sensitive_keys_recursively() -> None:
         "nested": {
             "Authorization": "Bearer token",
             "keep": "visible",
-            "items": [{"prompt_version": "hide-me"}, {"normal": "ok"}],
+            "items": [{"prompt_version": "prompt-v1"}, {"prompt_template": "hide-me"}, {"normal": "ok"}],
         },
         "debug_trace": {"raw": "hidden"},
     }
@@ -112,8 +113,9 @@ def test_sanitizer_redacts_sensitive_keys_recursively() -> None:
 
     assert sanitized["api_key"] == "[REDACTED]"
     assert sanitized["nested"]["Authorization"] == "[REDACTED]"
-    assert sanitized["nested"]["items"][0]["prompt_version"] == "[REDACTED]"
-    assert sanitized["nested"]["items"][1]["normal"] == "ok"
+    assert sanitized["nested"]["items"][0]["prompt_version"] == "prompt-v1"
+    assert sanitized["nested"]["items"][1]["prompt_template"] == "[REDACTED]"
+    assert sanitized["nested"]["items"][2]["normal"] == "ok"
     assert sanitized["debug_trace"] == "[REDACTED]"
 
 
@@ -138,7 +140,76 @@ def test_langsmith_recorder_is_noop_when_disabled_or_missing_key() -> None:
 
 
 def test_record_run_summary_writes_buffer_and_updates_run_metadata(db_session: Session, trace_path) -> None:
-    run = _create_run(db_session, metadata_json={"nested": {"secret_token": "hidden", "safe": "value"}})
+    timing_summary = {
+        "schema_version": "workflow_timing_summary_v1",
+        "total_duration_ms": 42,
+        "stage_count": 1,
+        "stages": [
+            {
+                "node_name": "initialize",
+                "attempt_count": 1,
+                "total_duration_ms": 42,
+            }
+        ],
+    }
+    run = _create_run(
+        db_session,
+        metadata_json={
+            "nested": {"secret_token": "hidden", "safe": "value"},
+            "workflow": {"timing": timing_summary},
+            "agents": {
+                "results": [
+                    {"role": "supervisor"},
+                    {"role": "discovery"},
+                ]
+            },
+            "demo": {
+                "trace_id": "trace-demo-existing",
+                "initial_error": {
+                    "error_type": "tool_timeout",
+                    "message": "Request failed",
+                    "details": {
+                        "api_key": "hide-me",
+                        "authorization": "Bearer secret",
+                        "visible": "safe-detail",
+                    },
+                    "stack_trace": "must-not-leak",
+                },
+            },
+        },
+    )
+    selected = PlanRepository(db_session).create(
+        run_id=run.run_id,
+        status="selected",
+        selected=True,
+        plan_json={
+            "execution": {"status": "succeeded"},
+            "feedback": {"status": "completed"},
+        },
+    )
+    ToolEventRepository(db_session).create(
+        run_id=run.run_id,
+        tool_name="search_poi",
+        tool_type="read",
+        provider="mock_world",
+        request_json={"query": "museum"},
+        response_json={"candidate_count": 3},
+        error_json=None,
+        status="completed",
+        cache_hit=False,
+        latency_ms=12,
+        langsmith_trace_id="trace-demo-existing",
+    )
+    ActionLedgerRepository(db_session).create(
+        run_id=run.run_id,
+        action_type="reserve_restaurant",
+        target_id="green-table",
+        idempotency_key=f"reserve:{run.run_id}",
+        status="succeeded",
+        request_json={"plan_id": str(selected.plan_id)},
+        response_json={"reservation": "ok"},
+        error_json=None,
+    )
     context = _recorder(db_session, trace_path).build_context(run.run_id)
 
     result = _recorder(db_session, trace_path).record_run_summary(context)
@@ -148,12 +219,35 @@ def test_record_run_summary_writes_buffer_and_updates_run_metadata(db_session: S
     row = AgentRunRepository(db_session).get_by_id(run.run_id)
     assert row is not None
     observability = row.metadata_json["observability"]
+    summary = row.metadata_json["summary"]
     assert observability["trace_id"] == context.trace_id
     assert observability["local_buffer"]["written"] is True
     assert observability["langsmith"]["posted"] is False
+    assert summary["schema_version"] == "weekendpilot_run_summary_v1"
+    assert summary["run_id"] == str(run.run_id)
+    assert summary["trace_id"] == context.trace_id
+    assert summary["prompt_version"] == "prompt-v1"
+    assert summary["selected_plan_id"] == str(selected.plan_id)
+    assert summary["tool_event_count"] == 1
+    assert summary["action_count"] == 1
+    assert summary["agent_roles"] == ["supervisor", "discovery"]
+    assert summary["workflow_timing_summary"] == timing_summary
+    assert summary["error"] == {
+        "error_type": "tool_timeout",
+        "message": "Request failed",
+        "source": "demo.initial_error",
+        "details": {
+            "api_key": "[REDACTED]",
+            "authorization": "[REDACTED]",
+            "visible": "safe-detail",
+            "stack_trace": "[REDACTED]",
+        },
+    }
 
     payload = json.loads(trace_path.read_text(encoding="utf-8").splitlines()[0])
     assert payload["schema_version"] == "weekendpilot_trace_v1"
+    assert payload["run_summary"] == summary
+    assert payload["workflow_timing_summary"] == timing_summary
     assert payload["metadata"]["nested"]["secret_token"] == "[REDACTED]"
     assert "action_id" not in json.dumps(payload)
     assert "tool_event_id" not in json.dumps(payload)
@@ -404,6 +498,122 @@ def test_internal_observability_service_handles_missing_optional_metadata(db_ses
     assert summary.observability_summary.langsmith_posted is None
     assert summary.observability_summary.local_buffer_error is None
     assert summary.observability_summary.langsmith_error is None
+
+
+def test_load_run_summary_returns_none_for_malformed_stored_summary() -> None:
+    assert load_run_summary({"summary": {"run_id": "not-a-uuid"}}) is None
+
+
+def test_internal_observability_service_prefers_canonical_summary_when_present(db_session: Session) -> None:
+    run = _create_run(
+        db_session,
+        metadata_json={
+            "summary": {
+                "schema_version": "weekendpilot_run_summary_v1",
+                "run_id": str(uuid4()),
+                "trace_id": "trace-from-summary",
+                "case_id": "case-observability",
+                "agent_version": "agent-v1",
+                "prompt_version": "prompt-v1",
+                "tool_profile": "mock_world",
+                "world_profile": "family_afternoon",
+                "failure_profile": None,
+                "workflow_status": "completed",
+                "selected_plan_id": str(uuid4()),
+                "plan_status": "selected",
+                "execution_status": "summary-executed",
+                "feedback_status": "summary-feedback",
+                "tool_event_count": 9,
+                "action_count": 4,
+                "agent_roles": ["summary-supervisor", "summary-discovery"],
+                "workflow_timing_summary": {
+                    "schema_version": "workflow_timing_summary_v1",
+                    "total_duration_ms": 99,
+                    "stage_count": 1,
+                    "stages": [
+                        {
+                            "node_name": "initialize",
+                            "attempt_count": 1,
+                            "total_duration_ms": 99,
+                        }
+                    ],
+                },
+                "error": None,
+            },
+            "workflow": {
+                "timing": {
+                    "schema_version": "workflow_timing_summary_v1",
+                    "total_duration_ms": 25,
+                    "stage_count": 1,
+                    "stages": [
+                        {
+                            "node_name": "execute_searches",
+                            "attempt_count": 1,
+                            "total_duration_ms": 25,
+                        }
+                    ],
+                }
+            },
+            "observability": {
+                "trace_id": "trace-observability",
+                "status": "completed",
+                "local_buffer": {"written": True, "error": None},
+                "langsmith": {"enabled": False, "posted": False, "error": None},
+            },
+            "agents": {
+                "results": [
+                    {"role": "legacy-supervisor"},
+                    {"role": "legacy-discovery"},
+                ]
+            },
+            "demo": {"trace_id": "trace-demo"},
+        },
+    )
+    PlanRepository(db_session).create(
+        run_id=run.run_id,
+        status="selected",
+        selected=True,
+        plan_json={
+            "execution": {"status": "legacy-executed"},
+            "feedback": {"status": "legacy-feedback"},
+        },
+    )
+    ToolEventRepository(db_session).create(
+        run_id=run.run_id,
+        tool_name="search_poi",
+        tool_type="read",
+        provider="mock_world",
+        request_json={"query": "museum"},
+        response_json={"candidate_count": 1},
+        error_json=None,
+        status="completed",
+        cache_hit=False,
+        latency_ms=10,
+        langsmith_trace_id="trace-observability",
+    )
+    ActionLedgerRepository(db_session).create(
+        run_id=run.run_id,
+        action_type="reserve_restaurant",
+        target_id="green-table",
+        idempotency_key=f"reserve:{run.run_id}",
+        status="succeeded",
+        request_json={"foo": "bar"},
+        response_json={"result": "ok"},
+        error_json=None,
+    )
+
+    summary = InternalObservabilityService(db_session).get_run_summary(run.run_id)
+
+    assert summary.trace_id == "trace-from-summary"
+    assert summary.tool_event_count == 9
+    assert summary.action_count == 4
+    assert summary.execution_status == "summary-executed"
+    assert summary.feedback_status == "summary-feedback"
+    assert summary.agent_roles == ["summary-supervisor", "summary-discovery"]
+    assert summary.workflow_timing_summary is not None
+    assert summary.workflow_timing_summary.total_duration_ms == 99
+    assert summary.observability_status == "completed"
+    assert summary.observability_summary.trace_id == "trace-observability"
 
 
 def test_internal_observability_service_raises_for_missing_run(db_session: Session) -> None:

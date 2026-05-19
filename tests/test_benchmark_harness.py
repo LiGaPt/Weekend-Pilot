@@ -511,6 +511,62 @@ def test_case_report_writer_includes_workflow_timing_summary() -> None:
         _cleanup_report_dir(report_dir)
 
 
+def test_case_report_writer_includes_run_summary_envelope() -> None:
+    result = BenchmarkCaseResult.model_validate(
+        {
+            "case_id": "family_afternoon_v1",
+            "status": "passed",
+            "scores": [],
+            "overall_score": 1.0,
+            "tool_event_count": 8,
+            "action_count": 1,
+            "run_summary": {
+                "schema_version": "weekendpilot_run_summary_v1",
+                "run_id": str(uuid4()),
+                "trace_id": "trace-1",
+                "case_id": "family_afternoon_v1",
+                "agent_version": "agent-v1",
+                "prompt_version": "prompt-v1",
+                "tool_profile": "mock_world",
+                "world_profile": "family_afternoon",
+                "failure_profile": None,
+                "workflow_status": "completed",
+                "selected_plan_id": str(uuid4()),
+                "plan_status": "selected",
+                "execution_status": "succeeded",
+                "feedback_status": "completed",
+                "tool_event_count": 8,
+                "action_count": 1,
+                "agent_roles": ["supervisor", "discovery"],
+                "workflow_timing_summary": {
+                    "schema_version": "workflow_timing_summary_v1",
+                    "total_duration_ms": 120,
+                    "stage_count": 1,
+                    "stages": [
+                        {
+                            "node_name": "initialize",
+                            "attempt_count": 1,
+                            "total_duration_ms": 120,
+                        }
+                    ],
+                },
+                "error": None,
+            },
+        }
+    )
+    report_dir = _unit_report_dir()
+
+    try:
+        report_path = Path(write_case_report(result, report_dir))
+
+        payload = json.loads(report_path.read_text(encoding="utf-8"))
+        assert payload["run_summary"]["schema_version"] == "weekendpilot_run_summary_v1"
+        assert payload["run_summary"]["workflow_status"] == "completed"
+        assert payload["run_summary"]["workflow_timing_summary"]["total_duration_ms"] == 120
+    finally:
+        _cleanup_report_dir(report_dir)
+
+
 def test_benchmark_timing_summary_uses_nearest_rank_percentiles_and_stage_order() -> None:
     results = [
         BenchmarkCaseResult(
@@ -661,6 +717,67 @@ def test_run_report_writer_creates_suite_report_with_timing_summary() -> None:
         assert payload["report_path"] == str(report_path)
         assert payload["benchmark_timing_summary"]["schema_version"] == "benchmark_timing_summary_v1"
         assert payload["benchmark_timing_summary"]["overall_total_duration_ms"]["sample_count"] == 1
+    finally:
+        _cleanup_report_dir(report_dir)
+
+
+def test_run_report_writer_includes_benchmark_summary_envelope() -> None:
+    result = BenchmarkRunReport.model_validate(
+        {
+            "run_status": "passed",
+            "case_results": [],
+            "passed_count": 1,
+            "failed_count": 0,
+            "error_count": 0,
+            "overall_score": 1.0,
+            "benchmark_timing_summary": {
+                "schema_version": "benchmark_timing_summary_v1",
+                "case_count": 1,
+                "overall_total_duration_ms": {
+                    "sample_count": 1,
+                    "min_ms": 120,
+                    "p50_ms": 120,
+                    "p95_ms": 120,
+                    "p99_ms": 120,
+                    "max_ms": 120,
+                    "mean_ms": 120.0,
+                },
+                "stages": [],
+            },
+            "benchmark_summary": {
+                "schema_version": "weekendpilot_benchmark_summary_v1",
+                "run_status": "passed",
+                "case_count": 1,
+                "passed_count": 1,
+                "failed_count": 0,
+                "error_count": 0,
+                "overall_score": 1.0,
+                "benchmark_timing_summary": {
+                    "schema_version": "benchmark_timing_summary_v1",
+                    "case_count": 1,
+                    "overall_total_duration_ms": {
+                        "sample_count": 1,
+                        "min_ms": 120,
+                        "p50_ms": 120,
+                        "p95_ms": 120,
+                        "p99_ms": 120,
+                        "max_ms": 120,
+                        "mean_ms": 120.0,
+                    },
+                    "stages": [],
+                },
+            },
+        }
+    )
+    report_dir = _unit_report_dir()
+
+    try:
+        report_path = Path(write_run_report(result, report_dir))
+
+        payload = json.loads(report_path.read_text(encoding="utf-8"))
+        assert payload["benchmark_summary"]["schema_version"] == "weekendpilot_benchmark_summary_v1"
+        assert payload["benchmark_summary"]["case_count"] == 1
+        assert payload["benchmark_summary"]["benchmark_timing_summary"]["case_count"] == 1
     finally:
         _cleanup_report_dir(report_dir)
 

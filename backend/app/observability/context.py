@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import Any
 from uuid import UUID, uuid4
 
+from pydantic import ValidationError
 from sqlalchemy import select
 
 from backend.app.models.runtime import ActionLedger
@@ -12,6 +13,7 @@ from backend.app.observability.langsmith_recorder import LangSmithRecorder
 from backend.app.observability.local_buffer import LocalTraceBuffer
 from backend.app.observability.redaction import sanitize_trace_payload
 from backend.app.observability.schemas import RunTraceContext, TraceRecordResult
+from backend.app.observability.summary import RunSummary, build_run_summary
 from backend.app.repositories import (
     ActionLedgerRepository,
     AgentRunRepository,
@@ -64,14 +66,32 @@ class ObservabilityRecorder:
         if run is None:
             raise ObservabilityError(f"Agent run {context.run_id} does not exist.")
 
-        payload = self._summary_payload(context)
+        tool_events = self.tool_events.list_for_run(context.run_id)
+        action_count = self._action_count(context.run_id)
+        selected_plan = self.plans.get_selected_for_run(context.run_id)
+        metadata = deepcopy(run.metadata_json) if isinstance(run.metadata_json, dict) else {}
+        run_summary = self._run_summary(
+            run=run,
+            selected_plan=selected_plan,
+            metadata=metadata,
+            trace_id=context.trace_id,
+            tool_event_count=len(tool_events),
+            action_count=action_count,
+        )
+        payload = self._summary_payload(
+            context,
+            metadata=metadata,
+            tool_event_count=len(tool_events),
+            action_count=action_count,
+            selected_plan=selected_plan,
+            run_summary=run_summary,
+        )
         local_result = self.local_buffer.write(payload)
         langsmith_status = (
             self.langsmith.post_summary(payload)
             if self.langsmith is not None
             else None
         )
-        metadata = deepcopy(run.metadata_json) if isinstance(run.metadata_json, dict) else {}
         metadata["observability"] = sanitize_trace_payload(
             {
                 "schema_version": self.schema_version,
@@ -94,6 +114,8 @@ class ObservabilityRecorder:
                 },
             }
         )
+        if run_summary is not None:
+            metadata["summary"] = sanitize_trace_payload(run_summary.model_dump(mode="json"))
         self.runs.update_metadata_json(context.run_id, metadata)
 
         return TraceRecordResult(
@@ -108,18 +130,19 @@ class ObservabilityRecorder:
             recorder_version=self.recorder_version,
         )
 
-    def _summary_payload(self, context: RunTraceContext) -> dict[str, Any]:
-        tool_events = self.tool_events.list_for_run(context.run_id)
-        action_count = self._action_count(context.run_id)
-        selected_plan = self.plans.get_selected_for_run(context.run_id)
+    def _summary_payload(
+        self,
+        context: RunTraceContext,
+        *,
+        metadata: dict[str, Any],
+        tool_event_count: int,
+        action_count: int,
+        selected_plan,
+        run_summary: RunSummary | None,
+    ) -> dict[str, Any]:
         plan_json = selected_plan.plan_json if selected_plan is not None and isinstance(selected_plan.plan_json, dict) else {}
         feedback = plan_json.get("feedback") if isinstance(plan_json, dict) else None
-        run = self.runs.get_by_id(context.run_id)
-        metadata = (
-            deepcopy(run.metadata_json)
-            if run is not None and isinstance(run.metadata_json, dict)
-            else deepcopy(context.metadata)
-        )
+        persisted_metadata = deepcopy(metadata) if isinstance(metadata, dict) else deepcopy(context.metadata)
         workflow_metadata = metadata.get("workflow") if isinstance(metadata, dict) else None
         workflow_timing_summary = (
             deepcopy(workflow_metadata.get("timing"))
@@ -135,19 +158,42 @@ class ObservabilityRecorder:
                 "run_id": str(context.run_id),
                 "project_name": context.project_name,
                 "status": self._run_status(context.run_id),
-                "tool_event_count": len(tool_events),
+                "tool_event_count": tool_event_count,
                 "action_count": action_count,
                 "plan_status": selected_plan.status if selected_plan is not None else None,
                 "feedback_status": feedback.get("status") if isinstance(feedback, dict) else None,
                 "workflow_timing_summary": workflow_timing_summary,
+                "run_summary": run_summary.model_dump(mode="json") if run_summary is not None else None,
                 "langsmith": {
                     "enabled": self.langsmith.enabled if self.langsmith is not None else False,
                     "posted": False,
                     "error": None,
                 },
-                "metadata": metadata,
+                "metadata": persisted_metadata,
             }
         )
+
+    def _run_summary(
+        self,
+        *,
+        run,
+        selected_plan,
+        metadata: dict[str, Any],
+        trace_id: str,
+        tool_event_count: int,
+        action_count: int,
+    ) -> RunSummary | None:
+        try:
+            return build_run_summary(
+                run,
+                selected_plan,
+                metadata,
+                trace_id_override=trace_id,
+                tool_event_count=tool_event_count,
+                action_count=action_count,
+            )
+        except ValidationError:
+            return None
 
     def _run_status(self, run_id: UUID) -> str | None:
         run = self.runs.get_by_id(run_id)

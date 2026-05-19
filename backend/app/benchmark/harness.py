@@ -6,6 +6,7 @@ from statistics import mean
 from typing import Any, Sequence
 from uuid import uuid4
 
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -26,9 +27,15 @@ from backend.app.benchmark.failure_profiles import (
     failure_profile_metadata,
 )
 from backend.app.benchmark.reporting import write_case_report, write_run_report
-from backend.app.benchmark.schemas import BenchmarkCase, BenchmarkCaseResult, BenchmarkRunReport
+from backend.app.benchmark.schemas import (
+    BenchmarkCase,
+    BenchmarkCaseResult,
+    BenchmarkRunReport,
+    BenchmarkSummary,
+)
 from backend.app.benchmark.timing import summarize_benchmark_timing
 from backend.app.models.runtime import ActionLedger
+from backend.app.observability.summary import RunSummary, build_run_summary, load_run_summary
 from backend.app.repositories import (
     ActionLedgerRepository,
     AgentRunRepository,
@@ -100,6 +107,15 @@ class BenchmarkHarness:
             error_count=error_count,
             overall_score=round(mean([result.overall_score for result in results]) if results else 0.0, 4),
             benchmark_timing_summary=summarize_benchmark_timing(results),
+            benchmark_summary=BenchmarkSummary(
+                run_status=run_status,
+                case_count=len(results),
+                passed_count=passed_count,
+                failed_count=failed_count,
+                error_count=error_count,
+                overall_score=round(mean([result.overall_score for result in results]) if results else 0.0, 4),
+                benchmark_timing_summary=summarize_benchmark_timing(results),
+            ),
         )
         report_path = write_run_report(report, self.report_dir)
         return report.model_copy(update={"report_path": str(report_path)})
@@ -177,6 +193,7 @@ class BenchmarkHarness:
                 status="error",
                 run_id=workflow_result.run_id,
                 trace_id=workflow_result.trace_id,
+                run_summary=None,
                 scores=[],
                 overall_score=0.0,
                 tool_event_count=workflow_result.tool_event_count,
@@ -194,15 +211,25 @@ class BenchmarkHarness:
 
         self._record_benchmark_metadata(repositories, run.run_id, case)
         updated_run = repositories.runs.get_by_id(run.run_id)
-        run_metadata = updated_run.metadata_json if updated_run is not None else run.metadata_json
+        persisted_run = updated_run if updated_run is not None else run
+        run_metadata = persisted_run.metadata_json if isinstance(persisted_run.metadata_json, dict) else {}
+        selected_plan = repositories.plans.get_selected_for_run(run.run_id)
+        tool_events = repositories.tool_events.list_for_run(run.run_id)
+        action_count = self._action_count(run.run_id)
+        run_summary = self._run_summary(
+            run=persisted_run,
+            selected_plan=selected_plan,
+            metadata=run_metadata,
+            trace_id=workflow_result.trace_id,
+            tool_event_count=len(tool_events),
+            action_count=action_count,
+        )
 
         if workflow_result.status == "error":
-            result = self._workflow_error_result(case, workflow_result)
+            result = self._workflow_error_result(case, workflow_result, run_summary=run_summary)
             report_path = write_case_report(result, self.report_dir)
             return result.model_copy(update={"report_path": str(report_path)})
 
-        tool_events = repositories.tool_events.list_for_run(run.run_id)
-        selected_plan = repositories.plans.get_selected_for_run(run.run_id)
         plan_json = selected_plan.plan_json if selected_plan is not None and isinstance(selected_plan.plan_json, dict) else {}
         execution = plan_json.get("execution") if isinstance(plan_json, dict) else None
         feedback = plan_json.get("feedback") if isinstance(plan_json, dict) else None
@@ -224,10 +251,11 @@ class BenchmarkHarness:
             status=status,
             run_id=run.run_id,
             trace_id=workflow_result.trace_id,
+            run_summary=run_summary,
             scores=scores,
             overall_score=overall,
             tool_event_count=len(tool_events),
-            action_count=self._action_count(run.run_id),
+            action_count=action_count,
             plan_status=getattr(selected_plan, "status", None),
             feedback_status=workflow_result.feedback_status or self._metadata_status(feedback),
             observability_status=workflow_result.observability_status,
@@ -244,12 +272,15 @@ class BenchmarkHarness:
         self,
         case: BenchmarkCase,
         workflow_result: WeekendPilotWorkflowResult,
+        *,
+        run_summary: RunSummary | None = None,
     ) -> BenchmarkCaseResult:
         return BenchmarkCaseResult(
             case_id=case.case_id,
             status="error",
             run_id=workflow_result.run_id,
             trace_id=workflow_result.trace_id,
+            run_summary=run_summary,
             scores=[],
             overall_score=0.0,
             tool_event_count=workflow_result.tool_event_count,
@@ -322,6 +353,31 @@ class BenchmarkHarness:
     def _action_count(self, run_id) -> int:
         statement = select(ActionLedger).where(ActionLedger.run_id == run_id)
         return len(list(self.session.scalars(statement).all()))
+
+    def _run_summary(
+        self,
+        *,
+        run,
+        selected_plan,
+        metadata: dict[str, Any],
+        trace_id: str | None,
+        tool_event_count: int,
+        action_count: int,
+    ) -> RunSummary | None:
+        stored = load_run_summary(metadata)
+        if stored is not None:
+            return stored
+        try:
+            return build_run_summary(
+                run,
+                selected_plan,
+                metadata,
+                trace_id_override=trace_id,
+                tool_event_count=tool_event_count,
+                action_count=action_count,
+            )
+        except ValidationError:
+            return None
 
 
 class _Repositories:
