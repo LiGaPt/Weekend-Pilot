@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 from uuid import UUID
 
@@ -16,6 +17,7 @@ from backend.app.workflow.schemas import (
     WorkflowStatus,
 )
 from backend.app.workflow.state import CandidateBlackboard, RouteTimeSummary, WeekendPilotWorkflowState
+from backend.app.workflow.timing import WorkflowTimingSummary
 
 
 class WeekendPilotWorkflowRunner:
@@ -31,6 +33,7 @@ class WeekendPilotWorkflowRunner:
             nodes = WeekendPilotWorkflowNodes(self.dependencies)
             graph = build_weekend_pilot_graph(nodes)
             final_state = graph.invoke(self._initial_state(request))
+            final_state = self._record_observability(nodes, final_state)
             return self._to_result(final_state)
         except Exception as exc:
             return WeekendPilotWorkflowResult(
@@ -86,6 +89,8 @@ class WeekendPilotWorkflowRunner:
             active_memories=[],
             candidate_blackboard=CandidateBlackboard(),
             route_time_summary=RouteTimeSummary(),
+            workflow_stage_timings=[],
+            workflow_timing_summary=None,
             agent_results=[],
             recovery_attempts=[],
             max_recovery_attempts=1,
@@ -108,6 +113,7 @@ class WeekendPilotWorkflowRunner:
             trace_id=self._text_or_none(state.get("trace_id")),
             status=status,
             selected_plan_id=self._uuid_or_none(state.get("selected_plan_id")),
+            workflow_timing_summary=self._workflow_timing_summary(state.get("workflow_timing_summary")),
             node_history=list(state.get("node_history") or []),
             tool_event_count=self._tool_event_count(run_id),
             action_count=self._action_count(run_id),
@@ -159,3 +165,49 @@ class WeekendPilotWorkflowRunner:
             elif isinstance(item, dict):
                 results.append(AgentResult.model_validate(item))
         return results
+
+    def _workflow_timing_summary(self, value: Any) -> WorkflowTimingSummary | None:
+        if isinstance(value, WorkflowTimingSummary):
+            return value
+        if isinstance(value, dict):
+            return WorkflowTimingSummary.model_validate(value)
+        return None
+
+    def _record_observability(
+        self,
+        nodes: WeekendPilotWorkflowNodes,
+        state: WeekendPilotWorkflowState | dict[str, Any],
+    ) -> WeekendPilotWorkflowState | dict[str, Any]:
+        if not isinstance(state, dict):
+            return state
+        if state.get("status") not in {"awaiting_confirmation", "completed", "failed"}:
+            return state
+        context = state.get("trace_context")
+        if context is None:
+            return state
+        try:
+            observability = nodes.recorder.record_run_summary(context)
+        except Exception as exc:
+            error_json = {
+                "error_type": "observability_failed",
+                "message": str(exc),
+                "exception_type": type(exc).__name__,
+            }
+            nodes._record_observability_error(state, error_json)
+            existing_error = state.get("error_json")
+            if isinstance(existing_error, dict):
+                merged_error = deepcopy(existing_error)
+            else:
+                merged_error = {"observability": error_json}
+            return {
+                **state,
+                "observability_status": "observability_failed",
+                "error_json": merged_error,
+            }
+        return {
+            **state,
+            "observability_result": observability,
+            "observability_status": (
+                "recorded" if observability.local_buffer_written else observability.status
+            ),
+        }

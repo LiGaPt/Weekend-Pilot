@@ -23,6 +23,7 @@ from backend.app.planning import (
 from backend.app.plans.schemas import PersistedPlan
 from backend.app.review.schemas import FinalReviewResult
 from backend.app.workflow.recovery import RecoveryAttempt
+from backend.app.workflow.timing import WorkflowNodeTimingRecord, WorkflowTimingSummary
 
 
 WorkflowStatus = Literal[
@@ -125,6 +126,8 @@ class WeekendPilotWorkflowState(TypedDict, total=False):
     execution_result: ExecutionWorkflowResult
     feedback_result: ExecutionFeedbackResult
     observability_result: TraceRecordResult
+    workflow_stage_timings: list[WorkflowNodeTimingRecord]
+    workflow_timing_summary: WorkflowTimingSummary | dict[str, Any] | None
     status: WorkflowStatus
     node_history: list[str]
     tool_event_count: int

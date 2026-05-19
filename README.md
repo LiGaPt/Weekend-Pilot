@@ -150,7 +150,7 @@ LOCAL_TRACE_BUFFER_PATH=var/traces/weekendpilot-traces.jsonl
 
 ## LocalLife-Bench Harness
 
-The benchmark harness runs file-based cases through the official LangGraph workflow and bounded deterministic agent adapters, then writes local JSON reports. It does not require LangSmith credentials or live provider access.
+The benchmark harness runs file-based cases through the official LangGraph workflow and bounded deterministic agent adapters, then writes local JSON reports. Case reports stay under `var/benchmarks/`, and suite runs also write `var/benchmarks/run-report.json` with overall and per-stage `P50`/`P95`/`P99` timing summaries. It does not require LangSmith credentials or live provider access.
 
 ```bash
 docker compose up -d postgres redis

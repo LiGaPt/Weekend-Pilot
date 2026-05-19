@@ -319,6 +319,16 @@ def test_graph_retry_recovery_loops_through_read_path_then_confirmation() -> Non
     assert result["node_history"].count("apply_recovery") == 1
     assert "saga_execution_engine" not in result["node_history"]
     assert result["status"] == "awaiting_confirmation"
+    assert result["workflow_timing_summary"]["schema_version"] == "workflow_timing_summary_v1"
+    assert result["workflow_timing_summary"]["total_duration_ms"] >= 1
+    stage_entries = {
+        entry["node_name"]: entry for entry in result["workflow_timing_summary"]["stages"]
+    }
+    assert stage_entries["execute_searches"]["attempt_count"] >= 2
+    assert stage_entries["execute_searches"]["total_duration_ms"] >= 2
+    assert result["workflow_timing_summary"]["stage_count"] == len(
+        result["workflow_timing_summary"]["stages"]
+    )
 
 
 def test_unsupported_profile_result_is_typed_and_does_not_raise() -> None:

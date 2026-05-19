@@ -47,6 +47,7 @@ from backend.app.workflow.state import (
     WeekendPilotWorkflowState,
     WorkflowMemoryRecord,
 )
+from backend.app.workflow.timing import WorkflowTimingSummary
 
 
 _RECOVERY_SENSITIVE_FRAGMENTS = (
@@ -408,32 +409,29 @@ class WeekendPilotWorkflowNodes:
             self._required_uuid(state, "selected_plan_id"),
         )
         workflow_status = "completed" if feedback.status == "completed" else "failed"
-        updates: dict[str, Any] = {
-            "feedback_result": feedback,
-            "feedback_status": feedback.status,
-            "status": workflow_status,
-        }
-        try:
-            observability = self.recorder.record_run_summary(
-                self._required_value(state, "trace_context")
-            )
-        except Exception as exc:
-            error_json = self._error_json("observability_failed", str(exc), exc)
-            self._record_observability_error(state, error_json)
-            if state.get("run_id") is not None:
-                self._persist_agent_metadata(
-                    self._required_uuid(state, "run_id"),
-                    self._agent_results(state),
-                )
-            updates["observability_status"] = "observability_failed"
-            updates["error_json"] = state.get("error_json") or {"observability": error_json}
-            return self._updates(state, "generate_summary_message", **updates)
+        return self._updates(
+            state,
+            "generate_summary_message",
+            feedback_result=feedback,
+            feedback_status=feedback.status,
+            status=workflow_status,
+        )
 
-        status = "recorded" if observability.local_buffer_written else observability.status
-        self._persist_agent_metadata(self._required_uuid(state, "run_id"), self._agent_results(state))
-        updates["observability_result"] = observability
-        updates["observability_status"] = status
-        return self._updates(state, "generate_summary_message", **updates)
+    def persist_workflow_timing_summary(
+        self,
+        run_id: UUID,
+        summary: WorkflowTimingSummary,
+    ) -> None:
+        run = self.repositories.runs.get_by_id(run_id)
+        if run is None:
+            return
+        metadata = deepcopy(run.metadata_json) if isinstance(run.metadata_json, dict) else {}
+        workflow = metadata.get("workflow")
+        if not isinstance(workflow, dict):
+            workflow = {}
+        workflow["timing"] = summary.model_dump(mode="json")
+        metadata["workflow"] = workflow
+        self.repositories.runs.update_metadata_json(run_id, metadata)
 
     def _get_or_create_user(self, external_user_id: str | None, display_name: str | None):
         if external_user_id:

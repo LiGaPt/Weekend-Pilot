@@ -6,6 +6,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from backend.app.benchmark.timing import BenchmarkTimingSummary
+from backend.app.workflow.timing import WorkflowTimingSummary
+
 
 BenchmarkCaseStatus = Literal["passed", "failed", "error"]
 BenchmarkReplayStatus = Literal["passed", "failed", "error"]
@@ -68,6 +71,7 @@ class BenchmarkCaseResult(BaseModel):
     feedback_status: str | None = None
     observability_status: str | None = None
     workflow_status: str | None = None
+    workflow_timing_summary: WorkflowTimingSummary | None = None
     workflow_node_history: list[str] = Field(default_factory=list)
     agent_roles: list[str] = Field(default_factory=list)
     failure_reasons: list[str] = Field(default_factory=list)
@@ -82,6 +86,8 @@ class BenchmarkRunReport(BaseModel):
     failed_count: int
     error_count: int
     overall_score: float
+    benchmark_timing_summary: BenchmarkTimingSummary | None = None
+    report_path: str | None = None
 
 
 class BenchmarkReplaySummary(BaseModel):

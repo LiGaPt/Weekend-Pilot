@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from uuid import uuid4
 
@@ -87,6 +88,24 @@ def _action_count(session: Session, run_id) -> int:
     return session.scalar(select(func.count()).select_from(ActionLedger).where(ActionLedger.run_id == run_id))
 
 
+def _assert_timing_artifacts(result, run: AgentRun, trace_path: Path) -> None:
+    assert result.workflow_timing_summary is not None
+    assert result.workflow_timing_summary.schema_version == "workflow_timing_summary_v1"
+    assert result.workflow_timing_summary.total_duration_ms >= 1
+    assert result.workflow_timing_summary.stage_count == len(result.workflow_timing_summary.stages)
+    assert result.workflow_timing_summary.stages
+    assert result.workflow_timing_summary.stages[0].node_name == "initialize"
+
+    persisted_timing = run.metadata_json["workflow"]["timing"]
+    assert persisted_timing["schema_version"] == "workflow_timing_summary_v1"
+    assert persisted_timing["stage_count"] == len(persisted_timing["stages"])
+    assert persisted_timing["total_duration_ms"] >= result.workflow_timing_summary.total_duration_ms
+
+    payload = json.loads(trace_path.read_text(encoding="utf-8").splitlines()[-1])
+    assert payload["workflow_timing_summary"] == persisted_timing
+    assert payload["workflow_timing_summary"]["stages"][0]["node_name"] == "initialize"
+
+
 def test_workflow_stops_at_confirmation_boundary_without_write_actions(
     db_session: Session,
     redis_runtime,
@@ -151,6 +170,7 @@ def test_workflow_auto_confirm_executes_feedback_and_observability(
     run = db_session.get(AgentRun, result.run_id)
     assert run is not None
     assert run.metadata_json["observability"]["trace_id"] == result.trace_id
+    _assert_timing_artifacts(result, run, trace_path)
 
 
 def test_workflow_recovery_stop_safely_records_metadata_without_actions(
@@ -223,6 +243,7 @@ def test_workflow_recovery_stop_safely_records_metadata_without_actions(
     assert recovery["attempt_count"] == 1
     assert recovery["max_attempts"] == 1
     assert recovery["attempts"][0]["status"] == "stopped"
+    _assert_timing_artifacts(result, run, trace_path)
 
 
 def test_workflow_recovery_retry_loops_once_and_pauses_without_actions(
@@ -308,3 +329,4 @@ def test_workflow_recovery_retry_loops_once_and_pauses_without_actions(
     assert recovery["attempt_count"] == 1
     assert recovery["attempts"][0]["status"] == "routed"
     assert recovery["attempts"][0]["route_to"] == "execute_searches"
+    _assert_timing_artifacts(result, run, trace_path)
