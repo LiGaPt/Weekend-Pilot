@@ -120,6 +120,12 @@ class ObservabilityRecorder:
             if run is not None and isinstance(run.metadata_json, dict)
             else deepcopy(context.metadata)
         )
+        workflow_metadata = metadata.get("workflow") if isinstance(metadata, dict) else None
+        workflow_timing_summary = (
+            deepcopy(workflow_metadata.get("timing"))
+            if isinstance(workflow_metadata, dict) and isinstance(workflow_metadata.get("timing"), dict)
+            else None
+        )
 
         return sanitize_trace_payload(
             {
@@ -133,6 +139,7 @@ class ObservabilityRecorder:
                 "action_count": action_count,
                 "plan_status": selected_plan.status if selected_plan is not None else None,
                 "feedback_status": feedback.get("status") if isinstance(feedback, dict) else None,
+                "workflow_timing_summary": workflow_timing_summary,
                 "langsmith": {
                     "enabled": self.langsmith.enabled if self.langsmith is not None else False,
                     "posted": False,

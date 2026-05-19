@@ -24,13 +24,16 @@ from backend.app.benchmark.graders import (
     grade_trajectory,
     grade_workflow_path,
 )
-from backend.app.benchmark.reporting import write_case_report
+from backend.app.benchmark.reporting import write_case_report, write_run_report
 from backend.app.benchmark.schemas import (
     BenchmarkCase,
     BenchmarkCaseResult,
     BenchmarkExpectedOutcome,
+    BenchmarkRunReport,
     BenchmarkScore,
 )
+from backend.app.benchmark.timing import summarize_benchmark_timing
+from backend.app.workflow.timing import WorkflowStageTimingEntry, WorkflowTimingSummary
 from backend.app.workflow.state import V1_WORKFLOW_NODE_NAMES
 
 
@@ -472,6 +475,196 @@ def test_report_writer_includes_workflow_fields_and_agent_roles() -> None:
         _cleanup_report_dir(report_dir)
 
 
+def test_case_report_writer_includes_workflow_timing_summary() -> None:
+    result = BenchmarkCaseResult(
+        case_id="family_afternoon_v1",
+        status="passed",
+        scores=[],
+        overall_score=1.0,
+        tool_event_count=8,
+        action_count=1,
+        workflow_timing_summary=_workflow_timing_summary(
+            total_duration_ms=120,
+            stages=[
+                WorkflowStageTimingEntry(
+                    node_name="initialize",
+                    attempt_count=1,
+                    total_duration_ms=5,
+                ),
+                WorkflowStageTimingEntry(
+                    node_name="execute_searches",
+                    attempt_count=2,
+                    total_duration_ms=40,
+                ),
+            ],
+        ),
+    )
+    report_dir = _unit_report_dir()
+
+    try:
+        report_path = Path(write_case_report(result, report_dir))
+
+        payload = json.loads(report_path.read_text(encoding="utf-8"))
+        assert payload["workflow_timing_summary"]["schema_version"] == "workflow_timing_summary_v1"
+        assert payload["workflow_timing_summary"]["stages"][1]["attempt_count"] == 2
+    finally:
+        _cleanup_report_dir(report_dir)
+
+
+def test_benchmark_timing_summary_uses_nearest_rank_percentiles_and_stage_order() -> None:
+    results = [
+        BenchmarkCaseResult(
+            case_id=f"case-{index}",
+            status="passed",
+            scores=[],
+            overall_score=1.0,
+            tool_event_count=8,
+            action_count=1,
+            workflow_timing_summary=summary,
+        )
+        for index, summary in enumerate(
+            [
+                _workflow_timing_summary(
+                    total_duration_ms=100,
+                    stages=[
+                        WorkflowStageTimingEntry(
+                            node_name="logical_planner_agent",
+                            attempt_count=1,
+                            total_duration_ms=20,
+                        ),
+                        WorkflowStageTimingEntry(
+                            node_name="execute_searches",
+                            attempt_count=1,
+                            total_duration_ms=30,
+                        ),
+                    ],
+                ),
+                _workflow_timing_summary(
+                    total_duration_ms=120,
+                    stages=[
+                        WorkflowStageTimingEntry(
+                            node_name="execute_searches",
+                            attempt_count=1,
+                            total_duration_ms=35,
+                        ),
+                    ],
+                ),
+                _workflow_timing_summary(
+                    total_duration_ms=140,
+                    stages=[
+                        WorkflowStageTimingEntry(
+                            node_name="execute_searches",
+                            attempt_count=2,
+                            total_duration_ms=40,
+                        ),
+                        WorkflowStageTimingEntry(
+                            node_name="logical_planner_agent",
+                            attempt_count=1,
+                            total_duration_ms=22,
+                        ),
+                    ],
+                ),
+                _workflow_timing_summary(
+                    total_duration_ms=160,
+                    stages=[
+                        WorkflowStageTimingEntry(
+                            node_name="logical_planner_agent",
+                            attempt_count=1,
+                            total_duration_ms=24,
+                        ),
+                        WorkflowStageTimingEntry(
+                            node_name="execute_searches",
+                            attempt_count=1,
+                            total_duration_ms=45,
+                        ),
+                    ],
+                ),
+                _workflow_timing_summary(
+                    total_duration_ms=300,
+                    stages=[
+                        WorkflowStageTimingEntry(
+                            node_name="execute_searches",
+                            attempt_count=1,
+                            total_duration_ms=60,
+                        ),
+                    ],
+                ),
+            ]
+        )
+    ]
+
+    summary = summarize_benchmark_timing(results)
+
+    assert summary.schema_version == "benchmark_timing_summary_v1"
+    assert summary.case_count == 5
+    assert summary.overall_total_duration_ms is not None
+    assert summary.overall_total_duration_ms.sample_count == 5
+    assert summary.overall_total_duration_ms.min_ms == 100
+    assert summary.overall_total_duration_ms.p50_ms == 140
+    assert summary.overall_total_duration_ms.p95_ms == 300
+    assert summary.overall_total_duration_ms.p99_ms == 300
+    assert summary.overall_total_duration_ms.max_ms == 300
+    assert summary.overall_total_duration_ms.mean_ms == 164.0
+    assert [entry.node_name for entry in summary.stages[:2]] == [
+        "execute_searches",
+        "logical_planner_agent",
+    ]
+    execute_searches = summary.stages[0]
+    assert execute_searches.sample_count == 5
+    assert execute_searches.retry_case_count == 1
+    assert execute_searches.min_ms == 30
+    assert execute_searches.p50_ms == 40
+    assert execute_searches.p95_ms == 60
+    assert execute_searches.p99_ms == 60
+    assert execute_searches.max_ms == 60
+    assert execute_searches.mean_ms == 42.0
+
+
+def test_run_report_writer_creates_suite_report_with_timing_summary() -> None:
+    result = BenchmarkRunReport(
+        run_status="passed",
+        case_results=[],
+        passed_count=1,
+        failed_count=0,
+        error_count=0,
+        overall_score=1.0,
+        benchmark_timing_summary=summarize_benchmark_timing(
+            [
+                BenchmarkCaseResult(
+                    case_id="family_afternoon_v1",
+                    status="passed",
+                    scores=[],
+                    overall_score=1.0,
+                    tool_event_count=8,
+                    action_count=1,
+                    workflow_timing_summary=_workflow_timing_summary(
+                        total_duration_ms=120,
+                        stages=[
+                            WorkflowStageTimingEntry(
+                                node_name="execute_searches",
+                                attempt_count=1,
+                                total_duration_ms=40,
+                            )
+                        ],
+                    ),
+                )
+            ]
+        ),
+    )
+    report_dir = _unit_report_dir()
+
+    try:
+        report_path = Path(write_run_report(result, report_dir))
+
+        payload = json.loads(report_path.read_text(encoding="utf-8"))
+        assert report_path.name == "run-report.json"
+        assert payload["report_path"] == str(report_path)
+        assert payload["benchmark_timing_summary"]["schema_version"] == "benchmark_timing_summary_v1"
+        assert payload["benchmark_timing_summary"]["overall_total_duration_ms"]["sample_count"] == 1
+    finally:
+        _cleanup_report_dir(report_dir)
+
+
 def _benchmark_case() -> BenchmarkCase:
     return BenchmarkCase(
         case_id="case",
@@ -482,6 +675,18 @@ def _benchmark_case() -> BenchmarkCase:
             min_tool_event_count=1,
             min_action_count=2,
         ),
+    )
+
+
+def _workflow_timing_summary(
+    *,
+    total_duration_ms: int,
+    stages: list[WorkflowStageTimingEntry],
+) -> WorkflowTimingSummary:
+    return WorkflowTimingSummary(
+        total_duration_ms=total_duration_ms,
+        stage_count=len(stages),
+        stages=stages,
     )
 
 

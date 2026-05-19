@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from backend.app.agents import AgentResult
 from backend.app.workflow.state import WeekendPilotWorkflowState, WorkflowStatus
+from backend.app.workflow.timing import WorkflowTimingSummary
 
 
 class WeekendPilotWorkflowRequest(BaseModel):
@@ -28,6 +29,7 @@ class WeekendPilotWorkflowResult(BaseModel):
     trace_id: str | None
     status: WorkflowStatus
     selected_plan_id: UUID | None = None
+    workflow_timing_summary: WorkflowTimingSummary | None = None
     node_history: list[str] = Field(default_factory=list)
     tool_event_count: int = 0
     action_count: int = 0

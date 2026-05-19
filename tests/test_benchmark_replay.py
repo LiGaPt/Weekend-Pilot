@@ -11,6 +11,7 @@ from backend.app.benchmark.errors import BenchmarkHarnessError
 from backend.app.benchmark.replay import BenchmarkReplayHarness, stable_replay_summary
 from backend.app.benchmark.reporting import write_case_report
 from backend.app.benchmark.schemas import BenchmarkCaseResult, BenchmarkScore
+from backend.app.workflow.timing import WorkflowStageTimingEntry, WorkflowTimingSummary
 
 
 FORBIDDEN_REPORT_TEXT = (
@@ -116,6 +117,41 @@ def test_replay_result_ignores_unstable_identifiers_and_paths(unit_report_dir: P
     assert "replay-trace" not in serialized
 
 
+def test_replay_result_ignores_additive_workflow_timing_summary(unit_report_dir: Path) -> None:
+    source = _case_result(
+        workflow_timing_summary=WorkflowTimingSummary(
+            total_duration_ms=120,
+            stage_count=1,
+            stages=[
+                WorkflowStageTimingEntry(
+                    node_name="execute_searches",
+                    attempt_count=1,
+                    total_duration_ms=40,
+                )
+            ],
+        )
+    )
+    replayed = _case_result(
+        workflow_timing_summary=WorkflowTimingSummary(
+            total_duration_ms=999,
+            stage_count=1,
+            stages=[
+                WorkflowStageTimingEntry(
+                    node_name="execute_searches",
+                    attempt_count=3,
+                    total_duration_ms=333,
+                )
+            ],
+        )
+    )
+    replay = BenchmarkReplayHarness(FakeBenchmarkHarness(replayed), replay_report_dir=unit_report_dir)
+
+    result = replay.replay_result(source)
+
+    assert result.status == "passed"
+    assert result.mismatches == []
+
+
 def test_replay_report_loads_case_report_from_disk(unit_report_dir: Path) -> None:
     source = _case_result()
     source_report = Path(write_case_report(source, unit_report_dir / "source"))
@@ -214,6 +250,7 @@ def _case_result(
     run_id=None,
     trace_id: str | None = None,
     report_path: str | None = None,
+    workflow_timing_summary: WorkflowTimingSummary | None = None,
     extra_trajectory_details: dict | None = None,
 ) -> BenchmarkCaseResult:
     trajectory_details = {
@@ -263,5 +300,6 @@ def _case_result(
         tool_event_count=8,
         action_count=action_count,
         workflow_status=workflow_status,
+        workflow_timing_summary=workflow_timing_summary,
         report_path=report_path,
     )

@@ -9,6 +9,7 @@ from backend.app.benchmark.schemas import (
     BenchmarkCaseResult,
     BenchmarkReplayCaseResult,
     BenchmarkReplayRunReport,
+    BenchmarkRunReport,
 )
 from backend.app.observability import sanitize_trace_payload
 
@@ -52,6 +53,17 @@ def write_replay_run_report(
 ) -> str:
     report_path = Path(report_dir) / filename
     _write_json_report(result.model_dump(mode="json"), report_path)
+    return str(report_path)
+
+
+def write_run_report(
+    result: BenchmarkRunReport,
+    report_dir: Path | str,
+    filename: str = "run-report.json",
+) -> str:
+    report_path = Path(report_dir) / filename
+    payload = result.model_copy(update={"report_path": str(report_path)})
+    _write_json_report(payload.model_dump(mode="json"), report_path)
     return str(report_path)
 
 

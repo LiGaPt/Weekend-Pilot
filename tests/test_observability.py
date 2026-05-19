@@ -215,6 +215,46 @@ def test_record_run_summary_uses_latest_sanitized_agent_metadata(
     assert "authorization" not in serialized
 
 
+def test_record_run_summary_promotes_workflow_timing_summary_to_top_level(
+    db_session: Session,
+    trace_path,
+) -> None:
+    timing_summary = {
+        "schema_version": "workflow_timing_summary_v1",
+        "total_duration_ms": 42,
+        "stage_count": 2,
+        "stages": [
+            {
+                "node_name": "initialize",
+                "attempt_count": 1,
+                "total_duration_ms": 5,
+            },
+            {
+                "node_name": "execute_searches",
+                "attempt_count": 2,
+                "total_duration_ms": 37,
+            },
+        ],
+    }
+    run = _create_run(
+        db_session,
+        metadata_json={
+            "workflow": {
+                "source": "observability-test",
+                "timing": timing_summary,
+            }
+        },
+    )
+    recorder = _recorder(db_session, trace_path)
+    context = recorder.build_context(run.run_id)
+
+    recorder.record_run_summary(context)
+
+    payload = json.loads(trace_path.read_text(encoding="utf-8").splitlines()[0])
+    assert payload["workflow_timing_summary"] == timing_summary
+    assert payload["workflow_timing_summary"]["stages"][1]["attempt_count"] == 2
+
+
 def test_agent_run_metadata_update_does_not_self_commit() -> None:
     session = SessionLocal()
     try:

@@ -25,8 +25,9 @@ from backend.app.benchmark.failure_profiles import (
     build_benchmark_failure_injector,
     failure_profile_metadata,
 )
-from backend.app.benchmark.reporting import write_case_report
+from backend.app.benchmark.reporting import write_case_report, write_run_report
 from backend.app.benchmark.schemas import BenchmarkCase, BenchmarkCaseResult, BenchmarkRunReport
+from backend.app.benchmark.timing import summarize_benchmark_timing
 from backend.app.models.runtime import ActionLedger
 from backend.app.repositories import (
     ActionLedgerRepository,
@@ -91,14 +92,17 @@ class BenchmarkHarness:
             run_status = "failed"
         else:
             run_status = "passed"
-        return BenchmarkRunReport(
+        report = BenchmarkRunReport(
             run_status=run_status,
             case_results=results,
             passed_count=passed_count,
             failed_count=failed_count,
             error_count=error_count,
             overall_score=round(mean([result.overall_score for result in results]) if results else 0.0, 4),
+            benchmark_timing_summary=summarize_benchmark_timing(results),
         )
+        report_path = write_run_report(report, self.report_dir)
+        return report.model_copy(update={"report_path": str(report_path)})
 
     def _run_case(self, case: BenchmarkCase) -> BenchmarkCaseResult:
         if case.tool_profile != "mock_world" or case.world_profile != "family_afternoon":
@@ -180,6 +184,7 @@ class BenchmarkHarness:
                 feedback_status=workflow_result.feedback_status,
                 observability_status=workflow_result.observability_status,
                 workflow_status=workflow_result.status,
+                workflow_timing_summary=workflow_result.workflow_timing_summary,
                 workflow_node_history=list(workflow_result.node_history),
                 agent_roles=self._agent_roles(workflow_result),
                 failure_reasons=["Workflow run was not persisted."],
@@ -227,6 +232,7 @@ class BenchmarkHarness:
             feedback_status=workflow_result.feedback_status or self._metadata_status(feedback),
             observability_status=workflow_result.observability_status,
             workflow_status=workflow_result.status,
+            workflow_timing_summary=workflow_result.workflow_timing_summary,
             workflow_node_history=list(workflow_result.node_history),
             agent_roles=self._agent_roles(workflow_result),
             failure_reasons=failure_reasons,
@@ -251,6 +257,7 @@ class BenchmarkHarness:
             feedback_status=workflow_result.feedback_status,
             observability_status=workflow_result.observability_status,
             workflow_status=workflow_result.status,
+            workflow_timing_summary=workflow_result.workflow_timing_summary,
             workflow_node_history=list(workflow_result.node_history),
             agent_roles=self._agent_roles(workflow_result),
             failure_reasons=[self._workflow_failure_reason(workflow_result)],
