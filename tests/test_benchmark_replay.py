@@ -152,6 +152,83 @@ def test_replay_result_ignores_additive_workflow_timing_summary(unit_report_dir:
     assert result.mismatches == []
 
 
+def test_replay_result_ignores_additive_run_summary(unit_report_dir: Path) -> None:
+    source = _case_result(
+        run_summary={
+            "schema_version": "weekendpilot_run_summary_v1",
+            "run_id": str(uuid4()),
+            "trace_id": "source-trace",
+            "case_id": "family_afternoon_v1",
+            "agent_version": "agent-v1",
+            "prompt_version": "prompt-v1",
+            "tool_profile": "mock_world",
+            "world_profile": "family_afternoon",
+            "failure_profile": None,
+            "workflow_status": "completed",
+            "selected_plan_id": str(uuid4()),
+            "plan_status": "selected",
+            "execution_status": "succeeded",
+            "feedback_status": "completed",
+            "tool_event_count": 8,
+            "action_count": 2,
+            "agent_roles": ["supervisor", "discovery"],
+            "workflow_timing_summary": {
+                "schema_version": "workflow_timing_summary_v1",
+                "total_duration_ms": 120,
+                "stage_count": 1,
+                "stages": [
+                    {
+                        "node_name": "initialize",
+                        "attempt_count": 1,
+                        "total_duration_ms": 120,
+                    }
+                ],
+            },
+            "error": None,
+        }
+    )
+    replayed = _case_result(
+        run_summary={
+            "schema_version": "weekendpilot_run_summary_v1",
+            "run_id": str(uuid4()),
+            "trace_id": "replay-trace",
+            "case_id": "family_afternoon_v1",
+            "agent_version": "agent-v1",
+            "prompt_version": "prompt-v1",
+            "tool_profile": "mock_world",
+            "world_profile": "family_afternoon",
+            "failure_profile": None,
+            "workflow_status": "completed",
+            "selected_plan_id": str(uuid4()),
+            "plan_status": "selected",
+            "execution_status": "succeeded",
+            "feedback_status": "completed",
+            "tool_event_count": 8,
+            "action_count": 2,
+            "agent_roles": ["supervisor", "discovery"],
+            "workflow_timing_summary": {
+                "schema_version": "workflow_timing_summary_v1",
+                "total_duration_ms": 999,
+                "stage_count": 1,
+                "stages": [
+                    {
+                        "node_name": "initialize",
+                        "attempt_count": 1,
+                        "total_duration_ms": 999,
+                    }
+                ],
+            },
+            "error": None,
+        }
+    )
+    replay = BenchmarkReplayHarness(FakeBenchmarkHarness(replayed), replay_report_dir=unit_report_dir)
+
+    result = replay.replay_result(source)
+
+    assert result.status == "passed"
+    assert result.mismatches == []
+
+
 def test_replay_report_loads_case_report_from_disk(unit_report_dir: Path) -> None:
     source = _case_result()
     source_report = Path(write_case_report(source, unit_report_dir / "source"))
@@ -251,6 +328,7 @@ def _case_result(
     trace_id: str | None = None,
     report_path: str | None = None,
     workflow_timing_summary: WorkflowTimingSummary | None = None,
+    run_summary: dict | None = None,
     extra_trajectory_details: dict | None = None,
 ) -> BenchmarkCaseResult:
     trajectory_details = {
@@ -301,5 +379,6 @@ def _case_result(
         action_count=action_count,
         workflow_status=workflow_status,
         workflow_timing_summary=workflow_timing_summary,
+        run_summary=run_summary,
         report_path=report_path,
     )

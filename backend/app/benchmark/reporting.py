@@ -28,6 +28,9 @@ _FORBIDDEN_KEY_PARTS = (
     "stack_trace",
     "stack trace",
 )
+_SAFE_KEY_NAMES = {
+    "prompt_version",
+}
 
 
 def write_case_report(result: BenchmarkCaseResult, report_dir: Path | str) -> str:
@@ -93,4 +96,6 @@ def _drop_forbidden_keys(value: Any) -> Any:
 
 def _is_forbidden_key(key: Any) -> bool:
     normalized = str(key).casefold()
+    if normalized in _SAFE_KEY_NAMES:
+        return False
     return any(part in normalized for part in _FORBIDDEN_KEY_PARTS)

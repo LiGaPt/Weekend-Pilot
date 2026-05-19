@@ -97,11 +97,18 @@ def _assert_timing_artifacts(result, run: AgentRun, trace_path: Path) -> None:
     assert result.workflow_timing_summary.stages[0].node_name == "initialize"
 
     persisted_timing = run.metadata_json["workflow"]["timing"]
+    persisted_summary = run.metadata_json["summary"]
     assert persisted_timing["schema_version"] == "workflow_timing_summary_v1"
     assert persisted_timing["stage_count"] == len(persisted_timing["stages"])
     assert persisted_timing["total_duration_ms"] >= result.workflow_timing_summary.total_duration_ms
+    assert persisted_summary["schema_version"] == "weekendpilot_run_summary_v1"
+    assert persisted_summary["trace_id"] == result.trace_id
+    assert persisted_summary["workflow_status"] == result.status
 
     payload = json.loads(trace_path.read_text(encoding="utf-8").splitlines()[-1])
+    assert payload["run_summary"]["schema_version"] == "weekendpilot_run_summary_v1"
+    assert payload["run_summary"]["trace_id"] == result.trace_id
+    assert payload["run_summary"]["workflow_status"] == result.status
     assert payload["workflow_timing_summary"] == persisted_timing
     assert payload["workflow_timing_summary"]["stages"][0]["node_name"] == "initialize"
 

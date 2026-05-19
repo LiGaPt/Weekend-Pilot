@@ -11,7 +11,13 @@ _SENSITIVE_KEY_PARTS = (
     "authorization",
     "prompt",
     "debug_trace",
+    "traceback",
+    "stack_trace",
+    "stack trace",
 )
+_SAFE_KEY_NAMES = {
+    "prompt_version",
+}
 _DROP_KEYS = {
     "prompt_tokens",
     "completion_tokens",
@@ -40,4 +46,6 @@ def sanitize_trace_payload(value: Any) -> Any:
 
 def _is_sensitive_key(key: Any) -> bool:
     normalized = str(key).casefold()
+    if normalized in _SAFE_KEY_NAMES:
+        return False
     return any(part in normalized for part in _SENSITIVE_KEY_PARTS)

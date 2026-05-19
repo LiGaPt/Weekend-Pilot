@@ -106,6 +106,9 @@ def test_benchmark_harness_runs_full_mock_world_case(
     assert result.trace_id is not None
     assert result.tool_event_count >= case.expected.min_tool_event_count
     assert result.action_count >= case.expected.min_action_count
+    assert result.run_summary is not None
+    assert result.run_summary.workflow_status == "completed"
+    assert result.run_summary.prompt_version == "prompt-v1"
     assert result.feedback_status == "completed"
     assert result.workflow_status == "completed"
     assert result.workflow_timing_summary is not None
@@ -118,6 +121,8 @@ def test_benchmark_harness_runs_full_mock_world_case(
     report_payload = json.loads(report_path.read_text(encoding="utf-8"))
     assert report_payload["case_id"] == case.case_id
     assert report_payload["status"] == "passed"
+    assert report_payload["run_summary"]["schema_version"] == "weekendpilot_run_summary_v1"
+    assert report_payload["run_summary"]["workflow_status"] == "completed"
     assert report_payload["workflow_status"] == "completed"
     assert report_payload["workflow_timing_summary"]["schema_version"] == "workflow_timing_summary_v1"
     assert "initialize" in report_payload["workflow_node_history"]
@@ -171,6 +176,9 @@ def test_benchmark_harness_runs_default_mock_world_suite(
     assert report.passed_count == 5
     assert report.failed_count == 0
     assert report.error_count == 0
+    assert report.benchmark_summary is not None
+    assert report.benchmark_summary.run_status == "passed"
+    assert report.benchmark_summary.case_count == len(cases)
     assert report.benchmark_timing_summary is not None
     assert report.report_path is not None
     assert Path(report.report_path).exists()
@@ -181,6 +189,7 @@ def test_benchmark_harness_runs_default_mock_world_suite(
         assert result.trace_id is not None
         assert result.workflow_status == "completed"
         assert result.workflow_timing_summary is not None
+        assert result.run_summary is not None
         assert result.feedback_status == "completed"
         assert set(result.agent_roles) == EXPECTED_AGENT_ROLES
         assert result.report_path is not None
@@ -190,6 +199,7 @@ def test_benchmark_harness_runs_default_mock_world_suite(
         report_payload = json.loads(report_path.read_text(encoding="utf-8"))
         assert report_payload["case_id"] == result.case_id
         assert report_payload["status"] == "passed"
+        assert report_payload["run_summary"]["schema_version"] == "weekendpilot_run_summary_v1"
         serialized_report = json.dumps(report_payload, sort_keys=True)
         for forbidden in FORBIDDEN_REPORT_TEXT:
             assert forbidden not in serialized_report
@@ -205,6 +215,8 @@ def test_benchmark_harness_runs_default_mock_world_suite(
 
     suite_payload = json.loads(Path(report.report_path).read_text(encoding="utf-8"))
     assert suite_payload["report_path"] == report.report_path
+    assert suite_payload["benchmark_summary"]["schema_version"] == "weekendpilot_benchmark_summary_v1"
+    assert suite_payload["benchmark_summary"]["run_status"] == "passed"
     assert suite_payload["benchmark_timing_summary"]["schema_version"] == "benchmark_timing_summary_v1"
     assert suite_payload["benchmark_timing_summary"]["case_count"] == len(cases)
     assert suite_payload["benchmark_timing_summary"]["overall_total_duration_ms"]["sample_count"] == len(cases)
@@ -237,6 +249,8 @@ def test_benchmark_harness_runs_route_failure_case_as_expected_safe_stop(
     assert result.run_id is not None
     assert result.workflow_status == "failed"
     assert result.workflow_timing_summary is not None
+    assert result.run_summary is not None
+    assert result.run_summary.workflow_status == "failed"
     assert result.action_count == 0
     assert "apply_recovery" in result.workflow_node_history
     assert "saga_execution_engine" not in result.workflow_node_history
@@ -269,6 +283,8 @@ def test_benchmark_harness_runs_route_failure_case_as_expected_safe_stop(
     assert recovery["attempts"][0]["status"] == "stopped"
 
     report_payload = json.loads(Path(result.report_path).read_text(encoding="utf-8"))
+    assert report_payload["run_summary"]["schema_version"] == "weekendpilot_run_summary_v1"
+    assert report_payload["run_summary"]["workflow_status"] == "failed"
     assert report_payload["workflow_timing_summary"]["schema_version"] == "workflow_timing_summary_v1"
     serialized_report = json.dumps(report_payload, sort_keys=True)
     for forbidden in FORBIDDEN_REPORT_TEXT:

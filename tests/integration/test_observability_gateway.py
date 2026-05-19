@@ -193,12 +193,16 @@ def test_full_mock_world_flow_populates_tool_event_trace_ids_and_records_summary
     assert row is not None
     assert row.metadata_json["observability"]["trace_id"] == trace_context.trace_id
     assert row.metadata_json["observability"]["langsmith"]["enabled"] is False
+    assert row.metadata_json["summary"]["schema_version"] == "weekendpilot_run_summary_v1"
+    assert row.metadata_json["summary"]["trace_id"] == trace_context.trace_id
 
     payload = json.loads(trace_path.read_text(encoding="utf-8").splitlines()[0])
     assert payload["trace_id"] == trace_context.trace_id
     assert payload["tool_event_count"] > 0
     assert payload["action_count"] == len(execution.action_results)
     assert payload["feedback_status"] == "completed"
+    assert payload["run_summary"]["schema_version"] == "weekendpilot_run_summary_v1"
+    assert payload["run_summary"]["trace_id"] == trace_context.trace_id
     serialized = json.dumps(payload, sort_keys=True)
     assert "must-redact" not in serialized
     assert "api_key" in serialized
@@ -303,6 +307,7 @@ def test_internal_observability_route_returns_sanitized_run_summary(
     assert payload["trace_id"] == "trace-demo"
     assert payload["tool_event_count"] == 1
     assert payload["action_count"] == 1
+    assert payload["agent_roles"] == ["supervisor", "discovery"]
     assert payload["workflow_timing_summary"]["total_duration_ms"] == 25
     assert payload["observability_summary"]["trace_id"] == "trace-internal"
     assert payload["observability_summary"]["local_buffer_error"] == {

@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from backend.app.observability.summary import RunSummary
 from backend.app.benchmark.timing import BenchmarkTimingSummary
 from backend.app.workflow.timing import WorkflowTimingSummary
 
@@ -63,6 +64,7 @@ class BenchmarkCaseResult(BaseModel):
     status: BenchmarkCaseStatus
     run_id: UUID | None = None
     trace_id: str | None = None
+    run_summary: RunSummary | None = None
     scores: list[BenchmarkScore]
     overall_score: float
     tool_event_count: int
@@ -78,6 +80,17 @@ class BenchmarkCaseResult(BaseModel):
     report_path: str | None = None
 
 
+class BenchmarkSummary(BaseModel):
+    schema_version: str = "weekendpilot_benchmark_summary_v1"
+    run_status: Literal["passed", "failed", "error"]
+    case_count: int
+    passed_count: int
+    failed_count: int
+    error_count: int
+    overall_score: float
+    benchmark_timing_summary: BenchmarkTimingSummary | None = None
+
+
 class BenchmarkRunReport(BaseModel):
     schema_version: str = "weekendpilot_benchmark_run_v1"
     run_status: Literal["passed", "failed", "error"]
@@ -87,6 +100,7 @@ class BenchmarkRunReport(BaseModel):
     error_count: int
     overall_score: float
     benchmark_timing_summary: BenchmarkTimingSummary | None = None
+    benchmark_summary: BenchmarkSummary | None = None
     report_path: str | None = None
 
 
