@@ -471,6 +471,17 @@ def test_internal_observability_service_builds_sanitized_run_summary(db_session:
         "saga_execution_engine",
         "generate_summary_message",
     ]
+    assert len(summary.tool_event_summaries) == 1
+    assert summary.tool_event_summaries[0].tool_name == "search_poi"
+    assert summary.tool_event_summaries[0].request_preview == {"query": "museum"}
+    assert summary.tool_event_summaries[0].response_preview == {"candidate_count": 3}
+    assert summary.tool_event_summaries[0].error_preview is None
+    assert len(summary.action_ledger_summaries) == 1
+    assert summary.action_ledger_summaries[0].action_type == "reserve_restaurant"
+    assert summary.action_ledger_summaries[0].target_id == "green-table"
+    assert summary.action_ledger_summaries[0].request_preview == {"plan_id": "[REDACTED]"}
+    assert summary.action_ledger_summaries[0].response_preview == {"reservation": "ok"}
+    assert summary.action_ledger_summaries[0].error_preview is None
     assert summary.workflow_timing_summary is not None
     assert summary.workflow_timing_summary.total_duration_ms == 42
     assert summary.observability_summary.trace_id == "trace-observability"
@@ -490,6 +501,8 @@ def test_internal_observability_service_handles_missing_optional_metadata(db_ses
     assert summary.observability_status is None
     assert summary.agent_roles == []
     assert summary.node_history == []
+    assert summary.tool_event_summaries == []
+    assert summary.action_ledger_summaries == []
     assert summary.workflow_timing_summary is None
     assert summary.observability_summary.trace_id is None
     assert summary.observability_summary.status is None

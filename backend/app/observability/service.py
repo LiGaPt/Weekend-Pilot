@@ -11,11 +11,18 @@ from sqlalchemy.orm import Session
 from backend.app.models.runtime import ActionLedger, AgentRun, Plan, ToolEvent
 from backend.app.observability.redaction import sanitize_trace_payload
 from backend.app.observability.schemas import (
+    InternalActionLedgerSummary,
     InternalObservabilityRunSummary,
     InternalObservabilitySummary,
+    InternalToolEventSummary,
 )
 from backend.app.observability.summary import RunSummary, load_run_summary
-from backend.app.repositories import AgentRunRepository, PlanRepository
+from backend.app.repositories import (
+    ActionLedgerRepository,
+    AgentRunRepository,
+    PlanRepository,
+    ToolEventRepository,
+)
 from backend.app.workflow.timing import WorkflowTimingSummary
 
 
@@ -56,6 +63,8 @@ class InternalObservabilityService:
             observability_status=self._observability_status(metadata),
             agent_roles=self._agent_roles(metadata, canonical_summary),
             node_history=self._node_history(metadata),
+            tool_event_summaries=self._tool_event_summaries(run.run_id),
+            action_ledger_summaries=self._action_ledger_summaries(run.run_id),
             workflow_timing_summary=self._workflow_timing_summary(metadata, canonical_summary),
             observability_summary=self._observability_summary(metadata),
         )
@@ -92,6 +101,38 @@ class InternalObservabilityService:
                 *(continuation if isinstance(continuation, list) else []),
             ]
             if isinstance(item, str)
+        ]
+
+    def _tool_event_summaries(self, run_id: UUID) -> list[InternalToolEventSummary]:
+        return [
+            InternalToolEventSummary(
+                tool_name=event.tool_name,
+                tool_type=event.tool_type,
+                provider=event.provider,
+                status=event.status,
+                cache_hit=event.cache_hit,
+                latency_ms=event.latency_ms,
+                created_at=event.created_at,
+                request_preview=_preview_payload(event.request_json),
+                response_preview=_preview_payload(event.response_json),
+                error_preview=_preview_payload(event.error_json),
+            )
+            for event in ToolEventRepository(self.session).list_for_run(run_id)
+        ]
+
+    def _action_ledger_summaries(self, run_id: UUID) -> list[InternalActionLedgerSummary]:
+        return [
+            InternalActionLedgerSummary(
+                action_type=action.action_type,
+                target_id=action.target_id,
+                status=action.status,
+                created_at=action.created_at,
+                updated_at=action.updated_at,
+                request_preview=_preview_payload(action.request_json),
+                response_preview=_preview_payload(action.response_json),
+                error_preview=_preview_payload(action.error_json),
+            )
+            for action in ActionLedgerRepository(self.session).list_for_run(run_id)
         ]
 
     def _agent_roles(self, metadata: dict[str, Any], canonical_summary: RunSummary | None) -> list[str]:
@@ -213,3 +254,33 @@ class InternalObservabilityService:
             self.session.scalar(select(func.count()).select_from(ActionLedger).where(ActionLedger.run_id == run_id))
             or 0
         )
+
+
+def _preview_payload(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+
+    sanitized = sanitize_trace_payload(deepcopy(value))
+    preview = _redact_identifier_keys(sanitized)
+    if isinstance(preview, dict):
+        return preview
+    return {"value": preview}
+
+
+def _redact_identifier_keys(value: Any) -> Any:
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for key, item in value.items():
+            if _is_identifier_key(key):
+                sanitized[key] = "[REDACTED]"
+            else:
+                sanitized[key] = _redact_identifier_keys(item)
+        return sanitized
+    if isinstance(value, list):
+        return [_redact_identifier_keys(item) for item in value]
+    return value
+
+
+def _is_identifier_key(key: Any) -> bool:
+    normalized = str(key).casefold()
+    return normalized == "id" or normalized.endswith("_id")

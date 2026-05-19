@@ -23,6 +23,8 @@ const summary: InternalObservabilityRunSummary = {
   observability_status: "completed",
   agent_roles: ["supervisor", "discovery"],
   node_history: ["initialize", "wait_confirmation"],
+  tool_event_summaries: [],
+  action_ledger_summaries: [],
   workflow_timing_summary: {
     schema_version: "workflow_timing_summary_v1",
     total_duration_ms: 42,

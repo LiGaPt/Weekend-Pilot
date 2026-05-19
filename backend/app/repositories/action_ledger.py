@@ -44,6 +44,14 @@ class ActionLedgerRepository:
         statement = select(ActionLedger).where(ActionLedger.idempotency_key == idempotency_key)
         return self.session.scalar(statement)
 
+    def list_for_run(self, run_id: UUID) -> list[ActionLedger]:
+        statement = (
+            select(ActionLedger)
+            .where(ActionLedger.run_id == run_id)
+            .order_by(ActionLedger.created_at, ActionLedger.action_id)
+        )
+        return list(self.session.scalars(statement).all())
+
     def update_status(
         self,
         action_id: UUID,
