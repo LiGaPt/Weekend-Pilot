@@ -10,20 +10,19 @@ from backend.app.benchmark.errors import BenchmarkHarnessError
 from backend.app.benchmark.schemas import BenchmarkCase
 
 
-_DEFAULT_CASE_IDS = (
+_REGISTERED_CASE_IDS = (
     "family_afternoon_v1",
     "family_indoor_light_meal_v1",
     "family_outdoor_quick_dinner_v1",
     "family_memory_override_v1",
     "family_citywalk_addon_v1",
     "solo_afternoon_v1",
+    "family_route_failure_v1",
 )
-
-_FAILURE_CASE_IDS = ("family_route_failure_v1",)
 
 
 def load_benchmark_case(case_id: str) -> BenchmarkCase:
-    if case_id not in (*_DEFAULT_CASE_IDS, *_FAILURE_CASE_IDS):
+    if case_id not in _REGISTERED_CASE_IDS:
         raise BenchmarkHarnessError(f"Unknown benchmark case ID: {case_id}")
 
     path = resources.files("backend.app.benchmark").joinpath("cases", f"{case_id}.json")
@@ -38,9 +37,5 @@ def load_benchmark_case(case_id: str) -> BenchmarkCase:
         raise BenchmarkHarnessError(f"Benchmark fixture schema is invalid: {case_id}") from exc
 
 
-def load_default_benchmark_cases() -> list[BenchmarkCase]:
-    return [load_benchmark_case(case_id) for case_id in _DEFAULT_CASE_IDS]
-
-
-def load_failure_benchmark_cases() -> list[BenchmarkCase]:
-    return [load_benchmark_case(case_id) for case_id in _FAILURE_CASE_IDS]
+def load_registered_benchmark_cases() -> list[BenchmarkCase]:
+    return [load_benchmark_case(case_id) for case_id in _REGISTERED_CASE_IDS]
