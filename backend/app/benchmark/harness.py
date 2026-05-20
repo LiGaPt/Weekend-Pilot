@@ -26,6 +26,7 @@ from backend.app.benchmark.failure_profiles import (
     build_benchmark_failure_injector,
     failure_profile_metadata,
 )
+from backend.app.benchmark.matrix import build_case_matrix_summary
 from backend.app.benchmark.reporting import write_case_report, write_run_report
 from backend.app.benchmark.schemas import (
     BenchmarkCase,
@@ -80,6 +81,7 @@ class BenchmarkHarness:
             result = BenchmarkCaseResult(
                 case_id=case.case_id,
                 status="error",
+                taxonomy=case.taxonomy,
                 scores=[],
                 overall_score=0.0,
                 tool_event_count=0,
@@ -94,6 +96,7 @@ class BenchmarkHarness:
         passed_count = sum(1 for result in results if result.status == "passed")
         failed_count = sum(1 for result in results if result.status == "failed")
         error_count = sum(1 for result in results if result.status == "error")
+        timing_summary = summarize_benchmark_timing(results)
         if error_count:
             run_status = "error"
         elif failed_count:
@@ -107,7 +110,7 @@ class BenchmarkHarness:
             failed_count=failed_count,
             error_count=error_count,
             overall_score=round(mean([result.overall_score for result in results]) if results else 0.0, 4),
-            benchmark_timing_summary=summarize_benchmark_timing(results),
+            benchmark_timing_summary=timing_summary,
             benchmark_summary=BenchmarkSummary(
                 run_status=run_status,
                 case_count=len(results),
@@ -115,7 +118,8 @@ class BenchmarkHarness:
                 failed_count=failed_count,
                 error_count=error_count,
                 overall_score=round(mean([result.overall_score for result in results]) if results else 0.0, 4),
-                benchmark_timing_summary=summarize_benchmark_timing(results),
+                benchmark_timing_summary=timing_summary,
+                matrix_summary=build_case_matrix_summary(cases),
             ),
         )
         report_path = write_run_report(report, self.report_dir)
@@ -126,6 +130,7 @@ class BenchmarkHarness:
             result = BenchmarkCaseResult(
                 case_id=case.case_id,
                 status="error",
+                taxonomy=case.taxonomy,
                 scores=[],
                 overall_score=0.0,
                 tool_event_count=0,
@@ -195,6 +200,7 @@ class BenchmarkHarness:
                 run_id=workflow_result.run_id,
                 trace_id=workflow_result.trace_id,
                 run_summary=None,
+                taxonomy=case.taxonomy,
                 scores=[],
                 overall_score=0.0,
                 tool_event_count=workflow_result.tool_event_count,
@@ -253,6 +259,7 @@ class BenchmarkHarness:
             run_id=run.run_id,
             trace_id=workflow_result.trace_id,
             run_summary=run_summary,
+            taxonomy=case.taxonomy,
             scores=scores,
             overall_score=overall,
             tool_event_count=len(tool_events),
@@ -282,6 +289,7 @@ class BenchmarkHarness:
             run_id=workflow_result.run_id,
             trace_id=workflow_result.trace_id,
             run_summary=run_summary,
+            taxonomy=case.taxonomy,
             scores=[],
             overall_score=0.0,
             tool_event_count=workflow_result.tool_event_count,
@@ -312,6 +320,7 @@ class BenchmarkHarness:
             "failure_profile_metadata": failure_profile_metadata(case.failure_profile),
             "benchmark_harness_version": self.harness_version,
             "harness_version": self.harness_version,
+            "taxonomy": case.taxonomy.model_dump(mode="json"),
             "metadata": case.metadata,
             "workflow_backed": True,
         }

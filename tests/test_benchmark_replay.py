@@ -229,6 +229,33 @@ def test_replay_result_ignores_additive_run_summary(unit_report_dir: Path) -> No
     assert result.mismatches == []
 
 
+def test_replay_result_ignores_additive_taxonomy(unit_report_dir: Path) -> None:
+    source = _case_result(
+        taxonomy={
+            "suite": "locallife_bench_v1",
+            "scenario_bucket": "family",
+            "level": "L1",
+            "tags": ["baseline", "child_friendly"],
+            "failure_mode": None,
+        }
+    )
+    replayed = _case_result(
+        taxonomy={
+            "suite": "locallife_bench_v1",
+            "scenario_bucket": "solo",
+            "level": "L2",
+            "tags": ["baseline", "light_activity"],
+            "failure_mode": None,
+        }
+    )
+    replay = BenchmarkReplayHarness(FakeBenchmarkHarness(replayed), replay_report_dir=unit_report_dir)
+
+    result = replay.replay_result(source)
+
+    assert result.status == "passed"
+    assert result.mismatches == []
+
+
 def test_replay_report_loads_case_report_from_disk(unit_report_dir: Path) -> None:
     source = _case_result()
     source_report = Path(write_case_report(source, unit_report_dir / "source"))
@@ -329,6 +356,7 @@ def _case_result(
     report_path: str | None = None,
     workflow_timing_summary: WorkflowTimingSummary | None = None,
     run_summary: dict | None = None,
+    taxonomy: dict | None = None,
     extra_trajectory_details: dict | None = None,
 ) -> BenchmarkCaseResult:
     trajectory_details = {
@@ -380,5 +408,6 @@ def _case_result(
         workflow_status=workflow_status,
         workflow_timing_summary=workflow_timing_summary,
         run_summary=run_summary,
+        taxonomy=taxonomy,
         report_path=report_path,
     )

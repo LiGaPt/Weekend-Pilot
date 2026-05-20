@@ -35,6 +35,22 @@ DEFAULT_CASE_IDS = {
     "family_citywalk_addon_v1",
     "solo_afternoon_v1",
 }
+DEFAULT_SCENARIO_BUCKET_COUNTS = {"family": 5, "solo": 1}
+DEFAULT_LEVEL_COUNTS = {"L1": 3, "L2": 3}
+DEFAULT_WORLD_PROFILE_COUNTS = {"family_afternoon": 5, "solo_afternoon": 1}
+DEFAULT_FAILURE_MODE_COUNTS = {"none": 6}
+DEFAULT_TAG_COUNTS = {
+    "addon_optional": 1,
+    "baseline": 2,
+    "child_friendly": 5,
+    "citywalk": 1,
+    "indoor_activity": 2,
+    "light_activity": 1,
+    "light_meal": 4,
+    "memory_override": 1,
+    "outdoor_activity": 1,
+    "quick_dinner": 1,
+}
 FORBIDDEN_REPORT_TEXT = ("action_id", "tool_event_id", "api_key", "token", "secret", "debug_trace")
 
 
@@ -113,6 +129,8 @@ def test_benchmark_harness_runs_full_mock_world_case(
     assert result.feedback_status == "completed"
     assert result.workflow_status == "completed"
     assert result.workflow_timing_summary is not None
+    assert result.taxonomy is not None
+    assert result.taxonomy.scenario_bucket == "family"
     assert "initialize" in result.workflow_node_history
     assert "generate_summary_message" in result.workflow_node_history
     assert set(result.agent_roles) == EXPECTED_AGENT_ROLES
@@ -122,6 +140,7 @@ def test_benchmark_harness_runs_full_mock_world_case(
     report_payload = json.loads(report_path.read_text(encoding="utf-8"))
     assert report_payload["case_id"] == case.case_id
     assert report_payload["status"] == "passed"
+    assert report_payload["taxonomy"]["scenario_bucket"] == "family"
     assert report_payload["run_summary"]["schema_version"] == "weekendpilot_run_summary_v1"
     assert report_payload["run_summary"]["workflow_status"] == "completed"
     assert report_payload["workflow_status"] == "completed"
@@ -144,6 +163,7 @@ def test_benchmark_harness_runs_full_mock_world_case(
     assert run.case_id == case.case_id
     assert run.metadata_json["benchmark"]["case_id"] == case.case_id
     assert run.metadata_json["benchmark"]["benchmark_harness_version"] == "locallife_bench_harness_v0"
+    assert run.metadata_json["benchmark"]["taxonomy"]["scenario_bucket"] == "family"
     assert run.metadata_json["benchmark"]["workflow_backed"] is True
     assert run.metadata_json["workflow"]["source"] == "langgraph-workflow"
     assert run.metadata_json["workflow"]["timing"]["schema_version"] == "workflow_timing_summary_v1"
@@ -175,6 +195,8 @@ def test_benchmark_harness_runs_solo_afternoon_case(
     assert result.workflow_status == "completed"
     assert result.run_summary is not None
     assert result.run_summary.world_profile == "solo_afternoon"
+    assert result.taxonomy is not None
+    assert result.taxonomy.scenario_bucket == "solo"
     assert result.report_path is not None
 
 
@@ -205,6 +227,12 @@ def test_benchmark_harness_runs_default_mock_world_suite(
     assert report.benchmark_summary is not None
     assert report.benchmark_summary.run_status == "passed"
     assert report.benchmark_summary.case_count == len(cases)
+    assert report.benchmark_summary.matrix_summary is not None
+    assert report.benchmark_summary.matrix_summary.scenario_bucket_counts == DEFAULT_SCENARIO_BUCKET_COUNTS
+    assert report.benchmark_summary.matrix_summary.level_counts == DEFAULT_LEVEL_COUNTS
+    assert report.benchmark_summary.matrix_summary.world_profile_counts == DEFAULT_WORLD_PROFILE_COUNTS
+    assert report.benchmark_summary.matrix_summary.failure_mode_counts == DEFAULT_FAILURE_MODE_COUNTS
+    assert report.benchmark_summary.matrix_summary.tag_counts == DEFAULT_TAG_COUNTS
     assert report.benchmark_timing_summary is not None
     assert report.report_path is not None
     assert Path(report.report_path).exists()
@@ -216,6 +244,7 @@ def test_benchmark_harness_runs_default_mock_world_suite(
         assert result.workflow_status == "completed"
         assert result.workflow_timing_summary is not None
         assert result.run_summary is not None
+        assert result.taxonomy is not None
         assert result.feedback_status == "completed"
         assert set(result.agent_roles) == EXPECTED_AGENT_ROLES
         assert result.report_path is not None
@@ -225,6 +254,7 @@ def test_benchmark_harness_runs_default_mock_world_suite(
         report_payload = json.loads(report_path.read_text(encoding="utf-8"))
         assert report_payload["case_id"] == result.case_id
         assert report_payload["status"] == "passed"
+        assert report_payload["taxonomy"]["suite"] == "locallife_bench_v1"
         assert report_payload["run_summary"]["schema_version"] == "weekendpilot_run_summary_v1"
         serialized_report = json.dumps(report_payload, sort_keys=True)
         for forbidden in FORBIDDEN_REPORT_TEXT:
@@ -234,6 +264,7 @@ def test_benchmark_harness_runs_default_mock_world_suite(
         assert run is not None
         assert run.case_id == result.case_id
         assert run.metadata_json["benchmark"]["case_id"] == result.case_id
+        assert run.metadata_json["benchmark"]["taxonomy"]["suite"] == "locallife_bench_v1"
         assert run.metadata_json["workflow"]["source"] == "langgraph-workflow"
         assert run.metadata_json["workflow"]["timing"]["schema_version"] == "workflow_timing_summary_v1"
         assert {entry["role"] for entry in run.metadata_json["agents"]["results"]} == EXPECTED_AGENT_ROLES
@@ -243,6 +274,11 @@ def test_benchmark_harness_runs_default_mock_world_suite(
     assert suite_payload["report_path"] == report.report_path
     assert suite_payload["benchmark_summary"]["schema_version"] == "weekendpilot_benchmark_summary_v1"
     assert suite_payload["benchmark_summary"]["run_status"] == "passed"
+    assert suite_payload["benchmark_summary"]["matrix_summary"]["scenario_bucket_counts"] == DEFAULT_SCENARIO_BUCKET_COUNTS
+    assert suite_payload["benchmark_summary"]["matrix_summary"]["level_counts"] == DEFAULT_LEVEL_COUNTS
+    assert suite_payload["benchmark_summary"]["matrix_summary"]["world_profile_counts"] == DEFAULT_WORLD_PROFILE_COUNTS
+    assert suite_payload["benchmark_summary"]["matrix_summary"]["failure_mode_counts"] == DEFAULT_FAILURE_MODE_COUNTS
+    assert suite_payload["benchmark_summary"]["matrix_summary"]["tag_counts"] == DEFAULT_TAG_COUNTS
     assert suite_payload["benchmark_timing_summary"]["schema_version"] == "benchmark_timing_summary_v1"
     assert suite_payload["benchmark_timing_summary"]["case_count"] == len(cases)
     assert suite_payload["benchmark_timing_summary"]["overall_total_duration_ms"]["sample_count"] == len(cases)

@@ -24,9 +24,18 @@
     "expected_execution_status": "succeeded",
     "expected_feedback_status": "completed"
   },
-  "metadata": {
+  "taxonomy": {
     "suite": "locallife_bench_v1",
+    "scenario_bucket": "solo",
     "level": "L1",
+    "tags": [
+      "baseline",
+      "light_activity",
+      "light_meal"
+    ],
+    "failure_mode": null
+  },
+  "metadata": {
     "focus": "baseline_solo_afternoon"
   }
 }

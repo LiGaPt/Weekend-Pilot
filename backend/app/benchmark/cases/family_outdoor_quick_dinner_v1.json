@@ -35,9 +35,18 @@
     "expected_execution_status": "succeeded",
     "expected_feedback_status": "completed"
   },
-  "metadata": {
+  "taxonomy": {
     "suite": "locallife_bench_v1",
+    "scenario_bucket": "family",
     "level": "L2",
+    "tags": [
+      "child_friendly",
+      "outdoor_activity",
+      "quick_dinner"
+    ],
+    "failure_mode": null
+  },
+  "metadata": {
     "focus": "outdoor_activity_and_quick_dinner"
   }
 }
