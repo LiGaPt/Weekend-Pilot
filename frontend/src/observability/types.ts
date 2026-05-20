@@ -11,6 +11,30 @@ export type InternalWorkflowTimingSummary = {
   stages: InternalWorkflowTimingStage[];
 };
 
+export type InternalToolEventSummary = {
+  tool_name: string;
+  tool_type: string;
+  provider: string;
+  status: string;
+  cache_hit: boolean;
+  latency_ms: number | null;
+  created_at: string;
+  request_preview: Record<string, unknown> | null;
+  response_preview: Record<string, unknown> | null;
+  error_preview: Record<string, unknown> | null;
+};
+
+export type InternalActionLedgerSummary = {
+  action_type: string;
+  target_id: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  request_preview: Record<string, unknown> | null;
+  response_preview: Record<string, unknown> | null;
+  error_preview: Record<string, unknown> | null;
+};
+
 export type InternalObservabilitySummary = {
   trace_id: string | null;
   status: string | null;
@@ -41,6 +65,8 @@ export type InternalObservabilityRunSummary = {
   observability_status: string | null;
   agent_roles: string[];
   node_history: string[];
+  tool_event_summaries: InternalToolEventSummary[];
+  action_ledger_summaries: InternalActionLedgerSummary[];
   workflow_timing_summary: InternalWorkflowTimingSummary | null;
   observability_summary: InternalObservabilitySummary;
 };

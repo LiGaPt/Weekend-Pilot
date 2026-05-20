@@ -45,9 +45,19 @@
     "expected_execution_status": "succeeded",
     "expected_feedback_status": "completed"
   },
-  "metadata": {
+  "taxonomy": {
     "suite": "locallife_bench_v1",
+    "scenario_bucket": "family",
     "level": "L2",
+    "tags": [
+      "child_friendly",
+      "indoor_activity",
+      "light_meal",
+      "memory_override"
+    ],
+    "failure_mode": null
+  },
+  "metadata": {
     "focus": "current_request_overrides_memory"
   }
 }

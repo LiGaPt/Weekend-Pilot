@@ -308,6 +308,32 @@ def test_internal_observability_route_returns_sanitized_run_summary(
     assert payload["tool_event_count"] == 1
     assert payload["action_count"] == 1
     assert payload["agent_roles"] == ["supervisor", "discovery"]
+    assert payload["tool_event_summaries"] == [
+        {
+            "tool_name": "search_poi",
+            "tool_type": "read",
+            "provider": "mock_world",
+            "status": "completed",
+            "cache_hit": False,
+            "latency_ms": 10,
+            "created_at": payload["tool_event_summaries"][0]["created_at"],
+            "request_preview": {"query": "museum"},
+            "response_preview": {"candidate_count": 2},
+            "error_preview": None,
+        }
+    ]
+    assert payload["action_ledger_summaries"] == [
+        {
+            "action_type": "reserve_restaurant",
+            "target_id": "green-table",
+            "status": "succeeded",
+            "created_at": payload["action_ledger_summaries"][0]["created_at"],
+            "updated_at": payload["action_ledger_summaries"][0]["updated_at"],
+            "request_preview": {"foo": "bar"},
+            "response_preview": {"result": "ok"},
+            "error_preview": None,
+        }
+    ]
     assert payload["workflow_timing_summary"]["total_duration_ms"] == 25
     assert payload["observability_summary"]["trace_id"] == "trace-internal"
     assert payload["observability_summary"]["local_buffer_error"] == {

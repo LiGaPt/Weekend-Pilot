@@ -48,6 +48,30 @@ class InternalObservabilitySummary(BaseModel):
     langsmith_error: Any | None = None
 
 
+class InternalToolEventSummary(BaseModel):
+    tool_name: str
+    tool_type: str
+    provider: str
+    status: str
+    cache_hit: bool
+    latency_ms: int | None = None
+    created_at: datetime
+    request_preview: dict[str, Any] | None = None
+    response_preview: dict[str, Any] | None = None
+    error_preview: dict[str, Any] | None = None
+
+
+class InternalActionLedgerSummary(BaseModel):
+    action_type: str
+    target_id: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    request_preview: dict[str, Any] | None = None
+    response_preview: dict[str, Any] | None = None
+    error_preview: dict[str, Any] | None = None
+
+
 class InternalObservabilityRunSummary(BaseModel):
     schema_version: str = "weekendpilot_internal_observability_run_v1"
     run_id: UUID
@@ -68,5 +92,7 @@ class InternalObservabilityRunSummary(BaseModel):
     observability_status: str | None = None
     agent_roles: list[str] = Field(default_factory=list)
     node_history: list[str] = Field(default_factory=list)
+    tool_event_summaries: list[InternalToolEventSummary] = Field(default_factory=list)
+    action_ledger_summaries: list[InternalActionLedgerSummary] = Field(default_factory=list)
     workflow_timing_summary: Any | None = None
     observability_summary: InternalObservabilitySummary = Field(default_factory=InternalObservabilitySummary)

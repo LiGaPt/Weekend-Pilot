@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from decimal import Decimal
+import re
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from backend.app.observability.summary import RunSummary
 from backend.app.benchmark.timing import BenchmarkTimingSummary
@@ -13,6 +14,7 @@ from backend.app.workflow.timing import WorkflowTimingSummary
 
 BenchmarkCaseStatus = Literal["passed", "failed", "error"]
 BenchmarkReplayStatus = Literal["passed", "failed", "error"]
+_LOWER_SNAKE_CASE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 class BenchmarkMemoryItem(BaseModel):
@@ -36,6 +38,37 @@ class BenchmarkExpectedOutcome(BaseModel):
     min_injected_failure_count: int = 0
 
 
+class BenchmarkCaseTaxonomy(BaseModel):
+    suite: Literal["locallife_bench_v1"]
+    scenario_bucket: Literal["family", "solo", "friends", "couple", "elder", "mixed", "unknown"]
+    level: Literal["L1", "L2", "L3", "L4", "L5"]
+    tags: list[str]
+    failure_mode: str | None = None
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, value: list[str]) -> list[str]:
+        seen: set[str] = set()
+        for tag in value:
+            if not isinstance(tag, str) or not tag:
+                raise ValueError("taxonomy tags must be non-empty strings")
+            if _LOWER_SNAKE_CASE_PATTERN.fullmatch(tag) is None:
+                raise ValueError("taxonomy tags must use lower_snake_case")
+            if tag in seen:
+                raise ValueError("taxonomy tags must be unique")
+            seen.add(tag)
+        return value
+
+    @field_validator("failure_mode")
+    @classmethod
+    def validate_failure_mode(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if _LOWER_SNAKE_CASE_PATTERN.fullmatch(value) is None:
+            raise ValueError("taxonomy failure_mode must use lower_snake_case")
+        return value
+
+
 class BenchmarkCase(BaseModel):
     case_id: str
     title: str
@@ -47,6 +80,7 @@ class BenchmarkCase(BaseModel):
     failure_profile: str | None = None
     memory_items: list[BenchmarkMemoryItem] = Field(default_factory=list)
     expected: BenchmarkExpectedOutcome
+    taxonomy: BenchmarkCaseTaxonomy
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -65,6 +99,7 @@ class BenchmarkCaseResult(BaseModel):
     run_id: UUID | None = None
     trace_id: str | None = None
     run_summary: RunSummary | None = None
+    taxonomy: BenchmarkCaseTaxonomy | None = None
     scores: list[BenchmarkScore]
     overall_score: float
     tool_event_count: int
@@ -80,6 +115,16 @@ class BenchmarkCaseResult(BaseModel):
     report_path: str | None = None
 
 
+class BenchmarkCaseMatrixSummary(BaseModel):
+    schema_version: str = "weekendpilot_benchmark_case_matrix_v1"
+    case_count: int
+    scenario_bucket_counts: dict[str, int] = Field(default_factory=dict)
+    level_counts: dict[str, int] = Field(default_factory=dict)
+    world_profile_counts: dict[str, int] = Field(default_factory=dict)
+    failure_mode_counts: dict[str, int] = Field(default_factory=dict)
+    tag_counts: dict[str, int] = Field(default_factory=dict)
+
+
 class BenchmarkSummary(BaseModel):
     schema_version: str = "weekendpilot_benchmark_summary_v1"
     run_status: Literal["passed", "failed", "error"]
@@ -89,6 +134,7 @@ class BenchmarkSummary(BaseModel):
     error_count: int
     overall_score: float
     benchmark_timing_summary: BenchmarkTimingSummary | None = None
+    matrix_summary: BenchmarkCaseMatrixSummary | None = None
 
 
 class BenchmarkRunReport(BaseModel):

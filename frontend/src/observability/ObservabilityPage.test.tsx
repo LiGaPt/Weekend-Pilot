@@ -30,6 +30,32 @@ const summary: InternalObservabilityRunSummary = {
   observability_status: "completed",
   agent_roles: ["supervisor", "discovery"],
   node_history: ["initialize", "wait_confirmation"],
+  tool_event_summaries: [
+    {
+      tool_name: "search_poi",
+      tool_type: "read",
+      provider: "mock_world",
+      status: "completed",
+      cache_hit: false,
+      latency_ms: 12,
+      created_at: "2026-05-19T13:01:40+08:00",
+      request_preview: { query: "museum" },
+      response_preview: { candidate_count: 2 },
+      error_preview: null,
+    },
+  ],
+  action_ledger_summaries: [
+    {
+      action_type: "reserve_restaurant",
+      target_id: "green-table",
+      status: "succeeded",
+      created_at: "2026-05-19T13:02:00+08:00",
+      updated_at: "2026-05-19T13:02:10+08:00",
+      request_preview: { plan_id: "[REDACTED]" },
+      response_preview: { result: "ok" },
+      error_preview: null,
+    },
+  ],
   workflow_timing_summary: {
     schema_version: "workflow_timing_summary_v1",
     total_duration_ms: 42,
@@ -84,7 +110,12 @@ describe("ObservabilityPage", () => {
     expect(screen.getByText("execute_searches")).toBeInTheDocument();
     expect(screen.getByText("supervisor")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Tool Events" })).toBeInTheDocument();
-    expect(screen.getByText("Detailed tool event inspection is not implemented in this task yet.")).toBeInTheDocument();
+    expect(screen.getByText("search_poi")).toBeInTheDocument();
+    expect(screen.getByText("green-table")).toBeInTheDocument();
+    expect(screen.getByText(/\"query\":\"museum\"/)).toBeInTheDocument();
+    expect(screen.getByText(/\"plan_id\":\"\[REDACTED\]\"/)).toBeInTheDocument();
+    expect(screen.getByText("Detailed benchmark artifact inspection is not implemented in this task yet.")).toBeInTheDocument();
+    expect(screen.getByText("Detailed recovery path inspection is not implemented in this task yet.")).toBeInTheDocument();
   });
 
   it("shows a neutral state when workflow timing is missing", async () => {

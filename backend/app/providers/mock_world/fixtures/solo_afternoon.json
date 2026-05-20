@@ -1,0 +1,184 @@
+{
+  "profile": "solo_afternoon",
+  "location": {
+    "city": "上海",
+    "area": "静安"
+  },
+  "pois": [
+    {
+      "poi_id": "activity_gallery_001",
+      "name": "静安轻展馆",
+      "category": "activity",
+      "address": "上海市静安区展览路18号",
+      "location": {
+        "lat": 31.2321,
+        "lng": 121.4552
+      },
+      "tags": ["indoor", "museum", "quiet", "light_activity"],
+      "description": "适合一个人慢慢逛的轻量展馆，节奏舒适。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "13:00",
+            "end": "17:30"
+          }
+        ],
+        "last_entry": "16:45"
+      },
+      "sort_order": 10
+    },
+    {
+      "poi_id": "activity_walk_001",
+      "name": "静安街区短途漫步",
+      "category": "activity",
+      "address": "上海市静安区街心路",
+      "location": {
+        "lat": 31.2298,
+        "lng": 121.4481
+      },
+      "tags": ["outdoor", "citywalk", "light_activity"],
+      "description": "树荫较多的短距离步行路线，适合一个人放松散步。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "00:00",
+            "end": "23:59"
+          }
+        ],
+        "last_entry": null
+      },
+      "sort_order": 20
+    },
+    {
+      "poi_id": "restaurant_light_001",
+      "name": "静安清淡食堂",
+      "category": "dining",
+      "address": "上海市静安区清食路66号",
+      "location": {
+        "lat": 31.2307,
+        "lng": 121.4516
+      },
+      "tags": ["lighter_options", "quiet", "vegetable_forward"],
+      "description": "提供清淡套餐、蒸菜和轻食碗，适合一个人安静吃晚餐。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:00",
+            "end": "20:30"
+          }
+        ],
+        "last_entry": "20:00"
+      },
+      "sort_order": 30
+    },
+    {
+      "poi_id": "restaurant_noodle_001",
+      "name": "静安简单面馆",
+      "category": "dining",
+      "address": "上海市静安区面香街8号",
+      "location": {
+        "lat": 31.2341,
+        "lng": 121.4478
+      },
+      "tags": ["quick_meal", "simple"],
+      "description": "小碗面和热汤，适合晚些时候快速吃一顿。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "10:00",
+            "end": "21:30"
+          }
+        ],
+        "last_entry": "21:00"
+      },
+      "sort_order": 40
+    }
+  ],
+  "routes": [
+    {
+      "origin_id": "activity_gallery_001",
+      "destination_id": "restaurant_light_001",
+      "mode": "walking",
+      "distance_meters": 650,
+      "duration_minutes": 9,
+      "summary": "步行距离很短，适合慢慢散步后直接用餐。"
+    },
+    {
+      "origin_id": "activity_walk_001",
+      "destination_id": "restaurant_light_001",
+      "mode": "walking",
+      "distance_meters": 780,
+      "duration_minutes": 11,
+      "summary": "沿街区慢走即可到达，路径平缓。"
+    },
+    {
+      "origin_id": "activity_gallery_001",
+      "destination_id": "restaurant_noodle_001",
+      "mode": "walking",
+      "distance_meters": 920,
+      "duration_minutes": 13,
+      "summary": "从展馆到面馆的短途步行路线。"
+    }
+  ],
+  "weather": {
+    "location": "徐汇",
+    "date": "2026-05-16",
+    "condition": "多云",
+    "temperature_c": 24,
+    "precipitation_chance": 0.1,
+    "advisory": "天气适合轻量步行，外出无需复杂准备。"
+  },
+  "queues": {
+    "queue_restaurant_light_001": {
+      "queue_id": "queue_restaurant_light_001",
+      "poi_id": "restaurant_light_001",
+      "status": "open",
+      "wait_minutes": 8,
+      "parties_ahead": 1
+    },
+    "queue_restaurant_noodle_001": {
+      "queue_id": "queue_restaurant_noodle_001",
+      "poi_id": "restaurant_noodle_001",
+      "status": "open",
+      "wait_minutes": 5,
+      "parties_ahead": 1
+    }
+  },
+  "table_availability": {
+    "restaurant_light_001": {
+      "restaurant_id": "restaurant_light_001",
+      "available": true,
+      "time_slots": ["17:30", "18:00", "18:30"],
+      "max_party_size": 2,
+      "notes": "靠窗安静位可订。"
+    },
+    "restaurant_noodle_001": {
+      "restaurant_id": "restaurant_noodle_001",
+      "available": true,
+      "time_slots": ["17:00", "17:30", "18:00", "18:30"],
+      "max_party_size": 4,
+      "notes": "翻台快，适合临时到店。"
+    }
+  },
+  "ticket_availability": {
+    "activity_gallery_001": {
+      "poi_id": "activity_gallery_001",
+      "available": true,
+      "time_slots": ["13:30", "14:00", "14:30"],
+      "remaining": 20,
+      "price_cents": 4000
+    },
+    "activity_walk_001": {
+      "poi_id": "activity_walk_001",
+      "available": true,
+      "time_slots": ["14:00", "15:00", "16:00"],
+      "remaining": 99,
+      "price_cents": 0
+    }
+  },
+  "addons": []
+}

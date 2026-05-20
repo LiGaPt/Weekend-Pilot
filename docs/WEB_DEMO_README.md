@@ -77,6 +77,8 @@ The repository now includes a separate internal observability review page for re
 
 Paste a `run_id` from the public demo flow into `/observability` to inspect the internal workflow summary, including timing, node history, agent roles, and observability status. The customer-facing demo at `/` stays customer-safe and no longer renders those internal fields.
 
+The internal review page now also shows sanitized tool-event and action-ledger detail panels. Benchmark-artifact and recovery-path panels remain placeholders for later tasks.
+
 ## Manual Demo Flow
 
 ### Happy Path

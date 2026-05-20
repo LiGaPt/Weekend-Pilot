@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { DemoApiError } from "../api/demo";
 import { getObservabilityRun } from "./api";
-import type { InternalObservabilityRunSummary } from "./types";
+import type {
+  InternalActionLedgerSummary,
+  InternalObservabilityRunSummary,
+  InternalToolEventSummary,
+} from "./types";
 
 const GENERIC_ERROR_MESSAGE = "Internal observability request failed. Please try again.";
 
@@ -208,8 +212,8 @@ function ObservabilityResult({ result }: { result: InternalObservabilityRunSumma
       </section>
 
       <div className="observability-placeholder-grid">
-        <PlaceholderPanel title="Tool Events" body="Detailed tool event inspection is not implemented in this task yet." />
-        <PlaceholderPanel title="Action Ledger" body="Detailed action ledger inspection is not implemented in this task yet." />
+        <ToolEventsPanel items={result.tool_event_summaries} />
+        <ActionLedgerPanel items={result.action_ledger_summaries} />
         <PlaceholderPanel
           title="Benchmark Artifacts"
           body="Detailed benchmark artifact inspection is not implemented in this task yet."
@@ -227,6 +231,72 @@ function PlaceholderPanel({ title, body }: { title: string; body: string }) {
         <h2>{title}</h2>
       </div>
       <p className="muted">{body}</p>
+    </section>
+  );
+}
+
+function ToolEventsPanel({ items }: { items: InternalToolEventSummary[] }) {
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <h2>Tool Events</h2>
+      </div>
+      {items.length ? (
+        <ul className="observability-detail-list">
+          {items.map((item, index) => (
+            <li key={`${item.tool_name}-${item.created_at}-${index}`}>
+              <div className="observability-detail-header">
+                <strong>{item.tool_name}</strong>
+                <span>{item.status}</span>
+              </div>
+              <dl className="metadata-list observability-list">
+                <MetaItem label="Type" value={item.tool_type} />
+                <MetaItem label="Provider" value={item.provider} />
+                <MetaItem label="Cache Hit" value={booleanLabel(item.cache_hit)} />
+                <MetaItem label="Latency" value={item.latency_ms === null ? null : `${item.latency_ms} ms`} />
+                <MetaItem label="Created At" value={item.created_at} />
+                <MetaItem label="Request Preview" value={stringifyValue(item.request_preview)} />
+                <MetaItem label="Response Preview" value={stringifyValue(item.response_preview)} />
+                <MetaItem label="Error Preview" value={stringifyValue(item.error_preview)} />
+              </dl>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted">No tool events were recorded for this run.</p>
+      )}
+    </section>
+  );
+}
+
+function ActionLedgerPanel({ items }: { items: InternalActionLedgerSummary[] }) {
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <h2>Action Ledger</h2>
+      </div>
+      {items.length ? (
+        <ul className="observability-detail-list">
+          {items.map((item, index) => (
+            <li key={`${item.action_type}-${item.target_id}-${item.created_at}-${index}`}>
+              <div className="observability-detail-header">
+                <strong>{item.action_type}</strong>
+                <span>{item.status}</span>
+              </div>
+              <dl className="metadata-list observability-list">
+                <MetaItem label="Target" value={item.target_id} />
+                <MetaItem label="Created At" value={item.created_at} />
+                <MetaItem label="Updated At" value={item.updated_at} />
+                <MetaItem label="Request Preview" value={stringifyValue(item.request_preview)} />
+                <MetaItem label="Response Preview" value={stringifyValue(item.response_preview)} />
+                <MetaItem label="Error Preview" value={stringifyValue(item.error_preview)} />
+              </dl>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted">No action ledger entries were recorded for this run.</p>
+      )}
     </section>
   );
 }

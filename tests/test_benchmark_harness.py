@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 
 from backend.app.benchmark import (
     load_benchmark_case,
@@ -32,9 +33,26 @@ from backend.app.benchmark.schemas import (
     BenchmarkRunReport,
     BenchmarkScore,
 )
+from backend.app.benchmark.matrix import build_case_matrix_summary
 from backend.app.benchmark.timing import summarize_benchmark_timing
 from backend.app.workflow.timing import WorkflowStageTimingEntry, WorkflowTimingSummary
 from backend.app.workflow.state import V1_WORKFLOW_NODE_NAMES
+
+
+def _taxonomy_payload(
+    *,
+    scenario_bucket: str = "unknown",
+    level: str = "L1",
+    tags: list[str] | None = None,
+    failure_mode: str | None = None,
+) -> dict[str, object]:
+    return {
+        "suite": "locallife_bench_v1",
+        "scenario_bucket": scenario_bucket,
+        "level": level,
+        "tags": tags or ["baseline"],
+        "failure_mode": failure_mode,
+    }
 
 
 REQUIRED_WORKFLOW_NODES = V1_WORKFLOW_NODE_NAMES
@@ -51,6 +69,7 @@ DEFAULT_CASE_IDS = (
     "family_outdoor_quick_dinner_v1",
     "family_memory_override_v1",
     "family_citywalk_addon_v1",
+    "solo_afternoon_v1",
 )
 FAILURE_CASE_IDS = ("family_route_failure_v1",)
 REQUIRED_CASE_TOOL_NAMES = {
@@ -63,13 +82,67 @@ REQUIRED_CASE_TOOL_NAMES = {
     "check_ticket_availability",
     "check_route",
 }
+DEFAULT_SCENARIO_BUCKET_COUNTS = {"family": 5, "solo": 1}
+DEFAULT_LEVEL_COUNTS = {"L1": 3, "L2": 3}
+DEFAULT_WORLD_PROFILE_COUNTS = {"family_afternoon": 5, "solo_afternoon": 1}
+DEFAULT_FAILURE_MODE_COUNTS = {"none": 6}
+DEFAULT_TAG_COUNTS = {
+    "addon_optional": 1,
+    "baseline": 2,
+    "child_friendly": 5,
+    "citywalk": 1,
+    "indoor_activity": 2,
+    "light_activity": 1,
+    "light_meal": 4,
+    "memory_override": 1,
+    "outdoor_activity": 1,
+    "quick_dinner": 1,
+}
+EXPECTED_TAXONOMY_BY_CASE = {
+    "family_afternoon_v1": _taxonomy_payload(
+        scenario_bucket="family",
+        level="L1",
+        tags=["baseline", "child_friendly", "light_meal"],
+    ),
+    "family_indoor_light_meal_v1": _taxonomy_payload(
+        scenario_bucket="family",
+        level="L2",
+        tags=["child_friendly", "indoor_activity", "light_meal"],
+    ),
+    "family_outdoor_quick_dinner_v1": _taxonomy_payload(
+        scenario_bucket="family",
+        level="L2",
+        tags=["child_friendly", "outdoor_activity", "quick_dinner"],
+    ),
+    "family_memory_override_v1": _taxonomy_payload(
+        scenario_bucket="family",
+        level="L2",
+        tags=["child_friendly", "indoor_activity", "light_meal", "memory_override"],
+    ),
+    "family_citywalk_addon_v1": _taxonomy_payload(
+        scenario_bucket="family",
+        level="L1",
+        tags=["addon_optional", "child_friendly", "citywalk"],
+    ),
+    "solo_afternoon_v1": _taxonomy_payload(
+        scenario_bucket="solo",
+        level="L1",
+        tags=["baseline", "light_activity", "light_meal"],
+    ),
+    "family_route_failure_v1": _taxonomy_payload(
+        scenario_bucket="family",
+        level="L2",
+        tags=["child_friendly", "failure_injected", "light_meal", "route_failure"],
+        failure_mode="route_unavailable",
+    ),
+}
 
 
 def test_default_fixtures_load_as_ordered_benchmark_cases() -> None:
     cases = load_default_benchmark_cases()
 
     assert [case.case_id for case in cases] == list(DEFAULT_CASE_IDS)
-    assert len(cases) == 5
+    assert len(cases) == 6
     assert all(isinstance(case, BenchmarkCase) for case in cases)
 
 
@@ -97,19 +170,41 @@ def test_default_fixtures_can_be_loaded_individually() -> None:
         assert case.case_id == case_id
 
 
-def test_default_fixtures_use_mock_world_family_profile() -> None:
+def test_default_and_failure_fixtures_expose_expected_taxonomy() -> None:
+    case_ids = [*DEFAULT_CASE_IDS, *FAILURE_CASE_IDS]
+
+    for case_id in case_ids:
+        case = load_benchmark_case(case_id)
+
+        assert case.taxonomy.model_dump(mode="json") == EXPECTED_TAXONOMY_BY_CASE[case_id]
+
+
+def test_default_fixtures_use_supported_mock_world_profiles() -> None:
     cases = load_default_benchmark_cases()
 
     assert {case.tool_profile for case in cases} == {"mock_world"}
-    assert {case.world_profile for case in cases} == {"family_afternoon"}
+    assert {case.world_profile for case in cases} == {"family_afternoon", "solo_afternoon"}
+
+
+def test_default_case_matrix_summary_counts_are_expected() -> None:
+    summary = build_case_matrix_summary(load_default_benchmark_cases())
+
+    assert summary.case_count == 6
+    assert summary.scenario_bucket_counts == DEFAULT_SCENARIO_BUCKET_COUNTS
+    assert summary.level_counts == DEFAULT_LEVEL_COUNTS
+    assert summary.world_profile_counts == DEFAULT_WORLD_PROFILE_COUNTS
+    assert summary.failure_mode_counts == DEFAULT_FAILURE_MODE_COUNTS
+    assert summary.tag_counts == DEFAULT_TAG_COUNTS
 
 
 def test_default_fixtures_include_v1_metadata_and_expected_tools() -> None:
     cases = load_default_benchmark_cases()
 
     for case in cases:
-        assert case.metadata["suite"] == "locallife_bench_v1"
-        assert case.metadata["level"] in {"L1", "L2"}
+        assert case.taxonomy.suite == "locallife_bench_v1"
+        assert case.taxonomy.level in {"L1", "L2"}
+        assert "suite" not in case.metadata
+        assert "level" not in case.metadata
         assert isinstance(case.metadata["focus"], str)
         assert case.metadata["focus"]
         assert set(case.expected.required_tool_names) == REQUIRED_CASE_TOOL_NAMES
@@ -117,9 +212,47 @@ def test_default_fixtures_include_v1_metadata_and_expected_tools() -> None:
         assert case.expected.expected_feedback_status == "completed"
 
 
+def test_solo_afternoon_fixture_uses_expected_profile_and_focus() -> None:
+    case = load_benchmark_case("solo_afternoon_v1")
+
+    assert case.tool_profile == "mock_world"
+    assert case.world_profile == "solo_afternoon"
+    assert case.taxonomy.scenario_bucket == "solo"
+    assert case.taxonomy.tags == ["baseline", "light_activity", "light_meal"]
+    assert case.metadata["focus"] == "baseline_solo_afternoon"
+
+
 def test_unknown_case_raises_benchmark_harness_error() -> None:
     with pytest.raises(BenchmarkHarnessError):
         load_benchmark_case("missing_case")
+
+
+def test_benchmark_case_rejects_duplicate_and_malformed_taxonomy_tags() -> None:
+    payload = {
+        "case_id": "case",
+        "title": "Case",
+        "user_input": "Plan an afternoon.",
+        "expected": {
+            "required_tool_names": ["search_poi"],
+            "min_tool_event_count": 1,
+            "min_action_count": 1,
+        },
+        "taxonomy": _taxonomy_payload(
+            scenario_bucket="unknown",
+            level="L1",
+            tags=["baseline", "baseline"],
+        ),
+    }
+    with pytest.raises(ValidationError):
+        BenchmarkCase.model_validate(payload)
+
+    payload["taxonomy"] = _taxonomy_payload(
+        scenario_bucket="unknown",
+        level="L1",
+        tags=["bad-tag"],
+    )
+    with pytest.raises(ValidationError):
+        BenchmarkCase.model_validate(payload)
 
 
 def test_trajectory_grader_passes_when_required_tools_are_present() -> None:
@@ -127,6 +260,7 @@ def test_trajectory_grader_passes_when_required_tools_are_present() -> None:
         case_id="case",
         title="Case",
         user_input="Plan an afternoon.",
+        taxonomy=_taxonomy_payload(),
         expected=BenchmarkExpectedOutcome(
             required_tool_names=["search_poi", "check_route"],
             min_tool_event_count=2,
@@ -149,6 +283,7 @@ def test_trajectory_grader_fails_when_required_tool_is_missing() -> None:
         case_id="case",
         title="Case",
         user_input="Plan an afternoon.",
+        taxonomy=_taxonomy_payload(),
         expected=BenchmarkExpectedOutcome(
             required_tool_names=["search_poi", "check_route"],
             min_tool_event_count=2,
@@ -195,6 +330,7 @@ def test_workflow_path_grader_passes_for_expected_safe_stop_failure() -> None:
         title="Route failure",
         user_input="Plan an afternoon.",
         failure_profile="route_unavailable_v0",
+        taxonomy=_taxonomy_payload(failure_mode="route_unavailable"),
         expected=BenchmarkExpectedOutcome(
             required_tool_names=["check_route"],
             min_tool_event_count=1,
@@ -279,6 +415,7 @@ def test_execution_safety_grader_accepts_absent_execution_when_expected_is_none(
         case_id="case",
         title="Case",
         user_input="Plan an afternoon.",
+        taxonomy=_taxonomy_payload(),
         expected=BenchmarkExpectedOutcome(
             required_tool_names=["search_poi"],
             min_tool_event_count=1,
@@ -313,6 +450,7 @@ def test_feedback_grader_accepts_absent_feedback_when_expected_is_none() -> None
         case_id="case",
         title="Case",
         user_input="Plan an afternoon.",
+        taxonomy=_taxonomy_payload(),
         expected=BenchmarkExpectedOutcome(
             required_tool_names=["search_poi"],
             min_tool_event_count=1,
@@ -332,6 +470,7 @@ def test_failure_injection_grader_requires_injected_failures() -> None:
         case_id="case",
         title="Case",
         user_input="Plan an afternoon.",
+        taxonomy=_taxonomy_payload(),
         expected=BenchmarkExpectedOutcome(
             required_tool_names=["check_route"],
             min_tool_event_count=1,
@@ -361,6 +500,7 @@ def test_recovery_expectation_grader_accepts_expected_recovery_action() -> None:
         case_id="case",
         title="Case",
         user_input="Plan an afternoon.",
+        taxonomy=_taxonomy_payload(),
         expected=BenchmarkExpectedOutcome(
             required_tool_names=["check_route"],
             min_tool_event_count=1,
@@ -567,6 +707,35 @@ def test_case_report_writer_includes_run_summary_envelope() -> None:
         _cleanup_report_dir(report_dir)
 
 
+def test_case_report_writer_includes_taxonomy() -> None:
+    result = BenchmarkCaseResult.model_validate(
+        {
+            "case_id": "solo_afternoon_v1",
+            "status": "passed",
+            "scores": [],
+            "overall_score": 1.0,
+            "tool_event_count": 8,
+            "action_count": 1,
+            "taxonomy": _taxonomy_payload(
+                scenario_bucket="solo",
+                level="L1",
+                tags=["baseline", "light_activity", "light_meal"],
+            ),
+        }
+    )
+    report_dir = _unit_report_dir()
+
+    try:
+        report_path = Path(write_case_report(result, report_dir))
+
+        payload = json.loads(report_path.read_text(encoding="utf-8"))
+        assert payload["taxonomy"]["suite"] == "locallife_bench_v1"
+        assert payload["taxonomy"]["scenario_bucket"] == "solo"
+        assert payload["taxonomy"]["tags"] == ["baseline", "light_activity", "light_meal"]
+    finally:
+        _cleanup_report_dir(report_dir)
+
+
 def test_benchmark_timing_summary_uses_nearest_rank_percentiles_and_stage_order() -> None:
     results = [
         BenchmarkCaseResult(
@@ -752,6 +921,15 @@ def test_run_report_writer_includes_benchmark_summary_envelope() -> None:
                 "failed_count": 0,
                 "error_count": 0,
                 "overall_score": 1.0,
+                "matrix_summary": {
+                    "schema_version": "weekendpilot_benchmark_case_matrix_v1",
+                    "case_count": 1,
+                    "scenario_bucket_counts": {"family": 1},
+                    "level_counts": {"L1": 1},
+                    "world_profile_counts": {"family_afternoon": 1},
+                    "failure_mode_counts": {"none": 1},
+                    "tag_counts": {"baseline": 1},
+                },
                 "benchmark_timing_summary": {
                     "schema_version": "benchmark_timing_summary_v1",
                     "case_count": 1,
@@ -777,6 +955,7 @@ def test_run_report_writer_includes_benchmark_summary_envelope() -> None:
         payload = json.loads(report_path.read_text(encoding="utf-8"))
         assert payload["benchmark_summary"]["schema_version"] == "weekendpilot_benchmark_summary_v1"
         assert payload["benchmark_summary"]["case_count"] == 1
+        assert payload["benchmark_summary"]["matrix_summary"]["scenario_bucket_counts"] == {"family": 1}
         assert payload["benchmark_summary"]["benchmark_timing_summary"]["case_count"] == 1
     finally:
         _cleanup_report_dir(report_dir)
@@ -787,6 +966,7 @@ def _benchmark_case() -> BenchmarkCase:
         case_id="case",
         title="Case",
         user_input="Plan an afternoon.",
+        taxonomy=_taxonomy_payload(),
         expected=BenchmarkExpectedOutcome(
             required_tool_names=["search_poi"],
             min_tool_event_count=1,

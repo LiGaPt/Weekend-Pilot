@@ -154,7 +154,7 @@ Local trace JSONL summaries now also embed the canonical `run_summary` envelope,
 
 The benchmark harness runs file-based cases through the official LangGraph workflow and bounded deterministic agent adapters, then writes local JSON reports. Case reports stay under `var/benchmarks/`, and suite runs also write `var/benchmarks/run-report.json` with overall and per-stage `P50`/`P95`/`P99` timing summaries. It does not require LangSmith credentials or live provider access.
 
-Each benchmark case report now includes `run_summary`, and each suite `run-report.json` includes a compact `benchmark_summary` envelope alongside the existing timing summary.
+Each benchmark case fixture now requires a structured `taxonomy` block that captures suite, scenario bucket, benchmark level, tags, and failure mode. Each benchmark case report now includes both `run_summary` and `taxonomy`, and each suite `run-report.json` includes a compact `benchmark_summary` envelope with `matrix_summary` alongside the existing timing summary so scenario coverage can be compared deterministically as the suite expands.
 
 ```bash
 docker compose up -d postgres redis
@@ -325,7 +325,7 @@ Open `http://127.0.0.1:5173`.
 The frontend defaults to `http://127.0.0.1:8000` for the API. To override it locally, set `VITE_API_BASE_URL` in `frontend/.env`.
 The public demo page only shows customer-safe run details. Internal trace and node history review lives at `http://127.0.0.1:5173/observability`.
 
-For internal review, open `http://127.0.0.1:5173/observability` and paste a `run_id` to inspect the internal run summary.
+For internal review, open `http://127.0.0.1:5173/observability` and paste a `run_id` to inspect the internal run summary, workflow timing, tool-event details, and action-ledger details.
 
 For the full Web demo runbook, see `docs/WEB_DEMO_README.md`.
 

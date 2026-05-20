@@ -28,9 +28,19 @@
     "expected_recovery_action": "stop_safely",
     "min_injected_failure_count": 1
   },
-  "metadata": {
+  "taxonomy": {
     "suite": "locallife_bench_v1",
+    "scenario_bucket": "family",
     "level": "L2",
+    "tags": [
+      "child_friendly",
+      "failure_injected",
+      "light_meal",
+      "route_failure"
+    ],
+    "failure_mode": "route_unavailable"
+  },
+  "metadata": {
     "focus": "route_failure_safe_stop"
   }
 }
