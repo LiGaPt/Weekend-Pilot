@@ -14,6 +14,7 @@ from backend.app.workflow.timing import WorkflowTimingSummary
 
 BenchmarkCaseStatus = Literal["passed", "failed", "error"]
 BenchmarkReplayStatus = Literal["passed", "failed", "error"]
+BenchmarkSuiteId = Literal["default", "failures", "all_registered"]
 _LOWER_SNAKE_CASE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
@@ -123,6 +124,15 @@ class BenchmarkCaseMatrixSummary(BaseModel):
     world_profile_counts: dict[str, int] = Field(default_factory=dict)
     failure_mode_counts: dict[str, int] = Field(default_factory=dict)
     tag_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class BenchmarkSuiteDescription(BaseModel):
+    suite_id: BenchmarkSuiteId
+    title: str
+    description: str
+    case_ids: list[str]
+    case_count: int
+    matrix_summary: BenchmarkCaseMatrixSummary
 
 
 class BenchmarkSummary(BaseModel):

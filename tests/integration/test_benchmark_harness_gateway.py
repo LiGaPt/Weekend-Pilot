@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from backend.app.benchmark import (
     BenchmarkHarness,
     load_benchmark_case,
+    load_benchmark_suite,
     load_default_benchmark_cases,
     load_failure_benchmark_cases,
 )
@@ -51,6 +52,10 @@ DEFAULT_TAG_COUNTS = {
     "outdoor_activity": 1,
     "quick_dinner": 1,
 }
+ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {"family": 6, "solo": 1}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 4}
+ALL_REGISTERED_WORLD_PROFILE_COUNTS = {"family_afternoon": 6, "solo_afternoon": 1}
+ALL_REGISTERED_FAILURE_MODE_COUNTS = {"none": 6, "route_unavailable": 1}
 FORBIDDEN_REPORT_TEXT = ("action_id", "tool_event_id", "api_key", "token", "secret", "debug_trace")
 
 
@@ -286,6 +291,37 @@ def test_benchmark_harness_runs_default_mock_world_suite(
     serialized_suite = json.dumps(suite_payload, sort_keys=True)
     for forbidden in FORBIDDEN_REPORT_TEXT:
         assert forbidden not in serialized_suite
+
+
+def test_benchmark_harness_runs_all_registered_suite(
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    cases = load_benchmark_suite("all_registered")
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    report = harness.run_cases(cases)
+
+    assert len(report.case_results) == 7
+    assert report.run_status == "passed"
+    assert report.passed_count == 7
+    assert report.failed_count == 0
+    assert report.error_count == 0
+    assert report.benchmark_summary is not None
+    assert report.benchmark_summary.matrix_summary is not None
+    assert report.benchmark_summary.matrix_summary.scenario_bucket_counts == ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
+    assert report.benchmark_summary.matrix_summary.level_counts == ALL_REGISTERED_LEVEL_COUNTS
+    assert report.benchmark_summary.matrix_summary.world_profile_counts == ALL_REGISTERED_WORLD_PROFILE_COUNTS
+    assert report.benchmark_summary.matrix_summary.failure_mode_counts == ALL_REGISTERED_FAILURE_MODE_COUNTS
 
 
 def test_benchmark_harness_runs_route_failure_case_as_expected_safe_stop(
