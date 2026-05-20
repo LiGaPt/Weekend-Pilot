@@ -73,7 +73,7 @@ class WeekendPilotWorkflowNodes:
         self.session = dependencies.session
         self.repositories = _Repositories(self.session)
         self.gateway = ToolGateway(
-            registry=build_mock_world_registry(),
+            registry=build_mock_world_registry(dependencies.world_profile),
             tool_events=self.repositories.tool_events,
             action_ledger=self.repositories.action_ledger,
             cache=dependencies.cache,

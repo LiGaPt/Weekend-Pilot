@@ -33,6 +33,7 @@ DEFAULT_CASE_IDS = {
     "family_outdoor_quick_dinner_v1",
     "family_memory_override_v1",
     "family_citywalk_addon_v1",
+    "solo_afternoon_v1",
 }
 FORBIDDEN_REPORT_TEXT = ("action_id", "tool_event_id", "api_key", "token", "secret", "debug_trace")
 
@@ -152,6 +153,31 @@ def test_benchmark_harness_runs_full_mock_world_case(
     assert run.metadata_json["observability"]["trace_id"] == result.trace_id
 
 
+def test_benchmark_harness_runs_solo_afternoon_case(
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    case = load_benchmark_case("solo_afternoon_v1")
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    result = harness.run_case(case)
+
+    assert result.status == "passed"
+    assert result.workflow_status == "completed"
+    assert result.run_summary is not None
+    assert result.run_summary.world_profile == "solo_afternoon"
+    assert result.report_path is not None
+
+
 def test_benchmark_harness_runs_default_mock_world_suite(
     db_session: Session,
     redis_runtime,
@@ -171,9 +197,9 @@ def test_benchmark_harness_runs_default_mock_world_suite(
     report = harness.run_cases(cases)
 
     assert {result.case_id for result in report.case_results} == DEFAULT_CASE_IDS
-    assert len(report.case_results) == 5
+    assert len(report.case_results) == 6
     assert report.run_status == "passed"
-    assert report.passed_count == 5
+    assert report.passed_count == 6
     assert report.failed_count == 0
     assert report.error_count == 0
     assert report.benchmark_summary is not None

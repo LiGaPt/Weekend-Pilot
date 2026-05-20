@@ -36,6 +36,7 @@ from backend.app.benchmark.schemas import (
 from backend.app.benchmark.timing import summarize_benchmark_timing
 from backend.app.models.runtime import ActionLedger
 from backend.app.observability.summary import RunSummary, build_run_summary, load_run_summary
+from backend.app.providers.mock_world.loader import SUPPORTED_PROFILES
 from backend.app.repositories import (
     ActionLedgerRepository,
     AgentRunRepository,
@@ -121,7 +122,7 @@ class BenchmarkHarness:
         return report.model_copy(update={"report_path": str(report_path)})
 
     def _run_case(self, case: BenchmarkCase) -> BenchmarkCaseResult:
-        if case.tool_profile != "mock_world" or case.world_profile != "family_afternoon":
+        if case.tool_profile != "mock_world" or case.world_profile not in SUPPORTED_PROFILES:
             result = BenchmarkCaseResult(
                 case_id=case.case_id,
                 status="error",

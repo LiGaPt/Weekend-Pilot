@@ -331,6 +331,25 @@ def test_graph_retry_recovery_loops_through_read_path_then_confirmation() -> Non
     )
 
 
+def test_workflow_request_accepts_supported_solo_profile_value() -> None:
+    request = WeekendPilotWorkflowRequest(
+        user_input="Plan a solo afternoon.",
+        world_profile="solo_afternoon",
+    )
+
+    assert request.world_profile == "solo_afternoon"
+
+
+def test_supported_solo_profile_is_not_rejected_by_runner() -> None:
+    runner = WeekendPilotWorkflowRunner(cast(WeekendPilotWorkflowDependencies, object()))
+    request = WeekendPilotWorkflowRequest(
+        user_input="Plan a solo afternoon.",
+        world_profile="solo_afternoon",
+    )
+
+    assert runner._unsupported_profile_result(request) is None
+
+
 def test_unsupported_profile_result_is_typed_and_does_not_raise() -> None:
     runner = WeekendPilotWorkflowRunner(cast(WeekendPilotWorkflowDependencies, object()))
     request = WeekendPilotWorkflowRequest.model_construct(

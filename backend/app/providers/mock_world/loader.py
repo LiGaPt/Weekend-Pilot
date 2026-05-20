@@ -7,7 +7,10 @@ from typing import Any
 from backend.app.providers.mock_world.errors import MockWorldError
 
 
-SUPPORTED_PROFILES = {"family_afternoon": "family_afternoon.json"}
+SUPPORTED_PROFILES = {
+    "family_afternoon": "family_afternoon.json",
+    "solo_afternoon": "solo_afternoon.json",
+}
 REQUIRED_TOP_LEVEL_KEYS = {
     "profile",
     "location",

@@ -51,6 +51,7 @@ DEFAULT_CASE_IDS = (
     "family_outdoor_quick_dinner_v1",
     "family_memory_override_v1",
     "family_citywalk_addon_v1",
+    "solo_afternoon_v1",
 )
 FAILURE_CASE_IDS = ("family_route_failure_v1",)
 REQUIRED_CASE_TOOL_NAMES = {
@@ -69,7 +70,7 @@ def test_default_fixtures_load_as_ordered_benchmark_cases() -> None:
     cases = load_default_benchmark_cases()
 
     assert [case.case_id for case in cases] == list(DEFAULT_CASE_IDS)
-    assert len(cases) == 5
+    assert len(cases) == 6
     assert all(isinstance(case, BenchmarkCase) for case in cases)
 
 
@@ -97,11 +98,11 @@ def test_default_fixtures_can_be_loaded_individually() -> None:
         assert case.case_id == case_id
 
 
-def test_default_fixtures_use_mock_world_family_profile() -> None:
+def test_default_fixtures_use_supported_mock_world_profiles() -> None:
     cases = load_default_benchmark_cases()
 
     assert {case.tool_profile for case in cases} == {"mock_world"}
-    assert {case.world_profile for case in cases} == {"family_afternoon"}
+    assert {case.world_profile for case in cases} == {"family_afternoon", "solo_afternoon"}
 
 
 def test_default_fixtures_include_v1_metadata_and_expected_tools() -> None:
@@ -115,6 +116,14 @@ def test_default_fixtures_include_v1_metadata_and_expected_tools() -> None:
         assert set(case.expected.required_tool_names) == REQUIRED_CASE_TOOL_NAMES
         assert case.expected.expected_execution_status == "succeeded"
         assert case.expected.expected_feedback_status == "completed"
+
+
+def test_solo_afternoon_fixture_uses_expected_profile_and_focus() -> None:
+    case = load_benchmark_case("solo_afternoon_v1")
+
+    assert case.tool_profile == "mock_world"
+    assert case.world_profile == "solo_afternoon"
+    assert case.metadata["focus"] == "baseline_solo_afternoon"
 
 
 def test_unknown_case_raises_benchmark_harness_error() -> None:

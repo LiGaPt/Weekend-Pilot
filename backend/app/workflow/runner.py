@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 
 from backend.app.agents import AgentResult
 from backend.app.models.runtime import ActionLedger, ToolEvent
+from backend.app.providers.mock_world.loader import SUPPORTED_PROFILES
 from backend.app.workflow.dependencies import WeekendPilotWorkflowDependencies
 from backend.app.workflow.graph import build_weekend_pilot_graph
 from backend.app.workflow.nodes import WeekendPilotWorkflowNodes
@@ -30,7 +31,8 @@ class WeekendPilotWorkflowRunner:
             return unsupported
 
         try:
-            nodes = WeekendPilotWorkflowNodes(self.dependencies)
+            dependencies = self.dependencies.model_copy(update={"world_profile": request.world_profile})
+            nodes = WeekendPilotWorkflowNodes(dependencies)
             graph = build_weekend_pilot_graph(nodes)
             final_state = graph.invoke(self._initial_state(request))
             final_state = self._record_observability(nodes, final_state)
@@ -51,7 +53,7 @@ class WeekendPilotWorkflowRunner:
         self,
         request: WeekendPilotWorkflowRequest,
     ) -> WeekendPilotWorkflowResult | None:
-        if request.tool_profile == "mock_world" and request.world_profile == "family_afternoon":
+        if request.tool_profile == "mock_world" and request.world_profile in SUPPORTED_PROFILES:
             return None
 
         return WeekendPilotWorkflowResult(
@@ -62,7 +64,7 @@ class WeekendPilotWorkflowRunner:
                 "error_type": "unsupported_profile",
                 "message": (
                     "WeekendPilot workflow supports only "
-                    "tool_profile='mock_world' and world_profile='family_afternoon'."
+                    "tool_profile='mock_world' with a supported Mock World profile."
                 ),
                 "tool_profile": request.tool_profile,
                 "world_profile": request.world_profile,

@@ -16,6 +16,7 @@ _DEFAULT_CASE_IDS = (
     "family_outdoor_quick_dinner_v1",
     "family_memory_override_v1",
     "family_citywalk_addon_v1",
+    "solo_afternoon_v1",
 )
 
 _FAILURE_CASE_IDS = ("family_route_failure_v1",)

@@ -1,0 +1,32 @@
+{
+  "case_id": "solo_afternoon_v1",
+  "title": "Solo afternoon local-life plan",
+  "user_input": "This afternoon I want a solo plan for a few hours, not too far from home, with a light activity and a lighter early dinner.",
+  "agent_version": "agent-v1",
+  "prompt_version": "prompt-v1",
+  "tool_profile": "mock_world",
+  "world_profile": "solo_afternoon",
+  "failure_profile": null,
+  "memory_items": [],
+  "expected": {
+    "required_tool_names": [
+      "search_poi",
+      "check_weather",
+      "get_poi_detail",
+      "check_opening_hours",
+      "check_queue",
+      "check_table_availability",
+      "check_ticket_availability",
+      "check_route"
+    ],
+    "min_tool_event_count": 8,
+    "min_action_count": 1,
+    "expected_execution_status": "succeeded",
+    "expected_feedback_status": "completed"
+  },
+  "metadata": {
+    "suite": "locallife_bench_v1",
+    "level": "L1",
+    "focus": "baseline_solo_afternoon"
+  }
+}
