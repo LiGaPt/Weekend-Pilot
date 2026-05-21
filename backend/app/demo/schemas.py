@@ -118,6 +118,21 @@ class DemoPlanVersionSummary(BaseModel):
     source_selected_plan_id: UUID | None = None
 
 
+class DemoActionManifestItemSummary(BaseModel):
+    action_ref: str | None = None
+    execution_order: int | None = Field(default=None, ge=1)
+    action_type: str | None = None
+    target_id: str | None = None
+    payload_preview: dict[str, Any] = Field(default_factory=dict)
+    reason: str | None = None
+
+
+class DemoActionManifestSummary(BaseModel):
+    source: str
+    action_count: int = Field(ge=0)
+    actions: list[DemoActionManifestItemSummary] = Field(default_factory=list)
+
+
 class DemoPlanPreview(BaseModel):
     plan_id: UUID
     status: str
@@ -130,6 +145,7 @@ class DemoPlanPreview(BaseModel):
     route: DemoRouteSummary | dict[str, Any] | None = None
     feasibility: DemoFeasibilitySummary | dict[str, Any] | None = None
     proposed_actions: list[DemoProposedActionSummary | dict[str, Any]] = Field(default_factory=list)
+    action_manifest: DemoActionManifestSummary
     confirmation: DemoConfirmationSummary | dict[str, Any] | None = None
     execution: DemoExecutionSummary | dict[str, Any] | None = None
     feedback: DemoFeedbackSummary | dict[str, Any] | None = None

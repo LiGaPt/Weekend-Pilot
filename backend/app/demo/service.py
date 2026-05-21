@@ -13,6 +13,7 @@ from backend.app.confirmation import HumanConfirmationService, PlanConfirmationE
 from backend.app.demo.replan import build_follow_up_intent
 from backend.app.execution import DeterministicExecutionWorkflow, ExecutionWorkflowError
 from backend.app.feedback import DeterministicFeedbackWriter, FeedbackWriterError
+from backend.app.demo.action_manifest import summarize_action_manifest
 from backend.app.demo.versioning import (
     build_initial_plan_version_metadata,
     build_next_plan_version_metadata,
@@ -638,6 +639,7 @@ class DemoWorkflowService:
                 else None
             ),
             proposed_actions=sanitize_demo_payload(draft.get("proposed_actions") or []),
+            action_manifest=summarize_action_manifest(plan.plan_json, sanitizer=sanitize_demo_payload),
             confirmation=sanitize_demo_payload(confirmation) if isinstance(confirmation, dict) else None,
             execution=sanitize_demo_payload(execution) if isinstance(execution, dict) else None,
             feedback=sanitize_demo_payload(feedback) if isinstance(feedback, dict) else None,

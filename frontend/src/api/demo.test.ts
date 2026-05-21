@@ -12,7 +12,30 @@ const summary: DemoRunSummary = {
     source_run_id: null,
     source_selected_plan_id: null,
   },
-  plans: [],
+  plans: [
+    {
+      plan_id: "plan-1",
+      status: "reviewed",
+      selected: true,
+      title: "Family-friendly afternoon",
+      summary: "A short family outing with a lighter dinner option.",
+      proposed_actions: [],
+      action_manifest: {
+        source: "proposed_actions",
+        action_count: 1,
+        actions: [
+          {
+            action_ref: "draft_1_action_1",
+            execution_order: 1,
+            action_type: "reserve_restaurant",
+            target_id: "restaurant_light_001",
+            payload_preview: { party_size: 3 },
+            reason: "Confirm to lock dinner seating.",
+          },
+        ],
+      },
+    },
+  ],
   action_count: 0,
   execution_status: null,
   feedback_status: null,

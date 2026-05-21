@@ -94,8 +94,22 @@ def test_demo_run_summary_serializes_minimal_web_safe_payload() -> None:
                 "plan_id": plan_id,
                 "status": "selected",
                 "selected": True,
-                "title": "徐汇亲子轻松下午",
-                "summary": "一条适合亲子出行和清淡晚餐的方案。",
+                "title": "Family-friendly afternoon",
+                "summary": "A short family outing with a lighter dinner option.",
+                "action_manifest": {
+                    "source": "proposed_actions",
+                    "action_count": 1,
+                    "actions": [
+                        {
+                            "action_ref": "draft_1_action_1",
+                            "execution_order": 1,
+                            "action_type": "reserve_restaurant",
+                            "target_id": "restaurant_light_001",
+                            "payload_preview": {"party_size": 3},
+                            "reason": "Confirm to lock dinner seating.",
+                        }
+                    ],
+                },
             }
         ],
         action_count=0,
@@ -115,6 +129,20 @@ def test_demo_run_summary_serializes_minimal_web_safe_payload() -> None:
         "source_selected_plan_id": None,
     }
     assert dumped["plans"][0]["plan_id"] == str(plan_id)
+    assert dumped["plans"][0]["action_manifest"] == {
+        "source": "proposed_actions",
+        "action_count": 1,
+        "actions": [
+            {
+                "action_ref": "draft_1_action_1",
+                "execution_order": 1,
+                "action_type": "reserve_restaurant",
+                "target_id": "restaurant_light_001",
+                "payload_preview": {"party_size": 3},
+                "reason": "Confirm to lock dinner seating.",
+            }
+        ],
+    }
     assert "trace_id" not in dumped
     assert "session_id" not in dumped
     assert "conversation" not in dumped
@@ -135,4 +163,32 @@ def test_demo_run_summary_requires_plan_version() -> None:
             execution_status=None,
             feedback_status=None,
             error=None,
+        )
+
+
+def test_demo_plan_preview_requires_action_manifest() -> None:
+    with pytest.raises(ValidationError):
+        DemoRunSummary.model_validate(
+            {
+                "run_id": str(uuid4()),
+                "status": "awaiting_confirmation",
+                "selected_plan_id": None,
+                "plan_version": {
+                    "version_number": 1,
+                    "version_label": "v1",
+                    "source_run_id": None,
+                    "source_selected_plan_id": None,
+                },
+                "plans": [
+                    {
+                        "plan_id": str(uuid4()),
+                        "status": "selected",
+                        "selected": True,
+                    }
+                ],
+                "action_count": 0,
+                "execution_status": None,
+                "feedback_status": None,
+                "error": None,
+            }
         )

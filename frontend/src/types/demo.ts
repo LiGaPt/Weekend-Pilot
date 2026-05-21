@@ -55,6 +55,21 @@ export type DemoProposedActionSummary = {
   reason?: string | null;
 };
 
+export type DemoActionManifestItemSummary = {
+  action_ref?: string | null;
+  execution_order?: number | null;
+  action_type?: string | null;
+  target_id?: string | null;
+  payload_preview?: Record<string, unknown>;
+  reason?: string | null;
+};
+
+export type DemoActionManifestSummary = {
+  source: "proposed_actions" | "confirmed_actions" | "none";
+  action_count: number;
+  actions: DemoActionManifestItemSummary[];
+};
+
 export type DemoConfirmationSummary = {
   status?: string | null;
   confirmed_by?: string | null;
@@ -106,6 +121,7 @@ export type DemoPlanPreview = {
   route?: DemoRouteSummary | null;
   feasibility?: DemoFeasibilitySummary | null;
   proposed_actions?: DemoProposedActionSummary[];
+  action_manifest: DemoActionManifestSummary;
   confirmation?: DemoConfirmationSummary | null;
   execution?: DemoExecutionSummary | null;
   feedback?: DemoFeedbackSummary | null;

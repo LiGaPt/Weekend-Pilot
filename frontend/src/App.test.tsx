@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -31,15 +31,15 @@ const awaitingRun: DemoRunSummary = {
       summary: "先做亲子科学体验，再步行去吃清淡晚餐。",
       activity: {
         name: "徐汇亲子科学馆",
-        category: "亲子活动",
-        address: "上海市徐汇区亲子科普路100号",
-        tags: ["亲子友好", "室内"],
+        category: "activity",
+        address: "上海市徐汇区亲子科普路 100 号",
+        tags: ["child_friendly", "indoor"],
       },
       dining: {
         name: "绿碗家庭轻食",
-        category: "清淡餐厅",
-        address: "上海市徐汇区健康弄66号",
-        tags: ["清淡菜", "亲子友好"],
+        category: "dining",
+        address: "上海市徐汇区健康街 6 号",
+        tags: ["lighter_options", "family_tables"],
       },
       timeline: [
         {
@@ -54,7 +54,7 @@ const awaitingRun: DemoRunSummary = {
         mode: "driving",
         distance_meters: 3200,
         duration_minutes: 18,
-        summary: "两站之间步行很短，适合推童车。",
+        summary: "两站之间步行很短，适合推婴儿车。",
       },
       feasibility: {
         is_feasible: true,
@@ -64,14 +64,21 @@ const awaitingRun: DemoRunSummary = {
         route_duration_minutes: 18,
         queue_wait_minutes: 5,
       },
-      proposed_actions: [
-        {
-          action_type: "reserve_restaurant",
-          target_id: "green-table",
-          requires_confirmation: true,
-          reason: "提前锁定晚餐座位。",
-        },
-      ],
+      proposed_actions: [],
+      action_manifest: {
+        source: "proposed_actions",
+        action_count: 1,
+        actions: [
+          {
+            action_ref: "draft_1_action_1",
+            execution_order: 1,
+            action_type: "reserve_restaurant",
+            target_id: "green-table",
+            payload_preview: { party_size: 3 },
+            reason: "提前锁定晚餐座位。",
+          },
+        ],
+      },
       confirmation: { status: "pending", action_count: 1 },
     },
     {
@@ -80,12 +87,27 @@ const awaitingRun: DemoRunSummary = {
       selected: false,
       title: "公园和咖啡备选",
       summary: "户外活动搭配咖啡简餐。",
-      activity: { name: "滨江亲子乐园", category: "户外活动", address: "滨江步道", tags: [] },
-      dining: { name: "软勺咖啡", category: "咖啡简餐", address: "咖啡街", tags: [] },
+      activity: {
+        name: "滨江亲子乐园",
+        category: "activity",
+        address: "滨江步道",
+        tags: [],
+      },
+      dining: {
+        name: "轻享咖啡",
+        category: "dining",
+        address: "咖啡街",
+        tags: [],
+      },
       timeline: [],
       route: null,
       feasibility: null,
       proposed_actions: [],
+      action_manifest: {
+        source: "none",
+        action_count: 0,
+        actions: [],
+      },
       confirmation: { status: "pending", action_count: 0 },
     },
   ],
@@ -105,6 +127,20 @@ const completedRun: DemoRunSummary = {
     {
       ...awaitingRun.plans[0],
       status: "executed",
+      action_manifest: {
+        source: "confirmed_actions",
+        action_count: 1,
+        actions: [
+          {
+            action_ref: "draft_1_action_1",
+            execution_order: 1,
+            action_type: "reserve_restaurant",
+            target_id: "green-table",
+            payload_preview: { party_size: 3 },
+            reason: "提前锁定晚餐座位。",
+          },
+        ],
+      },
       confirmation: { status: "confirmed", confirmed_by: "web-demo-user", action_count: 1 },
       execution: {
         status: "succeeded",
@@ -177,7 +213,8 @@ describe("App", () => {
     expect(screen.getByTestId("plan-version")).toHaveTextContent("v1");
     expect(screen.getByText("徐汇亲子科学馆")).toBeInTheDocument();
     expect(screen.getByText("绿碗家庭轻食")).toBeInTheDocument();
-    expect(screen.getByText("两站之间步行很短，适合推童车。")).toBeInTheDocument();
+    expect(screen.getByText("两站之间步行很短，适合推婴儿车。")).toBeInTheDocument();
+    expect(screen.getByText("green-table")).toBeInTheDocument();
   });
 
   it("does not render internal observability labels on the public page", async () => {
