@@ -517,6 +517,7 @@ def test_internal_observability_service_handles_missing_optional_metadata(db_ses
     assert summary.observability_summary.local_buffer_error is None
     assert summary.observability_summary.langsmith_error is None
     assert summary.benchmark_artifact_summary is None
+    assert summary.recovery_path_summary is None
 
 
 def test_load_run_summary_returns_none_for_malformed_stored_summary() -> None:
@@ -714,3 +715,107 @@ def test_internal_observability_service_returns_partial_benchmark_summary_when_a
     assert summary.benchmark_artifact_summary.overall_score is None
     assert summary.benchmark_artifact_summary.score_summaries == []
     assert summary.benchmark_artifact_summary.report_path is None
+
+
+def test_internal_observability_service_returns_recovery_path_summary_when_present(
+    db_session: Session,
+) -> None:
+    case = load_benchmark_case("family_route_failure_v1")
+    run = _create_run(
+        db_session,
+        metadata_json={
+            "workflow": {
+                "recovery": {
+                    "attempt_count": 1,
+                    "max_attempts": 1,
+                    "attempts": [
+                        {
+                            "attempt_index": 1,
+                            "source_node": "semantic_validator",
+                            "recovery_action": "stop_safely",
+                            "route_to": None,
+                            "error_type": "route_infeasible",
+                            "reason": "Recovery stopped after route failure.",
+                            "retry_budget_before": 0,
+                            "retry_budget_after": 0,
+                            "status": "stopped",
+                        }
+                    ],
+                }
+            },
+            "benchmark": {
+                "case_id": case.case_id,
+                "title": case.title,
+                "workflow_backed": True,
+                "taxonomy": case.taxonomy.model_dump(mode="json"),
+                "artifact_summary": {
+                    "schema_version": "weekendpilot_benchmark_artifact_summary_v1",
+                    "benchmark_status": "passed",
+                    "overall_score": 1.0,
+                    "workflow_status": "failed",
+                    "tool_event_count": 3,
+                    "action_count": 0,
+                    "failure_reasons": [],
+                    "score_summaries": [],
+                    "report_path": "var/benchmarks/family_route_failure_v1.json",
+                },
+            },
+        },
+    )
+
+    summary = InternalObservabilityService(db_session).get_run_summary(run.run_id)
+
+    assert summary.recovery_path_summary is not None
+    assert summary.recovery_path_summary.attempt_count == 1
+    assert summary.recovery_path_summary.max_attempts == 1
+    assert len(summary.recovery_path_summary.attempts) == 1
+    assert summary.recovery_path_summary.attempts[0].recovery_action == "stop_safely"
+    assert summary.recovery_path_summary.attempts[0].status == "stopped"
+    assert summary.recovery_path_summary.replay_source is not None
+    assert summary.recovery_path_summary.replay_source.case_id == "family_route_failure_v1"
+    assert (
+        summary.recovery_path_summary.replay_source.benchmark_report_path
+        == "var/benchmarks/family_route_failure_v1.json"
+    )
+
+
+def test_internal_observability_service_skips_malformed_recovery_attempts(
+    db_session: Session,
+) -> None:
+    run = _create_run(
+        db_session,
+        metadata_json={
+            "workflow": {
+                "recovery": {
+                    "attempt_count": 2,
+                    "max_attempts": 2,
+                    "attempts": [
+                        {
+                            "attempt_index": "bad",
+                            "recovery_action": "stop_safely",
+                        },
+                        {
+                            "attempt_index": 1,
+                            "source_node": "semantic_validator",
+                            "recovery_action": "retry",
+                            "route_to": "execute_searches",
+                            "error_type": "empty_result",
+                            "reason": "Retry the search path.",
+                            "retry_budget_before": 1,
+                            "retry_budget_after": 0,
+                            "status": "routed",
+                        },
+                    ],
+                }
+            }
+        },
+    )
+
+    summary = InternalObservabilityService(db_session).get_run_summary(run.run_id)
+
+    assert summary.recovery_path_summary is not None
+    assert summary.recovery_path_summary.attempt_count == 1
+    assert summary.recovery_path_summary.max_attempts == 2
+    assert len(summary.recovery_path_summary.attempts) == 1
+    assert summary.recovery_path_summary.attempts[0].route_to == "execute_searches"
+    assert summary.recovery_path_summary.replay_source is None

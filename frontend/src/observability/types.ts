@@ -35,6 +35,31 @@ export type InternalActionLedgerSummary = {
   error_preview: Record<string, unknown> | null;
 };
 
+export type InternalRecoveryAttemptSummary = {
+  attempt_index: number;
+  source_node: string;
+  recovery_action: string;
+  route_to: string | null;
+  error_type: string | null;
+  reason: string;
+  retry_budget_before: number;
+  retry_budget_after: number;
+  status: string;
+};
+
+export type InternalRecoveryReplaySourceSummary = {
+  case_id: string;
+  benchmark_report_path: string;
+};
+
+export type InternalRecoveryPathSummary = {
+  schema_version: string;
+  attempt_count: number;
+  max_attempts: number;
+  attempts: InternalRecoveryAttemptSummary[];
+  replay_source: InternalRecoveryReplaySourceSummary | null;
+};
+
 export type InternalObservabilitySummary = {
   trace_id: string | null;
   status: string | null;
@@ -102,4 +127,5 @@ export type InternalObservabilityRunSummary = {
   workflow_timing_summary: InternalWorkflowTimingSummary | null;
   observability_summary: InternalObservabilitySummary;
   benchmark_artifact_summary: InternalBenchmarkArtifactSummary | null;
+  recovery_path_summary: InternalRecoveryPathSummary | null;
 };

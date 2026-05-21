@@ -77,7 +77,7 @@ The repository now includes a separate internal observability review page for re
 
 Paste a `run_id` from the public demo flow into `/observability` to inspect the internal workflow summary, including timing, node history, agent roles, observability status, and benchmark artifact context for benchmark-backed runs. The customer-facing demo at `/` stays customer-safe and no longer renders those internal fields.
 
-The internal review page now also shows sanitized tool-event and action-ledger detail panels, plus a real benchmark-artifact panel populated from persisted run metadata. The `Recovery Path` panel remains a placeholder for a later task.
+The internal review page now also shows sanitized tool-event and action-ledger detail panels, a real benchmark-artifact panel populated from persisted run metadata, and a real recovery-path panel populated from persisted bounded recovery metadata. For benchmark-backed recovery runs, the page also shows the persisted benchmark case report path as replay input context. Replay execution and replay report browsing remain separate tooling.
 
 ## Manual Demo Flow
 

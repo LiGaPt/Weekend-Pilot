@@ -72,6 +72,31 @@ class InternalActionLedgerSummary(BaseModel):
     error_preview: dict[str, Any] | None = None
 
 
+class InternalRecoveryAttemptSummary(BaseModel):
+    attempt_index: int
+    source_node: str
+    recovery_action: str
+    route_to: str | None = None
+    error_type: str | None = None
+    reason: str
+    retry_budget_before: int
+    retry_budget_after: int
+    status: str
+
+
+class InternalRecoveryReplaySourceSummary(BaseModel):
+    case_id: str
+    benchmark_report_path: str
+
+
+class InternalRecoveryPathSummary(BaseModel):
+    schema_version: str = "weekendpilot_internal_recovery_path_v1"
+    attempt_count: int
+    max_attempts: int
+    attempts: list[InternalRecoveryAttemptSummary] = Field(default_factory=list)
+    replay_source: InternalRecoveryReplaySourceSummary | None = None
+
+
 class InternalBenchmarkTaxonomySummary(BaseModel):
     suite: str
     scenario_bucket: str
@@ -129,3 +154,4 @@ class InternalObservabilityRunSummary(BaseModel):
     workflow_timing_summary: Any | None = None
     observability_summary: InternalObservabilitySummary = Field(default_factory=InternalObservabilitySummary)
     benchmark_artifact_summary: InternalBenchmarkArtifactSummary | None = None
+    recovery_path_summary: InternalRecoveryPathSummary | None = None

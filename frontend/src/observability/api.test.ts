@@ -41,6 +41,7 @@ const summary: InternalObservabilityRunSummary = {
     langsmith_error: null,
   },
   benchmark_artifact_summary: null,
+  recovery_path_summary: null,
 };
 
 describe("internal observability API client", () => {
