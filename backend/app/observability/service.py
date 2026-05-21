@@ -12,6 +12,9 @@ from backend.app.models.runtime import ActionLedger, AgentRun, Plan, ToolEvent
 from backend.app.observability.redaction import sanitize_trace_payload
 from backend.app.observability.schemas import (
     InternalActionLedgerSummary,
+    InternalBenchmarkArtifactSummary,
+    InternalBenchmarkScoreSummary,
+    InternalBenchmarkTaxonomySummary,
     InternalObservabilityRunSummary,
     InternalObservabilitySummary,
     InternalToolEventSummary,
@@ -67,6 +70,7 @@ class InternalObservabilityService:
             action_ledger_summaries=self._action_ledger_summaries(run.run_id),
             workflow_timing_summary=self._workflow_timing_summary(metadata, canonical_summary),
             observability_summary=self._observability_summary(metadata),
+            benchmark_artifact_summary=self._benchmark_artifact_summary(metadata),
         )
 
     def _metadata(self, run: AgentRun) -> dict[str, Any]:
@@ -211,6 +215,49 @@ class InternalObservabilityService:
             langsmith_error=langsmith_error,
         )
 
+    def _benchmark_artifact_summary(
+        self,
+        metadata: dict[str, Any],
+    ) -> InternalBenchmarkArtifactSummary | None:
+        from backend.app.benchmark.suites import list_benchmark_suite_ids_for_case
+
+        benchmark = metadata.get("benchmark")
+        if not isinstance(benchmark, dict):
+            return None
+
+        case_id = benchmark.get("case_id")
+        if not isinstance(case_id, str):
+            return None
+
+        raw_taxonomy = benchmark.get("taxonomy")
+        taxonomy = None
+        if isinstance(raw_taxonomy, dict):
+            try:
+                taxonomy = InternalBenchmarkTaxonomySummary.model_validate(raw_taxonomy)
+            except ValidationError:
+                taxonomy = None
+
+        raw_artifact = benchmark.get("artifact_summary")
+        return InternalBenchmarkArtifactSummary(
+            case_id=case_id,
+            title=benchmark.get("title") if isinstance(benchmark.get("title"), str) else None,
+            workflow_backed=(
+                benchmark.get("workflow_backed")
+                if isinstance(benchmark.get("workflow_backed"), bool)
+                else None
+            ),
+            registered_suite_ids=list_benchmark_suite_ids_for_case(case_id),
+            taxonomy=taxonomy,
+            benchmark_status=_string_or_none(raw_artifact, "benchmark_status"),
+            overall_score=_float_or_none(raw_artifact, "overall_score"),
+            workflow_status=_string_or_none(raw_artifact, "workflow_status"),
+            tool_event_count=_int_or_none(raw_artifact, "tool_event_count"),
+            action_count=_int_or_none(raw_artifact, "action_count"),
+            failure_reasons=_string_list(_mapping_value(raw_artifact, "failure_reasons")),
+            score_summaries=_benchmark_score_summaries(_mapping_value(raw_artifact, "score_summaries")),
+            report_path=_string_or_none(raw_artifact, "report_path"),
+        )
+
     def _execution_status(
         self,
         selected_plan_json: dict[str, Any],
@@ -261,7 +308,7 @@ def _preview_payload(value: Any) -> dict[str, Any] | None:
         return None
 
     sanitized = sanitize_trace_payload(deepcopy(value))
-    preview = _redact_identifier_keys(sanitized)
+    preview = _drop_forbidden_preview_keys(_redact_identifier_keys(sanitized))
     if isinstance(preview, dict):
         return preview
     return {"value": preview}
@@ -281,6 +328,87 @@ def _redact_identifier_keys(value: Any) -> Any:
     return value
 
 
+def _drop_forbidden_preview_keys(value: Any) -> Any:
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for key, item in value.items():
+            if _is_forbidden_preview_key(key):
+                continue
+            sanitized[key] = _drop_forbidden_preview_keys(item)
+        return sanitized
+    if isinstance(value, list):
+        return [_drop_forbidden_preview_keys(item) for item in value]
+    return value
+
+
 def _is_identifier_key(key: Any) -> bool:
     normalized = str(key).casefold()
     return normalized == "id" or normalized.endswith("_id")
+
+
+def _is_forbidden_preview_key(key: Any) -> bool:
+    return str(key).casefold() in {
+        "action_id",
+        "tool_event_id",
+        "event_id",
+        "idempotency_key",
+        "confirmation_id",
+    }
+
+
+def _mapping_value(value: Any, key: str) -> Any:
+    if isinstance(value, dict):
+        return value.get(key)
+    return None
+
+
+def _string_or_none(value: Any, key: str) -> str | None:
+    candidate = _mapping_value(value, key)
+    return candidate if isinstance(candidate, str) else None
+
+
+def _int_or_none(value: Any, key: str) -> int | None:
+    candidate = _mapping_value(value, key)
+    return candidate if isinstance(candidate, int) else None
+
+
+def _float_or_none(value: Any, key: str) -> float | None:
+    candidate = _mapping_value(value, key)
+    if isinstance(candidate, (int, float)):
+        return float(candidate)
+    return None
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
+
+
+def _benchmark_score_summaries(value: Any) -> list[InternalBenchmarkScoreSummary]:
+    if not isinstance(value, list):
+        return []
+
+    summaries: list[InternalBenchmarkScoreSummary] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        status = item.get("status")
+        score = item.get("score")
+        reason = item.get("reason")
+        if (
+            isinstance(name, str)
+            and isinstance(status, str)
+            and isinstance(score, (int, float))
+            and isinstance(reason, str)
+        ):
+            summaries.append(
+                InternalBenchmarkScoreSummary(
+                    name=name,
+                    status=status,
+                    score=float(score),
+                    reason=reason,
+                )
+            )
+    return summaries

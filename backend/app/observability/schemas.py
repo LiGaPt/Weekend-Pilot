@@ -72,6 +72,38 @@ class InternalActionLedgerSummary(BaseModel):
     error_preview: dict[str, Any] | None = None
 
 
+class InternalBenchmarkTaxonomySummary(BaseModel):
+    suite: str
+    scenario_bucket: str
+    level: str
+    tags: list[str] = Field(default_factory=list)
+    failure_mode: str | None = None
+
+
+class InternalBenchmarkScoreSummary(BaseModel):
+    name: str
+    status: str
+    score: float
+    reason: str
+
+
+class InternalBenchmarkArtifactSummary(BaseModel):
+    schema_version: str = "weekendpilot_internal_benchmark_artifact_v1"
+    case_id: str
+    title: str | None = None
+    workflow_backed: bool | None = None
+    registered_suite_ids: list[str] = Field(default_factory=list)
+    taxonomy: InternalBenchmarkTaxonomySummary | None = None
+    benchmark_status: str | None = None
+    overall_score: float | None = None
+    workflow_status: str | None = None
+    tool_event_count: int | None = None
+    action_count: int | None = None
+    failure_reasons: list[str] = Field(default_factory=list)
+    score_summaries: list[InternalBenchmarkScoreSummary] = Field(default_factory=list)
+    report_path: str | None = None
+
+
 class InternalObservabilityRunSummary(BaseModel):
     schema_version: str = "weekendpilot_internal_observability_run_v1"
     run_id: UUID
@@ -96,3 +128,4 @@ class InternalObservabilityRunSummary(BaseModel):
     action_ledger_summaries: list[InternalActionLedgerSummary] = Field(default_factory=list)
     workflow_timing_summary: Any | None = None
     observability_summary: InternalObservabilitySummary = Field(default_factory=InternalObservabilitySummary)
+    benchmark_artifact_summary: InternalBenchmarkArtifactSummary | None = None

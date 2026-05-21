@@ -7,6 +7,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.orm import Session
 
+from backend.app.benchmark import load_benchmark_case
 from backend.app.db.session import SessionLocal
 from backend.app.models.runtime import ActionLedger, ToolEvent
 from backend.app.observability import (
@@ -448,7 +449,10 @@ def test_internal_observability_service_builds_sanitized_run_summary(db_session:
         target_id="green-table",
         idempotency_key="reserve:1",
         status="succeeded",
-        request_json={"plan_id": str(selected.plan_id)},
+        request_json={
+            "plan_id": str(selected.plan_id),
+            "idempotency_key": "internal-confirmation-key",
+        },
         response_json={"reservation": "ok"},
         error_json=None,
     )
@@ -488,6 +492,7 @@ def test_internal_observability_service_builds_sanitized_run_summary(db_session:
     assert summary.observability_summary.local_buffer_written is True
     assert summary.observability_summary.local_buffer_error == {"api_key": "[REDACTED]", "message": "buffer-failed"}
     assert summary.observability_summary.langsmith_error == "langsmith-down"
+    assert summary.benchmark_artifact_summary is None
 
 
 def test_internal_observability_service_handles_missing_optional_metadata(db_session: Session) -> None:
@@ -511,6 +516,7 @@ def test_internal_observability_service_handles_missing_optional_metadata(db_ses
     assert summary.observability_summary.langsmith_posted is None
     assert summary.observability_summary.local_buffer_error is None
     assert summary.observability_summary.langsmith_error is None
+    assert summary.benchmark_artifact_summary is None
 
 
 def test_load_run_summary_returns_none_for_malformed_stored_summary() -> None:
@@ -632,3 +638,79 @@ def test_internal_observability_service_prefers_canonical_summary_when_present(d
 def test_internal_observability_service_raises_for_missing_run(db_session: Session) -> None:
     with pytest.raises(InternalObservabilityRunNotFoundError):
         InternalObservabilityService(db_session).get_run_summary(uuid4())
+
+
+def test_internal_observability_service_returns_benchmark_artifact_summary_when_present(
+    db_session: Session,
+) -> None:
+    case = load_benchmark_case("solo_afternoon_v1")
+    run = _create_run(
+        db_session,
+        metadata_json={
+            "benchmark": {
+                "case_id": case.case_id,
+                "title": case.title,
+                "workflow_backed": True,
+                "taxonomy": case.taxonomy.model_dump(mode="json"),
+                "artifact_summary": {
+                    "schema_version": "weekendpilot_benchmark_artifact_summary_v1",
+                    "benchmark_status": "passed",
+                    "overall_score": 0.9583,
+                    "workflow_status": "completed",
+                    "tool_event_count": 8,
+                    "action_count": 1,
+                    "failure_reasons": [],
+                    "score_summaries": [
+                        {
+                            "name": "workflow_path",
+                            "status": "passed",
+                            "score": 1.0,
+                            "reason": "Workflow reached the expected path.",
+                        }
+                    ],
+                    "report_path": "var/benchmarks/solo_afternoon_v1.json",
+                },
+            }
+        },
+    )
+
+    summary = InternalObservabilityService(db_session).get_run_summary(run.run_id)
+
+    assert summary.benchmark_artifact_summary is not None
+    assert summary.benchmark_artifact_summary.case_id == "solo_afternoon_v1"
+    assert summary.benchmark_artifact_summary.registered_suite_ids == ["default", "all_registered"]
+    assert summary.benchmark_artifact_summary.taxonomy is not None
+    assert summary.benchmark_artifact_summary.taxonomy.scenario_bucket == "solo"
+    assert summary.benchmark_artifact_summary.benchmark_status == "passed"
+    assert summary.benchmark_artifact_summary.overall_score == 0.9583
+    assert summary.benchmark_artifact_summary.score_summaries[0].status == "passed"
+    assert summary.benchmark_artifact_summary.report_path == "var/benchmarks/solo_afternoon_v1.json"
+
+
+def test_internal_observability_service_returns_partial_benchmark_summary_when_artifact_summary_missing(
+    db_session: Session,
+) -> None:
+    case = load_benchmark_case("family_route_failure_v1")
+    run = _create_run(
+        db_session,
+        metadata_json={
+            "benchmark": {
+                "case_id": case.case_id,
+                "title": case.title,
+                "workflow_backed": True,
+                "taxonomy": case.taxonomy.model_dump(mode="json"),
+            }
+        },
+    )
+
+    summary = InternalObservabilityService(db_session).get_run_summary(run.run_id)
+
+    assert summary.benchmark_artifact_summary is not None
+    assert summary.benchmark_artifact_summary.case_id == "family_route_failure_v1"
+    assert summary.benchmark_artifact_summary.registered_suite_ids == ["failures", "all_registered"]
+    assert summary.benchmark_artifact_summary.taxonomy is not None
+    assert summary.benchmark_artifact_summary.taxonomy.failure_mode == "route_unavailable"
+    assert summary.benchmark_artifact_summary.benchmark_status is None
+    assert summary.benchmark_artifact_summary.overall_score is None
+    assert summary.benchmark_artifact_summary.score_summaries == []
+    assert summary.benchmark_artifact_summary.report_path is None

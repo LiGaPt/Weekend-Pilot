@@ -45,6 +45,38 @@ export type InternalObservabilitySummary = {
   langsmith_error: unknown;
 };
 
+export type InternalBenchmarkTaxonomySummary = {
+  suite: string;
+  scenario_bucket: string;
+  level: string;
+  tags: string[];
+  failure_mode: string | null;
+};
+
+export type InternalBenchmarkScoreSummary = {
+  name: string;
+  status: string;
+  score: number;
+  reason: string;
+};
+
+export type InternalBenchmarkArtifactSummary = {
+  schema_version: string;
+  case_id: string;
+  title: string | null;
+  workflow_backed: boolean | null;
+  registered_suite_ids: string[];
+  taxonomy: InternalBenchmarkTaxonomySummary | null;
+  benchmark_status: string | null;
+  overall_score: number | null;
+  workflow_status: string | null;
+  tool_event_count: number | null;
+  action_count: number | null;
+  failure_reasons: string[];
+  score_summaries: InternalBenchmarkScoreSummary[];
+  report_path: string | null;
+};
+
 export type InternalObservabilityRunSummary = {
   schema_version: string;
   run_id: string;
@@ -69,4 +101,5 @@ export type InternalObservabilityRunSummary = {
   action_ledger_summaries: InternalActionLedgerSummary[];
   workflow_timing_summary: InternalWorkflowTimingSummary | null;
   observability_summary: InternalObservabilitySummary;
+  benchmark_artifact_summary: InternalBenchmarkArtifactSummary | null;
 };

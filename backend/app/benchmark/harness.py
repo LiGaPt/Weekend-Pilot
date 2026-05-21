@@ -88,8 +88,7 @@ class BenchmarkHarness:
                 action_count=0,
                 failure_reasons=[f"{type(exc).__name__}: {exc}"],
             )
-            report_path = write_case_report(result, self.report_dir)
-            return result.model_copy(update={"report_path": str(report_path)})
+            return self._finalize_case_result(result)
 
     def run_cases(self, cases: Sequence[BenchmarkCase]) -> BenchmarkRunReport:
         results = [self.run_case(case) for case in cases]
@@ -137,8 +136,7 @@ class BenchmarkHarness:
                 action_count=0,
                 failure_reasons=[f"Unsupported benchmark profile: {case.tool_profile}/{case.world_profile}"],
             )
-            report_path = write_case_report(result, self.report_dir)
-            return result.model_copy(update={"report_path": str(report_path)})
+            return self._finalize_case_result(result)
 
         failure_injector = build_benchmark_failure_injector(case.failure_profile)
         repositories = _Repositories(self.session)
@@ -189,8 +187,7 @@ class BenchmarkHarness:
 
         if workflow_result.run_id is None:
             result = self._workflow_error_result(case, workflow_result)
-            report_path = write_case_report(result, self.report_dir)
-            return result.model_copy(update={"report_path": str(report_path)})
+            return self._finalize_case_result(result, repositories)
 
         run = repositories.runs.get_by_id(workflow_result.run_id)
         if run is None:
@@ -213,8 +210,7 @@ class BenchmarkHarness:
                 agent_roles=self._agent_roles(workflow_result),
                 failure_reasons=["Workflow run was not persisted."],
             )
-            report_path = write_case_report(result, self.report_dir)
-            return result.model_copy(update={"report_path": str(report_path)})
+            return self._finalize_case_result(result, repositories)
 
         self._record_benchmark_metadata(repositories, run.run_id, case)
         updated_run = repositories.runs.get_by_id(run.run_id)
@@ -234,8 +230,7 @@ class BenchmarkHarness:
 
         if workflow_result.status == "error":
             result = self._workflow_error_result(case, workflow_result, run_summary=run_summary)
-            report_path = write_case_report(result, self.report_dir)
-            return result.model_copy(update={"report_path": str(report_path)})
+            return self._finalize_case_result(result, repositories)
 
         plan_json = selected_plan.plan_json if selected_plan is not None and isinstance(selected_plan.plan_json, dict) else {}
         execution = plan_json.get("execution") if isinstance(plan_json, dict) else None
@@ -273,8 +268,7 @@ class BenchmarkHarness:
             agent_roles=self._agent_roles(workflow_result),
             failure_reasons=failure_reasons,
         )
-        report_path = write_case_report(result, self.report_dir)
-        return result.model_copy(update={"report_path": str(report_path)})
+        return self._finalize_case_result(result, repositories)
 
     def _workflow_error_result(
         self,
@@ -325,6 +319,52 @@ class BenchmarkHarness:
             "workflow_backed": True,
         }
         repositories.runs.update_metadata_json(run_id, metadata)
+
+    def _finalize_case_result(
+        self,
+        result: BenchmarkCaseResult,
+        repositories: "_Repositories" | None = None,
+    ) -> BenchmarkCaseResult:
+        report_path = write_case_report(result, self.report_dir)
+        result_with_path = result.model_copy(update={"report_path": str(report_path)})
+        if repositories is not None and result_with_path.run_id is not None:
+            try:
+                self._record_benchmark_artifact_summary(repositories, result_with_path)
+            except Exception:
+                return result_with_path
+        return result_with_path
+
+    def _record_benchmark_artifact_summary(
+        self,
+        repositories: "_Repositories",
+        result: BenchmarkCaseResult,
+    ) -> None:
+        run = repositories.runs.get_by_id(result.run_id)
+        if run is None:
+            return
+        metadata = deepcopy(run.metadata_json) if isinstance(run.metadata_json, dict) else {}
+        benchmark_metadata = deepcopy(metadata.get("benchmark")) if isinstance(metadata.get("benchmark"), dict) else {}
+        benchmark_metadata["artifact_summary"] = {
+            "schema_version": "weekendpilot_benchmark_artifact_summary_v1",
+            "benchmark_status": result.status,
+            "overall_score": result.overall_score,
+            "workflow_status": result.workflow_status,
+            "tool_event_count": result.tool_event_count,
+            "action_count": result.action_count,
+            "failure_reasons": list(result.failure_reasons),
+            "score_summaries": [
+                {
+                    "name": score.name,
+                    "status": "passed" if score.passed else "failed",
+                    "score": score.score,
+                    "reason": score.reason,
+                }
+                for score in result.scores
+            ],
+            "report_path": result.report_path,
+        }
+        metadata["benchmark"] = benchmark_metadata
+        repositories.runs.update_metadata_json(result.run_id, metadata)
 
     def _workflow_failure_reason(self, workflow_result: WeekendPilotWorkflowResult) -> str:
         error_json = workflow_result.error_json

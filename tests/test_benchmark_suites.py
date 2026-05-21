@@ -58,6 +58,22 @@ def test_load_benchmark_suite_returns_expected_named_membership() -> None:
     assert [case.case_id for case in load_benchmark_suite("all_registered")] == REGISTERED_CASE_IDS
 
 
+def test_list_benchmark_suite_ids_for_case_returns_expected_membership() -> None:
+    assert benchmark_suites.list_benchmark_suite_ids_for_case("family_afternoon_v1") == [
+        "default",
+        "all_registered",
+    ]
+    assert benchmark_suites.list_benchmark_suite_ids_for_case("solo_afternoon_v1") == [
+        "default",
+        "all_registered",
+    ]
+    assert benchmark_suites.list_benchmark_suite_ids_for_case("family_route_failure_v1") == [
+        "failures",
+        "all_registered",
+    ]
+    assert benchmark_suites.list_benchmark_suite_ids_for_case("missing_case_v1") == []
+
+
 def test_legacy_suite_wrappers_delegate_to_named_suites() -> None:
     assert [case.case_id for case in load_default_benchmark_cases()] == [
         case.case_id for case in load_benchmark_suite("default")

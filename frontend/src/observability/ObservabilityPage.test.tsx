@@ -74,7 +74,38 @@ const summary: InternalObservabilityRunSummary = {
     local_buffer_error: null,
     langsmith_error: null,
   },
+  benchmark_artifact_summary: {
+    schema_version: "weekendpilot_internal_benchmark_artifact_v1",
+    case_id: "solo_afternoon_v1",
+    title: "Solo afternoon local-life plan",
+    workflow_backed: true,
+    registered_suite_ids: ["default", "all_registered"],
+    taxonomy: {
+      suite: "locallife_bench_v1",
+      scenario_bucket: "solo",
+      level: "L1",
+      tags: ["baseline", "light_activity", "light_meal"],
+      failure_mode: null,
+    },
+    benchmark_status: "passed",
+    overall_score: 0.9583,
+    workflow_status: "completed",
+    tool_event_count: 8,
+    action_count: 1,
+    failure_reasons: [],
+    score_summaries: [
+      {
+        name: "workflow_path",
+        status: "passed",
+        score: 1,
+        reason: "Workflow reached the expected path.",
+      },
+    ],
+    report_path: "var/benchmarks/solo_afternoon_v1.json",
+  },
 };
+
+const benchmarkArtifactSummary = summary.benchmark_artifact_summary!;
 
 describe("ObservabilityPage", () => {
   beforeEach(() => {
@@ -114,7 +145,13 @@ describe("ObservabilityPage", () => {
     expect(screen.getByText("green-table")).toBeInTheDocument();
     expect(screen.getByText(/\"query\":\"museum\"/)).toBeInTheDocument();
     expect(screen.getByText(/\"plan_id\":\"\[REDACTED\]\"/)).toBeInTheDocument();
-    expect(screen.getByText("Detailed benchmark artifact inspection is not implemented in this task yet.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Benchmark Artifacts" })).toBeInTheDocument();
+    expect(screen.getByText("solo_afternoon_v1")).toBeInTheDocument();
+    expect(screen.getByText("Solo afternoon local-life plan")).toBeInTheDocument();
+    expect(screen.getByText("var/benchmarks/solo_afternoon_v1.json")).toBeInTheDocument();
+    expect(screen.getByText("locallife_bench_v1")).toBeInTheDocument();
+    expect(screen.getByText("light_activity")).toBeInTheDocument();
+    expect(screen.getByText("Workflow reached the expected path.")).toBeInTheDocument();
     expect(screen.getByText("Detailed recovery path inspection is not implemented in this task yet.")).toBeInTheDocument();
   });
 
@@ -130,6 +167,45 @@ describe("ObservabilityPage", () => {
     await user.click(screen.getByRole("button", { name: "Load Run" }));
 
     expect(await screen.findByText("No workflow timing summary is available for this run yet.")).toBeInTheDocument();
+  });
+
+  it("shows a neutral state when benchmark metadata is missing", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getObservabilityRun).mockResolvedValue({
+      ...summary,
+      benchmark_artifact_summary: null,
+    });
+    render(<ObservabilityPage />);
+
+    await user.type(screen.getByRole("textbox", { name: "Run ID" }), "run-1");
+    await user.click(screen.getByRole("button", { name: "Load Run" }));
+
+    expect(await screen.findByText("This run does not have benchmark artifact metadata.")).toBeInTheDocument();
+  });
+
+  it("shows a partial benchmark state when only benchmark identity is available", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getObservabilityRun).mockResolvedValue({
+      ...summary,
+      benchmark_artifact_summary: {
+        ...benchmarkArtifactSummary,
+        benchmark_status: null,
+        overall_score: null,
+        workflow_status: null,
+        tool_event_count: null,
+        action_count: null,
+        failure_reasons: [],
+        score_summaries: [],
+        report_path: null,
+      },
+    });
+    render(<ObservabilityPage />);
+
+    await user.type(screen.getByRole("textbox", { name: "Run ID" }), "run-1");
+    await user.click(screen.getByRole("button", { name: "Load Run" }));
+
+    expect(await screen.findByText("Solo afternoon local-life plan")).toBeInTheDocument();
+    expect(screen.getByText("Detailed benchmark scoring is not available for this run yet.")).toBeInTheDocument();
   });
 
   it("renders not found errors from the backend", async () => {
