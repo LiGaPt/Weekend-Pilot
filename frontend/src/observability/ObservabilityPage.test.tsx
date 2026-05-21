@@ -103,6 +103,28 @@ const summary: InternalObservabilityRunSummary = {
     ],
     report_path: "var/benchmarks/solo_afternoon_v1.json",
   },
+  recovery_path_summary: {
+    schema_version: "weekendpilot_internal_recovery_path_v1",
+    attempt_count: 1,
+    max_attempts: 1,
+    attempts: [
+      {
+        attempt_index: 1,
+        source_node: "semantic_validator",
+        recovery_action: "stop_safely",
+        route_to: null,
+        error_type: "route_infeasible",
+        reason: "Recovery stopped after route failure.",
+        retry_budget_before: 0,
+        retry_budget_after: 0,
+        status: "stopped",
+      },
+    ],
+    replay_source: {
+      case_id: "family_route_failure_v1",
+      benchmark_report_path: "var/benchmarks/family_route_failure_v1.json",
+    },
+  },
 };
 
 const benchmarkArtifactSummary = summary.benchmark_artifact_summary!;
@@ -152,7 +174,11 @@ describe("ObservabilityPage", () => {
     expect(screen.getByText("locallife_bench_v1")).toBeInTheDocument();
     expect(screen.getByText("light_activity")).toBeInTheDocument();
     expect(screen.getByText("Workflow reached the expected path.")).toBeInTheDocument();
-    expect(screen.getByText("Detailed recovery path inspection is not implemented in this task yet.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Recovery Path" })).toBeInTheDocument();
+    expect(screen.getByText("stop_safely")).toBeInTheDocument();
+    expect(screen.getByText("Recovery stopped after route failure.")).toBeInTheDocument();
+    expect(screen.getByText("family_route_failure_v1")).toBeInTheDocument();
+    expect(screen.getByText("var/benchmarks/family_route_failure_v1.json")).toBeInTheDocument();
   });
 
   it("shows a neutral state when workflow timing is missing", async () => {
@@ -206,6 +232,41 @@ describe("ObservabilityPage", () => {
 
     expect(await screen.findByText("Solo afternoon local-life plan")).toBeInTheDocument();
     expect(screen.getByText("Detailed benchmark scoring is not available for this run yet.")).toBeInTheDocument();
+  });
+
+  it("shows a neutral state when recovery metadata is missing", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getObservabilityRun).mockResolvedValue({
+      ...summary,
+      recovery_path_summary: null,
+    });
+    render(<ObservabilityPage />);
+
+    await user.type(screen.getByRole("textbox", { name: "Run ID" }), "run-1");
+    await user.click(screen.getByRole("button", { name: "Load Run" }));
+
+    expect(await screen.findByText("This run did not enter bounded recovery.")).toBeInTheDocument();
+  });
+
+  it("shows a partial recovery state when no valid recovery attempts are available", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getObservabilityRun).mockResolvedValue({
+      ...summary,
+      recovery_path_summary: {
+        ...summary.recovery_path_summary!,
+        attempt_count: 0,
+        attempts: [],
+        replay_source: null,
+      },
+    });
+    render(<ObservabilityPage />);
+
+    await user.type(screen.getByRole("textbox", { name: "Run ID" }), "run-1");
+    await user.click(screen.getByRole("button", { name: "Load Run" }));
+
+    expect(
+      await screen.findByText("Recovery metadata exists for this run, but no valid recovery attempts are available."),
+    ).toBeInTheDocument();
   });
 
   it("renders not found errors from the backend", async () => {

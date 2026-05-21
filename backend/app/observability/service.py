@@ -15,6 +15,9 @@ from backend.app.observability.schemas import (
     InternalBenchmarkArtifactSummary,
     InternalBenchmarkScoreSummary,
     InternalBenchmarkTaxonomySummary,
+    InternalRecoveryAttemptSummary,
+    InternalRecoveryPathSummary,
+    InternalRecoveryReplaySourceSummary,
     InternalObservabilityRunSummary,
     InternalObservabilitySummary,
     InternalToolEventSummary,
@@ -71,6 +74,7 @@ class InternalObservabilityService:
             workflow_timing_summary=self._workflow_timing_summary(metadata, canonical_summary),
             observability_summary=self._observability_summary(metadata),
             benchmark_artifact_summary=self._benchmark_artifact_summary(metadata),
+            recovery_path_summary=self._recovery_path_summary(metadata),
         )
 
     def _metadata(self, run: AgentRun) -> dict[str, Any]:
@@ -258,6 +262,29 @@ class InternalObservabilityService:
             report_path=_string_or_none(raw_artifact, "report_path"),
         )
 
+    def _recovery_path_summary(
+        self,
+        metadata: dict[str, Any],
+    ) -> InternalRecoveryPathSummary | None:
+        workflow = metadata.get("workflow")
+        if not isinstance(workflow, dict):
+            return None
+
+        recovery = workflow.get("recovery")
+        if not isinstance(recovery, dict):
+            return None
+
+        attempts = _recovery_attempt_summaries(_mapping_value(recovery, "attempts"))
+        attempt_count = len(attempts)
+        max_attempts = _non_negative_int_or_default(_mapping_value(recovery, "max_attempts"), attempt_count)
+
+        return InternalRecoveryPathSummary(
+            attempt_count=attempt_count,
+            max_attempts=max_attempts,
+            attempts=attempts,
+            replay_source=_recovery_replay_source(metadata),
+        )
+
     def _execution_status(
         self,
         selected_plan_json: dict[str, Any],
@@ -410,5 +437,43 @@ def _benchmark_score_summaries(value: Any) -> list[InternalBenchmarkScoreSummary
                     score=float(score),
                     reason=reason,
                 )
-            )
+                )
     return summaries
+
+
+def _recovery_attempt_summaries(value: Any) -> list[InternalRecoveryAttemptSummary]:
+    if not isinstance(value, list):
+        return []
+
+    attempts: list[InternalRecoveryAttemptSummary] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        try:
+            attempts.append(InternalRecoveryAttemptSummary.model_validate(item))
+        except ValidationError:
+            continue
+    return attempts
+
+
+def _recovery_replay_source(metadata: dict[str, Any]) -> InternalRecoveryReplaySourceSummary | None:
+    benchmark = metadata.get("benchmark")
+    if not isinstance(benchmark, dict):
+        return None
+
+    case_id = benchmark.get("case_id")
+    artifact_summary = benchmark.get("artifact_summary")
+    report_path = _string_or_none(artifact_summary, "report_path")
+    if not isinstance(case_id, str) or report_path is None:
+        return None
+
+    return InternalRecoveryReplaySourceSummary(
+        case_id=case_id,
+        benchmark_report_path=report_path,
+    )
+
+
+def _non_negative_int_or_default(value: Any, default: int) -> int:
+    if isinstance(value, int):
+        return max(value, 0)
+    return max(default, 0)

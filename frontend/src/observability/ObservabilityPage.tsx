@@ -5,6 +5,7 @@ import type {
   InternalActionLedgerSummary,
   InternalBenchmarkArtifactSummary,
   InternalObservabilityRunSummary,
+  InternalRecoveryPathSummary,
   InternalToolEventSummary,
 } from "./types";
 
@@ -216,7 +217,7 @@ function ObservabilityResult({ result }: { result: InternalObservabilityRunSumma
         <ToolEventsPanel items={result.tool_event_summaries} />
         <ActionLedgerPanel items={result.action_ledger_summaries} />
         <BenchmarkArtifactsPanel summary={result.benchmark_artifact_summary} />
-        <PlaceholderPanel title="Recovery Path" body="Detailed recovery path inspection is not implemented in this task yet." />
+        <RecoveryPathPanel summary={result.recovery_path_summary} />
       </div>
     </div>
   );
@@ -355,6 +356,71 @@ function BenchmarkArtifactsPanel({ summary }: { summary: InternalBenchmarkArtifa
           ) : (
             <p className="muted">Detailed benchmark scoring is not available for this run yet.</p>
           )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function RecoveryPathPanel({ summary }: { summary: InternalRecoveryPathSummary | null }) {
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <h2>Recovery Path</h2>
+      </div>
+      {summary === null ? (
+        <p className="muted">This run did not enter bounded recovery.</p>
+      ) : (
+        <>
+          <dl className="metadata-list observability-list">
+            <MetaItem label="Attempt Count" value={String(summary.attempt_count)} />
+            <MetaItem label="Max Attempts" value={String(summary.max_attempts)} />
+          </dl>
+
+          {summary.attempts.length ? (
+            <section className="panel">
+              <div className="section-heading">
+                <h3>Attempts</h3>
+              </div>
+              <ul className="observability-detail-list">
+                {summary.attempts.map((attempt) => (
+                  <li key={`${attempt.attempt_index}-${attempt.recovery_action}-${attempt.status}`}>
+                    <div className="observability-detail-header">
+                      <strong>{attempt.recovery_action}</strong>
+                      <span>{attempt.status}</span>
+                    </div>
+                    <dl className="metadata-list observability-list">
+                      <MetaItem label="Attempt Index" value={String(attempt.attempt_index)} />
+                      <MetaItem label="Source Node" value={attempt.source_node} />
+                      <MetaItem label="Route To" value={attempt.route_to} />
+                      <MetaItem label="Error Type" value={attempt.error_type} />
+                      <MetaItem label="Reason" value={attempt.reason} />
+                      <MetaItem label="Retry Budget Before" value={String(attempt.retry_budget_before)} />
+                      <MetaItem label="Retry Budget After" value={String(attempt.retry_budget_after)} />
+                    </dl>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : (
+            <p className="muted">Recovery metadata exists for this run, but no valid recovery attempts are available.</p>
+          )}
+
+          {summary.replay_source ? (
+            <section className="panel">
+              <div className="section-heading">
+                <h3>Replay Source</h3>
+              </div>
+              <dl className="metadata-list observability-list">
+                <MetaItem label="Case ID" value={summary.replay_source.case_id} mono />
+                <MetaItem
+                  label="Benchmark Report Path"
+                  value={summary.replay_source.benchmark_report_path}
+                  mono
+                />
+              </dl>
+            </section>
+          ) : null}
         </>
       )}
     </section>
