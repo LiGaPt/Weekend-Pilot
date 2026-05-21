@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from backend.app.benchmark import BenchmarkHarness, load_benchmark_case
 from backend.app.confirmation import HumanConfirmationService
 from backend.app.core.config import Settings, get_settings
 from backend.app.db.session import SessionLocal
@@ -352,3 +353,43 @@ def test_internal_observability_route_returns_404_for_missing_run(
     response = observability_client.get(f"/internal/runs/{uuid4()}/observability")
 
     assert response.status_code == 404
+
+
+def test_internal_observability_route_returns_benchmark_artifact_summary_for_benchmark_run(
+    db_session: Session,
+    redis_runtime,
+    observability_client: TestClient,
+    tmp_path: Path,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    case = load_benchmark_case("solo_afternoon_v1")
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=tmp_path / "benchmarks",
+        trace_buffer_path=tmp_path / "benchmarks-trace.jsonl",
+    )
+
+    result = harness.run_case(case)
+    assert result.run_id is not None
+    db_session.commit()
+
+    response = observability_client.get(f"/internal/runs/{result.run_id}/observability")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["benchmark_artifact_summary"] is not None
+    assert payload["benchmark_artifact_summary"]["case_id"] == "solo_afternoon_v1"
+    assert payload["benchmark_artifact_summary"]["registered_suite_ids"] == [
+        "default",
+        "all_registered",
+    ]
+    assert payload["benchmark_artifact_summary"]["benchmark_status"] == result.status
+    assert payload["benchmark_artifact_summary"]["report_path"] == result.report_path
+    assert payload["benchmark_artifact_summary"]["taxonomy"]["scenario_bucket"] == "solo"
+    assert payload["benchmark_artifact_summary"]["score_summaries"]
+    serialized = json.dumps(payload, sort_keys=True)
+    assert "action_id" not in serialized
+    assert "tool_event_id" not in serialized
+    assert "idempotency_key" not in serialized

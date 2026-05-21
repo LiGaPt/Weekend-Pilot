@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from backend.app.benchmark.errors import BenchmarkHarnessError
-from backend.app.benchmark.fixtures import load_benchmark_case, load_registered_benchmark_cases
 from backend.app.benchmark.matrix import build_case_matrix_summary
 from backend.app.benchmark.schemas import BenchmarkCase, BenchmarkSuiteDescription, BenchmarkSuiteId
 
@@ -47,10 +46,14 @@ _SUITE_DEFINITIONS: dict[str, dict[str, Any]] = {
 
 def load_benchmark_suite(suite_id: BenchmarkSuiteId | str) -> list[BenchmarkCase]:
     definition = _validated_suite_definition(str(suite_id))
+    from backend.app.benchmark.fixtures import load_benchmark_case
+
     return [load_benchmark_case(case_id) for case_id in definition["case_ids"]]
 
 
 def list_benchmark_suites() -> list[BenchmarkSuiteDescription]:
+    from backend.app.benchmark.fixtures import load_benchmark_case
+
     suites: list[BenchmarkSuiteDescription] = []
     for suite_id in _ORDERED_SUITE_IDS:
         definition = _validated_suite_definition(suite_id)
@@ -66,6 +69,15 @@ def list_benchmark_suites() -> list[BenchmarkSuiteDescription]:
             )
         )
     return suites
+
+
+def list_benchmark_suite_ids_for_case(case_id: str) -> list[BenchmarkSuiteId]:
+    matching_suite_ids: list[BenchmarkSuiteId] = []
+    for suite_id in _ORDERED_SUITE_IDS:
+        definition = _validated_suite_definition(suite_id)
+        if case_id in definition["case_ids"]:
+            matching_suite_ids.append(suite_id)
+    return matching_suite_ids
 
 
 def load_default_benchmark_cases() -> list[BenchmarkCase]:
@@ -84,6 +96,8 @@ def _validated_suite_definition(suite_id: str) -> dict[str, Any]:
     case_ids = definition.get("case_ids")
     if not isinstance(case_ids, list):
         raise BenchmarkHarnessError(f"Benchmark suite {suite_id} has invalid case_ids.")
+
+    from backend.app.benchmark.fixtures import load_registered_benchmark_cases
 
     registered_case_ids = {case.case_id for case in load_registered_benchmark_cases()}
     seen: set[str] = set()

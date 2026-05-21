@@ -203,6 +203,19 @@ def test_benchmark_harness_runs_solo_afternoon_case(
     assert result.taxonomy is not None
     assert result.taxonomy.scenario_bucket == "solo"
     assert result.report_path is not None
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    artifact_summary = run.metadata_json["benchmark"]["artifact_summary"]
+    assert artifact_summary["schema_version"] == "weekendpilot_benchmark_artifact_summary_v1"
+    assert artifact_summary["benchmark_status"] == result.status
+    assert artifact_summary["overall_score"] == result.overall_score
+    assert artifact_summary["workflow_status"] == result.workflow_status
+    assert artifact_summary["tool_event_count"] == result.tool_event_count
+    assert artifact_summary["action_count"] == result.action_count
+    assert artifact_summary["report_path"] == result.report_path
+    assert len(artifact_summary["score_summaries"]) == len(result.scores)
+    assert artifact_summary["score_summaries"][0]["name"] == result.scores[0].name
+    assert "details" not in artifact_summary["score_summaries"][0]
 
 
 def test_benchmark_harness_runs_default_mock_world_suite(

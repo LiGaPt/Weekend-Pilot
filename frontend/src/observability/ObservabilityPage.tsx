@@ -3,6 +3,7 @@ import { DemoApiError } from "../api/demo";
 import { getObservabilityRun } from "./api";
 import type {
   InternalActionLedgerSummary,
+  InternalBenchmarkArtifactSummary,
   InternalObservabilityRunSummary,
   InternalToolEventSummary,
 } from "./types";
@@ -214,10 +215,7 @@ function ObservabilityResult({ result }: { result: InternalObservabilityRunSumma
       <div className="observability-placeholder-grid">
         <ToolEventsPanel items={result.tool_event_summaries} />
         <ActionLedgerPanel items={result.action_ledger_summaries} />
-        <PlaceholderPanel
-          title="Benchmark Artifacts"
-          body="Detailed benchmark artifact inspection is not implemented in this task yet."
-        />
+        <BenchmarkArtifactsPanel summary={result.benchmark_artifact_summary} />
         <PlaceholderPanel title="Recovery Path" body="Detailed recovery path inspection is not implemented in this task yet." />
       </div>
     </div>
@@ -231,6 +229,134 @@ function PlaceholderPanel({ title, body }: { title: string; body: string }) {
         <h2>{title}</h2>
       </div>
       <p className="muted">{body}</p>
+    </section>
+  );
+}
+
+function BenchmarkArtifactsPanel({ summary }: { summary: InternalBenchmarkArtifactSummary | null }) {
+  const hasDetailedArtifact =
+    summary !== null &&
+    (summary.benchmark_status !== null ||
+      summary.overall_score !== null ||
+      summary.workflow_status !== null ||
+      summary.tool_event_count !== null ||
+      summary.action_count !== null ||
+      summary.report_path !== null ||
+      summary.failure_reasons.length > 0 ||
+      summary.score_summaries.length > 0);
+
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <h2>Benchmark Artifacts</h2>
+      </div>
+      {summary === null ? (
+        <p className="muted">This run does not have benchmark artifact metadata.</p>
+      ) : (
+        <>
+          <dl className="metadata-list observability-list">
+            <MetaItem label="Case ID" value={summary.case_id} mono />
+            <MetaItem label="Title" value={summary.title} />
+            <MetaItem label="Workflow Backed" value={booleanLabel(summary.workflow_backed)} />
+            <MetaItem label="Benchmark Status" value={summary.benchmark_status} />
+            <MetaItem
+              label="Overall Score"
+              value={summary.overall_score === null ? null : String(summary.overall_score)}
+            />
+            <MetaItem label="Workflow Status" value={summary.workflow_status} />
+            <MetaItem
+              label="Tool Event Count"
+              value={summary.tool_event_count === null ? null : String(summary.tool_event_count)}
+            />
+            <MetaItem
+              label="Action Count"
+              value={summary.action_count === null ? null : String(summary.action_count)}
+            />
+            <MetaItem label="Report Path" value={summary.report_path} mono />
+          </dl>
+
+          <section className="panel">
+            <div className="section-heading">
+              <h3>Registered Suites</h3>
+            </div>
+            {summary.registered_suite_ids.length ? (
+              <ul className="observability-chip-list">
+                {summary.registered_suite_ids.map((suiteId) => (
+                  <li key={suiteId}>{suiteId}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">No registered suite IDs matched this benchmark case.</p>
+            )}
+          </section>
+
+          <section className="panel">
+            <div className="section-heading">
+              <h3>Taxonomy</h3>
+            </div>
+            {summary.taxonomy ? (
+              <>
+                <dl className="metadata-list observability-list">
+                  <MetaItem label="Suite" value={summary.taxonomy.suite} />
+                  <MetaItem label="Scenario Bucket" value={summary.taxonomy.scenario_bucket} />
+                  <MetaItem label="Level" value={summary.taxonomy.level} />
+                  <MetaItem label="Failure Mode" value={summary.taxonomy.failure_mode} />
+                </dl>
+                {summary.taxonomy.tags.length ? (
+                  <ul className="observability-chip-list">
+                    {summary.taxonomy.tags.map((tag) => (
+                      <li key={tag}>{tag}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </>
+            ) : (
+              <p className="muted">No benchmark taxonomy is available for this run.</p>
+            )}
+          </section>
+
+          {hasDetailedArtifact ? (
+            <>
+              {summary.failure_reasons.length ? (
+                <section className="panel">
+                  <div className="section-heading">
+                    <h3>Failure Reasons</h3>
+                  </div>
+                  <ul className="node-list">
+                    {summary.failure_reasons.map((reason, index) => (
+                      <li key={`${reason}-${index}`}>{reason}</li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+
+              {summary.score_summaries.length ? (
+                <section className="panel">
+                  <div className="section-heading">
+                    <h3>Score Summaries</h3>
+                  </div>
+                  <ul className="observability-detail-list">
+                    {summary.score_summaries.map((score, index) => (
+                      <li key={`${score.name}-${index}`}>
+                        <div className="observability-detail-header">
+                          <strong>{score.name}</strong>
+                          <span>{score.status}</span>
+                        </div>
+                        <dl className="metadata-list observability-list">
+                          <MetaItem label="Score" value={String(score.score)} />
+                          <MetaItem label="Reason" value={score.reason} />
+                        </dl>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+            </>
+          ) : (
+            <p className="muted">Detailed benchmark scoring is not available for this run yet.</p>
+          )}
+        </>
+      )}
     </section>
   );
 }

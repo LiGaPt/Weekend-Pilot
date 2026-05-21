@@ -40,6 +40,7 @@ const summary: InternalObservabilityRunSummary = {
     local_buffer_error: null,
     langsmith_error: null,
   },
+  benchmark_artifact_summary: null,
 };
 
 describe("internal observability API client", () => {
