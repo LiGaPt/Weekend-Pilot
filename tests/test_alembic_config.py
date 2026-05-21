@@ -11,6 +11,8 @@ EXPECTED_TABLES = {
     "plans",
     "tool_events",
     "action_ledger",
+    "conversation_sessions",
+    "conversation_turns",
 }
 
 

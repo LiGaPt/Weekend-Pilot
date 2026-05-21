@@ -98,6 +98,8 @@ def test_demo_run_summary_serializes_minimal_web_safe_payload() -> None:
     assert dumped["selected_plan_id"] == str(plan_id)
     assert dumped["plans"][0]["plan_id"] == str(plan_id)
     assert "trace_id" not in dumped
+    assert "session_id" not in dumped
+    assert "conversation" not in dumped
     assert "tool_event_count" not in dumped
     assert "node_history" not in dumped
     assert "observability_status" not in dumped

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.config import Settings, get_settings
 from backend.app.db.session import SessionLocal, get_db
-from backend.app.models.runtime import ActionLedger, AgentRun, ToolEvent, User
+from backend.app.models.runtime import ActionLedger, AgentRun, ConversationSession, ConversationTurn, ToolEvent, User
 from backend.app.runtime import get_redis_client
 from backend.app.main import create_app
 
@@ -133,6 +133,12 @@ def _demo_trace_id(session: Session, run_id: UUID) -> str | None:
     return trace_id if isinstance(trace_id, str) else None
 
 
+def _load_run(session: Session, run_id: UUID) -> AgentRun:
+    run = session.get(AgentRun, run_id)
+    assert run is not None
+    return run
+
+
 def _assert_no_forbidden_keys(value) -> None:
     if isinstance(value, dict):
         forbidden = FORBIDDEN_RESPONSE_KEYS.intersection(value)
@@ -168,6 +174,44 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
     db = SessionLocal()
     try:
         assert _count_actions(db, run_id) == 0
+        run = _load_run(db, run_id)
+        assert run.session_id is not None
+        conversation_session = db.get(ConversationSession, run.session_id)
+        assert conversation_session is not None
+        assert conversation_session.user_id == run.user_id
+        assert conversation_session.channel == "web_demo"
+        assert conversation_session.status == "active"
+        assert conversation_session.metadata_json == {
+            "source": "demo_api_v1",
+            "case_id": case_ids[0],
+            "selected_plan_index": 0,
+        }
+        turns = list(
+            db.scalars(
+                select(ConversationTurn)
+                .where(ConversationTurn.session_id == run.session_id)
+                .order_by(ConversationTurn.turn_index, ConversationTurn.turn_id)
+            ).all()
+        )
+        assert len(turns) == 2
+        assert turns[0].turn_index == 1
+        assert turns[0].speaker_role == "user"
+        assert turns[0].turn_type == "user_request"
+        assert turns[0].content_text == USER_INPUT
+        assert turns[0].payload_json == {}
+        assert turns[1].turn_index == 2
+        assert turns[1].speaker_role == "assistant"
+        assert turns[1].turn_type == "assistant_plan_options"
+        assert isinstance(turns[1].content_text, str)
+        assert turns[1].content_text
+        assert turns[1].payload_json == {
+            "selected_plan_id": start_body["selected_plan_id"],
+            "plan_ids": [plan["plan_id"] for plan in start_body["plans"]],
+            "plan_count": len(start_body["plans"]),
+            "run_status": "awaiting_confirmation",
+        }
+        assert "draft" not in turns[1].payload_json
+        assert "plan_json" not in turns[1].payload_json
     finally:
         db.close()
 

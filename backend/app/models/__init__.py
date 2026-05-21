@@ -1,6 +1,8 @@
 from backend.app.models.runtime import (
     ActionLedger,
     AgentRun,
+    ConversationSession,
+    ConversationTurn,
     MemoryItem,
     Plan,
     ToolEvent,
@@ -11,6 +13,8 @@ from backend.app.models.runtime import (
 __all__ = [
     "ActionLedger",
     "AgentRun",
+    "ConversationSession",
+    "ConversationTurn",
     "MemoryItem",
     "Plan",
     "ToolEvent",

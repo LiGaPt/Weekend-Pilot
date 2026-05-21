@@ -12,6 +12,8 @@ EXPECTED_TABLES = {
     "plans",
     "tool_events",
     "action_ledger",
+    "conversation_sessions",
+    "conversation_turns",
 }
 
 
@@ -28,6 +30,7 @@ EXPECTED_COLUMNS = {
     "agent_runs": {
         "run_id",
         "user_id",
+        "session_id",
         "case_id",
         "agent_version",
         "prompt_version",
@@ -38,6 +41,26 @@ EXPECTED_COLUMNS = {
         "metadata_json",
         "created_at",
         "updated_at",
+    },
+    "conversation_sessions": {
+        "session_id",
+        "user_id",
+        "channel",
+        "status",
+        "metadata_json",
+        "created_at",
+        "updated_at",
+    },
+    "conversation_turns": {
+        "turn_id",
+        "session_id",
+        "run_id",
+        "turn_index",
+        "speaker_role",
+        "turn_type",
+        "content_text",
+        "payload_json",
+        "created_at",
     },
     "memory_items": {
         "memory_id",
@@ -90,6 +113,10 @@ EXPECTED_COLUMNS = {
 EXPECTED_FOREIGN_KEYS = {
     ("user_profiles", "user_id", "users", "user_id"),
     ("agent_runs", "user_id", "users", "user_id"),
+    ("agent_runs", "session_id", "conversation_sessions", "session_id"),
+    ("conversation_sessions", "user_id", "users", "user_id"),
+    ("conversation_turns", "session_id", "conversation_sessions", "session_id"),
+    ("conversation_turns", "run_id", "agent_runs", "run_id"),
     ("memory_items", "user_id", "users", "user_id"),
     ("memory_items", "source_run_id", "agent_runs", "run_id"),
     ("plans", "run_id", "agent_runs", "run_id"),
@@ -121,6 +148,17 @@ def test_action_ledger_idempotency_key_is_unique() -> None:
     }
 
     assert ("idempotency_key",) in unique_constraint_columns | unique_index_columns
+
+
+def test_conversation_turn_index_is_unique_per_session() -> None:
+    table = Base.metadata.tables["conversation_turns"]
+    unique_constraint_columns = {
+        tuple(column.name for column in constraint.columns)
+        for constraint in table.constraints
+        if isinstance(constraint, UniqueConstraint)
+    }
+
+    assert ("session_id", "turn_index") in unique_constraint_columns
 
 
 def test_representative_foreign_keys_are_defined() -> None:

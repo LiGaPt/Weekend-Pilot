@@ -21,9 +21,11 @@ class AgentRunRepository:
         failure_profile: str | None,
         status: str,
         metadata_json: dict[str, Any],
+        session_id: UUID | None = None,
     ) -> AgentRun:
         run = AgentRun(
             user_id=user_id,
+            session_id=session_id,
             case_id=case_id,
             agent_version=agent_version,
             prompt_version=prompt_version,
@@ -34,6 +36,16 @@ class AgentRunRepository:
             metadata_json=metadata_json,
         )
         self.session.add(run)
+        self.session.flush()
+        self.session.refresh(run)
+        return run
+
+    def update_session_id(self, run_id: UUID, session_id: UUID | None) -> AgentRun | None:
+        run = self.get_by_id(run_id)
+        if run is None:
+            return None
+
+        run.session_id = session_id
         self.session.flush()
         self.session.refresh(run)
         return run
