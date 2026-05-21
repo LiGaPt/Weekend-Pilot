@@ -155,6 +155,21 @@ def _assert_public_run_redaction(payload: dict[str, object]) -> None:
         assert key not in payload
 
 
+def _assert_plan_version(
+    payload: dict[str, object],
+    *,
+    version_number: int,
+    source_run_id: str | None,
+    source_selected_plan_id: str | None,
+) -> None:
+    assert payload["plan_version"] == {
+        "version_number": version_number,
+        "version_label": f"v{version_number}",
+        "source_run_id": source_run_id,
+        "source_selected_plan_id": source_selected_plan_id,
+    }
+
+
 def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
     test_client, case_ids, external_user_ids = client
 
@@ -168,6 +183,12 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
     assert start_body["action_count"] == 0
     assert start_body["plans"]
     assert start_body["selected_plan_id"]
+    _assert_plan_version(
+        start_body,
+        version_number=1,
+        source_run_id=None,
+        source_selected_plan_id=None,
+    )
     assert start_body["plans"][0]["confirmation"] is None
     run_id = UUID(start_body["run_id"])
 
@@ -223,6 +244,12 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
     assert status_body["run_id"] == str(run_id)
     assert status_body["selected_plan_id"] == start_body["selected_plan_id"]
     assert status_body["action_count"] == 0
+    _assert_plan_version(
+        status_body,
+        version_number=1,
+        source_run_id=None,
+        source_selected_plan_id=None,
+    )
 
     confirm_response = test_client.post(
         f"/demo/runs/{run_id}/confirm",
@@ -237,6 +264,12 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
     assert confirm_body["status"] == "completed"
     assert confirm_body["action_count"] > 0
     assert confirm_body["feedback_status"] == "completed"
+    _assert_plan_version(
+        confirm_body,
+        version_number=1,
+        source_run_id=None,
+        source_selected_plan_id=None,
+    )
     selected = next(plan for plan in confirm_body["plans"] if plan["selected"])
     assert selected["confirmation"]["status"] == "confirmed"
     assert selected["execution"]["status"] == "succeeded"
@@ -329,6 +362,12 @@ def test_demo_run_status_route_keeps_public_shape_after_internal_route_addition(
     payload = status_response.json()
     assert payload["run_id"] == run_id
     assert "plans" in payload
+    _assert_plan_version(
+        payload,
+        version_number=1,
+        source_run_id=None,
+        source_selected_plan_id=None,
+    )
     assert "trace_id" not in payload
     assert "tool_event_count" not in payload
     assert "node_history" not in payload
@@ -346,6 +385,12 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
     source_body = start_response.json()
     source_run_id = UUID(source_body["run_id"])
     source_selected_plan_id = source_body["selected_plan_id"]
+    _assert_plan_version(
+        source_body,
+        version_number=1,
+        source_run_id=None,
+        source_selected_plan_id=None,
+    )
 
     replan_response = test_client.post(
         f"/demo/runs/{source_run_id}/replan",
@@ -363,6 +408,32 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
     assert replan_body["status"] == "awaiting_confirmation"
     assert "session_id" not in replan_body
     assert "conversation" not in replan_body
+    _assert_plan_version(
+        replan_body,
+        version_number=2,
+        source_run_id=str(source_run_id),
+        source_selected_plan_id=source_selected_plan_id,
+    )
+
+    second_replan_response = test_client.post(
+        f"/demo/runs/{replan_body['run_id']}/replan",
+        json={
+            "user_input": "Keep it nearby again, but reduce walking even more.",
+            "selected_plan_index": 0,
+        },
+    )
+
+    assert second_replan_response.status_code == 200
+    second_replan_body = second_replan_response.json()
+    _assert_no_forbidden_keys(second_replan_body)
+    _assert_public_run_redaction(second_replan_body)
+    assert second_replan_body["run_id"] not in {str(source_run_id), replan_body["run_id"]}
+    _assert_plan_version(
+        second_replan_body,
+        version_number=3,
+        source_run_id=replan_body["run_id"],
+        source_selected_plan_id=replan_body["selected_plan_id"],
+    )
 
     status_response = test_client.get(f"/demo/runs/{source_run_id}")
     assert status_response.status_code == 200
@@ -370,13 +441,24 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
     assert source_after["run_id"] == str(source_run_id)
     assert source_after["status"] == source_body["status"]
     assert source_after["selected_plan_id"] == source_selected_plan_id
+    assert source_after["plan_version"] == source_body["plan_version"]
+
+    first_replan_status_response = test_client.get(f"/demo/runs/{replan_body['run_id']}")
+    assert first_replan_status_response.status_code == 200
+    first_replan_after = first_replan_status_response.json()
+    assert first_replan_after["run_id"] == replan_body["run_id"]
+    assert first_replan_after["selected_plan_id"] == replan_body["selected_plan_id"]
+    assert first_replan_after["plan_version"] == replan_body["plan_version"]
 
     db = SessionLocal()
     try:
         source_run = _load_run(db, source_run_id)
         replan_run = _load_run(db, UUID(replan_body["run_id"]))
+        second_replan_run = _load_run(db, UUID(second_replan_body["run_id"]))
         assert replan_run.user_id == source_run.user_id
         assert replan_run.session_id == source_run.session_id
+        assert second_replan_run.user_id == source_run.user_id
+        assert second_replan_run.session_id == source_run.session_id
         turns = list(
             db.scalars(
                 select(ConversationTurn)
@@ -387,6 +469,8 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
         assert [turn.turn_type for turn in turns] == [
             "user_request",
             "assistant_plan_options",
+            "user_follow_up",
+            "assistant_replan_options",
             "user_follow_up",
             "assistant_replan_options",
         ]
@@ -405,11 +489,43 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
             "plan_count": len(replan_body["plans"]),
             "run_status": "awaiting_confirmation",
         }
+        assert turns[4].run_id == second_replan_run.run_id
+        assert turns[4].payload_json == {
+            "mode": "replan",
+            "source_run_id": str(replan_run.run_id),
+            "source_selected_plan_id": replan_body["selected_plan_id"],
+        }
+        assert turns[5].run_id == second_replan_run.run_id
+        assert turns[5].payload_json == {
+            "mode": "replan",
+            "source_run_id": str(replan_run.run_id),
+            "selected_plan_id": second_replan_body["selected_plan_id"],
+            "plan_ids": [plan["plan_id"] for plan in second_replan_body["plans"]],
+            "plan_count": len(second_replan_body["plans"]),
+            "run_status": "awaiting_confirmation",
+        }
         assert "draft" not in turns[3].payload_json
         assert "plan_json" not in turns[3].payload_json
+        assert "draft" not in turns[5].payload_json
+        assert "plan_json" not in turns[5].payload_json
         assert isinstance(replan_run.metadata_json, dict)
         assert replan_run.metadata_json["demo"]["conversation"]["mode"] == "follow_up_replan_v0"
         assert replan_run.metadata_json["demo"]["conversation"]["source_run_id"] == str(source_run.run_id)
         assert replan_run.metadata_json["demo"]["conversation"]["source_selected_plan_id"] == source_selected_plan_id
+        assert source_run.metadata_json["demo"]["plan_version"] == {
+            "version_number": 1,
+            "source_run_id": None,
+            "source_selected_plan_id": None,
+        }
+        assert replan_run.metadata_json["demo"]["plan_version"] == {
+            "version_number": 2,
+            "source_run_id": str(source_run.run_id),
+            "source_selected_plan_id": source_selected_plan_id,
+        }
+        assert second_replan_run.metadata_json["demo"]["plan_version"] == {
+            "version_number": 3,
+            "source_run_id": str(replan_run.run_id),
+            "source_selected_plan_id": replan_body["selected_plan_id"],
+        }
     finally:
         db.close()

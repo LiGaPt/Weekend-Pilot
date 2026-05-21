@@ -13,6 +13,11 @@ from backend.app.confirmation import HumanConfirmationService, PlanConfirmationE
 from backend.app.demo.replan import build_follow_up_intent
 from backend.app.execution import DeterministicExecutionWorkflow, ExecutionWorkflowError
 from backend.app.feedback import DeterministicFeedbackWriter, FeedbackWriterError
+from backend.app.demo.versioning import (
+    build_initial_plan_version_metadata,
+    build_next_plan_version_metadata,
+    summarize_plan_version,
+)
 from backend.app.models.runtime import ActionLedger, AgentRun, Plan
 from backend.app.observability import LocalTraceBuffer, ObservabilityRecorder, RunTraceContext
 from backend.app.providers.mock_world import build_mock_world_registry
@@ -132,7 +137,11 @@ class DemoWorkflowService:
             raise DemoServiceError(500, "Demo workflow run disappeared.")
 
         self._ensure_conversation_baseline(run, request)
-        self._persist_demo_metadata(result.run_id, result)
+        self._persist_demo_metadata(
+            result.run_id,
+            result,
+            plan_version=build_initial_plan_version_metadata(),
+        )
         self.session.commit()
         return self.build_summary(result.run_id)
 
@@ -155,7 +164,8 @@ class DemoWorkflowService:
 
         plans = PlanRepository(self.session)
         source_selected_plan = plans.get_selected_for_run(source_run.run_id)
-        source_selected_plan_id = str(source_selected_plan.plan_id) if source_selected_plan is not None else None
+        source_selected_plan_uuid = source_selected_plan.plan_id if source_selected_plan is not None else None
+        source_selected_plan_id = str(source_selected_plan_uuid) if source_selected_plan_uuid is not None else None
         merged_intent = build_follow_up_intent(
             [
                 *self._session_user_turn_texts(source_session.session_id),
@@ -224,6 +234,11 @@ class DemoWorkflowService:
                 "trigger_turn_id": str(follow_up_turn.turn_id),
                 "source_selected_plan_id": source_selected_plan_id,
             },
+            plan_version=build_next_plan_version_metadata(
+                source_run.metadata_json,
+                source_run_id=source_run.run_id,
+                source_selected_plan_id=source_selected_plan_uuid,
+            ),
         )
         self.session.commit()
         return self.build_summary(replan_run.run_id)
@@ -311,6 +326,7 @@ class DemoWorkflowService:
             run_id=run.run_id,
             status=run.status,
             selected_plan_id=selected_plan.plan_id if selected_plan is not None else None,
+            plan_version=summarize_plan_version(run.metadata_json),
             plans=[self._plan_preview(plan) for plan in plan_rows],
             action_count=self._action_count(run_id),
             execution_status=execution.get("status") if isinstance(execution, dict) else None,
@@ -549,6 +565,7 @@ class DemoWorkflowService:
         result,
         *,
         conversation: dict[str, Any] | None = None,
+        plan_version: dict[str, Any] | None = None,
     ) -> None:
         runs = AgentRunRepository(self.session)
         run = self._load_run(runs, run_id)
@@ -571,6 +588,8 @@ class DemoWorkflowService:
         )
         if conversation is not None:
             demo["conversation"] = sanitize_demo_payload(conversation)
+        if plan_version is not None:
+            demo["plan_version"] = sanitize_demo_payload(plan_version)
         metadata["demo"] = demo
         runs.update_metadata_json(run_id, metadata)
 

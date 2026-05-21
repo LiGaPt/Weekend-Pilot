@@ -87,6 +87,13 @@ export type DemoFeedbackSummary = {
   generated_at?: string | null;
 };
 
+export type DemoPlanVersionSummary = {
+  version_number: number;
+  version_label: string;
+  source_run_id: string | null;
+  source_selected_plan_id: string | null;
+};
+
 export type DemoPlanPreview = {
   plan_id: string;
   status: string;
@@ -108,6 +115,7 @@ export type DemoRunSummary = {
   run_id: string;
   status: string;
   selected_plan_id: string | null;
+  plan_version: DemoPlanVersionSummary;
   plans: DemoPlanPreview[];
   action_count: number;
   execution_status: string | null;

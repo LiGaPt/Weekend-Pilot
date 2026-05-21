@@ -83,6 +83,12 @@ def test_demo_run_summary_serializes_minimal_web_safe_payload() -> None:
         run_id=run_id,
         status="awaiting_confirmation",
         selected_plan_id=plan_id,
+        plan_version={
+            "version_number": 1,
+            "version_label": "v1",
+            "source_run_id": None,
+            "source_selected_plan_id": None,
+        },
         plans=[
             {
                 "plan_id": plan_id,
@@ -102,6 +108,12 @@ def test_demo_run_summary_serializes_minimal_web_safe_payload() -> None:
 
     assert dumped["run_id"] == str(run_id)
     assert dumped["selected_plan_id"] == str(plan_id)
+    assert dumped["plan_version"] == {
+        "version_number": 1,
+        "version_label": "v1",
+        "source_run_id": None,
+        "source_selected_plan_id": None,
+    }
     assert dumped["plans"][0]["plan_id"] == str(plan_id)
     assert "trace_id" not in dumped
     assert "session_id" not in dumped
@@ -110,3 +122,17 @@ def test_demo_run_summary_serializes_minimal_web_safe_payload() -> None:
     assert "node_history" not in dumped
     assert "observability_status" not in dumped
     assert "agent_roles" not in dumped
+
+
+def test_demo_run_summary_requires_plan_version() -> None:
+    with pytest.raises(ValidationError):
+        DemoRunSummary(
+            run_id=uuid4(),
+            status="awaiting_confirmation",
+            selected_plan_id=None,
+            plans=[],
+            action_count=0,
+            execution_status=None,
+            feedback_status=None,
+            error=None,
+        )

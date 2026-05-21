@@ -111,6 +111,13 @@ class DemoFeedbackSummary(BaseModel):
     generated_at: str | None = None
 
 
+class DemoPlanVersionSummary(BaseModel):
+    version_number: int = Field(ge=1)
+    version_label: str
+    source_run_id: UUID | None = None
+    source_selected_plan_id: UUID | None = None
+
+
 class DemoPlanPreview(BaseModel):
     plan_id: UUID
     status: str
@@ -132,6 +139,7 @@ class DemoRunSummary(BaseModel):
     run_id: UUID
     status: str
     selected_plan_id: UUID | None = None
+    plan_version: DemoPlanVersionSummary
     plans: list[DemoPlanPreview] = Field(default_factory=list)
     action_count: int = 0
     execution_status: str | None = None

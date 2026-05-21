@@ -262,6 +262,7 @@ Expected response:
 ## Web Demo API
 
 The Web demo API starts the official workflow, pauses before write tools, and continues execution only after explicit confirmation. The MVP review path uses Chinese Mock World demo content for the family afternoon scenario.
+Every public demo run summary includes a compact `plan_version` object. The initial run starts at `v1`, and each follow-up replan increments the visible version label.
 
 ```bash
 docker compose up -d postgres redis
@@ -314,6 +315,7 @@ curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/replan \
 ```
 
 The replan response returns a new `run_id`. The internal conversation session is reused across the original run and the follow-up run, but that session state remains non-public and is not exposed in `DemoRunSummary`.
+Each replan also advances the public version label to `v2`, `v3`, and so on.
 
 ## Minimal Web UI Demo
 
@@ -336,6 +338,7 @@ Open `http://127.0.0.1:5173`.
 
 The frontend defaults to `http://127.0.0.1:8000` for the API. To override it locally, set `VITE_API_BASE_URL` in `frontend/.env`.
 The public demo page only shows customer-safe run details. Internal trace and node history review lives at `http://127.0.0.1:5173/observability`.
+The visible run inspector includes the current plan version label for the loaded run.
 
 For internal review, open `http://127.0.0.1:5173/observability` and paste a `run_id` to inspect the internal run summary, workflow timing, tool-event details, action-ledger details, benchmark artifact context, and bounded recovery-path details. Benchmark-backed recovery runs also surface the persisted benchmark case report path as replay input context for later inspection tooling.
 

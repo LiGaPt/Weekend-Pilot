@@ -4,7 +4,7 @@
 
 The Web demo is the primary MVP review path for WeekendPilot. It runs the React/Vite frontend against the FastAPI demo API, uses the Mock World provider only, pauses before write tools, and continues execution only after explicit confirmation. The visible demo copy and Mock World family-afternoon content are localized in Chinese for competition review.
 
-The public demo API now also supports `POST /demo/runs/{run_id}/replan` for follow-up replanning. That endpoint returns a new `run_id` while reusing the existing internal conversation session. The session state remains internal and is still not exposed in `DemoRunSummary`.
+The public demo API now also supports `POST /demo/runs/{run_id}/replan` for follow-up replanning. Every public `DemoRunSummary` includes a compact `plan_version` object: the initial run starts at `v1`, and each follow-up replan returns a new `run_id` with the next visible version label. The internal conversation session is reused, but that session state remains internal and is still not exposed in `DemoRunSummary`.
 
 No external local-life provider, map provider, LangSmith upload, API key, token, or secret is required.
 
@@ -89,12 +89,13 @@ The internal review page now also shows sanitized tool-event and action-ledger d
 2. Keep the default Chinese family afternoon request or enter an equivalent request.
 3. Click `开始规划`.
 4. Confirm the run reaches `awaiting_confirmation`.
-5. Confirm the action count is `0`.
-6. Review the selected plan, timeline, route, feasibility, and proposed actions.
-7. Click `确认所选方案`.
-8. Confirm the run reaches `completed`.
-9. Confirm execution and feedback are visible.
-10. Confirm the action count is greater than `0`.
+5. Confirm the visible plan version label is `v1`.
+6. Confirm the action count is `0`.
+7. Review the selected plan, timeline, route, feasibility, and proposed actions.
+8. Click `确认所选方案`.
+9. Confirm the run reaches `completed`.
+10. Confirm execution and feedback are visible.
+11. Confirm the action count is greater than `0`.
 
 ### Decline Path
 
@@ -119,8 +120,10 @@ curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/replan \
 
 4. Confirm the response returns a different `run_id`.
 5. Confirm the new run also reaches `awaiting_confirmation`.
-6. Confirm the original run is still readable through `GET /demo/runs/<old_run_id>` with its original selected plan unchanged.
-7. Confirm the public response still does not expose `session_id` or conversation history.
+6. Confirm the original run still shows `plan_version.version_label = v1` and the follow-up run shows `v2`.
+7. Repeat the replan call from the `v2` run if needed and confirm the next run shows `v3`.
+8. Confirm the original run is still readable through `GET /demo/runs/<old_run_id>` with its original selected plan unchanged.
+9. Confirm the public response still does not expose `session_id` or conversation history.
 
 ### Refresh Path
 
@@ -178,12 +181,13 @@ PostgreSQL, Redis, and migrations must already be ready.
 ## Expected Results
 
 - Planning stops at `awaiting_confirmation` before any write action.
+- The initial public run shows `plan_version.version_label = v1`.
 - Action count is `0` before confirmation.
 - Confirmation executes write actions through the deterministic workflow.
 - Completed execution and feedback are visible after confirmation.
 - Action count is greater than `0` after confirmation.
 - Declining a run leaves no confirm action available.
-- Replanning returns a new `run_id` while reusing the internal conversation session.
+- Replanning returns a new `run_id`, increments the visible version label, and still reuses the internal conversation session.
 - Refresh preserves the current visible run.
 - The page does not expose internal or sensitive keys such as `action_id`, `tool_event_id`, `idempotency_key`, `debug_trace`, `api_key`, `token`, `secret`, or `authorization`.
 
