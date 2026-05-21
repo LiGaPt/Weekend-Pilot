@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.app.confirmation import HumanConfirmationService, PlanConfirmationError
+from backend.app.demo.replan import build_follow_up_intent
 from backend.app.execution import DeterministicExecutionWorkflow, ExecutionWorkflowError
 from backend.app.feedback import DeterministicFeedbackWriter, FeedbackWriterError
 from backend.app.models.runtime import ActionLedger, AgentRun, Plan
@@ -22,6 +23,7 @@ from backend.app.repositories import (
     ConversationTurnRepository,
     PlanRepository,
     ToolEventRepository,
+    UserRepository,
 )
 from backend.app.runtime import FixedWindowRateLimiter, JsonRedisCache
 from backend.app.tool_gateway import ToolGateway
@@ -34,6 +36,7 @@ from backend.app.demo.schemas import (
     DemoConfirmRunRequest,
     DemoDeclineRunRequest,
     DemoPlanPreview,
+    DemoReplanRunRequest,
     DemoRunSummary,
     DemoStartRunRequest,
 )
@@ -129,22 +132,101 @@ class DemoWorkflowService:
             raise DemoServiceError(500, "Demo workflow run disappeared.")
 
         self._ensure_conversation_baseline(run, request)
-
-        metadata = self._metadata(run)
-        metadata["demo"] = {
-            "api_version": DEMO_API_VERSION,
-            "trace_id": result.trace_id,
-            "initial_status": result.status,
-            "initial_node_history": list(result.node_history),
-            "initial_error": sanitize_demo_payload(result.error_json),
-            "continuation_history": [],
-        }
-        runs.update_metadata_json(result.run_id, metadata)
+        self._persist_demo_metadata(result.run_id, result)
         self.session.commit()
         return self.build_summary(result.run_id)
 
     def get_run(self, run_id: UUID) -> DemoRunSummary:
         return self.build_summary(run_id)
+
+    def replan_run(self, run_id: UUID, request: DemoReplanRunRequest) -> DemoRunSummary:
+        runs = AgentRunRepository(self.session)
+        source_run = self._load_run(runs, run_id)
+        self._validate_replan_source_run(source_run)
+
+        session_repo = ConversationSessionRepository(self.session)
+        source_session = session_repo.get_by_id(source_run.session_id)
+        if source_session is None or source_session.user_id != source_run.user_id:
+            raise DemoServiceError(409, "Source run session is unavailable for replanning.")
+
+        user = UserRepository(self.session).get_by_id(source_run.user_id)
+        if user is None:
+            raise DemoServiceError(409, "Source run user is unavailable for replanning.")
+
+        plans = PlanRepository(self.session)
+        source_selected_plan = plans.get_selected_for_run(source_run.run_id)
+        source_selected_plan_id = str(source_selected_plan.plan_id) if source_selected_plan is not None else None
+        merged_intent = build_follow_up_intent(
+            [
+                *self._session_user_turn_texts(source_session.session_id),
+                request.user_input,
+            ]
+        )
+
+        runner = WeekendPilotWorkflowRunner(
+            WeekendPilotWorkflowDependencies(
+                session=self.session,
+                cache=self.cache,
+                rate_limiter=self.rate_limiter,
+                trace_buffer_path=self.trace_buffer_path,
+            )
+        )
+        result = runner.run(
+            WeekendPilotWorkflowRequest(
+                user_input=request.user_input,
+                external_user_id=user.external_id,
+                display_name=user.display_name,
+                existing_user_id=source_run.user_id,
+                session_id=source_session.session_id,
+                case_id=source_run.case_id,
+                tool_profile=source_run.tool_profile,
+                world_profile=source_run.world_profile,
+                agent_version=source_run.agent_version,
+                prompt_version=source_run.prompt_version,
+                failure_profile=source_run.failure_profile,
+                auto_confirm=False,
+                selected_plan_index=request.selected_plan_index,
+                intent_override=merged_intent,
+            )
+        )
+        if result.run_id is None:
+            raise DemoServiceError(500, "Demo follow-up replan did not create a run.")
+
+        replan_run = runs.get_by_id(result.run_id)
+        if replan_run is None:
+            raise DemoServiceError(500, "Demo follow-up replan run disappeared.")
+
+        follow_up_turn = self._ensure_run_turn(
+            replan_run,
+            speaker_role="user",
+            turn_type="user_follow_up",
+            content_text=request.user_input,
+            payload_json={
+                "mode": "replan",
+                "source_run_id": str(source_run.run_id),
+                "source_selected_plan_id": source_selected_plan_id,
+            },
+        )
+        self._ensure_selected_plan_turn(
+            replan_run,
+            turn_type="assistant_replan_options",
+            extra_payload={
+                "mode": "replan",
+                "source_run_id": str(source_run.run_id),
+            },
+        )
+        self._persist_demo_metadata(
+            replan_run.run_id,
+            result,
+            conversation={
+                "mode": "follow_up_replan_v0",
+                "source_run_id": str(source_run.run_id),
+                "trigger_turn_id": str(follow_up_turn.turn_id),
+                "source_selected_plan_id": source_selected_plan_id,
+            },
+        )
+        self.session.commit()
+        return self.build_summary(replan_run.run_id)
 
     def confirm_run(self, run_id: UUID, request: DemoConfirmRunRequest) -> DemoRunSummary:
         runs = AgentRunRepository(self.session)
@@ -331,50 +413,91 @@ class DemoWorkflowService:
         run: AgentRun,
         request: DemoStartRunRequest,
     ) -> None:
+        run = self._ensure_demo_session(
+            run,
+            case_id=request.case_id,
+            selected_plan_index=request.selected_plan_index,
+        )
+        self._ensure_run_turn(
+            run,
+            speaker_role="user",
+            turn_type="user_request",
+            content_text=request.user_input,
+            payload_json={},
+        )
+        self._ensure_selected_plan_turn(
+            run,
+            turn_type="assistant_plan_options",
+        )
+
+    def _ensure_demo_session(
+        self,
+        run: AgentRun,
+        *,
+        case_id: str | None,
+        selected_plan_index: int,
+    ) -> AgentRun:
         if run.user_id is None:
             raise DemoServiceError(500, "Demo workflow run is missing a user for session persistence.")
 
+        if run.session_id is not None:
+            return run
+
         runs = AgentRunRepository(self.session)
         session_repo = ConversationSessionRepository(self.session)
+        session_row = session_repo.create(
+            user_id=run.user_id,
+            channel="web_demo",
+            status="active",
+            metadata_json={
+                "source": "demo_api_v1",
+                "case_id": case_id,
+                "selected_plan_index": selected_plan_index,
+            },
+        )
+        updated_run = runs.update_session_id(run.run_id, session_row.session_id)
+        if updated_run is None:
+            raise DemoServiceError(500, "Demo workflow run disappeared during session persistence.")
+        return updated_run
+
+    def _ensure_run_turn(
+        self,
+        run: AgentRun,
+        *,
+        speaker_role: str,
+        turn_type: str,
+        content_text: str,
+        payload_json: dict[str, Any],
+    ):
+        existing_turn = self._run_turn_by_type(run.run_id, turn_type)
+        if existing_turn is not None:
+            return existing_turn
+
         turn_repo = ConversationTurnRepository(self.session)
+        return turn_repo.append(
+            session_id=self._required_session_id(run),
+            run_id=run.run_id,
+            speaker_role=speaker_role,
+            turn_type=turn_type,
+            content_text=content_text,
+            payload_json=payload_json,
+        )
+
+    def _ensure_selected_plan_turn(
+        self,
+        run: AgentRun,
+        *,
+        turn_type: str,
+        extra_payload: dict[str, Any] | None = None,
+    ):
+        existing_turn = self._run_turn_by_type(run.run_id, turn_type)
+        if existing_turn is not None:
+            return existing_turn
+
         plans = PlanRepository(self.session)
-
-        session_id = run.session_id
-        if session_id is None:
-            session_row = session_repo.create(
-                user_id=run.user_id,
-                channel="web_demo",
-                status="active",
-                metadata_json={
-                    "source": "demo_api_v1",
-                    "case_id": request.case_id,
-                    "selected_plan_index": request.selected_plan_index,
-                },
-            )
-            session_id = session_row.session_id
-            updated_run = runs.update_session_id(run.run_id, session_id)
-            if updated_run is None:
-                raise DemoServiceError(500, "Demo workflow run disappeared during session persistence.")
-            run = updated_run
-
-        existing_turns = turn_repo.list_for_session(session_id)
-        if not existing_turns:
-            turn_repo.append(
-                session_id=session_id,
-                run_id=run.run_id,
-                speaker_role="user",
-                turn_type="user_request",
-                content_text=request.user_input,
-                payload_json={},
-            )
-
         selected_plan = plans.get_selected_for_run(run.run_id)
         if selected_plan is None:
-            return
-
-        latest_turns = turn_repo.list_for_session(session_id)
-        if any(turn.turn_type == "assistant_plan_options" for turn in latest_turns):
-            return
+            return None
 
         plan_rows = plans.list_for_run(run.run_id)
         draft = self._plan_json(selected_plan).get("draft")
@@ -385,19 +508,78 @@ class DemoWorkflowService:
             or self._text_or_none(draft.get("title"))
             or "Plan options prepared for review."
         )
-        turn_repo.append(
-            session_id=session_id,
+        payload = {
+            **(extra_payload or {}),
+            "selected_plan_id": str(selected_plan.plan_id),
+            "plan_ids": [str(plan.plan_id) for plan in plan_rows],
+            "plan_count": len(plan_rows),
+            "run_status": run.status,
+        }
+        return ConversationTurnRepository(self.session).append(
+            session_id=self._required_session_id(run),
             run_id=run.run_id,
             speaker_role="assistant",
-            turn_type="assistant_plan_options",
+            turn_type=turn_type,
             content_text=content_text,
-            payload_json={
-                "selected_plan_id": str(selected_plan.plan_id),
-                "plan_ids": [str(plan.plan_id) for plan in plan_rows],
-                "plan_count": len(plan_rows),
-                "run_status": run.status,
-            },
+            payload_json=payload,
         )
+
+    def _run_turn_by_type(self, run_id: UUID, turn_type: str):
+        turn_repo = ConversationTurnRepository(self.session)
+        for turn in turn_repo.list_for_run(run_id):
+            if turn.turn_type == turn_type:
+                return turn
+        return None
+
+    def _required_session_id(self, run: AgentRun) -> UUID:
+        if run.session_id is None:
+            raise DemoServiceError(500, "Demo run is missing a conversation session.")
+        return run.session_id
+
+    def _session_user_turn_texts(self, session_id: UUID) -> list[str]:
+        return [
+            turn.content_text
+            for turn in ConversationTurnRepository(self.session).list_for_session(session_id)
+            if turn.speaker_role == "user"
+        ]
+
+    def _persist_demo_metadata(
+        self,
+        run_id: UUID,
+        result,
+        *,
+        conversation: dict[str, Any] | None = None,
+    ) -> None:
+        runs = AgentRunRepository(self.session)
+        run = self._load_run(runs, run_id)
+        metadata = self._metadata(run)
+        demo = metadata.get("demo")
+        if not isinstance(demo, dict):
+            demo = {}
+        history = demo.get("continuation_history")
+        if not isinstance(history, list):
+            history = []
+        demo.update(
+            {
+                "api_version": DEMO_API_VERSION,
+                "trace_id": result.trace_id,
+                "initial_status": result.status,
+                "initial_node_history": list(result.node_history),
+                "initial_error": sanitize_demo_payload(result.error_json),
+                "continuation_history": history,
+            }
+        )
+        if conversation is not None:
+            demo["conversation"] = sanitize_demo_payload(conversation)
+        metadata["demo"] = demo
+        runs.update_metadata_json(run_id, metadata)
+
+    def _validate_replan_source_run(self, source_run: AgentRun) -> None:
+        if source_run.user_id is None or source_run.session_id is None:
+            raise DemoServiceError(409, "Source run is missing session persistence for replanning.")
+
+        if source_run.status not in {"awaiting_confirmation", "declined", "completed", "failed"}:
+            raise DemoServiceError(409, "Source run status does not allow replanning.")
 
     def _append_continuation_history(self, run_id: UUID, steps: list[str]) -> None:
         runs = AgentRunRepository(self.session)

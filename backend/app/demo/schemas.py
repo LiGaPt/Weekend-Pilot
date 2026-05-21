@@ -14,6 +14,11 @@ class DemoStartRunRequest(BaseModel):
     selected_plan_index: int = Field(default=0, ge=0)
 
 
+class DemoReplanRunRequest(BaseModel):
+    user_input: str = Field(min_length=1)
+    selected_plan_index: int = Field(default=0, ge=0)
+
+
 class DemoConfirmRunRequest(BaseModel):
     plan_id: UUID | None = None
     confirmed_by: str = "web-demo-user"

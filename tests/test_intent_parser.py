@@ -80,3 +80,15 @@ def test_parser_keeps_vague_non_empty_input_with_conservative_defaults() -> None
     assert intent.constraints.child_friendly is False
     assert intent.activity_preferences == []
     assert intent.dining_preferences == []
+
+
+def test_parser_parse_with_signals_marks_supported_explicit_fields() -> None:
+    parser = DeterministicIntentParser()
+
+    parsed = parser.parse_with_signals(ENGLISH_MVP_REQUEST)
+
+    assert parsed.intent.scenario_type == "family"
+    assert parsed.signals.scenario_or_participants is True
+    assert parsed.signals.time_window is True
+    assert parsed.signals.max_distance_km is True
+    assert parsed.signals.dining_preferences is True

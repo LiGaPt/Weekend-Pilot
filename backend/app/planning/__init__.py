@@ -27,6 +27,8 @@ from backend.app.planning.itinerary_drafts import (
 from backend.app.planning.itinerary_generation import DeterministicItineraryGenerator
 from backend.app.planning.query_planner import DeterministicQueryPlanner
 from backend.app.planning.schemas import (
+    IntentParseResult,
+    IntentParseSignals,
     IntentConstraints,
     LocalLifeIntent,
     ParticipantProfile,
@@ -49,6 +51,8 @@ __all__ = [
     "EnrichmentToolResult",
     "FeasibilitySummary",
     "InitialToolExecutionResult",
+    "IntentParseResult",
+    "IntentParseSignals",
     "IntentConstraints",
     "IntentParseError",
     "ItineraryCandidateRef",
