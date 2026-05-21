@@ -16,6 +16,12 @@ const awaitingRun: DemoRunSummary = {
   run_id: "run-1",
   status: "awaiting_confirmation",
   selected_plan_id: "plan-1",
+  plan_version: {
+    version_number: 1,
+    version_label: "v1",
+    source_run_id: null,
+    source_selected_plan_id: null,
+  },
   plans: [
     {
       plan_id: "plan-1",
@@ -168,6 +174,7 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "徐汇亲子轻松下午" })).toBeInTheDocument();
     expect(screen.getAllByText("awaiting_confirmation").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("plan-version")).toHaveTextContent("v1");
     expect(screen.getByText("徐汇亲子科学馆")).toBeInTheDocument();
     expect(screen.getByText("绿碗家庭轻食")).toBeInTheDocument();
     expect(screen.getByText("两站之间步行很短，适合推童车。")).toBeInTheDocument();

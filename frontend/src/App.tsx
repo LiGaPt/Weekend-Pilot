@@ -220,6 +220,7 @@ function RunInspector({
         <MetaItem label="已执行操作" value={numberValue(run?.action_count)} testId="action-count" />
         <MetaItem label="执行状态" value={run?.execution_status} />
         <MetaItem label="反馈状态" value={run?.feedback_status} />
+        <MetaItem label="方案版本" value={run?.plan_version.version_label} testId="plan-version" />
       </dl>
       <button
         className="secondary-button full-width"

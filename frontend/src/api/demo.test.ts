@@ -6,6 +6,12 @@ const summary: DemoRunSummary = {
   run_id: "run-1",
   status: "awaiting_confirmation",
   selected_plan_id: "plan-1",
+  plan_version: {
+    version_number: 1,
+    version_label: "v1",
+    source_run_id: null,
+    source_selected_plan_id: null,
+  },
   plans: [],
   action_count: 0,
   execution_status: null,
