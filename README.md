@@ -305,6 +305,16 @@ curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/decline \
   -d "{\"declined_by\":\"web-demo-user\",\"reason\":\"用户选择暂不继续。\"}"
 ```
 
+Replan the current run with a follow-up:
+
+```bash
+curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/replan \
+  -H "Content-Type: application/json" \
+  -d "{\"user_input\":\"Keep it nearby, but make it a solo outing this time.\",\"selected_plan_index\":0}"
+```
+
+The replan response returns a new `run_id`. The internal conversation session is reused across the original run and the follow-up run, but that session state remains non-public and is not exposed in `DemoRunSummary`.
+
 ## Minimal Web UI Demo
 
 Run the backend first:

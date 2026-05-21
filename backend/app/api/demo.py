@@ -13,6 +13,7 @@ from backend.app.db.session import get_db
 from backend.app.demo import (
     DemoConfirmRunRequest,
     DemoDeclineRunRequest,
+    DemoReplanRunRequest,
     DemoRunSummary,
     DemoServiceError,
     DemoStartRunRequest,
@@ -73,6 +74,18 @@ def get_demo_run(
 ) -> DemoRunSummary:
     service = _build_service(db, redis_client, settings)
     return _call(db, lambda: service.get_run(run_id))
+
+
+@router.post("/demo/runs/{run_id}/replan", response_model=DemoRunSummary)
+def replan_demo_run(
+    run_id: UUID,
+    request: DemoReplanRunRequest,
+    db: Session = Depends(get_db),
+    redis_client: Redis = Depends(get_redis_client),
+    settings: Settings = Depends(get_settings),
+) -> DemoRunSummary:
+    service = _build_service(db, redis_client, settings)
+    return _call(db, lambda: service.replan_run(run_id, request))
 
 
 @router.post("/demo/runs/{run_id}/confirm", response_model=DemoRunSummary)

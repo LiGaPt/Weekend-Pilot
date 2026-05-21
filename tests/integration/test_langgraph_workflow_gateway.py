@@ -10,7 +10,9 @@ from sqlalchemy.orm import Session
 
 from backend.app.agents import AgentResult, DeterministicValidatorRecoveryAgent, RecoveryDecision
 from backend.app.db.session import SessionLocal
-from backend.app.models.runtime import ActionLedger, AgentRun, ToolEvent
+from backend.app.models.runtime import ActionLedger, AgentRun, ToolEvent, User
+from backend.app.planning import DeterministicIntentParser
+from backend.app.repositories import ConversationSessionRepository, UserRepository
 from backend.app.review.schemas import FinalReviewResult, ReviewCheck
 from backend.app.runtime import FixedWindowRateLimiter, JsonRedisCache, RedisKeyBuilder, get_redis_client
 from backend.app.workflow import (
@@ -337,3 +339,42 @@ def test_workflow_recovery_retry_loops_once_and_pauses_without_actions(
     assert recovery["attempts"][0]["status"] == "routed"
     assert recovery["attempts"][0]["route_to"] == "execute_searches"
     _assert_timing_artifacts(result, run, trace_path)
+
+
+def test_workflow_reuses_existing_user_and_session_with_intent_override(
+    db_session: Session,
+    redis_runtime,
+    trace_path: Path,
+) -> None:
+    runner = _build_runner(db_session, redis_runtime, trace_path)
+    user = UserRepository(db_session).create(
+        external_id=None,
+        display_name="Workflow Existing User Tester",
+    )
+    conversation_session = ConversationSessionRepository(db_session).create(
+        user_id=user.user_id,
+        channel="web_demo",
+        status="active",
+        metadata_json={"source": "test"},
+    )
+    original_user_count = db_session.scalar(select(func.count()).select_from(User))
+    intent_override = DeterministicIntentParser().parse(USER_INPUT)
+
+    result = runner.run(
+        WeekendPilotWorkflowRequest(
+            user_input="Keep it nearby and family friendly.",
+            case_id="case-langgraph-existing-user-session",
+            auto_confirm=False,
+            existing_user_id=user.user_id,
+            session_id=conversation_session.session_id,
+            intent_override=intent_override,
+        )
+    )
+
+    assert result.status == "awaiting_confirmation"
+    assert result.run_id is not None
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    assert run.user_id == user.user_id
+    assert run.session_id == conversation_session.session_id
+    assert db_session.scalar(select(func.count()).select_from(User)) == original_user_count

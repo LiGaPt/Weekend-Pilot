@@ -50,6 +50,18 @@ class LocalLifeIntent(BaseModel):
     parser_version: str
 
 
+class IntentParseSignals(BaseModel):
+    scenario_or_participants: bool = False
+    time_window: bool = False
+    max_distance_km: bool = False
+    dining_preferences: bool = False
+
+
+class IntentParseResult(BaseModel):
+    intent: LocalLifeIntent
+    signals: IntentParseSignals = Field(default_factory=IntentParseSignals)
+
+
 class PlannedToolCall(BaseModel):
     tool_name: str
     provider: ProviderProfile

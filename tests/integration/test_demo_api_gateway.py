@@ -336,3 +336,80 @@ def test_demo_run_status_route_keeps_public_shape_after_internal_route_addition(
     assert "agent_roles" not in payload
     assert "workflow_timing_summary" not in payload
     _assert_no_forbidden_keys(payload)
+
+
+def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
+    test_client, case_ids, external_user_ids = client
+    start_response = test_client.post("/demo/runs", json=_start_payload(case_ids, external_user_ids))
+
+    assert start_response.status_code == 200
+    source_body = start_response.json()
+    source_run_id = UUID(source_body["run_id"])
+    source_selected_plan_id = source_body["selected_plan_id"]
+
+    replan_response = test_client.post(
+        f"/demo/runs/{source_run_id}/replan",
+        json={
+            "user_input": "Keep it nearby, but make dinner lighter and stay flexible.",
+            "selected_plan_index": 0,
+        },
+    )
+
+    assert replan_response.status_code == 200
+    replan_body = replan_response.json()
+    _assert_no_forbidden_keys(replan_body)
+    _assert_public_run_redaction(replan_body)
+    assert UUID(replan_body["run_id"]) != source_run_id
+    assert replan_body["status"] == "awaiting_confirmation"
+    assert "session_id" not in replan_body
+    assert "conversation" not in replan_body
+
+    status_response = test_client.get(f"/demo/runs/{source_run_id}")
+    assert status_response.status_code == 200
+    source_after = status_response.json()
+    assert source_after["run_id"] == str(source_run_id)
+    assert source_after["status"] == source_body["status"]
+    assert source_after["selected_plan_id"] == source_selected_plan_id
+
+    db = SessionLocal()
+    try:
+        source_run = _load_run(db, source_run_id)
+        replan_run = _load_run(db, UUID(replan_body["run_id"]))
+        assert replan_run.user_id == source_run.user_id
+        assert replan_run.session_id == source_run.session_id
+        turns = list(
+            db.scalars(
+                select(ConversationTurn)
+                .where(ConversationTurn.session_id == source_run.session_id)
+                .order_by(ConversationTurn.turn_index, ConversationTurn.turn_id)
+            ).all()
+        )
+        assert [turn.turn_type for turn in turns] == [
+            "user_request",
+            "assistant_plan_options",
+            "user_follow_up",
+            "assistant_replan_options",
+        ]
+        assert turns[2].run_id == replan_run.run_id
+        assert turns[2].payload_json == {
+            "mode": "replan",
+            "source_run_id": str(source_run.run_id),
+            "source_selected_plan_id": source_selected_plan_id,
+        }
+        assert turns[3].run_id == replan_run.run_id
+        assert turns[3].payload_json == {
+            "mode": "replan",
+            "source_run_id": str(source_run.run_id),
+            "selected_plan_id": replan_body["selected_plan_id"],
+            "plan_ids": [plan["plan_id"] for plan in replan_body["plans"]],
+            "plan_count": len(replan_body["plans"]),
+            "run_status": "awaiting_confirmation",
+        }
+        assert "draft" not in turns[3].payload_json
+        assert "plan_json" not in turns[3].payload_json
+        assert isinstance(replan_run.metadata_json, dict)
+        assert replan_run.metadata_json["demo"]["conversation"]["mode"] == "follow_up_replan_v0"
+        assert replan_run.metadata_json["demo"]["conversation"]["source_run_id"] == str(source_run.run_id)
+        assert replan_run.metadata_json["demo"]["conversation"]["source_selected_plan_id"] == source_selected_plan_id
+    finally:
+        db.close()

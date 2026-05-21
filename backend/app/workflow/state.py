@@ -93,6 +93,8 @@ class WeekendPilotWorkflowState(TypedDict, total=False):
     user_input: str
     external_user_id: str | None
     display_name: str | None
+    existing_user_id: UUID | None
+    session_id: UUID | None
     case_id: str | None
     agent_version: str
     prompt_version: str
@@ -106,6 +108,7 @@ class WeekendPilotWorkflowState(TypedDict, total=False):
     trace_id: str | None
     trace_context: RunTraceContext
     active_memories: list[WorkflowMemoryRecord]
+    intent_override: LocalLifeIntent
     parsed_intent: LocalLifeIntent
     query_plan: QueryPlan
     candidate_collection: CandidateCollectionResult

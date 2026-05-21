@@ -24,6 +24,7 @@ from backend.app.planning import (
     CandidateEnricher,
     DeterministicIntentParser,
     DeterministicQueryPlanner,
+    LocalLifeIntent,
     QueryPlanExecutor,
 )
 from backend.app.plans import ReviewedPlanPersistenceService
@@ -96,7 +97,8 @@ class WeekendPilotWorkflowNodes:
         self.validator_recovery_agent = agents.validator_recovery
 
     def initialize(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
-        user = self._get_or_create_user(
+        user = self._resolve_user(
+            existing_user_id=state.get("existing_user_id"),
             external_user_id=state.get("external_user_id"),
             display_name=state.get("display_name"),
         )
@@ -117,6 +119,7 @@ class WeekendPilotWorkflowNodes:
                     "selected_plan_index": int(state.get("selected_plan_index") or 0),
                 }
             },
+            session_id=state.get("session_id"),
         )
         trace_context = self.recorder.build_context(run.run_id)
         return self._updates(
@@ -129,7 +132,8 @@ class WeekendPilotWorkflowNodes:
         )
 
     def parse_intent(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
-        intent = DeterministicIntentParser().parse(self._required_text(state, "user_input"))
+        intent_override = self._intent_override(state)
+        intent = intent_override or DeterministicIntentParser().parse(self._required_text(state, "user_input"))
         return self._updates(state, "parse_intent", parsed_intent=intent)
 
     def load_memory(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
@@ -443,6 +447,22 @@ class WeekendPilotWorkflowNodes:
             display_name=display_name,
         )
 
+    def _resolve_user(
+        self,
+        existing_user_id: UUID | None,
+        external_user_id: str | None,
+        display_name: str | None,
+    ):
+        if existing_user_id is not None:
+            existing = self.repositories.users.get_by_id(existing_user_id)
+            if existing is None:
+                raise WorkflowError(f"Existing user {existing_user_id} was not found.")
+            return existing
+        return self._get_or_create_user(
+            external_user_id=external_user_id,
+            display_name=display_name,
+        )
+
     def _updates(
         self,
         state: WeekendPilotWorkflowState,
@@ -719,6 +739,14 @@ class WeekendPilotWorkflowNodes:
         if value is None:
             raise WorkflowError(f"Workflow state is missing field {key!r}.")
         return value
+
+    def _intent_override(self, state: WeekendPilotWorkflowState):
+        value = state.get("intent_override")
+        if isinstance(value, dict):
+            return LocalLifeIntent.model_validate(value)
+        if isinstance(value, LocalLifeIntent):
+            return value
+        return None
 
     def _error_json(self, error_type: str, message: str, exc: Exception) -> dict[str, Any]:
         return {

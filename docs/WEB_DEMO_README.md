@@ -4,6 +4,8 @@
 
 The Web demo is the primary MVP review path for WeekendPilot. It runs the React/Vite frontend against the FastAPI demo API, uses the Mock World provider only, pauses before write tools, and continues execution only after explicit confirmation. The visible demo copy and Mock World family-afternoon content are localized in Chinese for competition review.
 
+The public demo API now also supports `POST /demo/runs/{run_id}/replan` for follow-up replanning. That endpoint returns a new `run_id` while reusing the existing internal conversation session. The session state remains internal and is still not exposed in `DemoRunSummary`.
+
 No external local-life provider, map provider, LangSmith upload, API key, token, or secret is required.
 
 ## Prerequisites
@@ -103,6 +105,23 @@ The internal review page now also shows sanitized tool-event and action-ledger d
 5. Confirm `确认所选方案` is no longer available.
 6. Confirm the action count remains `0`.
 
+### Follow-up Replan Path
+
+1. Start a fresh run and wait for `awaiting_confirmation`.
+2. Copy the visible `run_id`.
+3. Send a follow-up request:
+
+```bash
+curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/replan \
+  -H "Content-Type: application/json" \
+  -d "{\"user_input\":\"Keep it nearby, but make it a solo outing this time.\",\"selected_plan_index\":0}"
+```
+
+4. Confirm the response returns a different `run_id`.
+5. Confirm the new run also reaches `awaiting_confirmation`.
+6. Confirm the original run is still readable through `GET /demo/runs/<old_run_id>` with its original selected plan unchanged.
+7. Confirm the public response still does not expose `session_id` or conversation history.
+
 ### Refresh Path
 
 1. Start a run.
@@ -164,6 +183,7 @@ PostgreSQL, Redis, and migrations must already be ready.
 - Completed execution and feedback are visible after confirmation.
 - Action count is greater than `0` after confirmation.
 - Declining a run leaves no confirm action available.
+- Replanning returns a new `run_id` while reusing the internal conversation session.
 - Refresh preserves the current visible run.
 - The page does not expose internal or sensitive keys such as `action_id`, `tool_event_id`, `idempotency_key`, `debug_trace`, `api_key`, `token`, `secret`, or `authorization`.
 

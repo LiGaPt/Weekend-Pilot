@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from backend.app.demo.schemas import DemoRunSummary, DemoStartRunRequest
+from backend.app.demo.schemas import DemoReplanRunRequest, DemoRunSummary, DemoStartRunRequest
 from backend.app.demo.service import sanitize_demo_payload
 from backend.app.main import create_app
 
@@ -17,6 +17,7 @@ def test_create_app_includes_demo_routes() -> None:
 
     assert "/demo/runs" in paths
     assert "/demo/runs/{run_id}" in paths
+    assert "/demo/runs/{run_id}/replan" in paths
     assert "/demo/runs/{run_id}/confirm" in paths
     assert "/demo/runs/{run_id}/decline" in paths
     assert "/internal/runs/{run_id}/observability" in paths
@@ -40,6 +41,11 @@ def test_cors_preflight_allows_vite_localhost_origin() -> None:
 def test_start_request_rejects_empty_user_input() -> None:
     with pytest.raises(ValidationError):
         DemoStartRunRequest(user_input="")
+
+
+def test_replan_request_rejects_empty_user_input() -> None:
+    with pytest.raises(ValidationError):
+        DemoReplanRunRequest(user_input="")
 
 
 def test_sanitizer_removes_internal_and_sensitive_keys() -> None:
