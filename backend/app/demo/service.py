@@ -18,6 +18,8 @@ from backend.app.providers.mock_world import build_mock_world_registry
 from backend.app.repositories import (
     ActionLedgerRepository,
     AgentRunRepository,
+    ConversationSessionRepository,
+    ConversationTurnRepository,
     PlanRepository,
     ToolEventRepository,
 )
@@ -125,6 +127,8 @@ class DemoWorkflowService:
         run = runs.get_by_id(result.run_id)
         if run is None:
             raise DemoServiceError(500, "Demo workflow run disappeared.")
+
+        self._ensure_conversation_baseline(run, request)
 
         metadata = self._metadata(run)
         metadata["demo"] = {
@@ -321,6 +325,79 @@ class DemoWorkflowService:
             }
         )
         runs.update_metadata_json(run_id, metadata)
+
+    def _ensure_conversation_baseline(
+        self,
+        run: AgentRun,
+        request: DemoStartRunRequest,
+    ) -> None:
+        if run.user_id is None:
+            raise DemoServiceError(500, "Demo workflow run is missing a user for session persistence.")
+
+        runs = AgentRunRepository(self.session)
+        session_repo = ConversationSessionRepository(self.session)
+        turn_repo = ConversationTurnRepository(self.session)
+        plans = PlanRepository(self.session)
+
+        session_id = run.session_id
+        if session_id is None:
+            session_row = session_repo.create(
+                user_id=run.user_id,
+                channel="web_demo",
+                status="active",
+                metadata_json={
+                    "source": "demo_api_v1",
+                    "case_id": request.case_id,
+                    "selected_plan_index": request.selected_plan_index,
+                },
+            )
+            session_id = session_row.session_id
+            updated_run = runs.update_session_id(run.run_id, session_id)
+            if updated_run is None:
+                raise DemoServiceError(500, "Demo workflow run disappeared during session persistence.")
+            run = updated_run
+
+        existing_turns = turn_repo.list_for_session(session_id)
+        if not existing_turns:
+            turn_repo.append(
+                session_id=session_id,
+                run_id=run.run_id,
+                speaker_role="user",
+                turn_type="user_request",
+                content_text=request.user_input,
+                payload_json={},
+            )
+
+        selected_plan = plans.get_selected_for_run(run.run_id)
+        if selected_plan is None:
+            return
+
+        latest_turns = turn_repo.list_for_session(session_id)
+        if any(turn.turn_type == "assistant_plan_options" for turn in latest_turns):
+            return
+
+        plan_rows = plans.list_for_run(run.run_id)
+        draft = self._plan_json(selected_plan).get("draft")
+        if not isinstance(draft, dict):
+            draft = {}
+        content_text = (
+            self._text_or_none(draft.get("summary"))
+            or self._text_or_none(draft.get("title"))
+            or "Plan options prepared for review."
+        )
+        turn_repo.append(
+            session_id=session_id,
+            run_id=run.run_id,
+            speaker_role="assistant",
+            turn_type="assistant_plan_options",
+            content_text=content_text,
+            payload_json={
+                "selected_plan_id": str(selected_plan.plan_id),
+                "plan_ids": [str(plan.plan_id) for plan in plan_rows],
+                "plan_count": len(plan_rows),
+                "run_status": run.status,
+            },
+        )
 
     def _append_continuation_history(self, run_id: UUID, steps: list[str]) -> None:
         runs = AgentRunRepository(self.session)

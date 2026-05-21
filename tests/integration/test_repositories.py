@@ -9,6 +9,8 @@ from backend.app.db.session import SessionLocal
 from backend.app.repositories import (
     ActionLedgerRepository,
     AgentRunRepository,
+    ConversationSessionRepository,
+    ConversationTurnRepository,
     MemoryItemRepository,
     ToolEventRepository,
     UserRepository,
@@ -80,6 +82,61 @@ def test_agent_run_repository_creates_gets_and_updates_status(db_session: Sessio
     assert updated is run
     assert updated.status == "completed"
     assert repo.update_status(uuid4(), "failed") is None
+
+
+def test_agent_run_repository_updates_session_link(db_session: Session) -> None:
+    user = create_user(db_session)
+    session_row = ConversationSessionRepository(db_session).create(
+        user_id=user.user_id,
+        channel="web_demo",
+        status="active",
+        metadata_json={"source": "test"},
+    )
+    run = create_run(db_session, user.user_id)
+
+    updated = AgentRunRepository(db_session).update_session_id(run.run_id, session_row.session_id)
+
+    assert updated is run
+    assert updated.session_id == session_row.session_id
+    assert AgentRunRepository(db_session).update_session_id(uuid4(), session_row.session_id) is None
+
+
+def test_conversation_repositories_create_and_list_session_turns(db_session: Session) -> None:
+    user = create_user(db_session)
+    run = create_run(db_session, user.user_id)
+    sessions = ConversationSessionRepository(db_session)
+    turns = ConversationTurnRepository(db_session)
+
+    session_row = sessions.create(
+        user_id=user.user_id,
+        channel="web_demo",
+        status="active",
+        metadata_json={"source": "test"},
+    )
+    first = turns.append(
+        session_id=session_row.session_id,
+        run_id=run.run_id,
+        speaker_role="user",
+        turn_type="user_request",
+        content_text="Start planning",
+        payload_json={},
+    )
+    second = turns.append(
+        session_id=session_row.session_id,
+        run_id=run.run_id,
+        speaker_role="assistant",
+        turn_type="assistant_plan_options",
+        content_text="Here are the plan options.",
+        payload_json={"plan_count": 1},
+    )
+
+    assert sessions.get_by_id(session_row.session_id) is session_row
+    assert sessions.list_for_user(user.user_id) == [session_row]
+    assert first.turn_index == 1
+    assert second.turn_index == 2
+    assert turns.get_by_id(first.turn_id) is first
+    assert turns.list_for_session(session_row.session_id) == [first, second]
+    assert turns.list_for_run(run.run_id) == [first, second]
 
 
 def test_memory_item_repository_creates_and_lists_active_memory(db_session: Session) -> None:
@@ -208,6 +265,21 @@ def test_repositories_do_not_self_commit() -> None:
             display_name="Rollback User",
         )
         run = create_run(session, user.user_id)
+        conversation_session = ConversationSessionRepository(session).create(
+            user_id=user.user_id,
+            channel="web_demo",
+            status="active",
+            metadata_json={"source": "rollback-test"},
+        )
+        AgentRunRepository(session).update_session_id(run.run_id, conversation_session.session_id)
+        turn = ConversationTurnRepository(session).append(
+            session_id=conversation_session.session_id,
+            run_id=run.run_id,
+            speaker_role="user",
+            turn_type="user_request",
+            content_text="Not committed",
+            payload_json={},
+        )
         memory = MemoryItemRepository(session).create(
             user_id=user.user_id,
             memory_type="preference",
@@ -243,6 +315,8 @@ def test_repositories_do_not_self_commit() -> None:
         )
         user_id = user.user_id
         run_id = run.run_id
+        conversation_session_id = conversation_session.session_id
+        turn_id = turn.turn_id
         memory_id = memory.memory_id
         event_id = event.event_id
         action_id = action.action_id
@@ -255,6 +329,8 @@ def test_repositories_do_not_self_commit() -> None:
         assert UserRepository(verification_session).get_by_external_id(external_id) is None
         assert UserRepository(verification_session).get_by_id(user_id) is None
         assert AgentRunRepository(verification_session).get_by_id(run_id) is None
+        assert ConversationSessionRepository(verification_session).get_by_id(conversation_session_id) is None
+        assert ConversationTurnRepository(verification_session).get_by_id(turn_id) is None
         assert MemoryItemRepository(verification_session).get_by_id(memory_id) is None
         assert ToolEventRepository(verification_session).get_by_id(event_id) is None
         assert ActionLedgerRepository(verification_session).get_by_id(action_id) is None
