@@ -263,6 +263,7 @@ Expected response:
 
 The Web demo API starts the official workflow, pauses before write tools, and continues execution only after explicit confirmation. The MVP review path uses Chinese Mock World demo content for the family afternoon scenario.
 Every public demo run summary includes a compact `plan_version` object. The initial run starts at `v1`, and each follow-up replan increments the visible version label.
+Every public `DemoPlanPreview` now also includes `action_manifest`, which is the stable execution-preview contract for the Web demo. Before confirmation it summarizes `draft.proposed_actions` as `source = "proposed_actions"`. After confirmation or execution it summarizes persisted `confirmed_actions` as `source = "confirmed_actions"`. The older `proposed_actions` field remains present for compatibility, but the public frontend now renders action previews from `action_manifest.actions`.
 
 ```bash
 docker compose up -d postgres redis
@@ -339,6 +340,7 @@ Open `http://127.0.0.1:5173`.
 The frontend defaults to `http://127.0.0.1:8000` for the API. To override it locally, set `VITE_API_BASE_URL` in `frontend/.env`.
 The public demo page only shows customer-safe run details. Internal trace and node history review lives at `http://127.0.0.1:5173/observability`.
 The visible run inspector includes the current plan version label for the loaded run.
+The visible action preview for each plan tab now comes from `plans[*].action_manifest`, so pre-confirmation and post-confirmation states share one normalized public shape.
 
 For internal review, open `http://127.0.0.1:5173/observability` and paste a `run_id` to inspect the internal run summary, workflow timing, tool-event details, action-ledger details, benchmark artifact context, and bounded recovery-path details. Benchmark-backed recovery runs also surface the persisted benchmark case report path as replay input context for later inspection tooling.
 

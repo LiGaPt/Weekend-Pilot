@@ -170,6 +170,33 @@ def _assert_plan_version(
     }
 
 
+def _assert_action_manifest_preview(plan: dict[str, object]) -> None:
+    manifest = plan["action_manifest"]
+    assert isinstance(manifest, dict)
+    assert manifest["source"] == "proposed_actions"
+    assert manifest["action_count"] == len(plan["proposed_actions"])
+    assert len(manifest["actions"]) == manifest["action_count"]
+    for index, action in enumerate(manifest["actions"], start=1):
+        assert action["execution_order"] == index
+        assert "idempotency_key" not in action
+        assert "user_confirmed" not in action
+        _assert_no_forbidden_keys(action["payload_preview"])
+
+
+def _assert_action_manifest_confirmed(plan: dict[str, object]) -> None:
+    manifest = plan["action_manifest"]
+    assert isinstance(manifest, dict)
+    assert manifest["source"] == "confirmed_actions"
+    assert manifest["action_count"] == len(manifest["actions"])
+    assert [action["execution_order"] for action in manifest["actions"]] == list(
+        range(1, manifest["action_count"] + 1)
+    )
+    for action in manifest["actions"]:
+        assert "idempotency_key" not in action
+        assert "user_confirmed" not in action
+        _assert_no_forbidden_keys(action["payload_preview"])
+
+
 def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
     test_client, case_ids, external_user_ids = client
 
@@ -189,6 +216,8 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
         source_run_id=None,
         source_selected_plan_id=None,
     )
+    selected_start_plan = next(plan for plan in start_body["plans"] if plan["selected"])
+    _assert_action_manifest_preview(selected_start_plan)
     assert start_body["plans"][0]["confirmation"] is None
     run_id = UUID(start_body["run_id"])
 
@@ -250,6 +279,8 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
         source_run_id=None,
         source_selected_plan_id=None,
     )
+    status_selected_plan = next(plan for plan in status_body["plans"] if plan["selected"])
+    _assert_action_manifest_preview(status_selected_plan)
 
     confirm_response = test_client.post(
         f"/demo/runs/{run_id}/confirm",
@@ -271,6 +302,7 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
         source_selected_plan_id=None,
     )
     selected = next(plan for plan in confirm_body["plans"] if plan["selected"])
+    _assert_action_manifest_confirmed(selected)
     assert selected["confirmation"]["status"] == "confirmed"
     assert selected["execution"]["status"] == "succeeded"
     assert selected["feedback"]["status"] == "completed"
@@ -325,6 +357,7 @@ def test_demo_run_decline_creates_no_actions_and_blocks_later_confirm(client) ->
     assert decline_body["status"] == "declined"
     assert decline_body["action_count"] == 0
     selected = next(plan for plan in decline_body["plans"] if plan["selected"])
+    _assert_action_manifest_preview(selected)
     assert selected["confirmation"]["status"] == "declined"
 
     db = SessionLocal()
@@ -414,6 +447,8 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
         source_run_id=str(source_run_id),
         source_selected_plan_id=source_selected_plan_id,
     )
+    replan_selected_plan = next(plan for plan in replan_body["plans"] if plan["selected"])
+    _assert_action_manifest_preview(replan_selected_plan)
 
     second_replan_response = test_client.post(
         f"/demo/runs/{replan_body['run_id']}/replan",
@@ -434,6 +469,8 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
         source_run_id=replan_body["run_id"],
         source_selected_plan_id=replan_body["selected_plan_id"],
     )
+    second_replan_selected_plan = next(plan for plan in second_replan_body["plans"] if plan["selected"])
+    _assert_action_manifest_preview(second_replan_selected_plan)
 
     status_response = test_client.get(f"/demo/runs/{source_run_id}")
     assert status_response.status_code == 200

@@ -18,6 +18,7 @@ import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { confirmRun, declineRun, getRun, startRun } from "./api/demo";
 import type {
+  DemoActionManifestSummary,
   DemoCandidateSummary,
   DemoPlanPreview,
   DemoRunSummary,
@@ -338,16 +339,15 @@ function PlanDetail({ plan }: { plan: DemoPlanPreview }) {
           <MapPinned size={18} aria-hidden="true" />
           <h3 id="actions-title">待确认操作</h3>
         </div>
-        {plan.proposed_actions?.length ? (
+        <p className="muted">{actionManifestSourceLabel(plan.action_manifest)}</p>
+        {plan.action_manifest.actions.length ? (
           <ul className="action-list">
-            {plan.proposed_actions.map((action, index) => (
+            {plan.action_manifest.actions.map((action, index) => (
               <li key={`${action.action_ref ?? action.action_type ?? index}`}>
                 <span className="action-type">{actionLabel(action.action_type) || "操作"}</span>
                 <span>{action.target_id || "目标暂无"}</span>
                 <span className="muted">{action.reason || "理由暂无"}</span>
-                <span className="requirement">
-                  {action.requires_confirmation ? "需要确认" : "未标记确认"}
-                </span>
+                <span className="requirement">{actionExecutionLabel(action.execution_order)}</span>
               </li>
             ))}
           </ul>
@@ -666,6 +666,20 @@ function actionLabel(value?: string | null) {
     send_message: "发送消息",
   };
   return value ? labels[value] ?? value : null;
+}
+
+function actionExecutionLabel(value?: number | null) {
+  return typeof value === "number" ? `第 ${value} 步` : "顺序待定";
+}
+
+function actionManifestSourceLabel(manifest: DemoActionManifestSummary) {
+  if (manifest.source === "confirmed_actions") {
+    return "当前展示确认后将执行的稳定动作清单。";
+  }
+  if (manifest.source === "proposed_actions") {
+    return "当前展示确认前的执行预览。";
+  }
+  return "当前方案暂无可公开展示的执行动作。";
 }
 
 function feedbackStatusLabel(value?: string | null) {

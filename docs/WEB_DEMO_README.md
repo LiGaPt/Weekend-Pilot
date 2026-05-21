@@ -5,6 +5,28 @@
 The Web demo is the primary MVP review path for WeekendPilot. It runs the React/Vite frontend against the FastAPI demo API, uses the Mock World provider only, pauses before write tools, and continues execution only after explicit confirmation. The visible demo copy and Mock World family-afternoon content are localized in Chinese for competition review.
 
 The public demo API now also supports `POST /demo/runs/{run_id}/replan` for follow-up replanning. Every public `DemoRunSummary` includes a compact `plan_version` object: the initial run starts at `v1`, and each follow-up replan returns a new `run_id` with the next visible version label. The internal conversation session is reused, but that session state remains internal and is still not exposed in `DemoRunSummary`.
+Every public `DemoPlanPreview` now includes `action_manifest`, a stable execution-preview summary with this shape:
+
+```json
+{
+  "source": "proposed_actions | confirmed_actions | none",
+  "action_count": 1,
+  "actions": [
+    {
+      "action_ref": "draft_1_action_1",
+      "execution_order": 1,
+      "action_type": "reserve_restaurant",
+      "target_id": "restaurant_light_001",
+      "payload_preview": {
+        "party_size": 3
+      },
+      "reason": "Confirm to lock dinner seating."
+    }
+  ]
+}
+```
+
+`source = "proposed_actions"` is used for safe pre-confirmation previews, `source = "confirmed_actions"` is used after confirmation when persisted confirmed actions exist, and `source = "none"` is used when no valid public action preview is available.
 
 No external local-life provider, map provider, LangSmith upload, API key, token, or secret is required.
 
@@ -91,11 +113,13 @@ The internal review page now also shows sanitized tool-event and action-ledger d
 4. Confirm the run reaches `awaiting_confirmation`.
 5. Confirm the visible plan version label is `v1`.
 6. Confirm the action count is `0`.
-7. Review the selected plan, timeline, route, feasibility, and proposed actions.
-8. Click `确认所选方案`.
-9. Confirm the run reaches `completed`.
-10. Confirm execution and feedback are visible.
-11. Confirm the action count is greater than `0`.
+7. Review the selected plan, timeline, route, feasibility, and the visible `action_manifest` preview.
+8. Confirm the selected plan shows `action_manifest.source = proposed_actions`.
+9. Click `确认所选方案`.
+10. Confirm the run reaches `completed`.
+11. Confirm execution and feedback are visible.
+12. Confirm the action count is greater than `0`.
+13. Confirm the selected plan now shows `action_manifest.source = confirmed_actions`.
 
 ### Decline Path
 
@@ -183,9 +207,11 @@ PostgreSQL, Redis, and migrations must already be ready.
 - Planning stops at `awaiting_confirmation` before any write action.
 - The initial public run shows `plan_version.version_label = v1`.
 - Action count is `0` before confirmation.
+- Pre-confirmation selected plans expose `action_manifest.source = proposed_actions` when preview actions exist.
 - Confirmation executes write actions through the deterministic workflow.
 - Completed execution and feedback are visible after confirmation.
 - Action count is greater than `0` after confirmation.
+- Confirmed or executed plans expose `action_manifest.source = confirmed_actions` when persisted confirmed actions exist.
 - Declining a run leaves no confirm action available.
 - Replanning returns a new `run_id`, increments the visible version label, and still reuses the internal conversation session.
 - Refresh preserves the current visible run.
