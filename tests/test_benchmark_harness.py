@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from shutil import rmtree
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -10,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from backend.app.benchmark import (
+    BenchmarkHarness,
     load_benchmark_case,
     load_benchmark_suite,
     load_default_benchmark_cases,
@@ -17,6 +17,7 @@ from backend.app.benchmark import (
 )
 from backend.app.benchmark.errors import BenchmarkHarnessError
 import backend.app.benchmark.graders as benchmark_graders
+import backend.app.benchmark.harness as benchmark_harness
 from backend.app.benchmark.graders import (
     combine_scores,
     grade_execution_safety,
@@ -33,6 +34,8 @@ from backend.app.benchmark.schemas import (
     BenchmarkExpectedOutcome,
     BenchmarkRunReport,
     BenchmarkScore,
+    BenchmarkSuiteDescription,
+    BenchmarkSummary,
 )
 from backend.app.benchmark.matrix import build_case_matrix_summary
 from backend.app.benchmark.timing import summarize_benchmark_timing
@@ -1112,6 +1115,158 @@ def test_run_report_writer_includes_benchmark_summary_envelope() -> None:
         _cleanup_report_dir(report_dir)
 
 
+def test_benchmark_summary_schema_includes_suite_and_outcome_rollup_fields() -> None:
+    assert "suite_id" in BenchmarkSummary.model_fields
+    assert "suite_title" in BenchmarkSummary.model_fields
+    assert "outcome_rollup" in BenchmarkSummary.model_fields
+
+
+def test_run_cases_includes_additive_outcome_rollup_for_ad_hoc_cases(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cases = [
+        BenchmarkCase(
+            case_id="family-pass",
+            title="Family pass",
+            user_input="Plan a family outing.",
+            taxonomy=_taxonomy_payload(
+                scenario_bucket="family",
+                level="L1",
+                tags=["baseline", "child_friendly", "light_meal"],
+            ),
+            expected=BenchmarkExpectedOutcome(
+                required_tool_names=["search_poi"],
+                min_tool_event_count=1,
+                min_action_count=1,
+            ),
+        ),
+        BenchmarkCase(
+            case_id="solo-fail",
+            title="Solo fail",
+            user_input="Plan a solo outing.",
+            taxonomy=_taxonomy_payload(
+                scenario_bucket="solo",
+                level="L1",
+                tags=["baseline", "light_activity"],
+            ),
+            expected=BenchmarkExpectedOutcome(
+                required_tool_names=["search_poi"],
+                min_tool_event_count=1,
+                min_action_count=1,
+            ),
+        ),
+    ]
+    result_map = {
+        "family-pass": _benchmark_case_result(cases[0], status="passed"),
+        "solo-fail": _benchmark_case_result(cases[1], status="failed"),
+    }
+    report_dir = _unit_report_dir()
+    harness = BenchmarkHarness(session=None, cache=None, rate_limiter=None, report_dir=report_dir)
+
+    monkeypatch.setattr(harness, "run_case", lambda case: result_map[case.case_id])
+
+    try:
+        report = harness.run_cases(cases)
+
+        assert report.report_path is not None
+        assert report.report_path.endswith("run-report.json")
+        assert report.benchmark_summary is not None
+        assert report.benchmark_summary.suite_id is None
+        assert report.benchmark_summary.suite_title is None
+        assert report.benchmark_summary.outcome_rollup is not None
+        assert report.benchmark_summary.outcome_rollup.scenario_bucket_outcomes["family"].case_count == 1
+        assert report.benchmark_summary.outcome_rollup.scenario_bucket_outcomes["family"].passed_count == 1
+        assert report.benchmark_summary.outcome_rollup.scenario_bucket_outcomes["family"].pass_rate == 1.0
+        assert report.benchmark_summary.outcome_rollup.scenario_bucket_outcomes["solo"].failed_count == 1
+        assert report.benchmark_summary.outcome_rollup.scenario_bucket_outcomes["solo"].pass_rate == 0.0
+        assert "baseline" not in report.benchmark_summary.outcome_rollup.constraint_tag_outcomes
+        assert report.benchmark_summary.outcome_rollup.constraint_tag_outcomes["child_friendly"].passed_count == 1
+        assert report.benchmark_summary.outcome_rollup.constraint_tag_outcomes["light_activity"].failed_count == 1
+        assert report.benchmark_summary.outcome_rollup.failure_mode_outcomes["none"].case_count == 2
+        assert report.benchmark_summary.outcome_rollup.failure_mode_outcomes["none"].passed_count == 1
+        assert report.benchmark_summary.outcome_rollup.failure_mode_outcomes["none"].failed_count == 1
+        assert report.benchmark_summary.outcome_rollup.failure_mode_outcomes["none"].pass_rate == 0.5
+    finally:
+        _cleanup_report_dir(report_dir)
+
+
+def test_run_suite_uses_canonical_suite_report_filename_and_normalizes_failures_alias(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    case = BenchmarkCase(
+        case_id="family_route_failure_v1",
+        title="Recovery case",
+        user_input="Plan around the route failure.",
+        failure_profile="route_unavailable_v0",
+        taxonomy=_taxonomy_payload(
+            scenario_bucket="family",
+            level="L2",
+            tags=["child_friendly", "failure_injected", "light_meal", "route_failure"],
+            failure_mode="route_unavailable",
+        ),
+        expected=BenchmarkExpectedOutcome(
+            required_tool_names=["check_route"],
+            min_tool_event_count=1,
+            min_action_count=0,
+            expected_workflow_status="failed",
+            expected_execution_status=None,
+            expected_feedback_status=None,
+            expected_error_type="recovery_stopped",
+        ),
+    )
+    suite_description = BenchmarkSuiteDescription(
+        suite_id="recovery_focused",
+        title="Recovery focused benchmark suite",
+        description="Recovery-only suite",
+        case_ids=[case.case_id],
+        case_count=1,
+        matrix_summary=build_case_matrix_summary([case]),
+    )
+    report_dir = _unit_report_dir()
+    harness = BenchmarkHarness(session=None, cache=None, rate_limiter=None, report_dir=report_dir)
+    captured: dict[str, str] = {}
+    run_suite = getattr(harness, "run_suite", None)
+
+    assert callable(run_suite)
+
+    monkeypatch.setattr(benchmark_harness, "load_benchmark_suite", lambda suite_id: [case])
+    monkeypatch.setattr(benchmark_harness, "list_benchmark_suites", lambda: [suite_description])
+    monkeypatch.setattr(
+        benchmark_harness,
+        "write_run_report",
+        lambda result, directory, filename="run-report.json": captured.setdefault(
+            "report_path",
+            str(Path(directory) / filename),
+        ),
+    )
+    monkeypatch.setattr(
+        harness,
+        "run_case",
+        lambda benchmark_case: _benchmark_case_result(
+            benchmark_case,
+            status="passed",
+            workflow_status="failed",
+        ),
+    )
+
+    report = run_suite("failures")
+
+    assert report.report_path is not None
+    assert report.report_path.endswith("suite-recovery_focused-run-report.json")
+    assert captured["report_path"].endswith("suite-recovery_focused-run-report.json")
+    assert report.benchmark_summary is not None
+    assert report.benchmark_summary.suite_id == "recovery_focused"
+    assert report.benchmark_summary.suite_title == "Recovery focused benchmark suite"
+    assert report.benchmark_summary.outcome_rollup is not None
+    assert set(report.benchmark_summary.outcome_rollup.constraint_tag_outcomes) == {
+        "child_friendly",
+        "light_meal",
+    }
+    assert report.benchmark_summary.outcome_rollup.failure_mode_outcomes["route_unavailable"].case_count == 1
+    assert report.benchmark_summary.outcome_rollup.failure_mode_outcomes["route_unavailable"].passed_count == 1
+    assert report.benchmark_summary.outcome_rollup.failure_mode_outcomes["route_unavailable"].pass_rate == 1.0
+
+
 def _benchmark_case() -> BenchmarkCase:
     return BenchmarkCase(
         case_id="case",
@@ -1123,6 +1278,24 @@ def _benchmark_case() -> BenchmarkCase:
             min_tool_event_count=1,
             min_action_count=2,
         ),
+    )
+
+
+def _benchmark_case_result(
+    case: BenchmarkCase,
+    *,
+    status: str,
+    workflow_status: str = "completed",
+) -> BenchmarkCaseResult:
+    return BenchmarkCaseResult(
+        case_id=case.case_id,
+        status=status,
+        taxonomy=case.taxonomy,
+        scores=[],
+        overall_score=1.0 if status == "passed" else 0.0,
+        tool_event_count=max(case.expected.min_tool_event_count, 1),
+        action_count=max(case.expected.min_action_count, 0),
+        workflow_status=workflow_status,
     )
 
 
@@ -1144,7 +1317,12 @@ def _unit_report_dir() -> Path:
 
 def _cleanup_report_dir(path: Path) -> None:
     if path.exists():
-        rmtree(path)
+        for child in sorted(path.rglob("*"), reverse=True):
+            if child.is_file():
+                child.unlink()
+            elif child.is_dir():
+                child.rmdir()
+        path.rmdir()
     parent = path.parent
     if parent.exists() and not any(parent.iterdir()):
         parent.rmdir()

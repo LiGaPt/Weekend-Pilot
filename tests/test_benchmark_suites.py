@@ -27,9 +27,65 @@ REGISTERED_CASE_IDS = [
     "budget_lite_v1",
     "family_route_failure_v1",
 ]
-
-DEFAULT_CASE_IDS = REGISTERED_CASE_IDS[:-1]
-FAILURE_CASE_IDS = ["family_route_failure_v1"]
+BASELINE_CASE_IDS = REGISTERED_CASE_IDS[:6]
+EXPANDED_CASE_IDS = REGISTERED_CASE_IDS[6:10]
+RECOVERY_FOCUSED_CASE_IDS = ["family_route_failure_v1"]
+DEFAULT_CASE_IDS = BASELINE_CASE_IDS + EXPANDED_CASE_IDS
+CANONICAL_SUITE_IDS = ["baseline", "expanded", "recovery_focused", "default", "all_registered"]
+BASELINE_SCENARIO_BUCKET_COUNTS = {"family": 5, "solo": 1}
+BASELINE_LEVEL_COUNTS = {"L1": 3, "L2": 3}
+BASELINE_WORLD_PROFILE_COUNTS = {"family_afternoon": 5, "solo_afternoon": 1}
+BASELINE_FAILURE_MODE_COUNTS = {"none": 6}
+BASELINE_TAG_COUNTS = {
+    "addon_optional": 1,
+    "baseline": 2,
+    "child_friendly": 5,
+    "citywalk": 1,
+    "indoor_activity": 2,
+    "light_activity": 1,
+    "light_meal": 4,
+    "memory_override": 1,
+    "outdoor_activity": 1,
+    "quick_dinner": 1,
+}
+EXPANDED_SCENARIO_BUCKET_COUNTS = {
+    "couple": 1,
+    "friends": 1,
+    "mixed": 1,
+    "unknown": 1,
+}
+EXPANDED_LEVEL_COUNTS = {"L2": 4}
+EXPANDED_WORLD_PROFILE_COUNTS = {
+    "budget_lite": 1,
+    "couple_afternoon": 1,
+    "friends_gathering": 1,
+    "rainy_day_fallback": 1,
+}
+EXPANDED_FAILURE_MODE_COUNTS = {"none": 4}
+EXPANDED_TAG_COUNTS = {
+    "budget_limited": 1,
+    "casual_dining": 1,
+    "citywalk": 1,
+    "date_friendly": 1,
+    "fallback": 1,
+    "free_activity": 1,
+    "friends_group": 1,
+    "indoor_activity": 1,
+    "light_meal": 1,
+    "outdoor_activity": 1,
+    "quick_meal": 1,
+    "rainy_day": 1,
+}
+RECOVERY_SCENARIO_BUCKET_COUNTS = {"family": 1}
+RECOVERY_LEVEL_COUNTS = {"L2": 1}
+RECOVERY_WORLD_PROFILE_COUNTS = {"family_afternoon": 1}
+RECOVERY_FAILURE_MODE_COUNTS = {"route_unavailable": 1}
+RECOVERY_TAG_COUNTS = {
+    "child_friendly": 1,
+    "failure_injected": 1,
+    "light_meal": 1,
+    "route_failure": 1,
+}
 DEFAULT_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
     "family": 5,
@@ -117,22 +173,27 @@ def test_load_registered_benchmark_cases_returns_canonical_case_order() -> None:
 
 
 def test_load_benchmark_suite_returns_expected_named_membership() -> None:
+    assert [case.case_id for case in load_benchmark_suite("baseline")] == BASELINE_CASE_IDS
+    assert [case.case_id for case in load_benchmark_suite("expanded")] == EXPANDED_CASE_IDS
+    assert [case.case_id for case in load_benchmark_suite("recovery_focused")] == RECOVERY_FOCUSED_CASE_IDS
     assert [case.case_id for case in load_benchmark_suite("default")] == DEFAULT_CASE_IDS
-    assert [case.case_id for case in load_benchmark_suite("failures")] == FAILURE_CASE_IDS
+    assert [case.case_id for case in load_benchmark_suite("failures")] == RECOVERY_FOCUSED_CASE_IDS
     assert [case.case_id for case in load_benchmark_suite("all_registered")] == REGISTERED_CASE_IDS
 
 
 def test_list_benchmark_suite_ids_for_case_returns_expected_membership() -> None:
     assert benchmark_suites.list_benchmark_suite_ids_for_case("family_afternoon_v1") == [
+        "baseline",
         "default",
         "all_registered",
     ]
     assert benchmark_suites.list_benchmark_suite_ids_for_case("couple_afternoon_v1") == [
+        "expanded",
         "default",
         "all_registered",
     ]
     assert benchmark_suites.list_benchmark_suite_ids_for_case("family_route_failure_v1") == [
-        "failures",
+        "recovery_focused",
         "all_registered",
     ]
     assert benchmark_suites.list_benchmark_suite_ids_for_case("missing_case_v1") == []
@@ -143,33 +204,68 @@ def test_legacy_suite_wrappers_delegate_to_named_suites() -> None:
         case.case_id for case in load_benchmark_suite("default")
     ]
     assert [case.case_id for case in load_failure_benchmark_cases()] == [
-        case.case_id for case in load_benchmark_suite("failures")
+        case.case_id for case in load_benchmark_suite("recovery_focused")
     ]
 
 
 def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> None:
     suites = list_benchmark_suites()
 
-    assert [suite.suite_id for suite in suites] == ["default", "failures", "all_registered"]
+    assert [suite.suite_id for suite in suites] == CANONICAL_SUITE_IDS
     assert all(isinstance(suite, BenchmarkSuiteDescription) for suite in suites)
 
-    default = suites[0]
-    assert default.case_ids == DEFAULT_CASE_IDS
-    assert default.case_count == 10
-    assert default.matrix_summary.scenario_bucket_counts == DEFAULT_SCENARIO_BUCKET_COUNTS
-    assert default.matrix_summary.level_counts == DEFAULT_LEVEL_COUNTS
-    assert default.matrix_summary.world_profile_counts == DEFAULT_WORLD_PROFILE_COUNTS
-    assert default.matrix_summary.failure_mode_counts == DEFAULT_FAILURE_MODE_COUNTS
-    assert default.matrix_summary.tag_counts == DEFAULT_TAG_COUNTS
+    suite_map = {suite.suite_id: suite for suite in suites}
 
-    all_registered = suites[2]
-    assert all_registered.case_ids == REGISTERED_CASE_IDS
-    assert all_registered.case_count == 11
-    assert all_registered.matrix_summary.scenario_bucket_counts == ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
-    assert all_registered.matrix_summary.level_counts == ALL_REGISTERED_LEVEL_COUNTS
-    assert all_registered.matrix_summary.world_profile_counts == ALL_REGISTERED_WORLD_PROFILE_COUNTS
-    assert all_registered.matrix_summary.failure_mode_counts == ALL_REGISTERED_FAILURE_MODE_COUNTS
-    assert all_registered.matrix_summary.tag_counts == ALL_REGISTERED_TAG_COUNTS
+    _assert_suite_description(
+        suite_map["baseline"],
+        case_ids=BASELINE_CASE_IDS,
+        case_count=6,
+        scenario_bucket_counts=BASELINE_SCENARIO_BUCKET_COUNTS,
+        level_counts=BASELINE_LEVEL_COUNTS,
+        world_profile_counts=BASELINE_WORLD_PROFILE_COUNTS,
+        failure_mode_counts=BASELINE_FAILURE_MODE_COUNTS,
+        tag_counts=BASELINE_TAG_COUNTS,
+    )
+    _assert_suite_description(
+        suite_map["expanded"],
+        case_ids=EXPANDED_CASE_IDS,
+        case_count=4,
+        scenario_bucket_counts=EXPANDED_SCENARIO_BUCKET_COUNTS,
+        level_counts=EXPANDED_LEVEL_COUNTS,
+        world_profile_counts=EXPANDED_WORLD_PROFILE_COUNTS,
+        failure_mode_counts=EXPANDED_FAILURE_MODE_COUNTS,
+        tag_counts=EXPANDED_TAG_COUNTS,
+    )
+    _assert_suite_description(
+        suite_map["recovery_focused"],
+        case_ids=RECOVERY_FOCUSED_CASE_IDS,
+        case_count=1,
+        scenario_bucket_counts=RECOVERY_SCENARIO_BUCKET_COUNTS,
+        level_counts=RECOVERY_LEVEL_COUNTS,
+        world_profile_counts=RECOVERY_WORLD_PROFILE_COUNTS,
+        failure_mode_counts=RECOVERY_FAILURE_MODE_COUNTS,
+        tag_counts=RECOVERY_TAG_COUNTS,
+    )
+    _assert_suite_description(
+        suite_map["default"],
+        case_ids=DEFAULT_CASE_IDS,
+        case_count=10,
+        scenario_bucket_counts=DEFAULT_SCENARIO_BUCKET_COUNTS,
+        level_counts=DEFAULT_LEVEL_COUNTS,
+        world_profile_counts=DEFAULT_WORLD_PROFILE_COUNTS,
+        failure_mode_counts=DEFAULT_FAILURE_MODE_COUNTS,
+        tag_counts=DEFAULT_TAG_COUNTS,
+    )
+    _assert_suite_description(
+        suite_map["all_registered"],
+        case_ids=REGISTERED_CASE_IDS,
+        case_count=11,
+        scenario_bucket_counts=ALL_REGISTERED_SCENARIO_BUCKET_COUNTS,
+        level_counts=ALL_REGISTERED_LEVEL_COUNTS,
+        world_profile_counts=ALL_REGISTERED_WORLD_PROFILE_COUNTS,
+        failure_mode_counts=ALL_REGISTERED_FAILURE_MODE_COUNTS,
+        tag_counts=ALL_REGISTERED_TAG_COUNTS,
+    )
 
 
 def test_load_benchmark_suite_rejects_unknown_suite_id() -> None:
@@ -182,15 +278,25 @@ def test_list_benchmark_suites_rejects_duplicate_case_ids(monkeypatch: pytest.Mo
         benchmark_suites,
         "_SUITE_DEFINITIONS",
         {
-            "default": {
+            "baseline": {
                 "title": "Duplicate suite",
                 "description": "Invalid",
                 "case_ids": ["family_afternoon_v1", "family_afternoon_v1"],
             },
-            "failures": {
-                "title": "Failure benchmark suite",
-                "description": "Failure cases",
-                "case_ids": ["family_route_failure_v1"],
+            "expanded": {
+                "title": "Expanded suite",
+                "description": "Expanded cases",
+                "case_ids": EXPANDED_CASE_IDS,
+            },
+            "recovery_focused": {
+                "title": "Recovery suite",
+                "description": "Recovery cases",
+                "case_ids": RECOVERY_FOCUSED_CASE_IDS,
+            },
+            "default": {
+                "title": "Default suite",
+                "description": "Default cases",
+                "case_ids": DEFAULT_CASE_IDS,
             },
             "all_registered": {
                 "title": "All registered benchmark cases",
@@ -211,15 +317,25 @@ def test_list_benchmark_suites_rejects_unknown_registered_case_id(
         benchmark_suites,
         "_SUITE_DEFINITIONS",
         {
-            "default": {
-                "title": "Default benchmark suite",
-                "description": "Default cases",
-                "case_ids": ["family_afternoon_v1"],
+            "baseline": {
+                "title": "Baseline suite",
+                "description": "Baseline cases",
+                "case_ids": BASELINE_CASE_IDS,
             },
-            "failures": {
-                "title": "Failure benchmark suite",
-                "description": "Failure cases",
-                "case_ids": ["family_route_failure_v1"],
+            "expanded": {
+                "title": "Expanded suite",
+                "description": "Expanded cases",
+                "case_ids": EXPANDED_CASE_IDS,
+            },
+            "recovery_focused": {
+                "title": "Recovery suite",
+                "description": "Recovery cases",
+                "case_ids": RECOVERY_FOCUSED_CASE_IDS,
+            },
+            "default": {
+                "title": "Default suite",
+                "description": "Default cases",
+                "case_ids": DEFAULT_CASE_IDS,
             },
             "all_registered": {
                 "title": "All registered benchmark cases",
@@ -231,3 +347,23 @@ def test_list_benchmark_suites_rejects_unknown_registered_case_id(
 
     with pytest.raises(BenchmarkHarnessError, match="references unknown case ID: missing_case_v1"):
         list_benchmark_suites()
+
+
+def _assert_suite_description(
+    suite: BenchmarkSuiteDescription,
+    *,
+    case_ids: list[str],
+    case_count: int,
+    scenario_bucket_counts: dict[str, int],
+    level_counts: dict[str, int],
+    world_profile_counts: dict[str, int],
+    failure_mode_counts: dict[str, int],
+    tag_counts: dict[str, int],
+) -> None:
+    assert suite.case_ids == case_ids
+    assert suite.case_count == case_count
+    assert suite.matrix_summary.scenario_bucket_counts == scenario_bucket_counts
+    assert suite.matrix_summary.level_counts == level_counts
+    assert suite.matrix_summary.world_profile_counts == world_profile_counts
+    assert suite.matrix_summary.failure_mode_counts == failure_mode_counts
+    assert suite.matrix_summary.tag_counts == tag_counts

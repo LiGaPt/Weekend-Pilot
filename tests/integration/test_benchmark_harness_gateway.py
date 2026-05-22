@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from backend.app.benchmark import (
     BenchmarkHarness,
     load_benchmark_case,
-    load_benchmark_suite,
     load_default_benchmark_cases,
     load_failure_benchmark_cases,
 )
@@ -28,6 +27,21 @@ EXPECTED_AGENT_ROLES = {
     "itinerary_planner",
     "validator_recovery",
 }
+BASELINE_CASE_IDS = {
+    "family_afternoon_v1",
+    "family_indoor_light_meal_v1",
+    "family_outdoor_quick_dinner_v1",
+    "family_memory_override_v1",
+    "family_citywalk_addon_v1",
+    "solo_afternoon_v1",
+}
+EXPANDED_CASE_IDS = {
+    "couple_afternoon_v1",
+    "friends_gathering_v1",
+    "rainy_day_fallback_v1",
+    "budget_lite_v1",
+}
+RECOVERY_CASE_IDS = {"family_route_failure_v1"}
 DEFAULT_CASE_IDS = {
     "family_afternoon_v1",
     "family_indoor_light_meal_v1",
@@ -58,9 +72,68 @@ DEFAULT_WORLD_PROFILE_COUNTS = {
     "solo_afternoon": 1,
 }
 DEFAULT_FAILURE_MODE_COUNTS = {"none": 10}
+BASELINE_SCENARIO_BUCKET_COUNTS = {"family": 5, "solo": 1}
+BASELINE_FAILURE_MODE_COUNTS = {"none": 6}
+BASELINE_CONSTRAINT_TAG_COUNTS = {
+    "addon_optional": 1,
+    "child_friendly": 5,
+    "citywalk": 1,
+    "indoor_activity": 2,
+    "light_activity": 1,
+    "light_meal": 4,
+    "memory_override": 1,
+    "outdoor_activity": 1,
+    "quick_dinner": 1,
+}
+EXPANDED_SCENARIO_BUCKET_COUNTS = {
+    "couple": 1,
+    "friends": 1,
+    "mixed": 1,
+    "unknown": 1,
+}
+EXPANDED_FAILURE_MODE_COUNTS = {"none": 4}
+EXPANDED_CONSTRAINT_TAG_COUNTS = {
+    "budget_limited": 1,
+    "casual_dining": 1,
+    "citywalk": 1,
+    "date_friendly": 1,
+    "fallback": 1,
+    "free_activity": 1,
+    "friends_group": 1,
+    "indoor_activity": 1,
+    "light_meal": 1,
+    "outdoor_activity": 1,
+    "quick_meal": 1,
+    "rainy_day": 1,
+}
+RECOVERY_SCENARIO_BUCKET_COUNTS = {"family": 1}
+RECOVERY_FAILURE_MODE_COUNTS = {"route_unavailable": 1}
+RECOVERY_CONSTRAINT_TAG_COUNTS = {
+    "child_friendly": 1,
+    "light_meal": 1,
+}
 DEFAULT_TAG_COUNTS = {
     "addon_optional": 1,
     "baseline": 2,
+    "budget_limited": 1,
+    "casual_dining": 1,
+    "child_friendly": 5,
+    "citywalk": 2,
+    "date_friendly": 1,
+    "fallback": 1,
+    "free_activity": 1,
+    "friends_group": 1,
+    "indoor_activity": 3,
+    "light_activity": 1,
+    "light_meal": 5,
+    "memory_override": 1,
+    "outdoor_activity": 2,
+    "quick_dinner": 1,
+    "quick_meal": 1,
+    "rainy_day": 1,
+}
+DEFAULT_CONSTRAINT_TAG_COUNTS = {
+    "addon_optional": 1,
     "budget_limited": 1,
     "casual_dining": 1,
     "child_friendly": 5,
@@ -117,6 +190,25 @@ ALL_REGISTERED_TAG_COUNTS = {
     "quick_meal": 1,
     "rainy_day": 1,
     "route_failure": 1,
+}
+ALL_REGISTERED_CONSTRAINT_TAG_COUNTS = {
+    "addon_optional": 1,
+    "budget_limited": 1,
+    "casual_dining": 1,
+    "child_friendly": 6,
+    "citywalk": 2,
+    "date_friendly": 1,
+    "fallback": 1,
+    "free_activity": 1,
+    "friends_group": 1,
+    "indoor_activity": 3,
+    "light_activity": 1,
+    "light_meal": 6,
+    "memory_override": 1,
+    "outdoor_activity": 2,
+    "quick_dinner": 1,
+    "quick_meal": 1,
+    "rainy_day": 1,
 }
 FORBIDDEN_REPORT_TEXT = ("action_id", "tool_event_id", "api_key", "token", "secret", "debug_trace")
 
@@ -309,14 +401,48 @@ def test_benchmark_harness_records_memory_policy_for_override_case(
     assert "activity_preferences" in memory_policy["user_override_dimensions"]
 
 
-def test_benchmark_harness_runs_default_mock_world_suite(
+@pytest.mark.parametrize(
+    ("suite_id", "expected_case_ids", "expected_case_count", "scenario_counts", "failure_mode_counts", "constraint_tag_counts"),
+    [
+        (
+            "baseline",
+            BASELINE_CASE_IDS,
+            6,
+            BASELINE_SCENARIO_BUCKET_COUNTS,
+            BASELINE_FAILURE_MODE_COUNTS,
+            BASELINE_CONSTRAINT_TAG_COUNTS,
+        ),
+        (
+            "expanded",
+            EXPANDED_CASE_IDS,
+            4,
+            EXPANDED_SCENARIO_BUCKET_COUNTS,
+            EXPANDED_FAILURE_MODE_COUNTS,
+            EXPANDED_CONSTRAINT_TAG_COUNTS,
+        ),
+        (
+            "recovery_focused",
+            RECOVERY_CASE_IDS,
+            1,
+            RECOVERY_SCENARIO_BUCKET_COUNTS,
+            RECOVERY_FAILURE_MODE_COUNTS,
+            RECOVERY_CONSTRAINT_TAG_COUNTS,
+        ),
+    ],
+)
+def test_benchmark_harness_runs_named_mock_world_suite(
+    suite_id: str,
+    expected_case_ids: set[str],
+    expected_case_count: int,
+    scenario_counts: dict[str, int],
+    failure_mode_counts: dict[str, int],
+    constraint_tag_counts: dict[str, int],
     db_session: Session,
     redis_runtime,
     harness_paths,
 ) -> None:
     cache, rate_limiter = redis_runtime
     trace_path, report_dir = harness_paths
-    cases = load_default_benchmark_cases()
     harness = BenchmarkHarness(
         db_session,
         cache,
@@ -325,7 +451,72 @@ def test_benchmark_harness_runs_default_mock_world_suite(
         trace_buffer_path=trace_path,
     )
 
-    report = harness.run_cases(cases)
+    report = harness.run_suite(suite_id)
+
+    assert {result.case_id for result in report.case_results} == expected_case_ids
+    assert len(report.case_results) == expected_case_count
+    assert report.run_status == "passed"
+    assert report.passed_count == expected_case_count
+    assert report.failed_count == 0
+    assert report.error_count == 0
+    assert report.report_path is not None
+    assert report.report_path.endswith(f"suite-{suite_id}-run-report.json")
+    assert report.benchmark_summary is not None
+    assert report.benchmark_summary.suite_id == suite_id
+    assert report.benchmark_summary.suite_title is not None
+    assert report.benchmark_summary.outcome_rollup is not None
+    _assert_rollup_counts(
+        report.benchmark_summary.outcome_rollup.scenario_bucket_outcomes,
+        scenario_counts,
+    )
+    _assert_rollup_counts(
+        report.benchmark_summary.outcome_rollup.constraint_tag_outcomes,
+        constraint_tag_counts,
+    )
+    _assert_rollup_counts(
+        report.benchmark_summary.outcome_rollup.failure_mode_outcomes,
+        failure_mode_counts,
+    )
+
+    suite_payload = json.loads(Path(report.report_path).read_text(encoding="utf-8"))
+    assert suite_payload["benchmark_summary"]["suite_id"] == suite_id
+    assert suite_payload["benchmark_summary"]["suite_title"]
+    assert suite_payload["benchmark_summary"]["outcome_rollup"]["schema_version"] == (
+        "weekendpilot_benchmark_outcome_rollup_v1"
+    )
+    _assert_rollup_counts(
+        suite_payload["benchmark_summary"]["outcome_rollup"]["scenario_bucket_outcomes"],
+        scenario_counts,
+    )
+    _assert_rollup_counts(
+        suite_payload["benchmark_summary"]["outcome_rollup"]["constraint_tag_outcomes"],
+        constraint_tag_counts,
+    )
+    _assert_rollup_counts(
+        suite_payload["benchmark_summary"]["outcome_rollup"]["failure_mode_outcomes"],
+        failure_mode_counts,
+    )
+    serialized_suite = json.dumps(suite_payload, sort_keys=True)
+    for forbidden in FORBIDDEN_REPORT_TEXT:
+        assert forbidden not in serialized_suite
+
+
+def test_benchmark_harness_runs_default_mock_world_suite(
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    report = harness.run_suite("default")
 
     assert {result.case_id for result in report.case_results} == DEFAULT_CASE_IDS
     assert len(report.case_results) == 10
@@ -333,17 +524,32 @@ def test_benchmark_harness_runs_default_mock_world_suite(
     assert report.passed_count == 10
     assert report.failed_count == 0
     assert report.error_count == 0
+    assert report.report_path is not None
+    assert report.report_path.endswith("suite-default-run-report.json")
     assert report.benchmark_summary is not None
+    assert report.benchmark_summary.suite_id == "default"
     assert report.benchmark_summary.run_status == "passed"
-    assert report.benchmark_summary.case_count == len(cases)
+    assert report.benchmark_summary.case_count == 10
     assert report.benchmark_summary.matrix_summary is not None
     assert report.benchmark_summary.matrix_summary.scenario_bucket_counts == DEFAULT_SCENARIO_BUCKET_COUNTS
     assert report.benchmark_summary.matrix_summary.level_counts == DEFAULT_LEVEL_COUNTS
     assert report.benchmark_summary.matrix_summary.world_profile_counts == DEFAULT_WORLD_PROFILE_COUNTS
     assert report.benchmark_summary.matrix_summary.failure_mode_counts == DEFAULT_FAILURE_MODE_COUNTS
     assert report.benchmark_summary.matrix_summary.tag_counts == DEFAULT_TAG_COUNTS
+    assert report.benchmark_summary.outcome_rollup is not None
+    _assert_rollup_counts(
+        report.benchmark_summary.outcome_rollup.scenario_bucket_outcomes,
+        DEFAULT_SCENARIO_BUCKET_COUNTS,
+    )
+    _assert_rollup_counts(
+        report.benchmark_summary.outcome_rollup.constraint_tag_outcomes,
+        DEFAULT_CONSTRAINT_TAG_COUNTS,
+    )
+    _assert_rollup_counts(
+        report.benchmark_summary.outcome_rollup.failure_mode_outcomes,
+        DEFAULT_FAILURE_MODE_COUNTS,
+    )
     assert report.benchmark_timing_summary is not None
-    assert report.report_path is not None
     assert Path(report.report_path).exists()
 
     for result in report.case_results:
@@ -382,15 +588,28 @@ def test_benchmark_harness_runs_default_mock_world_suite(
     suite_payload = json.loads(Path(report.report_path).read_text(encoding="utf-8"))
     assert suite_payload["report_path"] == report.report_path
     assert suite_payload["benchmark_summary"]["schema_version"] == "weekendpilot_benchmark_summary_v1"
+    assert suite_payload["benchmark_summary"]["suite_id"] == "default"
     assert suite_payload["benchmark_summary"]["run_status"] == "passed"
     assert suite_payload["benchmark_summary"]["matrix_summary"]["scenario_bucket_counts"] == DEFAULT_SCENARIO_BUCKET_COUNTS
     assert suite_payload["benchmark_summary"]["matrix_summary"]["level_counts"] == DEFAULT_LEVEL_COUNTS
     assert suite_payload["benchmark_summary"]["matrix_summary"]["world_profile_counts"] == DEFAULT_WORLD_PROFILE_COUNTS
     assert suite_payload["benchmark_summary"]["matrix_summary"]["failure_mode_counts"] == DEFAULT_FAILURE_MODE_COUNTS
     assert suite_payload["benchmark_summary"]["matrix_summary"]["tag_counts"] == DEFAULT_TAG_COUNTS
+    _assert_rollup_counts(
+        suite_payload["benchmark_summary"]["outcome_rollup"]["scenario_bucket_outcomes"],
+        DEFAULT_SCENARIO_BUCKET_COUNTS,
+    )
+    _assert_rollup_counts(
+        suite_payload["benchmark_summary"]["outcome_rollup"]["constraint_tag_outcomes"],
+        DEFAULT_CONSTRAINT_TAG_COUNTS,
+    )
+    _assert_rollup_counts(
+        suite_payload["benchmark_summary"]["outcome_rollup"]["failure_mode_outcomes"],
+        DEFAULT_FAILURE_MODE_COUNTS,
+    )
     assert suite_payload["benchmark_timing_summary"]["schema_version"] == "benchmark_timing_summary_v1"
-    assert suite_payload["benchmark_timing_summary"]["case_count"] == len(cases)
-    assert suite_payload["benchmark_timing_summary"]["overall_total_duration_ms"]["sample_count"] == len(cases)
+    assert suite_payload["benchmark_timing_summary"]["case_count"] == 10
+    assert suite_payload["benchmark_timing_summary"]["overall_total_duration_ms"]["sample_count"] == 10
     assert suite_payload["benchmark_timing_summary"]["stages"]
     serialized_suite = json.dumps(suite_payload, sort_keys=True)
     for forbidden in FORBIDDEN_REPORT_TEXT:
@@ -404,7 +623,6 @@ def test_benchmark_harness_runs_all_registered_suite(
 ) -> None:
     cache, rate_limiter = redis_runtime
     trace_path, report_dir = harness_paths
-    cases = load_benchmark_suite("all_registered")
     harness = BenchmarkHarness(
         db_session,
         cache,
@@ -413,23 +631,39 @@ def test_benchmark_harness_runs_all_registered_suite(
         trace_buffer_path=trace_path,
     )
 
-    report = harness.run_cases(cases)
+    report = harness.run_suite("all_registered")
 
     assert len(report.case_results) == 11
     assert report.run_status == "passed"
     assert report.passed_count == 11
     assert report.failed_count == 0
     assert report.error_count == 0
+    assert report.report_path is not None
+    assert report.report_path.endswith("suite-all_registered-run-report.json")
     assert report.benchmark_summary is not None
+    assert report.benchmark_summary.suite_id == "all_registered"
     assert report.benchmark_summary.matrix_summary is not None
     assert report.benchmark_summary.matrix_summary.scenario_bucket_counts == ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
     assert report.benchmark_summary.matrix_summary.level_counts == ALL_REGISTERED_LEVEL_COUNTS
     assert report.benchmark_summary.matrix_summary.world_profile_counts == ALL_REGISTERED_WORLD_PROFILE_COUNTS
     assert report.benchmark_summary.matrix_summary.failure_mode_counts == ALL_REGISTERED_FAILURE_MODE_COUNTS
     assert report.benchmark_summary.matrix_summary.tag_counts == ALL_REGISTERED_TAG_COUNTS
-    assert report.report_path is not None
+    assert report.benchmark_summary.outcome_rollup is not None
+    _assert_rollup_counts(
+        report.benchmark_summary.outcome_rollup.scenario_bucket_outcomes,
+        ALL_REGISTERED_SCENARIO_BUCKET_COUNTS,
+    )
+    _assert_rollup_counts(
+        report.benchmark_summary.outcome_rollup.constraint_tag_outcomes,
+        ALL_REGISTERED_CONSTRAINT_TAG_COUNTS,
+    )
+    _assert_rollup_counts(
+        report.benchmark_summary.outcome_rollup.failure_mode_outcomes,
+        ALL_REGISTERED_FAILURE_MODE_COUNTS,
+    )
 
     suite_payload = json.loads(Path(report.report_path).read_text(encoding="utf-8"))
+    assert suite_payload["benchmark_summary"]["suite_id"] == "all_registered"
     assert suite_payload["benchmark_summary"]["matrix_summary"]["scenario_bucket_counts"] == (
         ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
     )
@@ -441,6 +675,18 @@ def test_benchmark_harness_runs_all_registered_suite(
         ALL_REGISTERED_FAILURE_MODE_COUNTS
     )
     assert suite_payload["benchmark_summary"]["matrix_summary"]["tag_counts"] == ALL_REGISTERED_TAG_COUNTS
+    _assert_rollup_counts(
+        suite_payload["benchmark_summary"]["outcome_rollup"]["scenario_bucket_outcomes"],
+        ALL_REGISTERED_SCENARIO_BUCKET_COUNTS,
+    )
+    _assert_rollup_counts(
+        suite_payload["benchmark_summary"]["outcome_rollup"]["constraint_tag_outcomes"],
+        ALL_REGISTERED_CONSTRAINT_TAG_COUNTS,
+    )
+    _assert_rollup_counts(
+        suite_payload["benchmark_summary"]["outcome_rollup"]["failure_mode_outcomes"],
+        ALL_REGISTERED_FAILURE_MODE_COUNTS,
+    )
 
 
 def test_benchmark_harness_runs_route_failure_case_as_expected_safe_stop(
@@ -506,3 +752,27 @@ def test_benchmark_harness_runs_route_failure_case_as_expected_safe_stop(
     serialized_report = json.dumps(report_payload, sort_keys=True)
     for forbidden in FORBIDDEN_REPORT_TEXT:
         assert forbidden not in serialized_report
+
+
+def _assert_rollup_counts(bucket_map, expected_case_counts: dict[str, int]) -> None:
+    assert set(bucket_map) == set(expected_case_counts)
+    for bucket, expected_count in expected_case_counts.items():
+        payload = bucket_map[bucket]
+        if isinstance(payload, dict):
+            case_count = payload["case_count"]
+            passed_count = payload["passed_count"]
+            failed_count = payload["failed_count"]
+            error_count = payload["error_count"]
+            pass_rate = payload["pass_rate"]
+        else:
+            case_count = payload.case_count
+            passed_count = payload.passed_count
+            failed_count = payload.failed_count
+            error_count = payload.error_count
+            pass_rate = payload.pass_rate
+
+        assert case_count == expected_count
+        assert passed_count == expected_count
+        assert failed_count == 0
+        assert error_count == 0
+        assert pass_rate == 1.0

@@ -1,53 +1,64 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from backend.app.benchmark.errors import BenchmarkHarnessError
 from backend.app.benchmark.matrix import build_case_matrix_summary
 from backend.app.benchmark.schemas import BenchmarkCase, BenchmarkSuiteDescription, BenchmarkSuiteId
 
 
-_ORDERED_SUITE_IDS: tuple[BenchmarkSuiteId, ...] = ("default", "failures", "all_registered")
-_SUITE_DEFINITIONS: dict[str, dict[str, Any]] = {
+_BASELINE_CASE_IDS = [
+    "family_afternoon_v1",
+    "family_indoor_light_meal_v1",
+    "family_outdoor_quick_dinner_v1",
+    "family_memory_override_v1",
+    "family_citywalk_addon_v1",
+    "solo_afternoon_v1",
+]
+_EXPANDED_CASE_IDS = [
+    "couple_afternoon_v1",
+    "friends_gathering_v1",
+    "rainy_day_fallback_v1",
+    "budget_lite_v1",
+]
+_RECOVERY_FOCUSED_CASE_IDS = ["family_route_failure_v1"]
+_DEFAULT_CASE_IDS = [*_BASELINE_CASE_IDS, *_EXPANDED_CASE_IDS]
+_ALL_REGISTERED_CASE_IDS = [*_DEFAULT_CASE_IDS, *_RECOVERY_FOCUSED_CASE_IDS]
+_ORDERED_SUITE_IDS: tuple[BenchmarkSuiteId, ...] = (
+    "baseline",
+    "expanded",
+    "recovery_focused",
+    "default",
+    "all_registered",
+)
+_SUITE_ALIASES: dict[str, BenchmarkSuiteId] = {
+    "failures": "recovery_focused",
+}
+_SUITE_DEFINITIONS: dict[BenchmarkSuiteId, dict[str, Any]] = {
+    "baseline": {
+        "title": "Baseline benchmark suite",
+        "description": "Historical family-plus-solo non-failure benchmark baseline.",
+        "case_ids": _BASELINE_CASE_IDS,
+    },
+    "expanded": {
+        "title": "Expanded scenario benchmark suite",
+        "description": "Expanded non-failure scenario pack added after the historical baseline.",
+        "case_ids": _EXPANDED_CASE_IDS,
+    },
+    "recovery_focused": {
+        "title": "Recovery focused benchmark suite",
+        "description": "Recovery-focused benchmark cases kept outside the non-failure suites.",
+        "case_ids": _RECOVERY_FOCUSED_CASE_IDS,
+    },
     "default": {
         "title": "Default benchmark suite",
-        "description": "Current non-failure baseline suite used by repository benchmark examples.",
-        "case_ids": [
-            "family_afternoon_v1",
-            "family_indoor_light_meal_v1",
-            "family_outdoor_quick_dinner_v1",
-            "family_memory_override_v1",
-            "family_citywalk_addon_v1",
-            "solo_afternoon_v1",
-            "couple_afternoon_v1",
-            "friends_gathering_v1",
-            "rainy_day_fallback_v1",
-            "budget_lite_v1",
-        ],
-    },
-    "failures": {
-        "title": "Failure benchmark suite",
-        "description": "Current failure-injection benchmark cases kept outside the default suite.",
-        "case_ids": [
-            "family_route_failure_v1",
-        ],
+        "description": "Current ten-case non-failure benchmark suite used by repository examples.",
+        "case_ids": _DEFAULT_CASE_IDS,
     },
     "all_registered": {
         "title": "All registered benchmark cases",
-        "description": "Current default plus failure cases in canonical repository order.",
-        "case_ids": [
-            "family_afternoon_v1",
-            "family_indoor_light_meal_v1",
-            "family_outdoor_quick_dinner_v1",
-            "family_memory_override_v1",
-            "family_citywalk_addon_v1",
-            "solo_afternoon_v1",
-            "couple_afternoon_v1",
-            "friends_gathering_v1",
-            "rainy_day_fallback_v1",
-            "budget_lite_v1",
-            "family_route_failure_v1",
-        ],
+        "description": "Current default plus recovery-focused cases in canonical repository order.",
+        "case_ids": _ALL_REGISTERED_CASE_IDS,
     },
 }
 
@@ -93,17 +104,18 @@ def load_default_benchmark_cases() -> list[BenchmarkCase]:
 
 
 def load_failure_benchmark_cases() -> list[BenchmarkCase]:
-    return load_benchmark_suite("failures")
+    return load_benchmark_suite("recovery_focused")
 
 
 def _validated_suite_definition(suite_id: str) -> dict[str, Any]:
-    if suite_id not in _SUITE_DEFINITIONS:
+    canonical_suite_id = _canonical_suite_id(suite_id)
+    if canonical_suite_id not in _SUITE_DEFINITIONS:
         raise BenchmarkHarnessError(f"Unknown benchmark suite ID: {suite_id}")
 
-    definition = _SUITE_DEFINITIONS[suite_id]
+    definition = _SUITE_DEFINITIONS[canonical_suite_id]
     case_ids = definition.get("case_ids")
     if not isinstance(case_ids, list):
-        raise BenchmarkHarnessError(f"Benchmark suite {suite_id} has invalid case_ids.")
+        raise BenchmarkHarnessError(f"Benchmark suite {canonical_suite_id} has invalid case_ids.")
 
     from backend.app.benchmark.fixtures import load_registered_benchmark_cases
 
@@ -111,8 +123,23 @@ def _validated_suite_definition(suite_id: str) -> dict[str, Any]:
     seen: set[str] = set()
     for case_id in case_ids:
         if case_id in seen:
-            raise BenchmarkHarnessError(f"Benchmark suite {suite_id} contains duplicate case ID: {case_id}")
+            raise BenchmarkHarnessError(
+                f"Benchmark suite {canonical_suite_id} contains duplicate case ID: {case_id}"
+            )
         if case_id not in registered_case_ids:
-            raise BenchmarkHarnessError(f"Benchmark suite {suite_id} references unknown case ID: {case_id}")
+            raise BenchmarkHarnessError(
+                f"Benchmark suite {canonical_suite_id} references unknown case ID: {case_id}"
+            )
         seen.add(case_id)
     return definition
+
+
+def canonical_benchmark_suite_id(suite_id: BenchmarkSuiteId | str) -> BenchmarkSuiteId:
+    canonical_suite_id = _canonical_suite_id(str(suite_id))
+    if canonical_suite_id not in _SUITE_DEFINITIONS:
+        raise BenchmarkHarnessError(f"Unknown benchmark suite ID: {suite_id}")
+    return cast(BenchmarkSuiteId, canonical_suite_id)
+
+
+def _canonical_suite_id(suite_id: str) -> str:
+    return _SUITE_ALIASES.get(suite_id, suite_id)

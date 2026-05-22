@@ -84,6 +84,23 @@ def trace_path():
             directory.rmdir()
 
 
+@pytest.fixture()
+def benchmark_paths():
+    directory = Path("var/test-benchmarks") / str(uuid4())
+    report_dir = directory / "benchmarks"
+    trace_path = directory / "benchmarks-trace.jsonl"
+    try:
+        yield report_dir, trace_path
+    finally:
+        for path in sorted(directory.rglob("*"), reverse=True) if directory.exists() else []:
+            if path.is_file():
+                path.unlink()
+            elif path.is_dir():
+                path.rmdir()
+        if directory.exists():
+            directory.rmdir()
+
+
 def _create_run(session: Session):
     user = UserRepository(session).create(
         external_id=f"observability-gateway-user-{uuid4()}",
@@ -359,16 +376,17 @@ def test_internal_observability_route_returns_benchmark_artifact_summary_for_ben
     db_session: Session,
     redis_runtime,
     observability_client: TestClient,
-    tmp_path: Path,
+    benchmark_paths,
 ) -> None:
     cache, rate_limiter = redis_runtime
+    report_dir, trace_file = benchmark_paths
     case = load_benchmark_case("solo_afternoon_v1")
     harness = BenchmarkHarness(
         db_session,
         cache,
         rate_limiter,
-        report_dir=tmp_path / "benchmarks",
-        trace_buffer_path=tmp_path / "benchmarks-trace.jsonl",
+        report_dir=report_dir,
+        trace_buffer_path=trace_file,
     )
 
     result = harness.run_case(case)
@@ -382,6 +400,7 @@ def test_internal_observability_route_returns_benchmark_artifact_summary_for_ben
     assert payload["benchmark_artifact_summary"] is not None
     assert payload["benchmark_artifact_summary"]["case_id"] == "solo_afternoon_v1"
     assert payload["benchmark_artifact_summary"]["registered_suite_ids"] == [
+        "baseline",
         "default",
         "all_registered",
     ]
@@ -399,16 +418,17 @@ def test_internal_observability_route_returns_recovery_path_summary_for_recovery
     db_session: Session,
     redis_runtime,
     observability_client: TestClient,
-    tmp_path: Path,
+    benchmark_paths,
 ) -> None:
     cache, rate_limiter = redis_runtime
+    report_dir, trace_file = benchmark_paths
     case = load_benchmark_case("family_route_failure_v1")
     harness = BenchmarkHarness(
         db_session,
         cache,
         rate_limiter,
-        report_dir=tmp_path / "benchmarks",
-        trace_buffer_path=tmp_path / "benchmarks-trace.jsonl",
+        report_dir=report_dir,
+        trace_buffer_path=trace_file,
     )
 
     result = harness.run_case(case)
