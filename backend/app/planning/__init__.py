@@ -12,6 +12,10 @@ from backend.app.planning.errors import (
     QueryExecutionError,
     QueryPlanError,
 )
+from backend.app.planning.clarification_policy import (
+    ClarificationPolicySummary,
+    apply_clarification_policy,
+)
 from backend.app.planning.execution import QueryPlanExecutor
 from backend.app.planning.intent_parser import DeterministicIntentParser
 from backend.app.planning.itinerary_drafts import (
@@ -48,6 +52,7 @@ __all__ = [
     "CandidateEnrichmentError",
     "CandidateEnrichmentResult",
     "CandidateCollectionResult",
+    "ClarificationPolicySummary",
     "DeterministicIntentParser",
     "DeterministicItineraryGenerator",
     "DeterministicQueryPlanner",
@@ -77,5 +82,6 @@ __all__ = [
     "TimelineItem",
     "TimeWindow",
     "ToolCallTemplate",
+    "apply_clarification_policy",
     "apply_memory_query_policy",
 ]

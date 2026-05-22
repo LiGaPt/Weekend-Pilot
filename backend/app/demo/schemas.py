@@ -19,6 +19,11 @@ class DemoReplanRunRequest(BaseModel):
     selected_plan_index: int = Field(default=0, ge=0)
 
 
+class DemoClarifyRunRequest(BaseModel):
+    user_input: str = Field(min_length=1)
+    selected_plan_index: int = Field(default=0, ge=0)
+
+
 class DemoConfirmRunRequest(BaseModel):
     plan_id: UUID | None = None
     confirmed_by: str = "web-demo-user"
@@ -118,6 +123,11 @@ class DemoPlanVersionSummary(BaseModel):
     source_selected_plan_id: UUID | None = None
 
 
+class DemoClarificationSummary(BaseModel):
+    prompt: str
+    missing_fields: list[str] = Field(default_factory=list)
+
+
 class DemoActionManifestItemSummary(BaseModel):
     action_ref: str | None = None
     execution_order: int | None = Field(default=None, ge=1)
@@ -161,3 +171,4 @@ class DemoRunSummary(BaseModel):
     execution_status: str | None = None
     feedback_status: str | None = None
     error: dict[str, Any] | None = None
+    clarification: DemoClarificationSummary | None = None

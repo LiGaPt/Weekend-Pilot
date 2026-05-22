@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import backend.app.demo.versioning as demo_versioning
 from uuid import uuid4
 
 from backend.app.demo.versioning import build_next_plan_version_metadata, summarize_plan_version
@@ -77,6 +78,22 @@ def test_build_next_plan_version_metadata_treats_missing_source_metadata_as_v1()
 
     assert metadata == {
         "version_number": 2,
+        "source_run_id": str(source_run_id),
+        "source_selected_plan_id": None,
+    }
+
+
+def test_build_clarification_plan_version_metadata_keeps_source_version_without_increment() -> None:
+    source_run_id = uuid4()
+
+    assert hasattr(demo_versioning, "build_clarification_plan_version_metadata")
+    metadata = demo_versioning.build_clarification_plan_version_metadata(
+        {"demo": {"plan_version": {"version_number": 1}}},
+        source_run_id=source_run_id,
+    )
+
+    assert metadata == {
+        "version_number": 1,
         "source_run_id": str(source_run_id),
         "source_selected_plan_id": None,
     }

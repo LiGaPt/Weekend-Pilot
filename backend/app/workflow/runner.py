@@ -150,7 +150,7 @@ class WeekendPilotWorkflowRunner:
         )
 
     def _status_or_error(self, value: Any) -> WorkflowStatus:
-        if value in {"awaiting_confirmation", "completed", "failed", "error"}:
+        if value in {"awaiting_clarification", "awaiting_confirmation", "completed", "failed", "error"}:
             return value
         return "error"
 
@@ -185,7 +185,7 @@ class WeekendPilotWorkflowRunner:
     ) -> WeekendPilotWorkflowState | dict[str, Any]:
         if not isinstance(state, dict):
             return state
-        if state.get("status") not in {"awaiting_confirmation", "completed", "failed"}:
+        if state.get("status") not in {"awaiting_clarification", "awaiting_confirmation", "completed", "failed"}:
             return state
         context = state.get("trace_context")
         if context is None:

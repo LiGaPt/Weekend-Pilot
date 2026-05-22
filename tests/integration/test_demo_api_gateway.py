@@ -40,6 +40,7 @@ REDACTED_PUBLIC_RUN_FIELDS = {
     "observability_status",
     "agent_roles",
 }
+VAGUE_USER_INPUT = "想周末出去玩一下。"
 
 
 @pytest.fixture()
@@ -142,6 +143,8 @@ def _load_run(session: Session, run_id: UUID) -> AgentRun:
 def _assert_no_forbidden_keys(value) -> None:
     if isinstance(value, dict):
         forbidden = FORBIDDEN_RESPONSE_KEYS.intersection(value)
+        if forbidden == {"prompt"} and set(value).issubset({"prompt", "missing_fields"}):
+            forbidden = set()
         assert forbidden == set()
         for child in value.values():
             _assert_no_forbidden_keys(child)
@@ -408,6 +411,116 @@ def test_demo_run_status_route_keeps_public_shape_after_internal_route_addition(
     assert "agent_roles" not in payload
     assert "workflow_timing_summary" not in payload
     _assert_no_forbidden_keys(payload)
+
+
+def test_demo_run_clarification_flow_reuses_session_and_keeps_version_v1(client) -> None:
+    test_client, case_ids, external_user_ids = client
+    payload = _start_payload(case_ids, external_user_ids)
+    payload["user_input"] = VAGUE_USER_INPUT
+
+    start_response = test_client.post("/demo/runs", json=payload)
+
+    assert start_response.status_code == 200
+    start_body = start_response.json()
+    _assert_no_forbidden_keys(start_body)
+    _assert_public_run_redaction(start_body)
+    assert start_body["status"] == "awaiting_clarification"
+    assert start_body["selected_plan_id"] is None
+    assert start_body["plans"] == []
+    assert start_body["action_count"] == 0
+    assert start_body["clarification"] == {
+        "prompt": "为了继续规划，请补充这次是谁一起去，以及大概什么时间出发、准备玩多久。",
+        "missing_fields": ["scenario_or_participants", "time_window"],
+    }
+    _assert_plan_version(
+        start_body,
+        version_number=1,
+        source_run_id=None,
+        source_selected_plan_id=None,
+    )
+    source_run_id = UUID(start_body["run_id"])
+
+    replan_response = test_client.post(
+        f"/demo/runs/{source_run_id}/replan",
+        json={
+            "user_input": "今天下午一个人出门玩几个小时，别太远。",
+            "selected_plan_index": 0,
+        },
+    )
+    assert replan_response.status_code == 409
+
+    clarify_response = test_client.post(
+        f"/demo/runs/{source_run_id}/clarify",
+        json={
+            "user_input": "今天下午一个人出门玩几个小时，别太远。",
+            "selected_plan_index": 0,
+        },
+    )
+
+    assert clarify_response.status_code == 200
+    clarify_body = clarify_response.json()
+    _assert_no_forbidden_keys(clarify_body)
+    _assert_public_run_redaction(clarify_body)
+    assert UUID(clarify_body["run_id"]) != source_run_id
+    assert clarify_body["status"] == "awaiting_confirmation"
+    assert clarify_body["clarification"] is None
+    assert clarify_body["selected_plan_id"] is not None
+    assert clarify_body["plans"]
+    _assert_plan_version(
+        clarify_body,
+        version_number=1,
+        source_run_id=str(source_run_id),
+        source_selected_plan_id=None,
+    )
+
+    db = SessionLocal()
+    try:
+        source_run = _load_run(db, source_run_id)
+        clarified_run = _load_run(db, UUID(clarify_body["run_id"]))
+        assert clarified_run.user_id == source_run.user_id
+        assert clarified_run.session_id == source_run.session_id
+        turns = list(
+            db.scalars(
+                select(ConversationTurn)
+                .where(ConversationTurn.session_id == source_run.session_id)
+                .order_by(ConversationTurn.turn_index, ConversationTurn.turn_id)
+            ).all()
+        )
+        assert [turn.turn_type for turn in turns] == [
+            "user_request",
+            "assistant_clarification_request",
+            "user_clarification_reply",
+            "assistant_plan_options",
+        ]
+        assert turns[1].run_id == source_run.run_id
+        assert turns[1].payload_json == {
+            "missing_fields": ["scenario_or_participants", "time_window"],
+            "run_status": "awaiting_clarification",
+        }
+        assert turns[2].run_id == clarified_run.run_id
+        assert turns[2].payload_json == {
+            "mode": "clarify",
+            "source_run_id": str(source_run.run_id),
+            "source_missing_fields": ["scenario_or_participants", "time_window"],
+        }
+        assert turns[3].run_id == clarified_run.run_id
+        assert source_run.metadata_json["demo"]["plan_version"] == {
+            "version_number": 1,
+            "source_run_id": None,
+            "source_selected_plan_id": None,
+        }
+        assert clarified_run.metadata_json["demo"]["plan_version"] == {
+            "version_number": 1,
+            "source_run_id": str(source_run.run_id),
+            "source_selected_plan_id": None,
+        }
+        assert source_run.metadata_json["workflow"]["clarification"] == {
+            "policy_version": "clarification_policy_v0",
+            "missing_fields": ["scenario_or_participants", "time_window"],
+            "question_text": "为了继续规划，请补充这次是谁一起去，以及大概什么时间出发、准备玩多久。",
+        }
+    finally:
+        db.close()
 
 
 def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:

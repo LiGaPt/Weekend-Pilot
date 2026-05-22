@@ -15,6 +15,7 @@ from backend.app.execution import DeterministicExecutionWorkflow, ExecutionWorkf
 from backend.app.feedback import DeterministicFeedbackWriter, FeedbackWriterError
 from backend.app.demo.action_manifest import summarize_action_manifest
 from backend.app.demo.versioning import (
+    build_clarification_plan_version_metadata,
     build_initial_plan_version_metadata,
     build_next_plan_version_metadata,
     summarize_plan_version,
@@ -39,6 +40,8 @@ from backend.app.workflow import (
     WeekendPilotWorkflowRunner,
 )
 from backend.app.demo.schemas import (
+    DemoClarificationSummary,
+    DemoClarifyRunRequest,
     DemoConfirmRunRequest,
     DemoDeclineRunRequest,
     DemoPlanPreview,
@@ -148,6 +151,89 @@ class DemoWorkflowService:
 
     def get_run(self, run_id: UUID) -> DemoRunSummary:
         return self.build_summary(run_id)
+
+    def clarify_run(self, run_id: UUID, request: DemoClarifyRunRequest) -> DemoRunSummary:
+        runs = AgentRunRepository(self.session)
+        source_run = self._load_run(runs, run_id)
+        self._validate_clarify_source_run(source_run)
+
+        source_session = ConversationSessionRepository(self.session).get_by_id(source_run.session_id)
+        if source_session is None or source_session.user_id != source_run.user_id:
+            raise DemoServiceError(409, "Source run session is unavailable for clarification.")
+
+        user = UserRepository(self.session).get_by_id(source_run.user_id)
+        if user is None:
+            raise DemoServiceError(409, "Source run user is unavailable for clarification.")
+
+        source_missing_fields = self._required_clarification_missing_fields(source_run)
+        merged_intent = build_follow_up_intent(
+            [
+                *self._session_user_turn_texts(source_session.session_id),
+                request.user_input,
+            ]
+        )
+
+        runner = WeekendPilotWorkflowRunner(
+            WeekendPilotWorkflowDependencies(
+                session=self.session,
+                cache=self.cache,
+                rate_limiter=self.rate_limiter,
+                trace_buffer_path=self.trace_buffer_path,
+            )
+        )
+        result = runner.run(
+            WeekendPilotWorkflowRequest(
+                user_input=request.user_input,
+                external_user_id=user.external_id,
+                display_name=user.display_name,
+                existing_user_id=source_run.user_id,
+                session_id=source_session.session_id,
+                case_id=source_run.case_id,
+                tool_profile=source_run.tool_profile,
+                world_profile=source_run.world_profile,
+                agent_version=source_run.agent_version,
+                prompt_version=source_run.prompt_version,
+                failure_profile=source_run.failure_profile,
+                auto_confirm=False,
+                selected_plan_index=request.selected_plan_index,
+                intent_override=merged_intent,
+            )
+        )
+        if result.run_id is None:
+            raise DemoServiceError(500, "Demo clarification workflow did not create a run.")
+
+        clarified_run = runs.get_by_id(result.run_id)
+        if clarified_run is None:
+            raise DemoServiceError(500, "Demo clarification run disappeared.")
+
+        clarification_turn = self._ensure_run_turn(
+            clarified_run,
+            speaker_role="user",
+            turn_type="user_clarification_reply",
+            content_text=request.user_input,
+            payload_json={
+                "mode": "clarify",
+                "source_run_id": str(source_run.run_id),
+                "source_missing_fields": source_missing_fields,
+            },
+        )
+        self._ensure_follow_up_presentation_turn(clarified_run, mode="clarify")
+        self._persist_demo_metadata(
+            clarified_run.run_id,
+            result,
+            conversation={
+                "mode": "clarification_turn_v0",
+                "source_run_id": str(source_run.run_id),
+                "trigger_turn_id": str(clarification_turn.turn_id),
+                "source_missing_fields": source_missing_fields,
+            },
+            plan_version=build_clarification_plan_version_metadata(
+                source_run.metadata_json,
+                source_run_id=source_run.run_id,
+            ),
+        )
+        self.session.commit()
+        return self.build_summary(clarified_run.run_id)
 
     def replan_run(self, run_id: UUID, request: DemoReplanRunRequest) -> DemoRunSummary:
         runs = AgentRunRepository(self.session)
@@ -333,6 +419,7 @@ class DemoWorkflowService:
             execution_status=execution.get("status") if isinstance(execution, dict) else None,
             feedback_status=feedback.get("status") if isinstance(feedback, dict) else None,
             error=self._error(run),
+            clarification=self._clarification_summary(run),
         )
 
     def _gateway(self) -> ToolGateway:
@@ -442,10 +529,7 @@ class DemoWorkflowService:
             content_text=request.user_input,
             payload_json={},
         )
-        self._ensure_selected_plan_turn(
-            run,
-            turn_type="assistant_plan_options",
-        )
+        self._ensure_initial_presentation_turn(run)
 
     def _ensure_demo_session(
         self,
@@ -541,6 +625,46 @@ class DemoWorkflowService:
             payload_json=payload,
         )
 
+    def _ensure_clarification_turn(self, run: AgentRun) -> None:
+        turn_type = "assistant_clarification_request"
+        existing_turn = self._run_turn_by_type(run.run_id, turn_type)
+        if existing_turn is not None:
+            return
+
+        clarification = self._required_clarification_summary(run)
+        ConversationTurnRepository(self.session).append(
+            session_id=self._required_session_id(run),
+            run_id=run.run_id,
+            speaker_role="assistant",
+            turn_type=turn_type,
+            content_text=clarification.prompt,
+            payload_json={
+                "missing_fields": clarification.missing_fields,
+                "run_status": run.status,
+            },
+        )
+
+    def _ensure_initial_presentation_turn(self, run: AgentRun) -> None:
+        if run.status == "awaiting_clarification":
+            self._ensure_clarification_turn(run)
+            return
+        self._ensure_selected_plan_turn(
+            run,
+            turn_type="assistant_plan_options",
+        )
+
+    def _ensure_follow_up_presentation_turn(self, run: AgentRun, *, mode: str) -> None:
+        if run.status == "awaiting_clarification":
+            self._ensure_clarification_turn(run)
+            return
+        turn_type = "assistant_replan_options" if mode == "replan" else "assistant_plan_options"
+        extra_payload = {"mode": mode} if mode == "replan" else None
+        self._ensure_selected_plan_turn(
+            run,
+            turn_type=turn_type,
+            extra_payload=extra_payload,
+        )
+
     def _run_turn_by_type(self, run_id: UUID, turn_type: str):
         turn_repo = ConversationTurnRepository(self.session)
         for turn in turn_repo.list_for_run(run_id):
@@ -600,6 +724,12 @@ class DemoWorkflowService:
 
         if source_run.status not in {"awaiting_confirmation", "declined", "completed", "failed"}:
             raise DemoServiceError(409, "Source run status does not allow replanning.")
+
+    def _validate_clarify_source_run(self, source_run: AgentRun) -> None:
+        if source_run.user_id is None or source_run.session_id is None:
+            raise DemoServiceError(409, "Source run is missing session persistence for clarification.")
+        if source_run.status != "awaiting_clarification":
+            raise DemoServiceError(409, "Source run status does not allow clarification.")
 
     def _append_continuation_history(self, run_id: UUID, steps: list[str]) -> None:
         runs = AgentRunRepository(self.session)
@@ -679,6 +809,31 @@ class DemoWorkflowService:
         if isinstance(demo, dict) and isinstance(demo.get("initial_error"), dict):
             return sanitize_demo_payload(demo["initial_error"])
         return None
+
+    def _clarification_summary(self, run: AgentRun) -> DemoClarificationSummary | None:
+        if run.status != "awaiting_clarification":
+            return None
+        return self._required_clarification_summary(run)
+
+    def _required_clarification_summary(self, run: AgentRun) -> DemoClarificationSummary:
+        metadata = self._metadata(run)
+        workflow = metadata.get("workflow")
+        if not isinstance(workflow, dict):
+            raise DemoServiceError(500, "Demo run is missing clarification workflow metadata.")
+        clarification = workflow.get("clarification")
+        if not isinstance(clarification, dict):
+            raise DemoServiceError(500, "Demo run is missing clarification details.")
+        prompt = clarification.get("question_text")
+        missing_fields = clarification.get("missing_fields")
+        if not isinstance(prompt, str) or not isinstance(missing_fields, list):
+            raise DemoServiceError(500, "Demo run clarification details are malformed.")
+        return DemoClarificationSummary(
+            prompt=prompt,
+            missing_fields=[field for field in missing_fields if isinstance(field, str)],
+        )
+
+    def _required_clarification_missing_fields(self, run: AgentRun) -> list[str]:
+        return self._required_clarification_summary(run).missing_fields
 
     def _action_count(self, run_id: UUID) -> int:
         return int(

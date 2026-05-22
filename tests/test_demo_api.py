@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+import backend.app.demo.schemas as demo_schemas
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -17,6 +18,7 @@ def test_create_app_includes_demo_routes() -> None:
 
     assert "/demo/runs" in paths
     assert "/demo/runs/{run_id}" in paths
+    assert "/demo/runs/{run_id}/clarify" in paths
     assert "/demo/runs/{run_id}/replan" in paths
     assert "/demo/runs/{run_id}/confirm" in paths
     assert "/demo/runs/{run_id}/decline" in paths
@@ -46,6 +48,12 @@ def test_start_request_rejects_empty_user_input() -> None:
 def test_replan_request_rejects_empty_user_input() -> None:
     with pytest.raises(ValidationError):
         DemoReplanRunRequest(user_input="")
+
+
+def test_clarify_request_rejects_empty_user_input() -> None:
+    assert hasattr(demo_schemas, "DemoClarifyRunRequest")
+    with pytest.raises(ValidationError):
+        demo_schemas.DemoClarifyRunRequest(user_input="")
 
 
 def test_sanitizer_removes_internal_and_sensitive_keys() -> None:
@@ -164,6 +172,60 @@ def test_demo_run_summary_requires_plan_version() -> None:
             feedback_status=None,
             error=None,
         )
+
+
+def test_demo_run_summary_serializes_clarification_payload() -> None:
+    summary = DemoRunSummary(
+        run_id=uuid4(),
+        status="awaiting_clarification",
+        selected_plan_id=None,
+        plan_version={
+            "version_number": 1,
+            "version_label": "v1",
+            "source_run_id": None,
+            "source_selected_plan_id": None,
+        },
+        plans=[],
+        action_count=0,
+        execution_status=None,
+        feedback_status=None,
+        error=None,
+        clarification={
+            "prompt": "为了继续规划，请补充这次是谁一起去，以及大概什么时间出发、准备玩多久。",
+            "missing_fields": ["scenario_or_participants", "time_window"],
+        },
+    )
+
+    dumped = summary.model_dump(mode="json")
+
+    assert dumped["clarification"] == {
+        "prompt": "为了继续规划，请补充这次是谁一起去，以及大概什么时间出发、准备玩多久。",
+        "missing_fields": ["scenario_or_participants", "time_window"],
+    }
+
+
+def test_demo_run_summary_allows_null_clarification_for_non_clarification_runs() -> None:
+    summary = DemoRunSummary(
+        run_id=uuid4(),
+        status="awaiting_confirmation",
+        selected_plan_id=None,
+        plan_version={
+            "version_number": 1,
+            "version_label": "v1",
+            "source_run_id": None,
+            "source_selected_plan_id": None,
+        },
+        plans=[],
+        action_count=0,
+        execution_status=None,
+        feedback_status=None,
+        error=None,
+        clarification=None,
+    )
+
+    dumped = summary.model_dump(mode="json")
+
+    assert dumped["clarification"] is None
 
 
 def test_demo_plan_preview_requires_action_manifest() -> None:

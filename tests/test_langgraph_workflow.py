@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+import backend.app.workflow.graph as workflow_graph
 from backend.app.agents import RecoveryDecision
 from backend.app.workflow import (
     WeekendPilotWorkflowDependencies,
@@ -31,7 +32,10 @@ class _StubNodes:
         return self._append(state, "load_memory")
 
     def generate_queries(self, state):
-        return self._append(state, "generate_queries")
+        updates = self._append(state, "generate_queries")
+        if state.get("generate_queries_status") is not None:
+            updates["status"] = state["generate_queries_status"]
+        return updates
 
     def execute_searches(self, state):
         return self._append(state, "execute_searches")
@@ -138,6 +142,13 @@ def test_confirmation_route_stops_when_awaiting_confirmation() -> None:
 
 def test_confirmation_route_continues_to_execute_when_confirmed() -> None:
     assert route_after_confirmation({"status": "completed", "auto_confirm": True}) == "saga_execution_engine"
+
+
+def test_generate_queries_route_stops_when_clarification_is_required() -> None:
+    assert hasattr(workflow_graph, "route_after_query_generation")
+    assert workflow_graph.route_after_query_generation({"status": "awaiting_clarification"}) == (
+        "awaiting_clarification"
+    )
 
 
 def test_validation_route_continues_to_final_review_for_passed_decision() -> None:
@@ -331,6 +342,23 @@ def test_graph_retry_recovery_loops_through_read_path_then_confirmation() -> Non
     )
 
 
+def test_graph_stops_after_generate_queries_when_clarification_is_required() -> None:
+    graph = build_weekend_pilot_graph(cast(Any, _StubNodes()))
+
+    result = graph.invoke(
+        {
+            "node_history": [],
+            "auto_confirm": False,
+            "generate_queries_status": "awaiting_clarification",
+        }
+    )
+
+    assert result["status"] == "awaiting_clarification"
+    assert "generate_queries" in result["node_history"]
+    assert "execute_searches" not in result["node_history"]
+    assert "wait_confirmation" not in result["node_history"]
+
+
 def test_workflow_request_accepts_supported_solo_profile_value() -> None:
     request = WeekendPilotWorkflowRequest(
         user_input="Plan a solo afternoon.",
@@ -372,3 +400,9 @@ def test_unsupported_profile_result_is_typed_and_does_not_raise() -> None:
     assert result.status == "error"
     assert result.error_json is not None
     assert result.error_json["error_type"] == "unsupported_profile"
+
+
+def test_runner_status_preserves_awaiting_clarification() -> None:
+    runner = WeekendPilotWorkflowRunner(cast(WeekendPilotWorkflowDependencies, object()))
+
+    assert runner._status_or_error("awaiting_clarification") == "awaiting_clarification"

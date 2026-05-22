@@ -1,6 +1,8 @@
 from backend.app.demo.schemas import (
     DemoActionManifestItemSummary,
     DemoActionManifestSummary,
+    DemoClarificationSummary,
+    DemoClarifyRunRequest,
     DemoConfirmRunRequest,
     DemoDeclineRunRequest,
     DemoPlanVersionSummary,
@@ -13,6 +15,8 @@ from backend.app.demo.service import DemoServiceError, DemoWorkflowService
 __all__ = [
     "DemoActionManifestItemSummary",
     "DemoActionManifestSummary",
+    "DemoClarificationSummary",
+    "DemoClarifyRunRequest",
     "DemoConfirmRunRequest",
     "DemoDeclineRunRequest",
     "DemoPlanVersionSummary",

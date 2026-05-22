@@ -55,7 +55,16 @@ def build_weekend_pilot_graph(nodes: WeekendPilotWorkflowNodes):
     graph.add_edge("initialize", "parse_intent")
     graph.add_edge("parse_intent", "load_memory")
     graph.add_edge("load_memory", "generate_queries")
-    graph.add_edge("generate_queries", "execute_searches")
+    graph.add_conditional_edges(
+        "generate_queries",
+        route_after_query_generation,
+        {
+            "execute_searches": "execute_searches",
+            "awaiting_clarification": END,
+            "failed": END,
+            "error": END,
+        },
+    )
     graph.add_edge("execute_searches", "populate_candidate_blackboard")
     graph.add_edge("populate_candidate_blackboard", "pre_flight_check_availability")
     graph.add_edge("pre_flight_check_availability", "logical_planner_agent")
@@ -96,6 +105,17 @@ def build_weekend_pilot_graph(nodes: WeekendPilotWorkflowNodes):
     graph.add_edge("generate_summary_message", END)
 
     return graph.compile()
+
+
+def route_after_query_generation(state: WeekendPilotWorkflowState | dict[str, Any]) -> str:
+    status = _state_value(state, "status")
+    if status == "awaiting_clarification":
+        return "awaiting_clarification"
+    if status == "failed":
+        return "failed"
+    if status == "error":
+        return "error"
+    return "execute_searches"
 
 
 def route_after_validation(state: WeekendPilotWorkflowState | dict[str, Any]) -> str:
