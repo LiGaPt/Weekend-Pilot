@@ -156,7 +156,7 @@ The benchmark harness runs file-based cases through the official LangGraph workf
 
 Each benchmark case fixture now requires a structured `taxonomy` block that captures suite, scenario bucket, benchmark level, tags, and failure mode. Each benchmark case report now includes both `run_summary` and `taxonomy`, and each suite `run-report.json` includes a compact `benchmark_summary` envelope with `matrix_summary` alongside the existing timing summary so scenario coverage can be compared deterministically as the suite expands.
 
-The repository now keeps three named benchmark suites in code: `default` for the current six-case non-failure baseline, `failures` for the explicit failure-injection cases, and `all_registered` for the full current fixture inventory. Suite descriptions derive their `matrix_summary` from the existing case taxonomy so expansion stays reviewable.
+The repository now keeps three named benchmark suites in code: `default` for the current ten-case non-failure scenario pack, `failures` for the explicit failure-injection cases, and `all_registered` for the full current fixture inventory. The default suite now expands beyond the original family-plus-solo baseline to include couple, friends-group, rainy-day fallback, and budget-lite coverage while keeping the failure case separate. Suite descriptions derive their `matrix_summary` from the existing case taxonomy so expansion stays reviewable.
 
 ```bash
 docker compose up -d postgres redis

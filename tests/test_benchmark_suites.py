@@ -21,27 +21,91 @@ REGISTERED_CASE_IDS = [
     "family_memory_override_v1",
     "family_citywalk_addon_v1",
     "solo_afternoon_v1",
+    "couple_afternoon_v1",
+    "friends_gathering_v1",
+    "rainy_day_fallback_v1",
+    "budget_lite_v1",
     "family_route_failure_v1",
 ]
 
 DEFAULT_CASE_IDS = REGISTERED_CASE_IDS[:-1]
 FAILURE_CASE_IDS = ["family_route_failure_v1"]
-ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {"family": 6, "solo": 1}
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 4}
-ALL_REGISTERED_WORLD_PROFILE_COUNTS = {"family_afternoon": 6, "solo_afternoon": 1}
-ALL_REGISTERED_FAILURE_MODE_COUNTS = {"none": 6, "route_unavailable": 1}
-ALL_REGISTERED_TAG_COUNTS = {
+DEFAULT_SCENARIO_BUCKET_COUNTS = {
+    "couple": 1,
+    "family": 5,
+    "friends": 1,
+    "mixed": 1,
+    "solo": 1,
+    "unknown": 1,
+}
+DEFAULT_LEVEL_COUNTS = {"L1": 3, "L2": 7}
+DEFAULT_WORLD_PROFILE_COUNTS = {
+    "budget_lite": 1,
+    "couple_afternoon": 1,
+    "family_afternoon": 5,
+    "friends_gathering": 1,
+    "rainy_day_fallback": 1,
+    "solo_afternoon": 1,
+}
+DEFAULT_FAILURE_MODE_COUNTS = {"none": 10}
+DEFAULT_TAG_COUNTS = {
     "addon_optional": 1,
     "baseline": 2,
-    "child_friendly": 6,
-    "citywalk": 1,
-    "failure_injected": 1,
-    "indoor_activity": 2,
+    "budget_limited": 1,
+    "casual_dining": 1,
+    "child_friendly": 5,
+    "citywalk": 2,
+    "date_friendly": 1,
+    "fallback": 1,
+    "free_activity": 1,
+    "friends_group": 1,
+    "indoor_activity": 3,
     "light_activity": 1,
     "light_meal": 5,
     "memory_override": 1,
-    "outdoor_activity": 1,
+    "outdoor_activity": 2,
     "quick_dinner": 1,
+    "quick_meal": 1,
+    "rainy_day": 1,
+}
+ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
+    "couple": 1,
+    "family": 6,
+    "friends": 1,
+    "mixed": 1,
+    "solo": 1,
+    "unknown": 1,
+}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8}
+ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
+    "budget_lite": 1,
+    "couple_afternoon": 1,
+    "family_afternoon": 6,
+    "friends_gathering": 1,
+    "rainy_day_fallback": 1,
+    "solo_afternoon": 1,
+}
+ALL_REGISTERED_FAILURE_MODE_COUNTS = {"none": 10, "route_unavailable": 1}
+ALL_REGISTERED_TAG_COUNTS = {
+    "addon_optional": 1,
+    "baseline": 2,
+    "budget_limited": 1,
+    "casual_dining": 1,
+    "child_friendly": 6,
+    "citywalk": 2,
+    "date_friendly": 1,
+    "failure_injected": 1,
+    "fallback": 1,
+    "free_activity": 1,
+    "friends_group": 1,
+    "indoor_activity": 3,
+    "light_activity": 1,
+    "light_meal": 6,
+    "memory_override": 1,
+    "outdoor_activity": 2,
+    "quick_dinner": 1,
+    "quick_meal": 1,
+    "rainy_day": 1,
     "route_failure": 1,
 }
 
@@ -63,7 +127,7 @@ def test_list_benchmark_suite_ids_for_case_returns_expected_membership() -> None
         "default",
         "all_registered",
     ]
-    assert benchmark_suites.list_benchmark_suite_ids_for_case("solo_afternoon_v1") == [
+    assert benchmark_suites.list_benchmark_suite_ids_for_case("couple_afternoon_v1") == [
         "default",
         "all_registered",
     ]
@@ -89,9 +153,18 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
     assert [suite.suite_id for suite in suites] == ["default", "failures", "all_registered"]
     assert all(isinstance(suite, BenchmarkSuiteDescription) for suite in suites)
 
+    default = suites[0]
+    assert default.case_ids == DEFAULT_CASE_IDS
+    assert default.case_count == 10
+    assert default.matrix_summary.scenario_bucket_counts == DEFAULT_SCENARIO_BUCKET_COUNTS
+    assert default.matrix_summary.level_counts == DEFAULT_LEVEL_COUNTS
+    assert default.matrix_summary.world_profile_counts == DEFAULT_WORLD_PROFILE_COUNTS
+    assert default.matrix_summary.failure_mode_counts == DEFAULT_FAILURE_MODE_COUNTS
+    assert default.matrix_summary.tag_counts == DEFAULT_TAG_COUNTS
+
     all_registered = suites[2]
     assert all_registered.case_ids == REGISTERED_CASE_IDS
-    assert all_registered.case_count == 7
+    assert all_registered.case_count == 11
     assert all_registered.matrix_summary.scenario_bucket_counts == ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
     assert all_registered.matrix_summary.level_counts == ALL_REGISTERED_LEVEL_COUNTS
     assert all_registered.matrix_summary.world_profile_counts == ALL_REGISTERED_WORLD_PROFILE_COUNTS

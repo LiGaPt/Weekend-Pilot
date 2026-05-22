@@ -10,6 +10,10 @@ from backend.app.providers.mock_world.errors import MockWorldError
 SUPPORTED_PROFILES = {
     "family_afternoon": "family_afternoon.json",
     "solo_afternoon": "solo_afternoon.json",
+    "couple_afternoon": "couple_afternoon.json",
+    "friends_gathering": "friends_gathering.json",
+    "rainy_day_fallback": "rainy_day_fallback.json",
+    "budget_lite": "budget_lite.json",
 }
 REQUIRED_TOP_LEVEL_KEYS = {
     "profile",

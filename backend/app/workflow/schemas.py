@@ -21,7 +21,14 @@ class WeekendPilotWorkflowRequest(BaseModel):
     agent_version: str = "agent-v1"
     prompt_version: str = "prompt-v1"
     tool_profile: Literal["mock_world"] = "mock_world"
-    world_profile: Literal["family_afternoon", "solo_afternoon"] = "family_afternoon"
+    world_profile: Literal[
+        "family_afternoon",
+        "solo_afternoon",
+        "couple_afternoon",
+        "friends_gathering",
+        "rainy_day_fallback",
+        "budget_lite",
+    ] = "family_afternoon"
     failure_profile: str | None = None
     auto_confirm: bool = False
     selected_plan_index: int = Field(default=0, ge=0)
