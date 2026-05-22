@@ -24,8 +24,10 @@ from backend.app.planning import (
     CandidateEnricher,
     DeterministicIntentParser,
     DeterministicQueryPlanner,
+    IntentParseSignals,
     LocalLifeIntent,
     QueryPlanExecutor,
+    apply_memory_query_policy,
 )
 from backend.app.plans import ReviewedPlanPersistenceService
 from backend.app.providers.mock_world import build_mock_world_registry
@@ -133,8 +135,19 @@ class WeekendPilotWorkflowNodes:
 
     def parse_intent(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         intent_override = self._intent_override(state)
-        intent = intent_override or DeterministicIntentParser().parse(self._required_text(state, "user_input"))
-        return self._updates(state, "parse_intent", parsed_intent=intent)
+        if intent_override is not None:
+            intent = intent_override
+            signals = self._intent_override_signals(intent_override)
+        else:
+            parsed = DeterministicIntentParser().parse_with_signals(self._required_text(state, "user_input"))
+            intent = parsed.intent
+            signals = parsed.signals
+        return self._updates(
+            state,
+            "parse_intent",
+            parsed_intent=intent,
+            intent_parse_signals=signals,
+        )
 
     def load_memory(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         user_id = self._required_uuid(state, "user_id")
@@ -145,8 +158,17 @@ class WeekendPilotWorkflowNodes:
         return self._updates(state, "load_memory", active_memories=memories)
 
     def generate_queries(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
-        query_plan = DeterministicQueryPlanner().build(
+        effective_intent, memory_policy = apply_memory_query_policy(
             self._required_value(state, "parsed_intent"),
+            self._required_value(state, "intent_parse_signals"),
+            list(state.get("active_memories", []) or []),
+        )
+        self._persist_workflow_memory_policy(
+            self._required_uuid(state, "run_id"),
+            memory_policy.model_dump(mode="json"),
+        )
+        query_plan = DeterministicQueryPlanner().build(
+            effective_intent,
             provider_profile=self._required_text(state, "tool_profile"),
         )
         agent_result, assignment_plan = self.supervisor_agent.assign(
@@ -535,6 +557,18 @@ class WeekendPilotWorkflowNodes:
         metadata["workflow"] = workflow
         self.repositories.runs.update_metadata_json(run_id, metadata)
 
+    def _persist_workflow_memory_policy(self, run_id: UUID, memory_policy: dict[str, Any]) -> None:
+        run = self.repositories.runs.get_by_id(run_id)
+        if run is None:
+            return
+        metadata = deepcopy(run.metadata_json) if isinstance(run.metadata_json, dict) else {}
+        workflow = metadata.get("workflow")
+        if not isinstance(workflow, dict):
+            workflow = {}
+        workflow["memory_policy"] = memory_policy
+        metadata["workflow"] = workflow
+        self.repositories.runs.update_metadata_json(run_id, metadata)
+
     def _fail(
         self,
         state: WeekendPilotWorkflowState,
@@ -747,6 +781,31 @@ class WeekendPilotWorkflowNodes:
         if isinstance(value, LocalLifeIntent):
             return value
         return None
+
+    def _intent_override_signals(self, intent: LocalLifeIntent) -> IntentParseSignals:
+        return IntentParseSignals(
+            scenario_or_participants=(
+                intent.scenario_type != "unknown"
+                or intent.participants.adults != 1
+                or bool(intent.participants.children_ages)
+            ),
+            time_window=any(
+                value is not None
+                for value in (
+                    intent.time_window.label,
+                    intent.time_window.start_at,
+                    intent.time_window.end_at,
+                    intent.time_window.duration_hours_min,
+                    intent.time_window.duration_hours_max,
+                )
+            ),
+            max_distance_km=intent.constraints.max_distance_km is not None,
+            dining_preferences=bool(intent.dining_preferences),
+            activity_preferences=any(
+                preference in {"citywalk", "indoor", "outdoor"}
+                for preference in intent.activity_preferences
+            ),
+        )
 
     def _error_json(self, error_type: str, message: str, exc: Exception) -> dict[str, Any]:
         return {

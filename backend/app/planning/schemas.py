@@ -55,6 +55,7 @@ class IntentParseSignals(BaseModel):
     time_window: bool = False
     max_distance_km: bool = False
     dining_preferences: bool = False
+    activity_preferences: bool = False
 
 
 class IntentParseResult(BaseModel):
