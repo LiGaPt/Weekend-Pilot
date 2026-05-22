@@ -17,6 +17,10 @@ _REGISTERED_CASE_IDS = (
     "family_memory_override_v1",
     "family_citywalk_addon_v1",
     "solo_afternoon_v1",
+    "couple_afternoon_v1",
+    "friends_gathering_v1",
+    "rainy_day_fallback_v1",
+    "budget_lite_v1",
     "family_route_failure_v1",
 )
 

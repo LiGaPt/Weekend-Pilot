@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from backend.app.benchmark import (
     load_benchmark_case,
+    load_benchmark_suite,
     load_default_benchmark_cases,
     load_failure_benchmark_cases,
 )
@@ -70,6 +71,10 @@ DEFAULT_CASE_IDS = (
     "family_memory_override_v1",
     "family_citywalk_addon_v1",
     "solo_afternoon_v1",
+    "couple_afternoon_v1",
+    "friends_gathering_v1",
+    "rainy_day_fallback_v1",
+    "budget_lite_v1",
 )
 FAILURE_CASE_IDS = ("family_route_failure_v1",)
 REQUIRED_CASE_TOOL_NAMES = {
@@ -82,21 +87,83 @@ REQUIRED_CASE_TOOL_NAMES = {
     "check_ticket_availability",
     "check_route",
 }
-DEFAULT_SCENARIO_BUCKET_COUNTS = {"family": 5, "solo": 1}
-DEFAULT_LEVEL_COUNTS = {"L1": 3, "L2": 3}
-DEFAULT_WORLD_PROFILE_COUNTS = {"family_afternoon": 5, "solo_afternoon": 1}
-DEFAULT_FAILURE_MODE_COUNTS = {"none": 6}
+DEFAULT_SCENARIO_BUCKET_COUNTS = {
+    "couple": 1,
+    "family": 5,
+    "friends": 1,
+    "mixed": 1,
+    "solo": 1,
+    "unknown": 1,
+}
+DEFAULT_LEVEL_COUNTS = {"L1": 3, "L2": 7}
+DEFAULT_WORLD_PROFILE_COUNTS = {
+    "budget_lite": 1,
+    "couple_afternoon": 1,
+    "family_afternoon": 5,
+    "friends_gathering": 1,
+    "rainy_day_fallback": 1,
+    "solo_afternoon": 1,
+}
+DEFAULT_FAILURE_MODE_COUNTS = {"none": 10}
 DEFAULT_TAG_COUNTS = {
     "addon_optional": 1,
     "baseline": 2,
+    "budget_limited": 1,
+    "casual_dining": 1,
     "child_friendly": 5,
-    "citywalk": 1,
-    "indoor_activity": 2,
+    "citywalk": 2,
+    "date_friendly": 1,
+    "fallback": 1,
+    "free_activity": 1,
+    "friends_group": 1,
+    "indoor_activity": 3,
     "light_activity": 1,
-    "light_meal": 4,
+    "light_meal": 5,
     "memory_override": 1,
-    "outdoor_activity": 1,
+    "outdoor_activity": 2,
     "quick_dinner": 1,
+    "quick_meal": 1,
+    "rainy_day": 1,
+}
+ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
+    "couple": 1,
+    "family": 6,
+    "friends": 1,
+    "mixed": 1,
+    "solo": 1,
+    "unknown": 1,
+}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8}
+ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
+    "budget_lite": 1,
+    "couple_afternoon": 1,
+    "family_afternoon": 6,
+    "friends_gathering": 1,
+    "rainy_day_fallback": 1,
+    "solo_afternoon": 1,
+}
+ALL_REGISTERED_FAILURE_MODE_COUNTS = {"none": 10, "route_unavailable": 1}
+ALL_REGISTERED_TAG_COUNTS = {
+    "addon_optional": 1,
+    "baseline": 2,
+    "budget_limited": 1,
+    "casual_dining": 1,
+    "child_friendly": 6,
+    "citywalk": 2,
+    "date_friendly": 1,
+    "failure_injected": 1,
+    "fallback": 1,
+    "free_activity": 1,
+    "friends_group": 1,
+    "indoor_activity": 3,
+    "light_activity": 1,
+    "light_meal": 6,
+    "memory_override": 1,
+    "outdoor_activity": 2,
+    "quick_dinner": 1,
+    "quick_meal": 1,
+    "rainy_day": 1,
+    "route_failure": 1,
 }
 EXPECTED_TAXONOMY_BY_CASE = {
     "family_afternoon_v1": _taxonomy_payload(
@@ -129,6 +196,26 @@ EXPECTED_TAXONOMY_BY_CASE = {
         level="L1",
         tags=["baseline", "light_activity", "light_meal"],
     ),
+    "couple_afternoon_v1": _taxonomy_payload(
+        scenario_bucket="couple",
+        level="L2",
+        tags=["citywalk", "date_friendly", "light_meal"],
+    ),
+    "friends_gathering_v1": _taxonomy_payload(
+        scenario_bucket="friends",
+        level="L2",
+        tags=["casual_dining", "friends_group", "outdoor_activity"],
+    ),
+    "rainy_day_fallback_v1": _taxonomy_payload(
+        scenario_bucket="mixed",
+        level="L2",
+        tags=["fallback", "indoor_activity", "rainy_day"],
+    ),
+    "budget_lite_v1": _taxonomy_payload(
+        scenario_bucket="unknown",
+        level="L2",
+        tags=["budget_limited", "free_activity", "quick_meal"],
+    ),
     "family_route_failure_v1": _taxonomy_payload(
         scenario_bucket="family",
         level="L2",
@@ -142,7 +229,7 @@ def test_default_fixtures_load_as_ordered_benchmark_cases() -> None:
     cases = load_default_benchmark_cases()
 
     assert [case.case_id for case in cases] == list(DEFAULT_CASE_IDS)
-    assert len(cases) == 6
+    assert len(cases) == 10
     assert all(isinstance(case, BenchmarkCase) for case in cases)
 
 
@@ -183,18 +270,36 @@ def test_default_fixtures_use_supported_mock_world_profiles() -> None:
     cases = load_default_benchmark_cases()
 
     assert {case.tool_profile for case in cases} == {"mock_world"}
-    assert {case.world_profile for case in cases} == {"family_afternoon", "solo_afternoon"}
+    assert {case.world_profile for case in cases} == {
+        "budget_lite",
+        "couple_afternoon",
+        "family_afternoon",
+        "friends_gathering",
+        "rainy_day_fallback",
+        "solo_afternoon",
+    }
 
 
 def test_default_case_matrix_summary_counts_are_expected() -> None:
     summary = build_case_matrix_summary(load_default_benchmark_cases())
 
-    assert summary.case_count == 6
+    assert summary.case_count == 10
     assert summary.scenario_bucket_counts == DEFAULT_SCENARIO_BUCKET_COUNTS
     assert summary.level_counts == DEFAULT_LEVEL_COUNTS
     assert summary.world_profile_counts == DEFAULT_WORLD_PROFILE_COUNTS
     assert summary.failure_mode_counts == DEFAULT_FAILURE_MODE_COUNTS
     assert summary.tag_counts == DEFAULT_TAG_COUNTS
+
+
+def test_all_registered_case_matrix_summary_counts_are_expected() -> None:
+    summary = build_case_matrix_summary(load_benchmark_suite("all_registered"))
+
+    assert summary.case_count == 11
+    assert summary.scenario_bucket_counts == ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
+    assert summary.level_counts == ALL_REGISTERED_LEVEL_COUNTS
+    assert summary.world_profile_counts == ALL_REGISTERED_WORLD_PROFILE_COUNTS
+    assert summary.failure_mode_counts == ALL_REGISTERED_FAILURE_MODE_COUNTS
+    assert summary.tag_counts == ALL_REGISTERED_TAG_COUNTS
 
 
 def test_default_fixtures_include_v1_metadata_and_expected_tools() -> None:
@@ -212,14 +317,60 @@ def test_default_fixtures_include_v1_metadata_and_expected_tools() -> None:
         assert case.expected.expected_feedback_status == "completed"
 
 
-def test_solo_afternoon_fixture_uses_expected_profile_and_focus() -> None:
-    case = load_benchmark_case("solo_afternoon_v1")
+@pytest.mark.parametrize(
+    ("case_id", "world_profile", "scenario_bucket", "tags", "focus"),
+    [
+        (
+            "solo_afternoon_v1",
+            "solo_afternoon",
+            "solo",
+            ["baseline", "light_activity", "light_meal"],
+            "baseline_solo_afternoon",
+        ),
+        (
+            "couple_afternoon_v1",
+            "couple_afternoon",
+            "couple",
+            ["citywalk", "date_friendly", "light_meal"],
+            "baseline_couple_citywalk",
+        ),
+        (
+            "friends_gathering_v1",
+            "friends_gathering",
+            "friends",
+            ["casual_dining", "friends_group", "outdoor_activity"],
+            "friends_group_hangout",
+        ),
+        (
+            "rainy_day_fallback_v1",
+            "rainy_day_fallback",
+            "mixed",
+            ["fallback", "indoor_activity", "rainy_day"],
+            "rainy_day_indoor_fallback",
+        ),
+        (
+            "budget_lite_v1",
+            "budget_lite",
+            "unknown",
+            ["budget_limited", "free_activity", "quick_meal"],
+            "budget_lite_low_cost_route",
+        ),
+    ],
+)
+def test_fixture_uses_expected_profile_taxonomy_and_focus(
+    case_id: str,
+    world_profile: str,
+    scenario_bucket: str,
+    tags: list[str],
+    focus: str,
+) -> None:
+    case = load_benchmark_case(case_id)
 
     assert case.tool_profile == "mock_world"
-    assert case.world_profile == "solo_afternoon"
-    assert case.taxonomy.scenario_bucket == "solo"
-    assert case.taxonomy.tags == ["baseline", "light_activity", "light_meal"]
-    assert case.metadata["focus"] == "baseline_solo_afternoon"
+    assert case.world_profile == world_profile
+    assert case.taxonomy.scenario_bucket == scenario_bucket
+    assert case.taxonomy.tags == tags
+    assert case.metadata["focus"] == focus
 
 
 def test_unknown_case_raises_benchmark_harness_error() -> None:

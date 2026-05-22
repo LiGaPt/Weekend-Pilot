@@ -1,0 +1,184 @@
+{
+  "profile": "budget_lite",
+  "location": {
+    "city": "上海",
+    "area": "普陀"
+  },
+  "pois": [
+    {
+      "poi_id": "activity_park_501",
+      "name": "河边免费公园步道",
+      "category": "activity",
+      "address": "上海市普陀区光复西路218号附近",
+      "location": {
+        "lat": 31.2447,
+        "lng": 121.4203
+      },
+      "tags": ["free_activity", "light_activity", "outdoor"],
+      "description": "完全免费、走起来轻松的公园步道，适合预算有限时先安排低成本活动。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "00:00",
+            "end": "23:59"
+          }
+        ],
+        "last_entry": null
+      },
+      "sort_order": 10
+    },
+    {
+      "poi_id": "activity_gallery_501",
+      "name": "社区免费展廊",
+      "category": "activity",
+      "address": "上海市普陀区岚皋路88号",
+      "location": {
+        "lat": 31.2385,
+        "lng": 121.4144
+      },
+      "tags": ["free_activity", "indoor", "quiet"],
+      "description": "社区里的免费小展廊，下雨或太热时也能作为低成本备选。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "13:00",
+            "end": "18:30"
+          }
+        ],
+        "last_entry": "18:00"
+      },
+      "sort_order": 20
+    },
+    {
+      "poi_id": "restaurant_bento_501",
+      "name": "平价便当小馆",
+      "category": "dining",
+      "address": "上海市普陀区中山北路166号",
+      "location": {
+        "lat": 31.2428,
+        "lng": 121.4181
+      },
+      "tags": ["budget_limited", "quick_meal", "value_set"],
+      "description": "套餐价格低、上餐快，适合预算有限时控制总花费。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "10:30",
+            "end": "21:00"
+          }
+        ],
+        "last_entry": "20:30"
+      },
+      "sort_order": 30
+    },
+    {
+      "poi_id": "restaurant_noodle_501",
+      "name": "街坊面馆",
+      "category": "dining",
+      "address": "上海市普陀区铜川路98号",
+      "location": {
+        "lat": 31.2404,
+        "lng": 121.4137
+      },
+      "tags": ["budget_limited", "quick_meal"],
+      "description": "价格平实、翻台快，适合不想在吃饭上花太多预算。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "10:00",
+            "end": "21:30"
+          }
+        ],
+        "last_entry": "21:00"
+      },
+      "sort_order": 40
+    }
+  ],
+  "routes": [
+    {
+      "origin_id": "activity_park_501",
+      "destination_id": "restaurant_bento_501",
+      "mode": "walking",
+      "distance_meters": 430,
+      "duration_minutes": 6,
+      "summary": "从公园出来步行到便当店很近，路线直接。"
+    },
+    {
+      "origin_id": "activity_park_501",
+      "destination_id": "restaurant_noodle_501",
+      "mode": "walking",
+      "distance_meters": 620,
+      "duration_minutes": 9,
+      "summary": "沿主路走即可到面馆，步行强度低。"
+    },
+    {
+      "origin_id": "activity_gallery_501",
+      "destination_id": "restaurant_bento_501",
+      "mode": "walking",
+      "distance_meters": 570,
+      "duration_minutes": 8,
+      "summary": "从展廊步行到便当店距离适中。"
+    }
+  ],
+  "weather": {
+    "location": "普陀",
+    "date": "2026-05-16",
+    "condition": "多云",
+    "temperature_c": 25,
+    "precipitation_chance": 0.18,
+    "advisory": "天气稳定，适合选择低成本户外路线。"
+  },
+  "queues": {
+    "queue_restaurant_bento_501": {
+      "queue_id": "queue_restaurant_bento_501",
+      "poi_id": "restaurant_bento_501",
+      "status": "open",
+      "wait_minutes": 5,
+      "parties_ahead": 1
+    },
+    "queue_restaurant_noodle_501": {
+      "queue_id": "queue_restaurant_noodle_501",
+      "poi_id": "restaurant_noodle_501",
+      "status": "open",
+      "wait_minutes": 4,
+      "parties_ahead": 1
+    }
+  },
+  "table_availability": {
+    "restaurant_bento_501": {
+      "restaurant_id": "restaurant_bento_501",
+      "available": true,
+      "time_slots": ["17:00", "17:30", "18:00", "18:30"],
+      "max_party_size": 2,
+      "notes": "便当档口旁的堂食位可直接落座。"
+    },
+    "restaurant_noodle_501": {
+      "restaurant_id": "restaurant_noodle_501",
+      "available": true,
+      "time_slots": ["17:00", "17:30", "18:00", "18:30"],
+      "max_party_size": 2,
+      "notes": "适合一个人或两人快速吃完。"
+    }
+  },
+  "ticket_availability": {
+    "activity_park_501": {
+      "poi_id": "activity_park_501",
+      "available": true,
+      "time_slots": ["14:00", "15:00", "16:00"],
+      "remaining": 99,
+      "price_cents": 0
+    },
+    "activity_gallery_501": {
+      "poi_id": "activity_gallery_501",
+      "available": true,
+      "time_slots": ["14:30", "15:30", "16:30"],
+      "remaining": 30,
+      "price_cents": 0
+    }
+  },
+  "addons": []
+}

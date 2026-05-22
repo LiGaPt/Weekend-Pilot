@@ -1,0 +1,184 @@
+{
+  "profile": "couple_afternoon",
+  "location": {
+    "city": "上海",
+    "area": "徐汇"
+  },
+  "pois": [
+    {
+      "poi_id": "activity_citywalk_201",
+      "name": "衡复安静街区漫步",
+      "category": "activity",
+      "address": "上海市徐汇区复兴西路118号附近",
+      "location": {
+        "lat": 31.2051,
+        "lng": 121.4428
+      },
+      "tags": ["citywalk", "child_friendly", "light_activity", "outdoor", "quiet"],
+      "description": "树荫比较多的安静街区 citywalk，适合轻松散步、慢慢逛书店和小店。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "00:00",
+            "end": "23:59"
+          }
+        ],
+        "last_entry": null
+      },
+      "sort_order": 10
+    },
+    {
+      "poi_id": "activity_gallery_201",
+      "name": "梧桐里小型画廊",
+      "category": "activity",
+      "address": "上海市徐汇区乌鲁木齐南路66号",
+      "location": {
+        "lat": 31.2017,
+        "lng": 121.4379
+      },
+      "tags": ["child_friendly", "indoor", "quiet", "gallery"],
+      "description": "体量不大的艺术空间，节奏安静，适合下雨或想坐下来慢看的时候。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "13:00",
+            "end": "18:00"
+          }
+        ],
+        "last_entry": "17:30"
+      },
+      "sort_order": 20
+    },
+    {
+      "poi_id": "restaurant_light_201",
+      "name": "花园轻食小馆",
+      "category": "dining",
+      "address": "上海市徐汇区安福路136号",
+      "location": {
+        "lat": 31.2041,
+        "lng": 121.4402
+      },
+      "tags": ["child_friendly", "lighter_options", "light_meal", "quiet"],
+      "description": "偏安静的轻食餐厅，沙拉、暖碗和清淡主菜选择多，适合 citywalk 后坐下来慢慢吃。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:00",
+            "end": "21:00"
+          }
+        ],
+        "last_entry": "20:30"
+      },
+      "sort_order": 30
+    },
+    {
+      "poi_id": "restaurant_bistro_201",
+      "name": "街角小酒馆",
+      "category": "dining",
+      "address": "上海市徐汇区武康路212号",
+      "location": {
+        "lat": 31.2062,
+        "lng": 121.4388
+      },
+      "tags": ["child_friendly", "casual", "quiet"],
+      "description": "座位不多的街角小馆，氛围轻松，适合散步后继续聊天。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:30",
+            "end": "22:00"
+          }
+        ],
+        "last_entry": "21:30"
+      },
+      "sort_order": 40
+    }
+  ],
+  "routes": [
+    {
+      "origin_id": "activity_citywalk_201",
+      "destination_id": "restaurant_light_201",
+      "mode": "walking",
+      "distance_meters": 680,
+      "duration_minutes": 10,
+      "summary": "沿梧桐街道慢走就能到，路程安静，适合继续散步。"
+    },
+    {
+      "origin_id": "activity_citywalk_201",
+      "destination_id": "restaurant_bistro_201",
+      "mode": "walking",
+      "distance_meters": 720,
+      "duration_minutes": 11,
+      "summary": "街区步行连接顺畅，路口不多。"
+    },
+    {
+      "origin_id": "activity_gallery_201",
+      "destination_id": "restaurant_light_201",
+      "mode": "walking",
+      "distance_meters": 520,
+      "duration_minutes": 8,
+      "summary": "从画廊出来步行几分钟即可到轻食餐厅。"
+    }
+  ],
+  "weather": {
+    "location": "徐汇",
+    "date": "2026-05-16",
+    "condition": "多云",
+    "temperature_c": 24,
+    "precipitation_chance": 0.12,
+    "advisory": "天气适合慢走和轻量户外活动，晚些时候气温舒适。"
+  },
+  "queues": {
+    "queue_restaurant_light_201": {
+      "queue_id": "queue_restaurant_light_201",
+      "poi_id": "restaurant_light_201",
+      "status": "open",
+      "wait_minutes": 8,
+      "parties_ahead": 1
+    },
+    "queue_restaurant_bistro_201": {
+      "queue_id": "queue_restaurant_bistro_201",
+      "poi_id": "restaurant_bistro_201",
+      "status": "open",
+      "wait_minutes": 15,
+      "parties_ahead": 3
+    }
+  },
+  "table_availability": {
+    "restaurant_light_201": {
+      "restaurant_id": "restaurant_light_201",
+      "available": true,
+      "time_slots": ["17:30", "18:00", "18:30"],
+      "max_party_size": 2,
+      "notes": "靠窗双人位可订。"
+    },
+    "restaurant_bistro_201": {
+      "restaurant_id": "restaurant_bistro_201",
+      "available": true,
+      "time_slots": ["18:00", "18:30", "19:00"],
+      "max_party_size": 2,
+      "notes": "适合两人慢慢用餐。"
+    }
+  },
+  "ticket_availability": {
+    "activity_citywalk_201": {
+      "poi_id": "activity_citywalk_201",
+      "available": true,
+      "time_slots": ["14:00", "15:00", "16:00"],
+      "remaining": 99,
+      "price_cents": 0
+    },
+    "activity_gallery_201": {
+      "poi_id": "activity_gallery_201",
+      "available": true,
+      "time_slots": ["14:30", "15:30", "16:30"],
+      "remaining": 18,
+      "price_cents": 3800
+    }
+  },
+  "addons": []
+}

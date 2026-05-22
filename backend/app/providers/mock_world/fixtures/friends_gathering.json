@@ -1,0 +1,184 @@
+{
+  "profile": "friends_gathering",
+  "location": {
+    "city": "上海",
+    "area": "长宁"
+  },
+  "pois": [
+    {
+      "poi_id": "activity_lawn_301",
+      "name": "苏河边草坪聚会点",
+      "category": "activity",
+      "address": "上海市长宁区临空一路88号附近",
+      "location": {
+        "lat": 31.2219,
+        "lng": 121.3876
+      },
+      "tags": ["group_friendly", "outdoor", "light_activity", "hangout"],
+      "description": "开阔的草坪和沿河步道，适合朋友见面、散步和聊天。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "00:00",
+            "end": "23:59"
+          }
+        ],
+        "last_entry": null
+      },
+      "sort_order": 10
+    },
+    {
+      "poi_id": "activity_sports_301",
+      "name": "街区运动公园",
+      "category": "activity",
+      "address": "上海市长宁区福泉北路198号",
+      "location": {
+        "lat": 31.2194,
+        "lng": 121.3928
+      },
+      "tags": ["group_friendly", "outdoor", "sports"],
+      "description": "适合朋友们轻松活动、打卡和轮流拍照的开放式公园。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "09:00",
+            "end": "20:30"
+          }
+        ],
+        "last_entry": "20:00"
+      },
+      "sort_order": 20
+    },
+    {
+      "poi_id": "restaurant_yard_301",
+      "name": "庭院分享餐吧",
+      "category": "dining",
+      "address": "上海市长宁区天山西路58号",
+      "location": {
+        "lat": 31.2203,
+        "lng": 121.3901
+      },
+      "tags": ["casual_dining", "friends_group", "sharing_plates"],
+      "description": "适合朋友边吃边聊的庭院餐吧，菜量和拼盘更适合多人分享。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:00",
+            "end": "22:00"
+          }
+        ],
+        "last_entry": "21:30"
+      },
+      "sort_order": 30
+    },
+    {
+      "poi_id": "restaurant_noodle_301",
+      "name": "朋友局面馆",
+      "category": "dining",
+      "address": "上海市长宁区协和路126号",
+      "location": {
+        "lat": 31.2179,
+        "lng": 121.3954
+      },
+      "tags": ["casual", "quick_meal"],
+      "description": "节奏轻松的面馆，适合不想排太久时快速落座。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "10:30",
+            "end": "21:30"
+          }
+        ],
+        "last_entry": "21:00"
+      },
+      "sort_order": 40
+    }
+  ],
+  "routes": [
+    {
+      "origin_id": "activity_lawn_301",
+      "destination_id": "restaurant_yard_301",
+      "mode": "walking",
+      "distance_meters": 540,
+      "duration_minutes": 8,
+      "summary": "沿河步道直接步行到餐吧，路线平坦。"
+    },
+    {
+      "origin_id": "activity_lawn_301",
+      "destination_id": "restaurant_noodle_301",
+      "mode": "walking",
+      "distance_meters": 860,
+      "duration_minutes": 13,
+      "summary": "从草坪走到面馆需要穿过一个街区。"
+    },
+    {
+      "origin_id": "activity_sports_301",
+      "destination_id": "restaurant_yard_301",
+      "mode": "walking",
+      "distance_meters": 730,
+      "duration_minutes": 11,
+      "summary": "公园出口步行到餐吧比较顺路。"
+    }
+  ],
+  "weather": {
+    "location": "长宁",
+    "date": "2026-05-16",
+    "condition": "晴",
+    "temperature_c": 26,
+    "precipitation_chance": 0.05,
+    "advisory": "天气稳定，适合户外轻松聚会和步行。"
+  },
+  "queues": {
+    "queue_restaurant_yard_301": {
+      "queue_id": "queue_restaurant_yard_301",
+      "poi_id": "restaurant_yard_301",
+      "status": "open",
+      "wait_minutes": 12,
+      "parties_ahead": 2
+    },
+    "queue_restaurant_noodle_301": {
+      "queue_id": "queue_restaurant_noodle_301",
+      "poi_id": "restaurant_noodle_301",
+      "status": "open",
+      "wait_minutes": 6,
+      "parties_ahead": 1
+    }
+  },
+  "table_availability": {
+    "restaurant_yard_301": {
+      "restaurant_id": "restaurant_yard_301",
+      "available": true,
+      "time_slots": ["17:30", "18:00", "18:30"],
+      "max_party_size": 6,
+      "notes": "适合朋友小聚的长桌可订。"
+    },
+    "restaurant_noodle_301": {
+      "restaurant_id": "restaurant_noodle_301",
+      "available": true,
+      "time_slots": ["17:00", "17:30", "18:00", "18:30"],
+      "max_party_size": 4,
+      "notes": "翻台快，适合临时决定。"
+    }
+  },
+  "ticket_availability": {
+    "activity_lawn_301": {
+      "poi_id": "activity_lawn_301",
+      "available": true,
+      "time_slots": ["14:00", "15:00", "16:00"],
+      "remaining": 99,
+      "price_cents": 0
+    },
+    "activity_sports_301": {
+      "poi_id": "activity_sports_301",
+      "available": true,
+      "time_slots": ["14:30", "15:30", "16:30"],
+      "remaining": 48,
+      "price_cents": 2000
+    }
+  },
+  "addons": []
+}

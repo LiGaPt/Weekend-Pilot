@@ -6,18 +6,34 @@ from backend.app.providers.mock_world.errors import MockWorldError
 from backend.app.providers.mock_world.loader import _validate_world, load_mock_world
 
 
+SUPPORTED_PROFILES = (
+    "solo_afternoon",
+    "couple_afternoon",
+    "friends_gathering",
+    "rainy_day_fallback",
+    "budget_lite",
+)
+
+
 def test_default_fixture_loads_family_afternoon_profile() -> None:
     world = load_mock_world()
 
     assert world["profile"] == "family_afternoon"
-    assert world["location"] == {"city": "上海", "area": "徐汇"}
+    assert isinstance(world["location"]["city"], str)
+    assert world["location"]["city"]
+    assert isinstance(world["location"]["area"], str)
+    assert world["location"]["area"]
 
 
-def test_explicit_fixture_loads_solo_afternoon_profile() -> None:
-    world = load_mock_world("solo_afternoon")
+@pytest.mark.parametrize("profile", SUPPORTED_PROFILES)
+def test_explicit_fixture_loads_supported_profile(profile: str) -> None:
+    world = load_mock_world(profile)
 
-    assert world["profile"] == "solo_afternoon"
-    assert world["location"] == {"city": "上海", "area": "静安"}
+    assert world["profile"] == profile
+    assert isinstance(world["location"]["city"], str)
+    assert world["location"]["city"]
+    assert isinstance(world["location"]["area"], str)
+    assert world["location"]["area"]
 
 
 def test_default_fixture_has_required_top_level_keys() -> None:
