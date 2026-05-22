@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from backend.app.core.config import Settings, get_settings
 from backend.app.db.session import get_db
 from backend.app.demo import (
+    DemoClarifyRunRequest,
     DemoConfirmRunRequest,
     DemoDeclineRunRequest,
     DemoReplanRunRequest,
@@ -74,6 +75,18 @@ def get_demo_run(
 ) -> DemoRunSummary:
     service = _build_service(db, redis_client, settings)
     return _call(db, lambda: service.get_run(run_id))
+
+
+@router.post("/demo/runs/{run_id}/clarify", response_model=DemoRunSummary)
+def clarify_demo_run(
+    run_id: UUID,
+    request: DemoClarifyRunRequest,
+    db: Session = Depends(get_db),
+    redis_client: Redis = Depends(get_redis_client),
+    settings: Settings = Depends(get_settings),
+) -> DemoRunSummary:
+    service = _build_service(db, redis_client, settings)
+    return _call(db, lambda: service.clarify_run(run_id, request))
 
 
 @router.post("/demo/runs/{run_id}/replan", response_model=DemoRunSummary)

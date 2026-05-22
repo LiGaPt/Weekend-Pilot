@@ -59,3 +59,20 @@ def test_follow_up_intent_uses_latest_explicit_dining_preference_signal() -> Non
     assert intent.participants.adults == 1
     assert intent.constraints.max_distance_km == 8
     assert intent.dining_preferences == ["lighter_options"]
+
+
+def test_follow_up_intent_merges_explicit_later_activity_style_signal() -> None:
+    intent = build_follow_up_intent(
+        [
+            "Plan a nearby solo afternoon for a few hours.",
+            "Keep it indoor.",
+        ]
+    )
+
+    assert intent.scenario_type == "solo"
+    assert intent.participants.adults == 1
+    assert intent.time_window.label == "this_afternoon"
+    assert intent.time_window.duration_hours_min == 4
+    assert intent.time_window.duration_hours_max == 6
+    assert intent.constraints.max_distance_km == 8
+    assert intent.activity_preferences == ["indoor"]

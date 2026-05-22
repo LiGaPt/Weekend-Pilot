@@ -39,6 +39,19 @@ def build_next_plan_version_metadata(
     }
 
 
+def build_clarification_plan_version_metadata(
+    source_metadata_json: dict[str, Any] | None,
+    *,
+    source_run_id: UUID,
+) -> dict[str, Any]:
+    source_summary = summarize_plan_version(source_metadata_json)
+    return {
+        "version_number": source_summary.version_number,
+        "source_run_id": str(source_run_id),
+        "source_selected_plan_id": None,
+    }
+
+
 def _plan_version_metadata(metadata_json: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(metadata_json, dict):
         return {}

@@ -28,6 +28,7 @@ from backend.app.workflow.timing import WorkflowNodeTimingRecord, WorkflowTiming
 
 
 WorkflowStatus = Literal[
+    "awaiting_clarification",
     "awaiting_confirmation",
     "completed",
     "failed",
@@ -127,6 +128,7 @@ class WeekendPilotWorkflowState(TypedDict, total=False):
     active_recovery_route: str | None
     persisted_plans: list[PersistedPlan]
     selected_plan_id: UUID | None
+    generate_queries_status: str | None
     confirmation_result: ConfirmationResult
     execution_result: ExecutionWorkflowResult
     feedback_result: ExecutionFeedbackResult

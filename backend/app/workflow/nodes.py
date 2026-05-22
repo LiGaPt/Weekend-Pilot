@@ -27,6 +27,7 @@ from backend.app.planning import (
     IntentParseSignals,
     LocalLifeIntent,
     QueryPlanExecutor,
+    apply_clarification_policy,
     apply_memory_query_policy,
 )
 from backend.app.plans import ReviewedPlanPersistenceService
@@ -158,15 +159,29 @@ class WeekendPilotWorkflowNodes:
         return self._updates(state, "load_memory", active_memories=memories)
 
     def generate_queries(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
+        run_id = self._required_uuid(state, "run_id")
         effective_intent, memory_policy = apply_memory_query_policy(
             self._required_value(state, "parsed_intent"),
             self._required_value(state, "intent_parse_signals"),
             list(state.get("active_memories", []) or []),
         )
         self._persist_workflow_memory_policy(
-            self._required_uuid(state, "run_id"),
+            run_id,
             memory_policy.model_dump(mode="json"),
         )
+        clarification = apply_clarification_policy(effective_intent)
+        if clarification is not None:
+            self._persist_workflow_clarification(
+                run_id,
+                clarification.model_dump(mode="json"),
+            )
+            self.repositories.runs.update_status(run_id, "awaiting_clarification")
+            return self._updates(
+                state,
+                "generate_queries",
+                status="awaiting_clarification",
+                action_count=self._action_count(run_id),
+            )
         query_plan = DeterministicQueryPlanner().build(
             effective_intent,
             provider_profile=self._required_text(state, "tool_profile"),
@@ -566,6 +581,18 @@ class WeekendPilotWorkflowNodes:
         if not isinstance(workflow, dict):
             workflow = {}
         workflow["memory_policy"] = memory_policy
+        metadata["workflow"] = workflow
+        self.repositories.runs.update_metadata_json(run_id, metadata)
+
+    def _persist_workflow_clarification(self, run_id: UUID, clarification: dict[str, Any]) -> None:
+        run = self.repositories.runs.get_by_id(run_id)
+        if run is None:
+            return
+        metadata = deepcopy(run.metadata_json) if isinstance(run.metadata_json, dict) else {}
+        workflow = metadata.get("workflow")
+        if not isinstance(workflow, dict):
+            workflow = {}
+        workflow["clarification"] = clarification
         metadata["workflow"] = workflow
         self.repositories.runs.update_metadata_json(run_id, metadata)
 

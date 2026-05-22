@@ -4,7 +4,8 @@
 
 The Web demo is the primary MVP review path for WeekendPilot. It runs the React/Vite frontend against the FastAPI demo API, uses the Mock World provider only, pauses before write tools, and continues execution only after explicit confirmation. The visible demo copy and Mock World family-afternoon content are localized in Chinese for competition review.
 
-The public demo API now also supports `POST /demo/runs/{run_id}/replan` for follow-up replanning. Every public `DemoRunSummary` includes a compact `plan_version` object: the initial run starts at `v1`, and each follow-up replan returns a new `run_id` with the next visible version label. The internal conversation session is reused, but that session state remains internal and is still not exposed in `DemoRunSummary`.
+The public demo API now also supports `POST /demo/runs/{run_id}/clarify` for pre-planning clarification replies and `POST /demo/runs/{run_id}/replan` for follow-up replanning. A vague start request can now stop in `awaiting_clarification` with `plans = []`, `selected_plan_id = null`, and a compact `clarification` summary that contains the public follow-up prompt plus the missing supported fields.
+Every public `DemoRunSummary` includes a compact `plan_version` object: the initial run starts at `v1`, and each follow-up replan returns a new `run_id` with the next visible version label. Clarification-only turns do not advance that visible version. A source run that ends in `awaiting_clarification` stays at `v1`, and the first clarification continuation that produces real plans also remains at `v1`. The internal conversation session is reused, but that session state remains internal and is still not exposed in `DemoRunSummary`.
 Every public `DemoPlanPreview` now includes `action_manifest`, a stable execution-preview summary with this shape:
 
 ```json
@@ -121,6 +122,25 @@ The internal review page now also shows sanitized tool-event and action-ledger d
 12. Confirm the action count is greater than `0`.
 13. Confirm the selected plan now shows `action_manifest.source = confirmed_actions`.
 
+### Clarification Path
+
+1. Start a fresh run with a vague request such as `想周末出去玩一下。`
+2. Confirm the run reaches `awaiting_clarification`.
+3. Confirm the visible response shows `plans = []`, `selected_plan_id = null`, and a non-null `clarification` summary.
+4. Confirm the visible plan version label still shows `v1`.
+5. Send the clarification reply:
+
+```bash
+curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/clarify \
+  -H "Content-Type: application/json" \
+  -d "{\"user_input\":\"今天下午一个人出门玩几个小时，别太远。\",\"selected_plan_index\":0}"
+```
+
+6. Confirm the response returns a different `run_id`.
+7. Confirm the continuation run reaches `awaiting_confirmation`.
+8. Confirm the continuation run still shows `plan_version.version_label = v1`.
+9. Confirm the public response still does not expose `session_id` or conversation history.
+
 ### Decline Path
 
 1. Start a fresh run.
@@ -205,7 +225,9 @@ PostgreSQL, Redis, and migrations must already be ready.
 ## Expected Results
 
 - Planning stops at `awaiting_confirmation` before any write action.
+- Vague start requests can stop at `awaiting_clarification` before any plan is generated.
 - The initial public run shows `plan_version.version_label = v1`.
+- Clarification-only turns keep the visible version label at `v1` until the first real plan is produced.
 - Action count is `0` before confirmation.
 - Pre-confirmation selected plans expose `action_manifest.source = proposed_actions` when preview actions exist.
 - Confirmation executes write actions through the deterministic workflow.

@@ -36,6 +36,13 @@ def build_follow_up_intent(
         if signals.dining_preferences:
             merged_intent.dining_preferences = list(next_intent.dining_preferences)
 
+        if signals.activity_preferences:
+            merged_intent.activity_preferences = [
+                preference
+                for preference in next_intent.activity_preferences
+                if preference in {"citywalk", "indoor", "outdoor"}
+            ]
+
     merged_intent.raw_text = "\n".join(parsed_turn.intent.raw_text for parsed_turn in parsed_turns)
     merged_intent.origin_text = None
     merged_intent.parser_version = parser.parser_version
