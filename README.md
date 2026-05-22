@@ -152,11 +152,19 @@ Local trace JSONL summaries now also embed the canonical `run_summary` envelope,
 
 ## LocalLife-Bench Harness
 
-The benchmark harness runs file-based cases through the official LangGraph workflow and bounded deterministic agent adapters, then writes local JSON reports. Case reports stay under `var/benchmarks/`, and suite runs also write `var/benchmarks/run-report.json` with overall and per-stage `P50`/`P95`/`P99` timing summaries. It does not require LangSmith credentials or live provider access.
+The benchmark harness runs file-based cases through the official LangGraph workflow and bounded deterministic agent adapters, then writes local JSON reports. Case reports stay under `var/benchmarks/`. Ad hoc `run_cases(...)` runs still write `var/benchmarks/run-report.json`, while named `run_suite(...)` runs write `var/benchmarks/suite-<suite_id>-run-report.json`. It does not require LangSmith credentials or live provider access.
 
-Each benchmark case fixture now requires a structured `taxonomy` block that captures suite, scenario bucket, benchmark level, tags, and failure mode. Each benchmark case report now includes both `run_summary` and `taxonomy`, and each suite `run-report.json` includes a compact `benchmark_summary` envelope with `matrix_summary` alongside the existing timing summary so scenario coverage can be compared deterministically as the suite expands.
+Each benchmark case fixture now requires a structured `taxonomy` block that captures suite, scenario bucket, benchmark level, tags, and failure mode. Each benchmark case report now includes both `run_summary` and `taxonomy`. Each suite summary now includes both `matrix_summary` coverage counts and additive `outcome_rollup` pass-rate buckets by scenario family, constraint tag, and failure mode so coverage and benchmark pass rate can be compared directly as the suite catalog expands.
 
-The repository now keeps three named benchmark suites in code: `default` for the current ten-case non-failure scenario pack, `failures` for the explicit failure-injection cases, and `all_registered` for the full current fixture inventory. The default suite now expands beyond the original family-plus-solo baseline to include couple, friends-group, rainy-day fallback, and budget-lite coverage while keeping the failure case separate. Suite descriptions derive their `matrix_summary` from the existing case taxonomy so expansion stays reviewable.
+The repository now keeps five canonical named benchmark suites in code:
+
+- `baseline` for the historical six-case family-plus-solo non-failure baseline
+- `expanded` for the added couple, friends-group, rainy-day fallback, and budget-lite scenario pack
+- `recovery_focused` for the explicit failure-injection recovery case pack
+- `default` for the ten-case non-failure union of `baseline + expanded`
+- `all_registered` for the full registered fixture inventory
+
+The legacy `failures` suite name remains loadable as a compatibility alias to `recovery_focused`, and `load_failure_benchmark_cases()` now resolves to that canonical recovery-focused suite. Suite descriptions still derive their `matrix_summary` from the existing case taxonomy so expansion stays reviewable.
 
 ```bash
 docker compose up -d postgres redis

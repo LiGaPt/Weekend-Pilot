@@ -679,7 +679,11 @@ def test_internal_observability_service_returns_benchmark_artifact_summary_when_
 
     assert summary.benchmark_artifact_summary is not None
     assert summary.benchmark_artifact_summary.case_id == "solo_afternoon_v1"
-    assert summary.benchmark_artifact_summary.registered_suite_ids == ["default", "all_registered"]
+    assert summary.benchmark_artifact_summary.registered_suite_ids == [
+        "baseline",
+        "default",
+        "all_registered",
+    ]
     assert summary.benchmark_artifact_summary.taxonomy is not None
     assert summary.benchmark_artifact_summary.taxonomy.scenario_bucket == "solo"
     assert summary.benchmark_artifact_summary.benchmark_status == "passed"
@@ -708,7 +712,10 @@ def test_internal_observability_service_returns_partial_benchmark_summary_when_a
 
     assert summary.benchmark_artifact_summary is not None
     assert summary.benchmark_artifact_summary.case_id == "family_route_failure_v1"
-    assert summary.benchmark_artifact_summary.registered_suite_ids == ["failures", "all_registered"]
+    assert summary.benchmark_artifact_summary.registered_suite_ids == [
+        "recovery_focused",
+        "all_registered",
+    ]
     assert summary.benchmark_artifact_summary.taxonomy is not None
     assert summary.benchmark_artifact_summary.taxonomy.failure_mode == "route_unavailable"
     assert summary.benchmark_artifact_summary.benchmark_status is None

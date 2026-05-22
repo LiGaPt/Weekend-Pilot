@@ -14,7 +14,7 @@ from backend.app.workflow.timing import WorkflowTimingSummary
 
 BenchmarkCaseStatus = Literal["passed", "failed", "error"]
 BenchmarkReplayStatus = Literal["passed", "failed", "error"]
-BenchmarkSuiteId = Literal["default", "failures", "all_registered"]
+BenchmarkSuiteId = Literal["baseline", "expanded", "recovery_focused", "default", "all_registered"]
 _LOWER_SNAKE_CASE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
@@ -135,8 +135,25 @@ class BenchmarkSuiteDescription(BaseModel):
     matrix_summary: BenchmarkCaseMatrixSummary
 
 
+class BenchmarkOutcomeBucketStats(BaseModel):
+    case_count: int
+    passed_count: int
+    failed_count: int
+    error_count: int
+    pass_rate: float
+
+
+class BenchmarkOutcomeRollup(BaseModel):
+    schema_version: str = "weekendpilot_benchmark_outcome_rollup_v1"
+    scenario_bucket_outcomes: dict[str, BenchmarkOutcomeBucketStats] = Field(default_factory=dict)
+    constraint_tag_outcomes: dict[str, BenchmarkOutcomeBucketStats] = Field(default_factory=dict)
+    failure_mode_outcomes: dict[str, BenchmarkOutcomeBucketStats] = Field(default_factory=dict)
+
+
 class BenchmarkSummary(BaseModel):
     schema_version: str = "weekendpilot_benchmark_summary_v1"
+    suite_id: BenchmarkSuiteId | None = None
+    suite_title: str | None = None
     run_status: Literal["passed", "failed", "error"]
     case_count: int
     passed_count: int
@@ -145,6 +162,7 @@ class BenchmarkSummary(BaseModel):
     overall_score: float
     benchmark_timing_summary: BenchmarkTimingSummary | None = None
     matrix_summary: BenchmarkCaseMatrixSummary | None = None
+    outcome_rollup: BenchmarkOutcomeRollup | None = None
 
 
 class BenchmarkRunReport(BaseModel):

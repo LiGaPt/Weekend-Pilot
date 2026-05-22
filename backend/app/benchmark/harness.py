@@ -27,12 +27,19 @@ from backend.app.benchmark.failure_profiles import (
     failure_profile_metadata,
 )
 from backend.app.benchmark.matrix import build_case_matrix_summary
+from backend.app.benchmark.rollups import build_benchmark_outcome_rollup
 from backend.app.benchmark.reporting import write_case_report, write_run_report
 from backend.app.benchmark.schemas import (
     BenchmarkCase,
     BenchmarkCaseResult,
     BenchmarkRunReport,
     BenchmarkSummary,
+    BenchmarkSuiteId,
+)
+from backend.app.benchmark.suites import (
+    canonical_benchmark_suite_id,
+    list_benchmark_suites,
+    load_benchmark_suite,
 )
 from backend.app.benchmark.timing import summarize_benchmark_timing
 from backend.app.models.runtime import ActionLedger
@@ -91,11 +98,38 @@ class BenchmarkHarness:
             return self._finalize_case_result(result)
 
     def run_cases(self, cases: Sequence[BenchmarkCase]) -> BenchmarkRunReport:
+        return self._run_cases_with_summary(cases, suite_id=None, suite_title=None, report_filename="run-report.json")
+
+    def run_suite(self, suite_id: BenchmarkSuiteId | str) -> BenchmarkRunReport:
+        canonical_suite_id = canonical_benchmark_suite_id(suite_id)
+        suite_cases = load_benchmark_suite(canonical_suite_id)
+        suite_description = next(
+            (suite for suite in list_benchmark_suites() if suite.suite_id == canonical_suite_id),
+            None,
+        )
+        if suite_description is None:
+            raise BenchmarkHarnessError(f"Unknown benchmark suite ID: {suite_id}")
+        return self._run_cases_with_summary(
+            suite_cases,
+            suite_id=canonical_suite_id,
+            suite_title=suite_description.title,
+            report_filename=f"suite-{canonical_suite_id}-run-report.json",
+        )
+
+    def _run_cases_with_summary(
+        self,
+        cases: Sequence[BenchmarkCase],
+        *,
+        suite_id: BenchmarkSuiteId | None,
+        suite_title: str | None,
+        report_filename: str,
+    ) -> BenchmarkRunReport:
         results = [self.run_case(case) for case in cases]
         passed_count = sum(1 for result in results if result.status == "passed")
         failed_count = sum(1 for result in results if result.status == "failed")
         error_count = sum(1 for result in results if result.status == "error")
         timing_summary = summarize_benchmark_timing(results)
+        overall_score = round(mean([result.overall_score for result in results]) if results else 0.0, 4)
         if error_count:
             run_status = "error"
         elif failed_count:
@@ -108,20 +142,23 @@ class BenchmarkHarness:
             passed_count=passed_count,
             failed_count=failed_count,
             error_count=error_count,
-            overall_score=round(mean([result.overall_score for result in results]) if results else 0.0, 4),
+            overall_score=overall_score,
             benchmark_timing_summary=timing_summary,
             benchmark_summary=BenchmarkSummary(
+                suite_id=suite_id,
+                suite_title=suite_title,
                 run_status=run_status,
                 case_count=len(results),
                 passed_count=passed_count,
                 failed_count=failed_count,
                 error_count=error_count,
-                overall_score=round(mean([result.overall_score for result in results]) if results else 0.0, 4),
+                overall_score=overall_score,
                 benchmark_timing_summary=timing_summary,
                 matrix_summary=build_case_matrix_summary(cases),
+                outcome_rollup=build_benchmark_outcome_rollup(results),
             ),
         )
-        report_path = write_run_report(report, self.report_dir)
+        report_path = write_run_report(report, self.report_dir, filename=report_filename)
         return report.model_copy(update={"report_path": str(report_path)})
 
     def _run_case(self, case: BenchmarkCase) -> BenchmarkCaseResult:
