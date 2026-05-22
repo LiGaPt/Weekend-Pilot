@@ -218,6 +218,35 @@ def test_benchmark_harness_runs_solo_afternoon_case(
     assert "details" not in artifact_summary["score_summaries"][0]
 
 
+def test_benchmark_harness_records_memory_policy_for_override_case(
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    case = load_benchmark_case("family_memory_override_v1")
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    result = harness.run_case(case)
+
+    assert result.status == "passed"
+    assert result.run_id is not None
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+
+    memory_policy = run.metadata_json["workflow"]["memory_policy"]
+    assert memory_policy["policy_version"] == "memory_query_policy_v0"
+    assert "activity_style" in memory_policy["ignored_low_confidence_keys"]
+    assert "activity_preferences" in memory_policy["user_override_dimensions"]
+
+
 def test_benchmark_harness_runs_default_mock_world_suite(
     db_session: Session,
     redis_runtime,

@@ -92,3 +92,32 @@ def test_parser_parse_with_signals_marks_supported_explicit_fields() -> None:
     assert parsed.signals.time_window is True
     assert parsed.signals.max_distance_km is True
     assert parsed.signals.dining_preferences is True
+    assert parsed.signals.activity_preferences is False
+
+
+def test_parser_extracts_explicit_indoor_activity_preference() -> None:
+    parser = DeterministicIntentParser()
+
+    parsed = parser.parse_with_signals("Please plan an indoor activity for later.")
+
+    assert parsed.intent.activity_preferences == ["indoor"]
+    assert parsed.signals.activity_preferences is True
+
+
+def test_parser_prefers_citywalk_over_broader_outdoor_activity_signal() -> None:
+    parser = DeterministicIntentParser()
+
+    parsed = parser.parse_with_signals("想安排一个城市漫步或者 outdoor 活动。")
+
+    assert parsed.intent.activity_preferences == ["citywalk"]
+    assert parsed.signals.activity_preferences is True
+
+
+def test_parser_child_friendly_default_does_not_mark_explicit_activity_signal() -> None:
+    parser = DeterministicIntentParser()
+
+    parsed = parser.parse_with_signals("Take my child somewhere fun this afternoon.")
+
+    assert parsed.intent.constraints.child_friendly is True
+    assert parsed.intent.activity_preferences == ["child_friendly"]
+    assert parsed.signals.activity_preferences is False

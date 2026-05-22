@@ -5,7 +5,11 @@ import pytest
 from backend.app.planning import (
     DeterministicIntentParser,
     DeterministicQueryPlanner,
+    IntentConstraints,
+    LocalLifeIntent,
+    ParticipantProfile,
     QueryPlanError,
+    TimeWindow,
 )
 from backend.app.tool_gateway.registry import WRITE_TOOLS
 
@@ -88,3 +92,26 @@ def test_amap_query_plan_excludes_mock_only_availability_templates() -> None:
 def test_unsupported_provider_profile_is_rejected() -> None:
     with pytest.raises(QueryPlanError, match="Unsupported provider_profile"):
         DeterministicQueryPlanner().build(_family_intent(), provider_profile="real_world")
+
+
+def test_mock_world_query_plan_uses_effective_activity_style_preferences() -> None:
+    intent = LocalLifeIntent(
+        raw_text="Plan something fun.",
+        participants=ParticipantProfile(),
+        time_window=TimeWindow(),
+        constraints=IntentConstraints(child_friendly=True),
+        activity_preferences=["child_friendly", "indoor"],
+        dining_preferences=[],
+        parser_version="test-parser",
+    )
+
+    plan = DeterministicQueryPlanner().build(intent)
+
+    activity_call = next(
+        call
+        for call in plan.initial_tool_calls
+        if call.tool_name == "search_poi" and call.payload["category"] == "activity"
+    )
+
+    assert activity_call.payload["query"] == "indoor"
+    assert activity_call.payload["tags"] == ["child_friendly", "indoor"]

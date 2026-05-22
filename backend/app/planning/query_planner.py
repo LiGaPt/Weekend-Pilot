@@ -8,6 +8,7 @@ from backend.app.tool_gateway.registry import WRITE_TOOLS
 class DeterministicQueryPlanner:
     planner_version = "deterministic_query_planner_v1"
     _SUPPORTED_PROFILES = {"mock_world", "amap"}
+    _ACTIVITY_STYLE_PREFERENCES = ("citywalk", "indoor", "outdoor")
 
     def build(self, intent: LocalLifeIntent, provider_profile: str = "mock_world") -> QueryPlan:
         if provider_profile not in self._SUPPORTED_PROFILES:
@@ -42,6 +43,9 @@ class DeterministicQueryPlanner:
         activity_tags = []
         if intent.constraints.child_friendly:
             activity_tags.append("child_friendly")
+        for preference in intent.activity_preferences:
+            if preference in self._ACTIVITY_STYLE_PREFERENCES and preference not in activity_tags:
+                activity_tags.append(preference)
 
         dining_tags = []
         if intent.constraints.child_friendly:
@@ -192,6 +196,9 @@ class DeterministicQueryPlanner:
         return "local dining"
 
     def _mock_world_activity_query(self, intent: LocalLifeIntent) -> str:
+        for preference in self._ACTIVITY_STYLE_PREFERENCES:
+            if preference in intent.activity_preferences:
+                return preference
         if intent.constraints.child_friendly:
             return "child_friendly"
         return "activity"

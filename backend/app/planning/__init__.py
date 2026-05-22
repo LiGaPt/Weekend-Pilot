@@ -25,6 +25,10 @@ from backend.app.planning.itinerary_drafts import (
     TimelineItem,
 )
 from backend.app.planning.itinerary_generation import DeterministicItineraryGenerator
+from backend.app.planning.memory_query_policy import (
+    MemoryQueryPolicySummary,
+    apply_memory_query_policy,
+)
 from backend.app.planning.query_planner import DeterministicQueryPlanner
 from backend.app.planning.schemas import (
     IntentParseResult,
@@ -61,6 +65,7 @@ __all__ = [
     "ItineraryFailureReason",
     "ItineraryRouteRef",
     "LocalLifeIntent",
+    "MemoryQueryPolicySummary",
     "ParticipantProfile",
     "PlannedToolCall",
     "ProposedAction",
@@ -72,4 +77,5 @@ __all__ = [
     "TimelineItem",
     "TimeWindow",
     "ToolCallTemplate",
+    "apply_memory_query_policy",
 ]

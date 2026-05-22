@@ -15,6 +15,7 @@ from backend.app.planning import (
     Candidate,
     CandidateCollectionResult,
     CandidateEnrichmentResult,
+    IntentParseSignals,
     ItineraryDraftResult,
     LocalLifeIntent,
     QueryPlan,
@@ -110,6 +111,7 @@ class WeekendPilotWorkflowState(TypedDict, total=False):
     active_memories: list[WorkflowMemoryRecord]
     intent_override: LocalLifeIntent
     parsed_intent: LocalLifeIntent
+    intent_parse_signals: IntentParseSignals
     query_plan: QueryPlan
     candidate_collection: CandidateCollectionResult
     candidate_blackboard: CandidateBlackboard

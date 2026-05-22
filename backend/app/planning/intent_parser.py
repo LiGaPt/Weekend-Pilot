@@ -32,6 +32,10 @@ class DeterministicIntentParser:
     _ZH_NOT_FAR = "\u4e0d\u592a\u8fdc"
     _ZH_NEARBY = "\u9644\u8fd1"
     _ZH_LIGHT = "\u6e05\u6de1"
+    _ZH_CITYWALK = "\u57ce\u5e02\u6f2b\u6b65"
+    _ZH_INDOOR = "\u5ba4\u5185"
+    _ZH_OUTDOOR = "\u6237\u5916"
+    _ZH_OUTSIDE = "\u5ba4\u5916"
     _ZH_AGE = "\u5c81"
     _ZH_SON = "\u513f\u5b50"
     _ZH_DAUGHTER = "\u5973\u513f"
@@ -85,6 +89,9 @@ class DeterministicIntentParser:
         dining_preferences = self._parse_dining_preferences(normalized)
         child_friendly = family_signal or child_signal or bool(child_ages)
         activity_preferences = ["child_friendly"] if child_friendly else []
+        explicit_activity_style = self._parse_activity_style(normalized)
+        if explicit_activity_style and explicit_activity_style not in activity_preferences:
+            activity_preferences.append(explicit_activity_style)
         scenario_type = self._parse_scenario_type(normalized, family_signal, friend_signal, solo_signal)
 
         intent = LocalLifeIntent(
@@ -113,6 +120,7 @@ class DeterministicIntentParser:
             time_window=self._time_window_has_explicit_signal(time_window),
             max_distance_km=max_distance_km is not None,
             dining_preferences=bool(dining_preferences),
+            activity_preferences=explicit_activity_style is not None,
         )
         return IntentParseResult(intent=intent, signals=signals)
 
@@ -203,6 +211,16 @@ class DeterministicIntentParser:
         if any(phrase in text for phrase in ("lighter", "eat lighter", "light food", self._ZH_LIGHT)):
             return ["lighter_options"]
         return []
+
+    def _parse_activity_style(self, text: str) -> str | None:
+        for style, fragments in (
+            ("citywalk", ("citywalk", "city walk", self._ZH_CITYWALK)),
+            ("indoor", ("indoor", "inside", self._ZH_INDOOR)),
+            ("outdoor", ("outdoor", "outside", self._ZH_OUTDOOR, self._ZH_OUTSIDE)),
+        ):
+            if any(fragment in text for fragment in fragments):
+                return style
+        return None
 
     def _contains_any(self, text: str, keywords: tuple[str, ...]) -> bool:
         return any(keyword in text for keyword in keywords)
