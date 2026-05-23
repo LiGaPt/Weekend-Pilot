@@ -118,6 +118,7 @@ class QueryPlanExecutor:
         for item_index, item in enumerate(results):
             candidate = self._candidate_from_payload(
                 item,
+                call=call,
                 provider=call.provider,
                 source_call_index=source_call_index,
                 item_index=item_index,
@@ -130,6 +131,7 @@ class QueryPlanExecutor:
         self,
         payload: dict[str, Any],
         *,
+        call: PlannedToolCall,
         provider: str,
         source_call_index: int,
         item_index: int,
@@ -141,6 +143,10 @@ class QueryPlanExecutor:
             or f"{provider}:{source_call_index}:{item_index}"
         )
         category = self._text_or_none(payload.get("category")) or "unknown"
+        if provider == "amap":
+            hinted_category = self._text_or_none(call.payload.get("canonical_category"))
+            if hinted_category in {"activity", "dining"}:
+                category = hinted_category
         tags = payload.get("tags")
         return Candidate(
             candidate_id=candidate_id,

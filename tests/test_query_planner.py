@@ -89,6 +89,10 @@ def test_amap_query_plan_excludes_mock_only_availability_templates() -> None:
         "check_table_availability",
         "check_ticket_availability",
     } & {template.tool_name for template in plan.candidate_enrichment_templates}
+    search_calls = [call for call in plan.initial_tool_calls if call.tool_name == "search_poi"]
+    assert [call.payload["canonical_category"] for call in search_calls] == ["activity", "dining"]
+    assert search_calls[0].payload["keywords"] == "family child friendly activity"
+    assert search_calls[1].payload["keywords"] == "lighter family dining"
 
 
 def test_unsupported_provider_profile_is_rejected() -> None:

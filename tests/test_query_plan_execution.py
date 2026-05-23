@@ -183,21 +183,72 @@ def test_amap_shaped_search_result_without_tags_normalizes_safely() -> None:
         ]
     )
     plan = _plan(
-        [PlannedToolCall(tool_name="search_poi", provider="amap", payload={"keywords": "park"})],
+        [
+            PlannedToolCall(
+                tool_name="search_poi",
+                provider="amap",
+                payload={"keywords": "park", "canonical_category": "activity"},
+            )
+        ],
+        provider_profile="amap",
+    )
+
+    result = QueryPlanExecutor(gateway).execute_initial_calls(plan, uuid4())
+
+    assert len(result.activity_candidates) == 1
+    assert result.dining_candidates == []
+    assert result.other_candidates == []
+    candidate = result.activity_candidates[0]
+    assert candidate.candidate_id == "B002"
+    assert candidate.name == "Family Park"
+    assert candidate.category == "activity"
+    assert candidate.provider == "amap"
+    assert candidate.source == "amap"
+    assert candidate.tags == []
+    assert candidate.raw_payload["category"] == "Park"
+
+
+def test_amap_search_result_uses_source_call_hint_for_dining_bucket() -> None:
+    gateway = FakeGateway(
+        [
+            _gateway_result(
+                "search_poi",
+                "amap",
+                response_json={
+                    "results": [
+                        {
+                            "id": "B102",
+                            "name": "Light Kitchen",
+                            "category": "Restaurant",
+                            "address": "88 Dining Road",
+                            "location": "121.480,31.230",
+                            "source": "amap",
+                        }
+                    ]
+                },
+            )
+        ]
+    )
+    plan = _plan(
+        [
+            PlannedToolCall(
+                tool_name="search_poi",
+                provider="amap",
+                payload={"keywords": "dining", "canonical_category": "dining"},
+            )
+        ],
         provider_profile="amap",
     )
 
     result = QueryPlanExecutor(gateway).execute_initial_calls(plan, uuid4())
 
     assert result.activity_candidates == []
-    assert result.dining_candidates == []
-    assert len(result.other_candidates) == 1
-    candidate = result.other_candidates[0]
-    assert candidate.candidate_id == "B002"
-    assert candidate.name == "Family Park"
-    assert candidate.provider == "amap"
-    assert candidate.source == "amap"
-    assert candidate.tags == []
+    assert len(result.dining_candidates) == 1
+    assert result.other_candidates == []
+    candidate = result.dining_candidates[0]
+    assert candidate.candidate_id == "B102"
+    assert candidate.category == "dining"
+    assert candidate.raw_payload["category"] == "Restaurant"
 
 
 def test_weather_response_is_captured_separately() -> None:

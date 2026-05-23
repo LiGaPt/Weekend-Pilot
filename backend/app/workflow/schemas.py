@@ -20,7 +20,7 @@ class WeekendPilotWorkflowRequest(BaseModel):
     case_id: str | None = None
     agent_version: str = "agent-v1"
     prompt_version: str = "prompt-v1"
-    tool_profile: Literal["mock_world"] = "mock_world"
+    tool_profile: Literal["mock_world", "amap"] = "mock_world"
     world_profile: Literal[
         "family_afternoon",
         "solo_afternoon",
@@ -28,6 +28,7 @@ class WeekendPilotWorkflowRequest(BaseModel):
         "friends_gathering",
         "rainy_day_fallback",
         "budget_lite",
+        "amap_shanghai_live",
     ] = "family_afternoon"
     failure_profile: str | None = None
     auto_confirm: bool = False

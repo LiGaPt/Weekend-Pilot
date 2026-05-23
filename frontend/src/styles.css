@@ -22,6 +22,10 @@ input {
   font: inherit;
 }
 
+select {
+  font: inherit;
+}
+
 button {
   border: 0;
 }
@@ -125,6 +129,10 @@ button {
   margin-bottom: 8px;
 }
 
+.field-stack {
+  margin-top: 14px;
+}
+
 textarea {
   background: #fbfcfd;
   border: 1px solid #cbd5df;
@@ -146,6 +154,17 @@ textarea {
   width: 100%;
 }
 
+.select-input {
+  appearance: none;
+  background: #fbfcfd;
+  border: 1px solid #cbd5df;
+  border-radius: 7px;
+  color: #1f2933;
+  min-height: 40px;
+  padding: 10px 12px;
+  width: 100%;
+}
+
 textarea:focus,
 input:focus,
 button:focus-visible {
@@ -157,6 +176,13 @@ button:focus-visible {
 .decline-reason {
   color: #9a3412;
   font-size: 13px;
+  margin: 8px 0 0;
+}
+
+.helper-text {
+  color: #536171;
+  font-size: 13px;
+  line-height: 1.5;
   margin: 8px 0 0;
 }
 
@@ -236,6 +262,18 @@ button:disabled {
   display: flex;
   gap: 8px;
   margin-top: 14px;
+  padding: 10px 12px;
+}
+
+.notice-banner {
+  align-items: flex-start;
+  background: #eef8ff;
+  border: 1px solid #bddcff;
+  border-radius: 7px;
+  color: #174a7c;
+  display: flex;
+  gap: 8px;
+  max-width: 420px;
   padding: 10px 12px;
 }
 

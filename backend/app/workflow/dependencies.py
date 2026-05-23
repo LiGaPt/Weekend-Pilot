@@ -15,6 +15,7 @@ class WeekendPilotWorkflowDependencies(BaseModel):
     session: Session
     cache: JsonRedisCache
     rate_limiter: FixedWindowRateLimiter
+    tool_profile: str = "mock_world"
     world_profile: str = "family_afternoon"
     failure_injector: ToolFailureInjector | None = None
     trace_buffer_path: Path | str | None = None

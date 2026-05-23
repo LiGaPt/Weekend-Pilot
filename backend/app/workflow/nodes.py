@@ -33,6 +33,7 @@ from backend.app.planning import (
     apply_memory_query_policy,
 )
 from backend.app.plans import ReviewedPlanPersistenceService
+from backend.app.providers.amap import build_amap_registry
 from backend.app.providers.mock_world import build_mock_world_registry
 from backend.app.repositories import (
     ActionLedgerRepository,
@@ -79,7 +80,7 @@ class WeekendPilotWorkflowNodes:
         self.session = dependencies.session
         self.repositories = _Repositories(self.session)
         self.gateway = ToolGateway(
-            registry=build_mock_world_registry(dependencies.world_profile),
+            registry=self._registry(dependencies.tool_profile, dependencies.world_profile),
             tool_events=self.repositories.tool_events,
             action_ledger=self.repositories.action_ledger,
             cache=dependencies.cache,
@@ -100,6 +101,13 @@ class WeekendPilotWorkflowNodes:
         self.dining_agent = agents.dining
         self.itinerary_planner_agent = agents.itinerary_planner
         self.validator_recovery_agent = agents.validator_recovery
+
+    def _registry(self, tool_profile: str, world_profile: str):
+        if tool_profile == "mock_world":
+            return build_mock_world_registry(world_profile)
+        if tool_profile == "amap":
+            return build_amap_registry()
+        raise WorkflowError(f"Unsupported workflow tool profile {tool_profile!r}.")
 
     def initialize(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         user = self._resolve_user(

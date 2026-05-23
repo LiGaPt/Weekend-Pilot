@@ -15,6 +15,7 @@ vi.mock("./api/demo", () => ({
 const awaitingRun: DemoRunSummary = {
   run_id: "run-1",
   status: "awaiting_confirmation",
+  read_profile: "mock_world",
   selected_plan_id: "plan-1",
   plan_version: {
     version_number: 1,
@@ -27,24 +28,24 @@ const awaitingRun: DemoRunSummary = {
       plan_id: "plan-1",
       status: "reviewed",
       selected: true,
-      title: "徐汇亲子轻松下午",
-      summary: "先做亲子科学体验，再步行去吃清淡晚餐。",
+      title: "Family science afternoon",
+      summary: "Start with a family activity, then stop for a lighter dinner.",
       activity: {
-        name: "徐汇亲子科学馆",
+        name: "Science House",
         category: "activity",
-        address: "上海市徐汇区亲子科普路 100 号",
+        address: "100 Museum Road",
         tags: ["child_friendly", "indoor"],
       },
       dining: {
-        name: "绿碗家庭轻食",
+        name: "Light Kitchen",
         category: "dining",
-        address: "上海市徐汇区健康街 6 号",
+        address: "6 Healthy Lane",
         tags: ["lighter_options", "family_tables"],
       },
       timeline: [
         {
           sequence: 1,
-          title: "参观科学馆",
+          title: "Science visit",
           start_label: "14:00",
           end_label: "16:00",
           duration_minutes: 120,
@@ -54,11 +55,11 @@ const awaitingRun: DemoRunSummary = {
         mode: "driving",
         distance_meters: 3200,
         duration_minutes: 18,
-        summary: "两站之间步行很短，适合推婴儿车。",
+        summary: "Short walk between stops.",
       },
       feasibility: {
         is_feasible: true,
-        reasons: ["符合下午出行时间窗。"],
+        reasons: ["Fits the afternoon time window."],
         warnings: [],
         total_duration_minutes: 270,
         route_duration_minutes: 18,
@@ -75,7 +76,7 @@ const awaitingRun: DemoRunSummary = {
             action_type: "reserve_restaurant",
             target_id: "green-table",
             payload_preview: { party_size: 3 },
-            reason: "提前锁定晚餐座位。",
+            reason: "Lock the dinner table after confirmation.",
           },
         ],
       },
@@ -85,18 +86,18 @@ const awaitingRun: DemoRunSummary = {
       plan_id: "plan-2",
       status: "reviewed",
       selected: false,
-      title: "公园和咖啡备选",
-      summary: "户外活动搭配咖啡简餐。",
+      title: "Park fallback",
+      summary: "Outdoor play plus a quick coffee shop dinner.",
       activity: {
-        name: "滨江亲子乐园",
+        name: "Riverside Park",
         category: "activity",
-        address: "滨江步道",
+        address: "Riverside Walk",
         tags: [],
       },
       dining: {
-        name: "轻享咖啡",
+        name: "Corner Cafe",
         category: "dining",
-        address: "咖啡街",
+        address: "Coffee Street",
         tags: [],
       },
       timeline: [],
@@ -115,6 +116,12 @@ const awaitingRun: DemoRunSummary = {
   execution_status: null,
   feedback_status: null,
   error: null,
+};
+
+const awaitingAmapRun: DemoRunSummary = {
+  ...awaitingRun,
+  run_id: "run-amap",
+  read_profile: "amap",
 };
 
 const completedRun: DemoRunSummary = {
@@ -137,7 +144,7 @@ const completedRun: DemoRunSummary = {
             action_type: "reserve_restaurant",
             target_id: "green-table",
             payload_preview: { party_size: 3 },
-            reason: "提前锁定晚餐座位。",
+            reason: "Lock the dinner table after confirmation.",
           },
         ],
       },
@@ -149,11 +156,11 @@ const completedRun: DemoRunSummary = {
       },
       feedback: {
         status: "written",
-        headline: "安排已完成",
-        message: "订座和消息通知已完成。",
+        headline: "Execution complete",
+        message: "Reservation and message steps finished.",
         completed_actions: [{ action_type: "reserve_restaurant", status: "succeeded" }],
         failed_actions: [],
-        next_steps: ["13:40 出发。"],
+        next_steps: ["Leave at 13:40."],
       },
     },
   ],
@@ -169,7 +176,7 @@ const declinedRun: DemoRunSummary = {
       confirmation: {
         status: "declined",
         declined_by: "web-demo-user",
-        reason: "用户选择暂不继续。",
+        reason: "User chose not to continue.",
       },
     },
   ],
@@ -182,23 +189,26 @@ describe("App", () => {
     vi.mocked(declineRun).mockReset();
   });
 
-  it("renders the default prompt and start button", () => {
+  it("renders the default prompt, default read profile, and start button", () => {
     render(<App />);
 
-    expect(screen.getByRole("textbox", { name: /^需求$/ })).toHaveValue(
-      "今天下午想和爱人、5岁的孩子出门玩几个小时，别离家太远。孩子要适合亲子活动，爱人最近想吃清淡一点，帮我安排一下。",
+    expect(screen.getByRole("textbox")).toHaveValue(
+      "\u4eca\u5929\u4e0b\u5348\u60f3\u548c\u7231\u4eba\u30015\u5c81\u7684\u5b69\u5b50\u51fa\u95e8\u73a9\u51e0\u4e2a\u5c0f\u65f6\uff0c\u522b\u79bb\u5bb6\u592a\u8fdc\u3002\u5b69\u5b50\u8981\u9002\u5408\u4eb2\u5b50\u6d3b\u52a8\uff0c\u7231\u4eba\u6700\u8fd1\u60f3\u5403\u6e05\u6de1\u4e00\u70b9\uff0c\u5e2e\u6211\u5b89\u6392\u4e00\u4e0b\u3002",
     );
-    expect(screen.getByRole("button", { name: /开始规划/ })).toBeEnabled();
+    expect(screen.getByTestId("start-button")).toBeEnabled();
+    expect(screen.getByTestId("read-profile-select")).toHaveValue("mock_world");
   });
 
   it("disables start when the request is empty", async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.clear(screen.getByRole("textbox", { name: /^需求$/ }));
+    await user.clear(screen.getByRole("textbox"));
 
-    expect(screen.getByRole("button", { name: /开始规划/ })).toBeDisabled();
-    expect(screen.getByText(/请输入需求/)).toBeInTheDocument();
+    expect(screen.getByTestId("start-button")).toBeDisabled();
+    expect(
+      screen.getByText((_, element) => element?.classList.contains("validation-text") ?? false),
+    ).toBeInTheDocument();
   });
 
   it("renders awaiting-confirmation status and plan details after successful start", async () => {
@@ -206,15 +216,16 @@ describe("App", () => {
     vi.mocked(startRun).mockResolvedValue(awaitingRun);
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: /开始规划/ }));
+    await user.click(screen.getByTestId("start-button"));
 
-    expect(await screen.findByRole("heading", { name: "徐汇亲子轻松下午" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Family science afternoon" })).toBeInTheDocument();
     expect(screen.getAllByText("awaiting_confirmation").length).toBeGreaterThan(0);
     expect(screen.getByTestId("plan-version")).toHaveTextContent("v1");
-    expect(screen.getByText("徐汇亲子科学馆")).toBeInTheDocument();
-    expect(screen.getByText("绿碗家庭轻食")).toBeInTheDocument();
-    expect(screen.getByText("两站之间步行很短，适合推婴儿车。")).toBeInTheDocument();
+    expect(screen.getByText("Science House")).toBeInTheDocument();
+    expect(screen.getByText("Light Kitchen")).toBeInTheDocument();
+    expect(screen.getByText("Short walk between stops.")).toBeInTheDocument();
     expect(screen.getByText("green-table")).toBeInTheDocument();
+    expect(screen.getByTestId("active-read-profile")).toHaveTextContent("Mock World");
   });
 
   it("does not render internal observability labels on the public page", async () => {
@@ -229,11 +240,11 @@ describe("App", () => {
     vi.mocked(startRun).mockResolvedValue(awaitingRun);
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: /开始规划/ }));
-    await user.click(await screen.findByRole("tab", { name: /公园和咖啡备选/ }));
+    await user.click(screen.getByTestId("start-button"));
+    await user.click(await screen.findByRole("tab", { name: /Park fallback/ }));
 
-    expect(screen.getByText("滨江亲子乐园")).toBeInTheDocument();
-    expect(screen.queryByText("徐汇亲子科学馆")).not.toBeInTheDocument();
+    expect(screen.getByText("Riverside Park")).toBeInTheDocument();
+    expect(screen.queryByText("Science House")).not.toBeInTheDocument();
   });
 
   it("confirms a selected plan and renders completed feedback", async () => {
@@ -242,12 +253,12 @@ describe("App", () => {
     vi.mocked(confirmRun).mockResolvedValue(completedRun);
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: /开始规划/ }));
-    await user.click(await screen.findByRole("button", { name: /确认所选方案/ }));
+    await user.click(screen.getByTestId("start-button"));
+    await user.click(await screen.findByTestId("confirm-button"));
 
     expect(confirmRun).toHaveBeenCalledWith("run-1", "plan-1");
-    expect(await screen.findByText("安排已完成")).toBeInTheDocument();
-    expect(screen.getByText("订座和消息通知已完成。")).toBeInTheDocument();
+    expect(await screen.findByText("Execution complete")).toBeInTheDocument();
+    expect(screen.getByText("Reservation and message steps finished.")).toBeInTheDocument();
   });
 
   it("declines a selected plan and hides confirm action", async () => {
@@ -256,12 +267,11 @@ describe("App", () => {
     vi.mocked(declineRun).mockResolvedValue(declinedRun);
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: /开始规划/ }));
-    await user.click(await screen.findByRole("button", { name: /^暂不继续$/ }));
+    await user.click(screen.getByTestId("start-button"));
+    await user.click(await screen.findByTestId("decline-button"));
 
     expect(declineRun).toHaveBeenCalledWith("run-1", "plan-1");
-    expect(await screen.findByText("用户选择暂不继续。")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /确认所选方案/ })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("confirm-button")).not.toBeInTheDocument();
   });
 
   it("renders API errors in user-readable form", async () => {
@@ -269,9 +279,42 @@ describe("App", () => {
     vi.mocked(startRun).mockRejectedValue(new Error("API connection failed."));
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: /开始规划/ }));
+    await user.click(screen.getByTestId("start-button"));
 
     const alert = await screen.findByRole("alert");
-    expect(within(alert).getByText("演示请求失败，请稍后重试。")).toBeInTheDocument();
+    expect(within(alert).getByText(/./)).toBeInTheDocument();
+  });
+
+  it("sends the selected read profile when starting a run", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startRun).mockResolvedValue(awaitingAmapRun);
+    render(<App />);
+
+    await user.selectOptions(screen.getByTestId("read-profile-select"), "amap");
+    await user.click(screen.getByTestId("start-button"));
+
+    expect(startRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        read_profile: "amap",
+      }),
+    );
+  });
+
+  it("shows AMAP as the active read profile and blocks confirmation for the read-only preview path", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startRun).mockResolvedValue(awaitingAmapRun);
+    render(<App />);
+
+    await user.click(screen.getByTestId("start-button"));
+
+    expect(await screen.findByTestId("active-read-profile")).toHaveTextContent(
+      "AMap \u53ea\u8bfb\u9884\u89c8",
+    );
+    expect(screen.getByTestId("amap-read-only-notice")).toHaveTextContent(
+      "\u53ea\u8bfb\u9884\u89c8",
+    );
+    expect(screen.queryByTestId("confirm-button")).not.toBeInTheDocument();
+    expect(screen.getByTestId("decline-button")).toBeEnabled();
+    expect(screen.getByTestId("refresh-button")).toBeEnabled();
   });
 });

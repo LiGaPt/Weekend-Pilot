@@ -22,6 +22,7 @@ from backend.app.demo.versioning import (
 )
 from backend.app.models.runtime import ActionLedger, AgentRun, Plan
 from backend.app.observability import LocalTraceBuffer, ObservabilityRecorder, RunTraceContext
+from backend.app.providers.amap.errors import AMapConfigurationError
 from backend.app.providers.mock_world import build_mock_world_registry
 from backend.app.repositories import (
     ActionLedgerRepository,
@@ -52,6 +53,8 @@ from backend.app.demo.schemas import (
 
 
 DEMO_API_VERSION = "web_demo_api_v1"
+AMAP_NOT_CONFIGURED_MESSAGE = "AMAP read path is not configured for this environment."
+AMAP_CONFIRM_REJECT_MESSAGE = "AMAP read-only demo runs cannot be confirmed."
 _FORBIDDEN_KEY_FRAGMENTS = (
     "action_id",
     "tool_event_id",
@@ -110,6 +113,7 @@ class DemoWorkflowService:
         self.trace_buffer_path = trace_buffer_path
 
     def start_run(self, request: DemoStartRunRequest) -> DemoRunSummary:
+        tool_profile, world_profile = self._workflow_profiles_for_read_profile(request.read_profile)
         runner = WeekendPilotWorkflowRunner(
             WeekendPilotWorkflowDependencies(
                 session=self.session,
@@ -124,8 +128,8 @@ class DemoWorkflowService:
                 external_user_id=request.external_user_id,
                 display_name=request.display_name,
                 case_id=request.case_id,
-                tool_profile="mock_world",
-                world_profile="family_afternoon",
+                tool_profile=tool_profile,
+                world_profile=world_profile,
                 agent_version="agent-v1",
                 prompt_version="prompt-v1",
                 auto_confirm=False,
@@ -133,7 +137,7 @@ class DemoWorkflowService:
             )
         )
         if result.run_id is None:
-            raise DemoServiceError(500, "Demo workflow did not create a run.")
+            raise self._workflow_start_error(result, "Demo workflow did not create a run.")
 
         runs = AgentRunRepository(self.session)
         run = runs.get_by_id(result.run_id)
@@ -200,7 +204,7 @@ class DemoWorkflowService:
             )
         )
         if result.run_id is None:
-            raise DemoServiceError(500, "Demo clarification workflow did not create a run.")
+            raise self._workflow_start_error(result, "Demo clarification workflow did not create a run.")
 
         clarified_run = runs.get_by_id(result.run_id)
         if clarified_run is None:
@@ -287,7 +291,7 @@ class DemoWorkflowService:
             )
         )
         if result.run_id is None:
-            raise DemoServiceError(500, "Demo follow-up replan did not create a run.")
+            raise self._workflow_start_error(result, "Demo follow-up replan did not create a run.")
 
         replan_run = runs.get_by_id(result.run_id)
         if replan_run is None:
@@ -333,6 +337,8 @@ class DemoWorkflowService:
     def confirm_run(self, run_id: UUID, request: DemoConfirmRunRequest) -> DemoRunSummary:
         runs = AgentRunRepository(self.session)
         run = self._load_run(runs, run_id)
+        if run.tool_profile == "amap":
+            raise DemoServiceError(409, AMAP_CONFIRM_REJECT_MESSAGE)
         plan = self._resolve_plan(run_id, request.plan_id)
 
         if self._has_execution_and_feedback(plan):
@@ -412,6 +418,7 @@ class DemoWorkflowService:
         return DemoRunSummary(
             run_id=run.run_id,
             status=run.status,
+            read_profile=self._read_profile_for_tool_profile(run.tool_profile),
             selected_plan_id=selected_plan.plan_id if selected_plan is not None else None,
             plan_version=summarize_plan_version(run.metadata_json),
             plans=[self._plan_preview(plan) for plan in plan_rows],
@@ -430,6 +437,22 @@ class DemoWorkflowService:
             cache=self.cache,
             rate_limiter=self.rate_limiter,
         )
+
+    def _workflow_profiles_for_read_profile(self, read_profile: str) -> tuple[str, str]:
+        if read_profile == "amap":
+            return "amap", "amap_shanghai_live"
+        return "mock_world", "family_afternoon"
+
+    def _read_profile_for_tool_profile(self, tool_profile: str) -> str:
+        if tool_profile == "amap":
+            return "amap"
+        return "mock_world"
+
+    def _workflow_start_error(self, result, default_message: str) -> DemoServiceError:
+        error_json = result.error_json if isinstance(result.error_json, dict) else {}
+        if error_json.get("exception_type") == AMapConfigurationError.__name__:
+            return DemoServiceError(500, AMAP_NOT_CONFIGURED_MESSAGE)
+        return DemoServiceError(500, default_message)
 
     def _resolve_plan(self, run_id: UUID, requested_plan_id: UUID | None) -> Plan:
         plans = PlanRepository(self.session)
