@@ -1,0 +1,47 @@
+{
+  "case_id": "rainy_day_ticket_sold_out_v1",
+  "title": "Rainy day ticket sold out and bad weather safe stop",
+  "user_input": "This afternoon I want to go out with a friend for a few hours, not too far, but since it is rainy please keep the plan indoor with a nearby meal.",
+  "agent_version": "agent-v1",
+  "prompt_version": "prompt-v1",
+  "tool_profile": "mock_world",
+  "world_profile": "rainy_day_fallback",
+  "failure_profile": "ticket_sold_out_and_bad_weather_v0",
+  "memory_items": [],
+  "expected": {
+    "required_tool_names": [
+      "search_poi",
+      "check_weather",
+      "get_poi_detail",
+      "check_opening_hours",
+      "check_queue",
+      "check_table_availability",
+      "check_ticket_availability",
+      "check_route"
+    ],
+    "min_tool_event_count": 8,
+    "min_action_count": 0,
+    "expected_workflow_status": "failed",
+    "expected_execution_status": null,
+    "expected_feedback_status": null,
+    "expected_error_type": "recovery_stopped",
+    "expected_recovery_action": "stop_safely",
+    "min_injected_failure_count": 3
+  },
+  "taxonomy": {
+    "suite": "locallife_bench_v1",
+    "scenario_bucket": "mixed",
+    "level": "L5",
+    "tags": [
+      "bad_weather",
+      "composite_failure",
+      "failure_injected",
+      "rainy_day",
+      "ticket_sold_out"
+    ],
+    "failure_mode": "ticket_sold_out_and_bad_weather"
+  },
+  "metadata": {
+    "focus": "ticket_sold_out_bad_weather_safe_stop"
+  }
+}

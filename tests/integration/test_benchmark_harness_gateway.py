@@ -41,7 +41,11 @@ EXPANDED_CASE_IDS = {
     "rainy_day_fallback_v1",
     "budget_lite_v1",
 }
-RECOVERY_CASE_IDS = {"family_route_failure_v1"}
+RECOVERY_CASE_IDS = {
+    "family_route_failure_v1",
+    "family_route_and_dining_unavailable_v1",
+    "rainy_day_ticket_sold_out_v1",
+}
 DEFAULT_CASE_IDS = {
     "family_afternoon_v1",
     "family_indoor_light_meal_v1",
@@ -106,11 +110,20 @@ EXPANDED_CONSTRAINT_TAG_COUNTS = {
     "quick_meal": 1,
     "rainy_day": 1,
 }
-RECOVERY_SCENARIO_BUCKET_COUNTS = {"family": 1}
-RECOVERY_FAILURE_MODE_COUNTS = {"route_unavailable": 1}
+RECOVERY_SCENARIO_BUCKET_COUNTS = {"family": 2, "mixed": 1}
+RECOVERY_FAILURE_MODE_COUNTS = {
+    "route_and_dining_unavailable": 1,
+    "route_unavailable": 1,
+    "ticket_sold_out_and_bad_weather": 1,
+}
 RECOVERY_CONSTRAINT_TAG_COUNTS = {
-    "child_friendly": 1,
+    "bad_weather": 1,
+    "child_friendly": 2,
+    "composite_failure": 2,
+    "dining_unavailable": 1,
     "light_meal": 1,
+    "rainy_day": 1,
+    "ticket_sold_out": 1,
 }
 DEFAULT_TAG_COUNTS = {
     "addon_optional": 1,
@@ -153,31 +166,39 @@ DEFAULT_CONSTRAINT_TAG_COUNTS = {
 }
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
-    "family": 6,
+    "family": 7,
     "friends": 1,
-    "mixed": 1,
+    "mixed": 2,
     "solo": 1,
     "unknown": 1,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L5": 2}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
-    "family_afternoon": 6,
+    "family_afternoon": 7,
     "friends_gathering": 1,
-    "rainy_day_fallback": 1,
+    "rainy_day_fallback": 2,
     "solo_afternoon": 1,
 }
-ALL_REGISTERED_FAILURE_MODE_COUNTS = {"none": 10, "route_unavailable": 1}
+ALL_REGISTERED_FAILURE_MODE_COUNTS = {
+    "none": 10,
+    "route_and_dining_unavailable": 1,
+    "route_unavailable": 1,
+    "ticket_sold_out_and_bad_weather": 1,
+}
 ALL_REGISTERED_TAG_COUNTS = {
     "addon_optional": 1,
+    "bad_weather": 1,
     "baseline": 2,
     "budget_limited": 1,
     "casual_dining": 1,
-    "child_friendly": 6,
+    "child_friendly": 7,
     "citywalk": 2,
+    "composite_failure": 2,
     "date_friendly": 1,
-    "failure_injected": 1,
+    "dining_unavailable": 1,
+    "failure_injected": 3,
     "fallback": 1,
     "free_activity": 1,
     "friends_group": 1,
@@ -188,16 +209,20 @@ ALL_REGISTERED_TAG_COUNTS = {
     "outdoor_activity": 2,
     "quick_dinner": 1,
     "quick_meal": 1,
-    "rainy_day": 1,
-    "route_failure": 1,
+    "rainy_day": 2,
+    "route_failure": 2,
+    "ticket_sold_out": 1,
 }
 ALL_REGISTERED_CONSTRAINT_TAG_COUNTS = {
     "addon_optional": 1,
+    "bad_weather": 1,
     "budget_limited": 1,
     "casual_dining": 1,
-    "child_friendly": 6,
+    "child_friendly": 7,
     "citywalk": 2,
+    "composite_failure": 2,
     "date_friendly": 1,
+    "dining_unavailable": 1,
     "fallback": 1,
     "free_activity": 1,
     "friends_group": 1,
@@ -208,7 +233,8 @@ ALL_REGISTERED_CONSTRAINT_TAG_COUNTS = {
     "outdoor_activity": 2,
     "quick_dinner": 1,
     "quick_meal": 1,
-    "rainy_day": 1,
+    "rainy_day": 2,
+    "ticket_sold_out": 1,
 }
 FORBIDDEN_REPORT_TEXT = ("action_id", "tool_event_id", "api_key", "token", "secret", "debug_trace")
 
@@ -423,7 +449,7 @@ def test_benchmark_harness_records_memory_policy_for_override_case(
         (
             "recovery_focused",
             RECOVERY_CASE_IDS,
-            1,
+            3,
             RECOVERY_SCENARIO_BUCKET_COUNTS,
             RECOVERY_FAILURE_MODE_COUNTS,
             RECOVERY_CONSTRAINT_TAG_COUNTS,
@@ -633,9 +659,9 @@ def test_benchmark_harness_runs_all_registered_suite(
 
     report = harness.run_suite("all_registered")
 
-    assert len(report.case_results) == 11
+    assert len(report.case_results) == 13
     assert report.run_status == "passed"
-    assert report.passed_count == 11
+    assert report.passed_count == 13
     assert report.failed_count == 0
     assert report.error_count == 0
     assert report.report_path is not None
@@ -697,7 +723,11 @@ def test_benchmark_harness_runs_route_failure_case_as_expected_safe_stop(
     cache, rate_limiter = redis_runtime
     trace_path, report_dir = harness_paths
     case = load_benchmark_case("family_route_failure_v1")
-    assert [item.case_id for item in load_failure_benchmark_cases()] == ["family_route_failure_v1"]
+    assert [item.case_id for item in load_failure_benchmark_cases()] == [
+        "family_route_failure_v1",
+        "family_route_and_dining_unavailable_v1",
+        "rainy_day_ticket_sold_out_v1",
+    ]
     harness = BenchmarkHarness(
         db_session,
         cache,
@@ -744,14 +774,94 @@ def test_benchmark_harness_runs_route_failure_case_as_expected_safe_stop(
     recovery = run.metadata_json["workflow"]["recovery"]
     assert recovery["attempts"][0]["recovery_action"] == "stop_safely"
     assert recovery["attempts"][0]["status"] == "stopped"
+    assert result.failure_chain_summary is not None
+    assert result.failure_chain_summary.profile_id == "route_unavailable_v0"
+    assert result.failure_chain_summary.injected_effects == ["check_route:route_infeasible:failed"]
+    assert result.failure_chain_summary.recovery_actions == ["stop_safely"]
+    assert result.failure_chain_summary.bounded is True
 
     report_payload = json.loads(Path(result.report_path).read_text(encoding="utf-8"))
     assert report_payload["run_summary"]["schema_version"] == "weekendpilot_run_summary_v1"
     assert report_payload["run_summary"]["workflow_status"] == "failed"
     assert report_payload["workflow_timing_summary"]["schema_version"] == "workflow_timing_summary_v1"
+    assert report_payload["failure_chain_summary"]["profile_id"] == "route_unavailable_v0"
     serialized_report = json.dumps(report_payload, sort_keys=True)
     for forbidden in FORBIDDEN_REPORT_TEXT:
         assert forbidden not in serialized_report
+
+
+@pytest.mark.parametrize(
+    ("case_id", "expected_profile", "expected_effects"),
+    [
+        (
+            "family_route_and_dining_unavailable_v1",
+            "route_and_dining_unavailable_v0",
+            [
+                "check_queue:dining_unavailable:succeeded",
+                "check_table_availability:dining_unavailable:succeeded",
+                "check_route:route_infeasible:failed",
+            ],
+        ),
+        (
+            "rainy_day_ticket_sold_out_v1",
+            "ticket_sold_out_and_bad_weather_v0",
+            [
+                "check_weather:bad_weather:succeeded",
+                "check_ticket_availability:ticket_sold_out:succeeded",
+            ],
+        ),
+    ],
+)
+def test_benchmark_harness_runs_composite_failure_case_as_bounded_safe_stop(
+    case_id: str,
+    expected_profile: str,
+    expected_effects: list[str],
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    case = load_benchmark_case(case_id)
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    result = harness.run_case(case)
+
+    assert result.status == "passed"
+    assert result.workflow_status == "failed"
+    assert result.action_count == 0
+    assert result.failure_chain_summary is not None
+    assert result.failure_chain_summary.profile_id == expected_profile
+    assert result.failure_chain_summary.injected_effects == expected_effects
+    assert result.failure_chain_summary.recovery_actions == ["stop_safely"]
+    assert result.failure_chain_summary.attempt_count == 1
+    assert result.failure_chain_summary.max_attempts == 2
+    assert result.failure_chain_summary.bounded is True
+
+    action_count = db_session.scalar(
+        select(func.count()).select_from(ActionLedger).where(ActionLedger.run_id == result.run_id)
+    )
+    assert action_count == 0
+
+    tool_events = db_session.scalars(select(ToolEvent).where(ToolEvent.run_id == result.run_id)).all()
+    injected_events = [
+        event
+        for event in tool_events
+        if isinstance(event.error_json, dict)
+        and event.error_json.get("error_type") in {"failure_injected", "failure_injected_response"}
+    ]
+    assert len(injected_events) >= len(expected_effects)
+
+    report_payload = json.loads(Path(result.report_path).read_text(encoding="utf-8"))
+    assert report_payload["failure_chain_summary"]["profile_id"] == expected_profile
+    assert report_payload["failure_chain_summary"]["injected_effects"] == expected_effects
+    assert report_payload["failure_chain_summary"]["recovery_actions"] == ["stop_safely"]
 
 
 def _assert_rollup_counts(bucket_map, expected_case_counts: dict[str, int]) -> None:

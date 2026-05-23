@@ -16,6 +16,7 @@ from backend.app.benchmark import (
     load_failure_benchmark_cases,
 )
 from backend.app.benchmark.errors import BenchmarkHarnessError
+from backend.app.benchmark.failure_chain import build_failure_chain_summary
 import backend.app.benchmark.graders as benchmark_graders
 import backend.app.benchmark.harness as benchmark_harness
 from backend.app.benchmark.graders import (
@@ -79,7 +80,11 @@ DEFAULT_CASE_IDS = (
     "rainy_day_fallback_v1",
     "budget_lite_v1",
 )
-FAILURE_CASE_IDS = ("family_route_failure_v1",)
+FAILURE_CASE_IDS = (
+    "family_route_failure_v1",
+    "family_route_and_dining_unavailable_v1",
+    "rainy_day_ticket_sold_out_v1",
+)
 REQUIRED_CASE_TOOL_NAMES = {
     "search_poi",
     "check_weather",
@@ -130,31 +135,39 @@ DEFAULT_TAG_COUNTS = {
 }
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
-    "family": 6,
+    "family": 7,
     "friends": 1,
-    "mixed": 1,
+    "mixed": 2,
     "solo": 1,
     "unknown": 1,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L5": 2}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
-    "family_afternoon": 6,
+    "family_afternoon": 7,
     "friends_gathering": 1,
-    "rainy_day_fallback": 1,
+    "rainy_day_fallback": 2,
     "solo_afternoon": 1,
 }
-ALL_REGISTERED_FAILURE_MODE_COUNTS = {"none": 10, "route_unavailable": 1}
+ALL_REGISTERED_FAILURE_MODE_COUNTS = {
+    "none": 10,
+    "route_and_dining_unavailable": 1,
+    "route_unavailable": 1,
+    "ticket_sold_out_and_bad_weather": 1,
+}
 ALL_REGISTERED_TAG_COUNTS = {
     "addon_optional": 1,
+    "bad_weather": 1,
     "baseline": 2,
     "budget_limited": 1,
     "casual_dining": 1,
-    "child_friendly": 6,
+    "child_friendly": 7,
     "citywalk": 2,
+    "composite_failure": 2,
     "date_friendly": 1,
-    "failure_injected": 1,
+    "dining_unavailable": 1,
+    "failure_injected": 3,
     "fallback": 1,
     "free_activity": 1,
     "friends_group": 1,
@@ -165,8 +178,9 @@ ALL_REGISTERED_TAG_COUNTS = {
     "outdoor_activity": 2,
     "quick_dinner": 1,
     "quick_meal": 1,
-    "rainy_day": 1,
-    "route_failure": 1,
+    "rainy_day": 2,
+    "route_failure": 2,
+    "ticket_sold_out": 1,
 }
 EXPECTED_TAXONOMY_BY_CASE = {
     "family_afternoon_v1": _taxonomy_payload(
@@ -225,6 +239,30 @@ EXPECTED_TAXONOMY_BY_CASE = {
         tags=["child_friendly", "failure_injected", "light_meal", "route_failure"],
         failure_mode="route_unavailable",
     ),
+    "family_route_and_dining_unavailable_v1": _taxonomy_payload(
+        scenario_bucket="family",
+        level="L5",
+        tags=[
+            "child_friendly",
+            "composite_failure",
+            "dining_unavailable",
+            "failure_injected",
+            "route_failure",
+        ],
+        failure_mode="route_and_dining_unavailable",
+    ),
+    "rainy_day_ticket_sold_out_v1": _taxonomy_payload(
+        scenario_bucket="mixed",
+        level="L5",
+        tags=[
+            "bad_weather",
+            "composite_failure",
+            "failure_injected",
+            "rainy_day",
+            "ticket_sold_out",
+        ],
+        failure_mode="ticket_sold_out_and_bad_weather",
+    ),
 }
 
 
@@ -250,6 +288,18 @@ def test_failure_fixtures_are_loadable_but_not_default() -> None:
     assert case.expected.expected_error_type == "recovery_stopped"
     assert case.expected.expected_recovery_action == "stop_safely"
     assert case.expected.min_injected_failure_count == 1
+
+    composite_case = load_benchmark_case("family_route_and_dining_unavailable_v1")
+    assert composite_case.failure_profile == "route_and_dining_unavailable_v0"
+    assert composite_case.expected.min_injected_failure_count == 3
+    assert composite_case.expected.expected_workflow_status == "failed"
+    assert composite_case.expected.expected_execution_status is None
+    assert composite_case.expected.expected_feedback_status is None
+
+    rainy_case = load_benchmark_case("rainy_day_ticket_sold_out_v1")
+    assert rainy_case.failure_profile == "ticket_sold_out_and_bad_weather_v0"
+    assert rainy_case.expected.min_injected_failure_count == 3
+    assert rainy_case.expected.expected_recovery_action == "stop_safely"
 
 
 def test_default_fixtures_can_be_loaded_individually() -> None:
@@ -297,7 +347,7 @@ def test_default_case_matrix_summary_counts_are_expected() -> None:
 def test_all_registered_case_matrix_summary_counts_are_expected() -> None:
     summary = build_case_matrix_summary(load_benchmark_suite("all_registered"))
 
-    assert summary.case_count == 11
+    assert summary.case_count == 13
     assert summary.scenario_bucket_counts == ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
     assert summary.level_counts == ALL_REGISTERED_LEVEL_COUNTS
     assert summary.world_profile_counts == ALL_REGISTERED_WORLD_PROFILE_COUNTS
@@ -318,6 +368,70 @@ def test_default_fixtures_include_v1_metadata_and_expected_tools() -> None:
         assert set(case.expected.required_tool_names) == REQUIRED_CASE_TOOL_NAMES
         assert case.expected.expected_execution_status == "succeeded"
         assert case.expected.expected_feedback_status == "completed"
+
+
+def test_build_failure_chain_summary_deduplicates_effects_and_marks_bounded() -> None:
+    summary = build_failure_chain_summary(
+        failure_profile="route_and_dining_unavailable_v0",
+        tool_events=[
+            SimpleNamespace(
+                tool_name="check_queue",
+                status="succeeded",
+                error_json={
+                    "error_type": "failure_injected_response",
+                    "details": {"effect_type": "dining_unavailable"},
+                },
+            ),
+            SimpleNamespace(
+                tool_name="check_queue",
+                status="succeeded",
+                error_json={
+                    "error_type": "failure_injected_response",
+                    "details": {"effect_type": "dining_unavailable"},
+                },
+            ),
+            SimpleNamespace(
+                tool_name="check_table_availability",
+                status="succeeded",
+                error_json={
+                    "error_type": "failure_injected_response",
+                    "details": {"effect_type": "dining_unavailable"},
+                },
+            ),
+            SimpleNamespace(
+                tool_name="check_route",
+                status="failed",
+                error_json={
+                    "error_type": "failure_injected",
+                    "details": {"effect_type": "route_infeasible"},
+                },
+            ),
+        ],
+        run_metadata={
+            "workflow": {
+                "recovery": {
+                    "attempt_count": 1,
+                    "max_attempts": 2,
+                    "attempts": [
+                        {"recovery_action": "stop_safely", "status": "stopped"},
+                    ],
+                }
+            }
+        },
+        workflow_status="failed",
+    )
+
+    assert summary.profile_id == "route_and_dining_unavailable_v0"
+    assert summary.injected_effects == [
+        "check_queue:dining_unavailable:succeeded",
+        "check_table_availability:dining_unavailable:succeeded",
+        "check_route:route_infeasible:failed",
+    ]
+    assert summary.recovery_actions == ["stop_safely"]
+    assert summary.attempt_count == 1
+    assert summary.max_attempts == 2
+    assert summary.bounded is True
+    assert summary.terminal_workflow_status == "failed"
 
 
 @pytest.mark.parametrize(

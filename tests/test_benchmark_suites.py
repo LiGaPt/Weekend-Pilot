@@ -26,10 +26,16 @@ REGISTERED_CASE_IDS = [
     "rainy_day_fallback_v1",
     "budget_lite_v1",
     "family_route_failure_v1",
+    "family_route_and_dining_unavailable_v1",
+    "rainy_day_ticket_sold_out_v1",
 ]
 BASELINE_CASE_IDS = REGISTERED_CASE_IDS[:6]
 EXPANDED_CASE_IDS = REGISTERED_CASE_IDS[6:10]
-RECOVERY_FOCUSED_CASE_IDS = ["family_route_failure_v1"]
+RECOVERY_FOCUSED_CASE_IDS = [
+    "family_route_failure_v1",
+    "family_route_and_dining_unavailable_v1",
+    "rainy_day_ticket_sold_out_v1",
+]
 DEFAULT_CASE_IDS = BASELINE_CASE_IDS + EXPANDED_CASE_IDS
 CANONICAL_SUITE_IDS = ["baseline", "expanded", "recovery_focused", "default", "all_registered"]
 BASELINE_SCENARIO_BUCKET_COUNTS = {"family": 5, "solo": 1}
@@ -76,15 +82,24 @@ EXPANDED_TAG_COUNTS = {
     "quick_meal": 1,
     "rainy_day": 1,
 }
-RECOVERY_SCENARIO_BUCKET_COUNTS = {"family": 1}
-RECOVERY_LEVEL_COUNTS = {"L2": 1}
-RECOVERY_WORLD_PROFILE_COUNTS = {"family_afternoon": 1}
-RECOVERY_FAILURE_MODE_COUNTS = {"route_unavailable": 1}
+RECOVERY_SCENARIO_BUCKET_COUNTS = {"family": 2, "mixed": 1}
+RECOVERY_LEVEL_COUNTS = {"L2": 1, "L5": 2}
+RECOVERY_WORLD_PROFILE_COUNTS = {"family_afternoon": 2, "rainy_day_fallback": 1}
+RECOVERY_FAILURE_MODE_COUNTS = {
+    "route_and_dining_unavailable": 1,
+    "route_unavailable": 1,
+    "ticket_sold_out_and_bad_weather": 1,
+}
 RECOVERY_TAG_COUNTS = {
-    "child_friendly": 1,
-    "failure_injected": 1,
+    "bad_weather": 1,
+    "child_friendly": 2,
+    "composite_failure": 2,
+    "dining_unavailable": 1,
+    "failure_injected": 3,
     "light_meal": 1,
-    "route_failure": 1,
+    "rainy_day": 1,
+    "route_failure": 2,
+    "ticket_sold_out": 1,
 }
 DEFAULT_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
@@ -126,31 +141,39 @@ DEFAULT_TAG_COUNTS = {
 }
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
-    "family": 6,
+    "family": 7,
     "friends": 1,
-    "mixed": 1,
+    "mixed": 2,
     "solo": 1,
     "unknown": 1,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L5": 2}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
-    "family_afternoon": 6,
+    "family_afternoon": 7,
     "friends_gathering": 1,
-    "rainy_day_fallback": 1,
+    "rainy_day_fallback": 2,
     "solo_afternoon": 1,
 }
-ALL_REGISTERED_FAILURE_MODE_COUNTS = {"none": 10, "route_unavailable": 1}
+ALL_REGISTERED_FAILURE_MODE_COUNTS = {
+    "none": 10,
+    "route_and_dining_unavailable": 1,
+    "route_unavailable": 1,
+    "ticket_sold_out_and_bad_weather": 1,
+}
 ALL_REGISTERED_TAG_COUNTS = {
     "addon_optional": 1,
+    "bad_weather": 1,
     "baseline": 2,
     "budget_limited": 1,
     "casual_dining": 1,
-    "child_friendly": 6,
+    "child_friendly": 7,
     "citywalk": 2,
+    "composite_failure": 2,
     "date_friendly": 1,
-    "failure_injected": 1,
+    "dining_unavailable": 1,
+    "failure_injected": 3,
     "fallback": 1,
     "free_activity": 1,
     "friends_group": 1,
@@ -161,8 +184,9 @@ ALL_REGISTERED_TAG_COUNTS = {
     "outdoor_activity": 2,
     "quick_dinner": 1,
     "quick_meal": 1,
-    "rainy_day": 1,
-    "route_failure": 1,
+    "rainy_day": 2,
+    "route_failure": 2,
+    "ticket_sold_out": 1,
 }
 
 
@@ -239,7 +263,7 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
     _assert_suite_description(
         suite_map["recovery_focused"],
         case_ids=RECOVERY_FOCUSED_CASE_IDS,
-        case_count=1,
+        case_count=3,
         scenario_bucket_counts=RECOVERY_SCENARIO_BUCKET_COUNTS,
         level_counts=RECOVERY_LEVEL_COUNTS,
         world_profile_counts=RECOVERY_WORLD_PROFILE_COUNTS,
@@ -259,7 +283,7 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
     _assert_suite_description(
         suite_map["all_registered"],
         case_ids=REGISTERED_CASE_IDS,
-        case_count=11,
+        case_count=13,
         scenario_bucket_counts=ALL_REGISTERED_SCENARIO_BUCKET_COUNTS,
         level_counts=ALL_REGISTERED_LEVEL_COUNTS,
         world_profile_counts=ALL_REGISTERED_WORLD_PROFILE_COUNTS,

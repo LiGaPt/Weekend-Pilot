@@ -60,6 +60,7 @@ def test_stable_summary_extracts_replay_fields() -> None:
         action_count=0,
         injected_failure_count=2,
         recovery_actions=["stop_safely"],
+        failure_chain_signature=["check_route:route_infeasible:failed"],
     )
 
     summary = stable_replay_summary(result)
@@ -70,6 +71,7 @@ def test_stable_summary_extracts_replay_fields() -> None:
     assert summary.action_count == 0
     assert summary.injected_failure_count == 2
     assert summary.recovery_actions == ["stop_safely"]
+    assert summary.failure_chain_signature == ["check_route:route_infeasible:failed"]
 
 
 def test_replay_result_passes_for_matching_stable_fields(unit_report_dir: Path) -> None:
@@ -101,6 +103,33 @@ def test_replay_result_fails_with_explicit_mismatches(unit_report_dir: Path) -> 
     assert [(item.field, item.source, item.replay) for item in result.mismatches] == [
         ("workflow_status", "completed", "failed"),
         ("action_count", 2, 0),
+    ]
+
+
+def test_replay_result_fails_when_failure_chain_signature_differs(unit_report_dir: Path) -> None:
+    source = _case_result(
+        failure_chain_signature=["check_queue:dining_unavailable:succeeded"],
+        recovery_actions=["stop_safely"],
+        workflow_status="failed",
+        action_count=0,
+    )
+    replayed = _case_result(
+        failure_chain_signature=["check_route:route_infeasible:failed"],
+        recovery_actions=["stop_safely"],
+        workflow_status="failed",
+        action_count=0,
+    )
+    replay = BenchmarkReplayHarness(FakeBenchmarkHarness(replayed), replay_report_dir=unit_report_dir)
+
+    result = replay.replay_result(source)
+
+    assert result.status == "failed"
+    assert [(item.field, item.source, item.replay) for item in result.mismatches] == [
+        (
+            "failure_chain_signature",
+            ["check_queue:dining_unavailable:succeeded"],
+            ["check_route:route_infeasible:failed"],
+        ),
     ]
 
 
@@ -351,6 +380,7 @@ def _case_result(
     action_count: int = 2,
     injected_failure_count: int = 0,
     recovery_actions: list[str] | None = None,
+    failure_chain_signature: list[str] | None = None,
     run_id=None,
     trace_id: str | None = None,
     report_path: str | None = None,
@@ -409,5 +439,18 @@ def _case_result(
         workflow_timing_summary=workflow_timing_summary,
         run_summary=run_summary,
         taxonomy=taxonomy,
+        failure_chain_summary=(
+            {
+                "profile_id": "route_unavailable_v0",
+                "injected_effects": failure_chain_signature or [],
+                "recovery_actions": recovery_actions or [],
+                "attempt_count": 1 if failure_chain_signature else 0,
+                "max_attempts": 2 if failure_chain_signature else 0,
+                "bounded": True,
+                "terminal_workflow_status": workflow_status,
+            }
+            if failure_chain_signature is not None
+            else None
+        ),
         report_path=report_path,
     )

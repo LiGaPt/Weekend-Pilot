@@ -22,6 +22,8 @@ _REGISTERED_CASE_IDS = (
     "rainy_day_fallback_v1",
     "budget_lite_v1",
     "family_route_failure_v1",
+    "family_route_and_dining_unavailable_v1",
+    "rainy_day_ticket_sold_out_v1",
 )
 
 

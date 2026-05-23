@@ -246,7 +246,8 @@ def grade_failure_injection(case: BenchmarkCase, tool_events: Sequence[Any]) -> 
         event
         for event in tool_events
         if isinstance(_value(event, "error_json"), dict)
-        and _value(event, "error_json").get("error_type") == "failure_injected"
+        and _value(event, "error_json").get("error_type")
+        in {"failure_injected", "failure_injected_response"}
     ]
     expected_minimum = case.expected.min_injected_failure_count
     passed = len(injected_events) >= expected_minimum

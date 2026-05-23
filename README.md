@@ -154,17 +154,17 @@ Local trace JSONL summaries now also embed the canonical `run_summary` envelope,
 
 The benchmark harness runs file-based cases through the official LangGraph workflow and bounded deterministic agent adapters, then writes local JSON reports. Case reports stay under `var/benchmarks/`. Ad hoc `run_cases(...)` runs still write `var/benchmarks/run-report.json`, while named `run_suite(...)` runs write `var/benchmarks/suite-<suite_id>-run-report.json`. It does not require LangSmith credentials or live provider access.
 
-Each benchmark case fixture now requires a structured `taxonomy` block that captures suite, scenario bucket, benchmark level, tags, and failure mode. Each benchmark case report now includes both `run_summary` and `taxonomy`. Each suite summary now includes both `matrix_summary` coverage counts and additive `outcome_rollup` pass-rate buckets by scenario family, constraint tag, and failure mode so coverage and benchmark pass rate can be compared directly as the suite catalog expands.
+Each benchmark case fixture now requires a structured `taxonomy` block that captures suite, scenario bucket, benchmark level, tags, and failure mode. Each benchmark case report now includes both `run_summary` and `taxonomy`. Failure-profile cases also add a sanitized `failure_chain_summary` so injected effects, bounded recovery actions, and terminal workflow state stay directly reviewable in case reports. Each suite summary now includes both `matrix_summary` coverage counts and additive `outcome_rollup` pass-rate buckets by scenario family, constraint tag, and failure mode so coverage and benchmark pass rate can be compared directly as the suite catalog expands.
 
 The repository now keeps five canonical named benchmark suites in code:
 
 - `baseline` for the historical six-case family-plus-solo non-failure baseline
 - `expanded` for the added couple, friends-group, rainy-day fallback, and budget-lite scenario pack
-- `recovery_focused` for the explicit failure-injection recovery case pack
+- `recovery_focused` for the explicit three-case failure-injection recovery pack: the legacy route failure case plus two composite chaos cases
 - `default` for the ten-case non-failure union of `baseline + expanded`
-- `all_registered` for the full registered fixture inventory
+- `all_registered` for the full 13-case registered fixture inventory
 
-The legacy `failures` suite name remains loadable as a compatibility alias to `recovery_focused`, and `load_failure_benchmark_cases()` now resolves to that canonical recovery-focused suite. Suite descriptions still derive their `matrix_summary` from the existing case taxonomy so expansion stays reviewable.
+The legacy `failures` suite name remains loadable as a compatibility alias to `recovery_focused`, and `load_failure_benchmark_cases()` now resolves to that canonical recovery-focused suite. Replay stable comparison now also includes `failure_chain_signature`, which mirrors the ordered injected-effect chain from `failure_chain_summary.injected_effects`. Suite descriptions still derive their `matrix_summary` from the existing case taxonomy so expansion stays reviewable.
 
 ```bash
 docker compose up -d postgres redis

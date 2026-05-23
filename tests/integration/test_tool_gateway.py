@@ -225,7 +225,9 @@ def test_injected_read_failure_writes_failed_event_without_provider_call(
             ToolFailureInjectionRule(
                 rule_id="route_unavailable_v0.check_route",
                 tool_name="check_route",
-                injected_error_type="route_infeasible",
+                effect_kind="hard_failure",
+                effect_type="route_infeasible",
+                gateway_status="failed",
             )
         ],
     )
@@ -260,6 +262,73 @@ def test_injected_read_failure_writes_failed_event_without_provider_call(
     assert events[0].tool_name == "check_route"
     assert events[0].status == "failed"
     assert events[0].error_json["error_type"] == "failure_injected"
+
+
+def test_injected_read_response_override_writes_succeeded_event_without_provider_call(
+    db_session: Session,
+    redis_runtime,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    provider = FakeProvider()
+    injector = StaticToolFailureInjector(
+        profile_id="ticket_sold_out_and_bad_weather_v0",
+        rules=[
+            ToolFailureInjectionRule(
+                rule_id="ticket_sold_out_and_bad_weather_v0.check_weather",
+                tool_name="check_weather",
+                effect_kind="response_override",
+                effect_type="bad_weather",
+                gateway_status="succeeded",
+                response_json_template={
+                    "weather": {
+                        "location": "{location}",
+                        "date": "2026-05-16",
+                        "condition": "中雨",
+                        "temperature_c": 20,
+                        "precipitation_chance": 0.92,
+                        "advisory": "强降雨，建议室内或取消户外活动。",
+                    }
+                },
+            )
+        ],
+    )
+    gateway = build_gateway(
+        db_session,
+        ToolDefinition(name="check_weather", tool_type="read", default_provider="fake"),
+        provider,
+        cache,
+        rate_limiter,
+        failure_injector=injector,
+    )
+    run = create_run(db_session)
+
+    result = gateway.invoke(
+        ToolGatewayRequest(
+            run_id=run.run_id,
+            tool_name="check_weather",
+            payload={"location": "Shanghai"},
+        )
+    )
+
+    assert result.status == "succeeded"
+    assert result.response_json == {
+        "weather": {
+            "location": "Shanghai",
+            "date": "2026-05-16",
+            "condition": "中雨",
+            "temperature_c": 20,
+            "precipitation_chance": 0.92,
+            "advisory": "强降雨，建议室内或取消户外活动。",
+        }
+    }
+    assert result.error_json["error_type"] == "failure_injected_response"
+    assert provider.calls == []
+
+    events = ToolEventRepository(db_session).list_for_run(run.run_id)
+    assert len(events) == 1
+    assert events[0].tool_name == "check_weather"
+    assert events[0].status == "succeeded"
+    assert events[0].error_json["error_type"] == "failure_injected_response"
 
 
 def test_write_tool_is_blocked_before_confirmation(db_session: Session, redis_runtime) -> None:
