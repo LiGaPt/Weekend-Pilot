@@ -19,7 +19,7 @@ docs/PROJECT_BLUEPRINT.md
 - Current branch is `codex/memory-query-policy-baseline-v0`.
 - Latest code commit is `6103c44 feat: add memory query policy baseline`.
 - In the working tree, `docs/specs/` and `docs/plans/` are continuous and matched from `001` through `047`.
-- In git-tracked history, the numbered spec/plan chain is continuous and matched only through `046`; the `047` doc pair is currently untracked local state.
+- At authoring time in git-tracked history, the numbered spec/plan chain was continuous and matched only through `046`; the Task `047` doc pair existed only as local state.
 - The current repository already has the M4 foundations needed for clarification continuation:
   - durable `conversation_sessions`
   - durable `conversation_turns`
@@ -268,7 +268,7 @@ git commit -m "feat: add demo clarification turn workflow"
 git push -u origin codex/demo-clarification-turn-workflow-v0
 ```
 
-The implementer must confirm that `.env`, secrets, `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `docs/specs/047-memory-query-policy-baseline-v0.md`, `docs/plans/047-memory-query-policy-baseline-v0-plan.md`, `qc`, and `var/` are not staged.
+The implementer must confirm that `.env`, secrets, `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, `var/`, and any unrelated local doc drafts are not staged.
 
 ## 9. Out-of-scope Changes
 

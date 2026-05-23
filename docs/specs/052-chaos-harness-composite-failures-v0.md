@@ -344,7 +344,7 @@ rainy_day_ticket_sold_out_v1
 - Do not add new Mock World fixture files.
 - Do not change default non-failure suite membership.
 - Do not add new frontend observability panels or public benchmark endpoints.
-- Do not backfill or stage the missing `047`, `049`, or `050` spec/plan docs as part of this task.
+- Do not backfill or stage unrelated task-doc convergence work as part of this task.
 - Do not commit local `var/` artifacts, `qc`, or unrelated local docs such as `docs/NEXT_PHASE_ROADMAP.md` and `docs/TASK_WORKFLOW_PROMPTS.md`.
 
 ## 5. Interfaces and Contracts

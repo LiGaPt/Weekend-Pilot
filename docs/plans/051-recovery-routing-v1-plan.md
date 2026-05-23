@@ -25,14 +25,8 @@ docs/NEXT_PHASE_ROADMAP.md
 - Current branch is `codex/benchmark-l2-l3-suite-expansion-v0`.
 - Latest code commit is `6cf0c15 feat: add benchmark suite coverage rollups`.
 - On disk, `docs/specs/` and `docs/plans/` are continuous and matched through `050`.
-- In git-tracked state, the numbered spec/plan chain is only tracked through `048`.
-- Local untracked task-doc drafts currently exist for:
-  - `docs/specs/047-memory-query-policy-baseline-v0.md`
-  - `docs/plans/047-memory-query-policy-baseline-v0-plan.md`
-  - `docs/specs/049-mock-world-scenario-pack-expansion-v1.md`
-  - `docs/plans/049-mock-world-scenario-pack-expansion-v1-plan.md`
-  - `docs/specs/050-benchmark-l2-l3-suite-expansion-v0.md`
-  - `docs/plans/050-benchmark-l2-l3-suite-expansion-v0-plan.md`
+- At authoring time in git-tracked state, the numbered spec/plan chain was only tracked through `048`.
+- At authoring time, Task `047`, `049`, and `050` docs still existed only as local doc drafts outside Task `051`.
 - Additional unrelated untracked local files currently exist:
   - `docs/NEXT_PHASE_ROADMAP.md`
   - `docs/TASK_WORKFLOW_PROMPTS.md`
@@ -271,7 +265,7 @@ docs/NEXT_PHASE_ROADMAP.md
     - confirm the new task does not stage:
       - `docs/NEXT_PHASE_ROADMAP.md`
       - `docs/TASK_WORKFLOW_PROMPTS.md`
-      - all untracked `047`, `049`, and `050` doc drafts
+      - any unrelated local doc drafts
       - `qc`
       - `var/`
 
@@ -341,7 +335,7 @@ git commit -m "feat: add bounded recovery routing v1"
 git push -u origin codex/recovery-routing-v1
 ```
 
-The implementer must confirm that `.env`, secrets, `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, all untracked `047` / `049` / `050` doc drafts, `qc`, and `var/` are not staged.
+The implementer must confirm that `.env`, secrets, `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, any unrelated local doc drafts, `qc`, and `var/` are not staged.
 
 ## 9. Out-of-scope Changes
 
@@ -389,5 +383,5 @@ After implementation, report back with:
 - Confirmation that `family_route_failure_v1` still ends with `stop_safely`.
 - The verification commands that were run and their results.
 - The commit hash and push result.
-- Confirmation that the unrelated untracked `047`, `049`, and `050` doc drafts remained unstaged.
+- Confirmation that unrelated local doc drafts remained unstaged.
 - Any remaining follow-up limitation, especially that real provider recovery and broader benchmark authoring remain separate tasks.

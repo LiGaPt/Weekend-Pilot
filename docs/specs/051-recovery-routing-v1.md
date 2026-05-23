@@ -226,7 +226,7 @@ This task builds directly on:
 - Do not add automatic write-action retries.
 - Do not widen `expand_search_radius` into real geo-radius logic for `mock_world`.
 - Do not convert this task into a general conversation redesign.
-- Do not stage or commit unrelated local task-doc drafts for Tasks `047`, `049`, or `050`.
+- Do not stage or commit unrelated local task-doc drafts.
 
 ## 5. Interfaces and Contracts
 
@@ -395,6 +395,6 @@ Important defaults chosen here:
 - mock-world expansion is modeled as search breadth increase, not true geo-radius logic
 - replacement excludes already-produced blocked draft pairs only
 - recovery `ask_user` must reuse the existing clarification contract and continuation route
-- the current untracked local docs for Tasks `047`, `049`, and `050` are not part of this task and must not be staged with it
+- unrelated local doc drafts are not part of this task and must not be staged with it
 
 If the implementation seems to require new provider contracts, new public schema shapes, or new benchmark fixtures, stop and narrow the change back down. Those are separate tasks.
