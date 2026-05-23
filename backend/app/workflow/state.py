@@ -125,6 +125,8 @@ class WeekendPilotWorkflowState(TypedDict, total=False):
     recovery_decision: RecoveryDecision
     recovery_attempts: list[RecoveryAttempt]
     max_recovery_attempts: int
+    search_expansion_level: int
+    excluded_candidate_pairs: list[dict[str, str]]
     active_recovery_route: str | None
     persisted_plans: list[PersistedPlan]
     selected_plan_id: UUID | None

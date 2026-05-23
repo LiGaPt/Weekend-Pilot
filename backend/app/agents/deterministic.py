@@ -5,9 +5,11 @@ from typing import Any
 from pydantic import BaseModel
 
 from backend.app.agents.policies import default_agent_policy, validate_agent_tool_usage
+from backend.app.agents.recovery_policy import decide_recovery_action
 from backend.app.agents.schemas import (
     AgentInvocationContext,
     AgentResult,
+    RecoveryEvaluationContext,
     RecoveryDecision,
     SupervisorAssignment,
     SupervisorAssignmentPlan,
@@ -257,6 +259,7 @@ class DeterministicValidatorRecoveryAgent:
         enrichment: CandidateEnrichmentResult,
         drafts: ItineraryDraftResult,
         pre_confirmation_action_count: int = 0,
+        recovery_context: RecoveryEvaluationContext | None = None,
         context: AgentInvocationContext | None = None,
     ) -> tuple[AgentResult, FinalReviewResult, RecoveryDecision]:
         del context
@@ -266,7 +269,12 @@ class DeterministicValidatorRecoveryAgent:
             drafts,
             pre_confirmation_action_count=pre_confirmation_action_count,
         )
-        decision = self._decision(review)
+        decision = self._decision(
+            plan,
+            review,
+            drafts,
+            recovery_context=recovery_context,
+        )
         result = _agent_result(
             role="validator_recovery",
             status="completed" if review.safe_to_present else "blocked",
@@ -282,21 +290,19 @@ class DeterministicValidatorRecoveryAgent:
         )
         return result, review, decision
 
-    def _decision(self, review: FinalReviewResult) -> RecoveryDecision:
-        if review.safe_to_present:
-            return RecoveryDecision(
-                verdict="passed",
-                recovery_action="none",
-                retry_budget=0,
-                reason="Final review is safe to present.",
-            )
-        error_type = review.errors[0].check_name if review.errors else "plan_invalid"
-        return RecoveryDecision(
-            verdict="failed",
-            error_type=error_type,
-            recovery_action="stop_safely",
-            retry_budget=0,
-            reason="Final review blocked presentation; recovery should stop safely.",
+    def _decision(
+        self,
+        plan: QueryPlan,
+        review: FinalReviewResult,
+        drafts: ItineraryDraftResult,
+        *,
+        recovery_context: RecoveryEvaluationContext | None = None,
+    ) -> RecoveryDecision:
+        return decide_recovery_action(
+            plan=plan,
+            review=review,
+            drafts=drafts,
+            recovery_context=recovery_context,
         )
 
 

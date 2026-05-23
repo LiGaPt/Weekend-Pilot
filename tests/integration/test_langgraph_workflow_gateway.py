@@ -8,10 +8,23 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from backend.app.agents import AgentResult, DeterministicValidatorRecoveryAgent, RecoveryDecision
+from backend.app.agents import (
+    AgentResult,
+    DeterministicItineraryPlannerAgent,
+    DeterministicValidatorRecoveryAgent,
+    RecoveryDecision,
+)
 from backend.app.db.session import SessionLocal
 from backend.app.models.runtime import ActionLedger, AgentRun, ToolEvent, User
-from backend.app.planning import DeterministicIntentParser
+from backend.app.planning import (
+    DeterministicIntentParser,
+    DeterministicQueryPlanner,
+    FeasibilitySummary,
+    ItineraryCandidateRef,
+    ItineraryDraft,
+    ItineraryDraftResult,
+    ItineraryRouteRef,
+)
 from backend.app.repositories import ConversationSessionRepository, UserRepository
 from backend.app.review.schemas import FinalReviewResult, ReviewCheck
 from backend.app.runtime import FixedWindowRateLimiter, JsonRedisCache, RedisKeyBuilder, get_redis_client
@@ -115,6 +128,40 @@ def _assert_timing_artifacts(result, run: AgentRun, trace_path: Path) -> None:
     assert payload["workflow_timing_summary"]["stages"][0]["node_name"] == "initialize"
 
 
+def _draft(draft_id: str, *, activity_id: str, dining_id: str) -> ItineraryDraft:
+    return ItineraryDraft(
+        draft_id=draft_id,
+        title=f"{activity_id} + {dining_id}",
+        summary="test draft",
+        activity=ItineraryCandidateRef(
+            candidate_id=activity_id,
+            name=activity_id,
+            category="activity",
+            provider="mock_world",
+        ),
+        dining=ItineraryCandidateRef(
+            candidate_id=dining_id,
+            name=dining_id,
+            category="dining",
+            provider="mock_world",
+        ),
+        route=ItineraryRouteRef(
+            origin_candidate_id=activity_id,
+            destination_candidate_id=dining_id,
+            provider="mock_world",
+            mode="walking",
+            distance_meters=1000,
+            duration_minutes=15,
+        ),
+        feasibility=FeasibilitySummary(
+            is_feasible=True,
+            reasons=["usable"],
+            total_duration_minutes=300,
+            route_duration_minutes=15,
+        ),
+    )
+
+
 def test_workflow_stops_at_confirmation_boundary_without_write_actions(
     db_session: Session,
     redis_runtime,
@@ -188,8 +235,16 @@ def test_workflow_recovery_stop_safely_records_metadata_without_actions(
     trace_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def _blocked_review(self, plan, enrichment, drafts, pre_confirmation_action_count=0, context=None):
-        del self, plan, enrichment, pre_confirmation_action_count, context
+    def _blocked_review(
+        self,
+        plan,
+        enrichment,
+        drafts,
+        pre_confirmation_action_count=0,
+        recovery_context=None,
+        context=None,
+    ):
+        del self, plan, enrichment, pre_confirmation_action_count, recovery_context, context
         failed_check = ReviewCheck(
             check_name="route_verified",
             status="failed",
@@ -250,7 +305,7 @@ def test_workflow_recovery_stop_safely_records_metadata_without_actions(
     assert run is not None
     recovery = run.metadata_json["workflow"]["recovery"]
     assert recovery["attempt_count"] == 1
-    assert recovery["max_attempts"] == 1
+    assert recovery["max_attempts"] == 2
     assert recovery["attempts"][0]["status"] == "stopped"
     _assert_timing_artifacts(result, run, trace_path)
 
@@ -264,7 +319,15 @@ def test_workflow_recovery_retry_loops_once_and_pauses_without_actions(
     original_review = DeterministicValidatorRecoveryAgent.review
     call_count = {"count": 0}
 
-    def _retry_then_pass(self, plan, enrichment, drafts, pre_confirmation_action_count=0, context=None):
+    def _retry_then_pass(
+        self,
+        plan,
+        enrichment,
+        drafts,
+        pre_confirmation_action_count=0,
+        recovery_context=None,
+        context=None,
+    ):
         call_count["count"] += 1
         if call_count["count"] > 1:
             return original_review(
@@ -273,6 +336,7 @@ def test_workflow_recovery_retry_loops_once_and_pauses_without_actions(
                 enrichment,
                 drafts,
                 pre_confirmation_action_count=pre_confirmation_action_count,
+                recovery_context=recovery_context,
                 context=context,
             )
 
@@ -338,6 +402,315 @@ def test_workflow_recovery_retry_loops_once_and_pauses_without_actions(
     assert recovery["attempt_count"] == 1
     assert recovery["attempts"][0]["status"] == "routed"
     assert recovery["attempts"][0]["route_to"] == "execute_searches"
+    _assert_timing_artifacts(result, run, trace_path)
+
+
+def test_workflow_recovery_replace_candidate_filters_first_pair_and_pauses_without_actions(
+    db_session: Session,
+    redis_runtime,
+    trace_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_review = DeterministicValidatorRecoveryAgent.review
+    validator_call_count = {"count": 0}
+    excluded_pair: dict[str, str] = {}
+
+    def _replace_then_pass(
+        self,
+        plan,
+        enrichment,
+        drafts,
+        pre_confirmation_action_count=0,
+        recovery_context=None,
+        context=None,
+    ):
+        validator_call_count["count"] += 1
+        if validator_call_count["count"] == 1:
+            assert len(drafts.drafts) >= 2
+            excluded_pair.update(
+                {
+                    "activity_candidate_id": drafts.drafts[0].activity.candidate_id,
+                    "dining_candidate_id": drafts.drafts[0].dining.candidate_id,
+                }
+            )
+            failed_check = ReviewCheck(
+                check_name="route_verified",
+                status="failed",
+                severity="error",
+                message="First draft route is blocked.",
+                draft_id="draft_1",
+            )
+            review = FinalReviewResult(
+                run_id=drafts.run_id,
+                provider_profile=drafts.provider_profile,
+                decision="blocked",
+                safe_to_present=False,
+                checks=[failed_check],
+                errors=[failed_check],
+                gate_version="test-gate",
+            )
+            decision = RecoveryDecision(
+                verdict="failed",
+                error_type="route_verified",
+                recovery_action="replace_candidate",
+                route_to="logical_planner_agent",
+                retry_budget=1,
+                reason="Try the next candidate pair.",
+            )
+            return (
+                AgentResult(
+                    role="validator_recovery",
+                    status="blocked",
+                    summary="Replace candidate pair.",
+                    adapter_version="test-validator",
+                    output_json={"recovery_decision": decision.model_dump(mode="json")},
+                ),
+                    review,
+                    decision,
+                )
+
+        remaining_pairs = [
+            (draft.activity.candidate_id, draft.dining.candidate_id)
+            for draft in drafts.drafts
+        ]
+        assert remaining_pairs
+        assert (
+            excluded_pair["activity_candidate_id"],
+            excluded_pair["dining_candidate_id"],
+        ) not in remaining_pairs
+        return original_review(
+            self,
+            plan,
+            enrichment,
+            drafts,
+            pre_confirmation_action_count=pre_confirmation_action_count,
+            recovery_context=recovery_context,
+            context=context,
+        )
+
+    monkeypatch.setattr(DeterministicValidatorRecoveryAgent, "review", _replace_then_pass)
+    runner = _build_runner(db_session, redis_runtime, trace_path)
+
+    result = runner.run(
+        WeekendPilotWorkflowRequest(
+            user_input=USER_INPUT,
+            external_user_id=f"workflow-recovery-replace-{uuid4()}",
+            display_name="Workflow Recovery Replace Tester",
+            case_id="case-langgraph-recovery-replace",
+            auto_confirm=False,
+        )
+    )
+
+    assert result.status == "awaiting_confirmation"
+    assert result.run_id is not None
+    assert result.action_count == 0
+    assert _action_count(db_session, result.run_id) == 0
+    assert result.node_history.count("logical_planner_agent") >= 2
+    assert result.node_history.count("apply_recovery") == 1
+
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    recovery = run.metadata_json["workflow"]["recovery"]
+    assert recovery["attempts"][0]["recovery_action"] == "replace_candidate"
+    assert recovery["attempts"][0]["route_to"] == "logical_planner_agent"
+    assert recovery["excluded_candidate_pairs"] == [excluded_pair]
+    assert recovery["search_expansion_level"] == 0
+    _assert_timing_artifacts(result, run, trace_path)
+
+
+def test_workflow_recovery_expand_search_radius_reruns_query_generation_with_bounded_limit(
+    db_session: Session,
+    redis_runtime,
+    trace_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_review = DeterministicValidatorRecoveryAgent.review
+    original_build = DeterministicQueryPlanner.build
+    observed_search_limits: list[int | None] = []
+    validator_call_count = {"count": 0}
+
+    def _tracking_build(self, intent, provider_profile="mock_world", *, search_limit_override=None):
+        observed_search_limits.append(search_limit_override)
+        return original_build(
+            self,
+            intent,
+            provider_profile=provider_profile,
+            search_limit_override=search_limit_override,
+        )
+
+    def _expand_then_pass(
+        self,
+        plan,
+        enrichment,
+        drafts,
+        pre_confirmation_action_count=0,
+        recovery_context=None,
+        context=None,
+    ):
+        validator_call_count["count"] += 1
+        if validator_call_count["count"] == 1:
+            failed_check = ReviewCheck(
+                check_name="draft_exists",
+                status="failed",
+                severity="error",
+                message="No draft is available.",
+            )
+            review = FinalReviewResult(
+                run_id=uuid4(),
+                provider_profile="mock_world",
+                decision="blocked",
+                safe_to_present=False,
+                checks=[failed_check],
+                errors=[failed_check],
+                gate_version="test-gate",
+            )
+            decision = RecoveryDecision(
+                verdict="failed",
+                error_type="draft_exists",
+                recovery_action="expand_search_radius",
+                route_to="generate_queries",
+                retry_budget=1,
+                reason="Expand search breadth once.",
+            )
+            return (
+                AgentResult(
+                    role="validator_recovery",
+                    status="blocked",
+                    summary="Expand search breadth.",
+                    adapter_version="test-validator",
+                    output_json={"recovery_decision": decision.model_dump(mode="json")},
+                ),
+                review,
+                decision,
+            )
+
+        return original_review(
+            self,
+            plan,
+            enrichment,
+            drafts,
+            pre_confirmation_action_count=pre_confirmation_action_count,
+            recovery_context=recovery_context,
+            context=context,
+        )
+
+    monkeypatch.setattr(DeterministicQueryPlanner, "build", _tracking_build)
+    monkeypatch.setattr(DeterministicValidatorRecoveryAgent, "review", _expand_then_pass)
+    runner = _build_runner(db_session, redis_runtime, trace_path)
+
+    result = runner.run(
+        WeekendPilotWorkflowRequest(
+            user_input=USER_INPUT,
+            external_user_id=f"workflow-recovery-expand-{uuid4()}",
+            display_name="Workflow Recovery Expand Tester",
+            case_id="case-langgraph-recovery-expand",
+            auto_confirm=False,
+        )
+    )
+
+    assert result.status == "awaiting_confirmation"
+    assert result.run_id is not None
+    assert result.action_count == 0
+    assert _action_count(db_session, result.run_id) == 0
+    assert result.node_history.count("generate_queries") >= 2
+    assert result.node_history.count("apply_recovery") == 1
+    assert observed_search_limits[0] is None
+    assert 8 in observed_search_limits[1:]
+
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    recovery = run.metadata_json["workflow"]["recovery"]
+    assert recovery["attempts"][0]["recovery_action"] == "expand_search_radius"
+    assert recovery["attempts"][0]["route_to"] == "generate_queries"
+    assert recovery["search_expansion_level"] == 1
+    _assert_timing_artifacts(result, run, trace_path)
+
+
+def test_workflow_recovery_ask_user_reuses_clarification_contract_without_actions(
+    db_session: Session,
+    redis_runtime,
+    trace_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _ask_user(
+        self,
+        plan,
+        enrichment,
+        drafts,
+        pre_confirmation_action_count=0,
+        recovery_context=None,
+        context=None,
+    ):
+        del self, plan, enrichment, drafts, pre_confirmation_action_count, recovery_context, context
+        failed_check = ReviewCheck(
+            check_name="draft_exists",
+            status="failed",
+            severity="error",
+            message="Need user tradeoff input.",
+        )
+        review = FinalReviewResult(
+            run_id=uuid4(),
+            provider_profile="mock_world",
+            decision="blocked",
+            safe_to_present=False,
+            checks=[failed_check],
+            errors=[failed_check],
+            gate_version="test-gate",
+        )
+        decision = RecoveryDecision(
+            verdict="failed",
+            error_type="draft_exists",
+            recovery_action="ask_user",
+            retry_budget=0,
+            reason="Need user tradeoff input.",
+        )
+        return (
+            AgentResult(
+                role="validator_recovery",
+                status="blocked",
+                summary="Need user tradeoff input.",
+                adapter_version="test-validator",
+                output_json={"recovery_decision": decision.model_dump(mode="json")},
+            ),
+            review,
+            decision,
+        )
+
+    monkeypatch.setattr(DeterministicValidatorRecoveryAgent, "review", _ask_user)
+    runner = _build_runner(db_session, redis_runtime, trace_path)
+
+    result = runner.run(
+        WeekendPilotWorkflowRequest(
+            user_input=USER_INPUT,
+            external_user_id=f"workflow-recovery-clarify-{uuid4()}",
+            display_name="Workflow Recovery Clarify Tester",
+            case_id="case-langgraph-recovery-clarify",
+            auto_confirm=False,
+        )
+    )
+
+    assert result.status == "awaiting_clarification"
+    assert result.run_id is not None
+    assert result.action_count == 0
+    assert _action_count(db_session, result.run_id) == 0
+    assert "apply_recovery" in result.node_history
+    assert "wait_confirmation" not in result.node_history
+
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    workflow = run.metadata_json["workflow"]
+    recovery = workflow["recovery"]
+    assert recovery["attempts"][0]["recovery_action"] == "ask_user"
+    assert recovery["attempts"][0]["status"] == "awaiting_user"
+    assert workflow["clarification"] == {
+        "policy_version": "recovery_clarification_v1",
+        "missing_fields": ["distance_flexibility"],
+        "question_text": (
+            "\u4e3a\u4e86\u7ee7\u7eed\u89c4\u5212\uff0c\u8bf7\u544a\u8bc9\u6211\u662f\u5426\u53ef\u4ee5"
+            "\u63a5\u53d7\u66f4\u8fdc\u4e00\u70b9\uff0c\u6216\u8005\u4ecd\u7136\u9700\u8981\u63a7\u5236"
+            "\u5728\u5f53\u524d\u8ddd\u79bb\u5185\u3002"
+        ),
+    }
     _assert_timing_artifacts(result, run, trace_path)
 
 

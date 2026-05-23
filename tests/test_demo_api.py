@@ -204,6 +204,44 @@ def test_demo_run_summary_serializes_clarification_payload() -> None:
     }
 
 
+def test_demo_run_summary_serializes_recovery_clarification_payload() -> None:
+    summary = DemoRunSummary(
+        run_id=uuid4(),
+        status="awaiting_clarification",
+        selected_plan_id=None,
+        plan_version={
+            "version_number": 1,
+            "version_label": "v1",
+            "source_run_id": None,
+            "source_selected_plan_id": None,
+        },
+        plans=[],
+        action_count=0,
+        execution_status=None,
+        feedback_status=None,
+        error=None,
+        clarification={
+            "prompt": (
+                "\u4e3a\u4e86\u7ee7\u7eed\u89c4\u5212\uff0c\u8bf7\u544a\u8bc9\u6211\u662f\u5426\u53ef\u4ee5"
+                "\u63a5\u53d7\u66f4\u8fdc\u4e00\u70b9\uff0c\u6216\u8005\u4ecd\u7136\u9700\u8981\u63a7\u5236"
+                "\u5728\u5f53\u524d\u8ddd\u79bb\u5185\u3002"
+            ),
+            "missing_fields": ["distance_flexibility"],
+        },
+    )
+
+    dumped = summary.model_dump(mode="json")
+
+    assert dumped["clarification"] == {
+        "prompt": (
+            "\u4e3a\u4e86\u7ee7\u7eed\u89c4\u5212\uff0c\u8bf7\u544a\u8bc9\u6211\u662f\u5426\u53ef\u4ee5"
+            "\u63a5\u53d7\u66f4\u8fdc\u4e00\u70b9\uff0c\u6216\u8005\u4ecd\u7136\u9700\u8981\u63a7\u5236"
+            "\u5728\u5f53\u524d\u8ddd\u79bb\u5185\u3002"
+        ),
+        "missing_fields": ["distance_flexibility"],
+    }
+
+
 def test_demo_run_summary_allows_null_clarification_for_non_clarification_runs() -> None:
     summary = DemoRunSummary(
         run_id=uuid4(),

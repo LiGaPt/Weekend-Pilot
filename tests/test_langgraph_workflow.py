@@ -92,6 +92,9 @@ class _StubNodes:
                 retry_budget=0,
                 reason="safe after replacement",
             )
+        elif decision.recovery_action == "ask_user":
+            updates["status"] = "awaiting_clarification"
+            updates["active_recovery_route"] = None
         else:
             updates["status"] = "failed"
         return updates
@@ -249,10 +252,10 @@ def test_recovery_route_resolver_stops_for_ask_user() -> None:
         max_attempts=1,
     )
 
-    assert result.route_to == "failed"
-    assert result.error_type == "recovery_requires_user_input"
+    assert result.route_to == "awaiting_clarification"
+    assert result.error_type is None
     assert result.attempt is not None
-    assert result.attempt.status == "stopped"
+    assert result.attempt.status == "awaiting_user"
 
 
 def test_recovery_route_resolver_stops_when_budget_exhausted() -> None:
@@ -313,6 +316,10 @@ def test_recovery_graph_route_never_jumps_to_execution() -> None:
     assert route_after_recovery({"active_recovery_route": "saga_execution_engine"}) == "failed"
 
 
+def test_recovery_graph_route_allows_terminal_clarification_status() -> None:
+    assert route_after_recovery({"status": "awaiting_clarification"}) == "awaiting_clarification"
+
+
 def test_graph_retry_recovery_loops_through_read_path_then_confirmation() -> None:
     graph = build_weekend_pilot_graph(cast(Any, _StubNodes()))
     decision = RecoveryDecision(
@@ -356,6 +363,23 @@ def test_graph_stops_after_generate_queries_when_clarification_is_required() -> 
     assert result["status"] == "awaiting_clarification"
     assert "generate_queries" in result["node_history"]
     assert "execute_searches" not in result["node_history"]
+    assert "wait_confirmation" not in result["node_history"]
+
+
+def test_graph_stops_after_recovery_when_user_clarification_is_required() -> None:
+    graph = build_weekend_pilot_graph(cast(Any, _StubNodes()))
+    decision = RecoveryDecision(
+        verdict="failed",
+        error_type="draft_exists",
+        recovery_action="ask_user",
+        retry_budget=0,
+        reason="need user tradeoff",
+    )
+
+    result = graph.invoke({"node_history": [], "auto_confirm": False, "recovery_decision": decision})
+
+    assert result["status"] == "awaiting_clarification"
+    assert "apply_recovery" in result["node_history"]
     assert "wait_confirmation" not in result["node_history"]
 
 

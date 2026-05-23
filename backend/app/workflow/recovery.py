@@ -12,10 +12,11 @@ RecoveryRouteTarget = Literal[
     "generate_queries",
     "execute_searches",
     "logical_planner_agent",
+    "awaiting_clarification",
     "failed",
     "error",
 ]
-RecoveryAttemptStatus = Literal["routed", "stopped"]
+RecoveryAttemptStatus = Literal["routed", "stopped", "awaiting_user"]
 
 _ACTION_ROUTE_MAP = {
     "retry": "execute_searches",
@@ -74,12 +75,19 @@ def resolve_recovery_route(
 
     retry_budget_before = max(decision.retry_budget, 0)
     if decision.recovery_action == "ask_user":
-        return _stop_from_decision(
-            decision,
+        attempt = RecoveryAttempt(
             attempt_index=attempt_index,
-            error_type="recovery_requires_user_input",
+            recovery_action=decision.recovery_action,
+            route_to="awaiting_clarification",
+            error_type=decision.error_type,
+            reason=decision.reason,
             retry_budget_before=retry_budget_before,
             retry_budget_after=retry_budget_before,
+            status="awaiting_user",
+        )
+        return RecoveryRouteResult(
+            route_to="awaiting_clarification",
+            attempt=attempt,
             message="Recovery requires user input.",
         )
     if decision.recovery_action == "stop_safely":
