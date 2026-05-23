@@ -18,6 +18,7 @@ from backend.app.benchmark.graders import (
     grade_execution_safety,
     grade_failure_injection,
     grade_feedback,
+    grade_memory_governance,
     grade_plan_quality,
     grade_recovery_expectation,
     grade_trajectory,
@@ -195,7 +196,7 @@ class BenchmarkHarness:
                 confidence=item.confidence,
                 source_run_id=None,
                 source_langsmith_trace_id=None,
-                expires_at=None,
+                expires_at=item.expires_at,
                 status=item.status,
             )
 
@@ -300,6 +301,8 @@ class BenchmarkHarness:
             scores.insert(3, grade_plan_quality(selected_plan))
         if case.expected.expected_recovery_action is not None:
             scores.append(grade_recovery_expectation(case, run_metadata))
+        if case.expected.memory_governance is not None:
+            scores.append(grade_memory_governance(case, run_metadata))
         status, overall, failure_reasons = combine_scores(scores)
         result = BenchmarkCaseResult(
             case_id=case.case_id,

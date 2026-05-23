@@ -24,6 +24,7 @@ from backend.app.benchmark.graders import (
     grade_execution_safety,
     grade_failure_injection,
     grade_feedback,
+    grade_memory_governance,
     grade_recovery_expectation,
     grade_trajectory,
     grade_workflow_path,
@@ -32,6 +33,8 @@ from backend.app.benchmark.reporting import write_case_report, write_run_report
 from backend.app.benchmark.schemas import (
     BenchmarkCase,
     BenchmarkCaseResult,
+    BenchmarkMemoryDecisionExpectation,
+    BenchmarkMemoryGovernanceExpectation,
     BenchmarkExpectedOutcome,
     BenchmarkRunReport,
     BenchmarkScore,
@@ -85,6 +88,11 @@ FAILURE_CASE_IDS = (
     "family_route_and_dining_unavailable_v1",
     "rainy_day_ticket_sold_out_v1",
 )
+MEMORY_GOVERNANCE_CASE_IDS = (
+    "family_memory_override_v1",
+    "family_memory_advisory_fill_v1",
+    "family_memory_expired_advisory_v1",
+)
 REQUIRED_CASE_TOOL_NAMES = {
     "search_poi",
     "check_weather",
@@ -133,25 +141,38 @@ DEFAULT_TAG_COUNTS = {
     "quick_meal": 1,
     "rainy_day": 1,
 }
+MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS = {"family": 3}
+MEMORY_GOVERNANCE_LEVEL_COUNTS = {"L2": 1, "L3": 2}
+MEMORY_GOVERNANCE_WORLD_PROFILE_COUNTS = {"family_afternoon": 3}
+MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS = {"none": 3}
+MEMORY_GOVERNANCE_TAG_COUNTS = {
+    "child_friendly": 3,
+    "indoor_activity": 2,
+    "light_meal": 2,
+    "memory_advisory": 1,
+    "memory_expired": 1,
+    "memory_governance": 2,
+    "memory_override": 1,
+}
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
-    "family": 7,
+    "family": 9,
     "friends": 1,
     "mixed": 2,
     "solo": 1,
     "unknown": 1,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L5": 2}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L3": 2, "L5": 2}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
-    "family_afternoon": 7,
+    "family_afternoon": 9,
     "friends_gathering": 1,
     "rainy_day_fallback": 2,
     "solo_afternoon": 1,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
-    "none": 10,
+    "none": 12,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
@@ -162,7 +183,7 @@ ALL_REGISTERED_TAG_COUNTS = {
     "baseline": 2,
     "budget_limited": 1,
     "casual_dining": 1,
-    "child_friendly": 7,
+    "child_friendly": 9,
     "citywalk": 2,
     "composite_failure": 2,
     "date_friendly": 1,
@@ -171,9 +192,12 @@ ALL_REGISTERED_TAG_COUNTS = {
     "fallback": 1,
     "free_activity": 1,
     "friends_group": 1,
-    "indoor_activity": 3,
+    "indoor_activity": 4,
     "light_activity": 1,
-    "light_meal": 6,
+    "light_meal": 7,
+    "memory_advisory": 1,
+    "memory_expired": 1,
+    "memory_governance": 2,
     "memory_override": 1,
     "outdoor_activity": 2,
     "quick_dinner": 1,
@@ -202,6 +226,16 @@ EXPECTED_TAXONOMY_BY_CASE = {
         scenario_bucket="family",
         level="L2",
         tags=["child_friendly", "indoor_activity", "light_meal", "memory_override"],
+    ),
+    "family_memory_advisory_fill_v1": _taxonomy_payload(
+        scenario_bucket="family",
+        level="L3",
+        tags=["child_friendly", "light_meal", "memory_advisory", "memory_governance"],
+    ),
+    "family_memory_expired_advisory_v1": _taxonomy_payload(
+        scenario_bucket="family",
+        level="L3",
+        tags=["child_friendly", "indoor_activity", "memory_expired", "memory_governance"],
     ),
     "family_citywalk_addon_v1": _taxonomy_payload(
         scenario_bucket="family",
@@ -302,6 +336,36 @@ def test_failure_fixtures_are_loadable_but_not_default() -> None:
     assert rainy_case.expected.expected_recovery_action == "stop_safely"
 
 
+def test_memory_governance_fixtures_are_loadable_but_not_default() -> None:
+    default_cases = load_default_benchmark_cases()
+    default_case_ids = {case.case_id for case in default_cases}
+
+    advisory_case = load_benchmark_case("family_memory_advisory_fill_v1")
+    expired_case = load_benchmark_case("family_memory_expired_advisory_v1")
+
+    assert advisory_case.case_id == "family_memory_advisory_fill_v1"
+    assert advisory_case.case_id not in default_case_ids
+    assert advisory_case.expected.memory_governance is not None
+    assert advisory_case.expected.memory_governance.expected_policy_version == "memory_query_policy_v1"
+    assert advisory_case.expected.memory_governance.expected_dimension_sources == {
+        "dining_preferences": "memory",
+    }
+    assert advisory_case.expected.memory_governance.expected_dimension_tiers == {
+        "dining_preferences": "advisory",
+    }
+
+    assert expired_case.case_id == "family_memory_expired_advisory_v1"
+    assert expired_case.case_id not in default_case_ids
+    assert expired_case.memory_items[0].expires_at is not None
+    assert expired_case.expected.memory_governance is not None
+    assert expired_case.expected.memory_governance.expected_dimension_sources == {
+        "activity_preferences": "memory",
+    }
+    assert expired_case.expected.memory_governance.expected_dimension_tiers == {
+        "activity_preferences": "advisory",
+    }
+
+
 def test_default_fixtures_can_be_loaded_individually() -> None:
     for case_id in DEFAULT_CASE_IDS:
         case = load_benchmark_case(case_id)
@@ -311,7 +375,7 @@ def test_default_fixtures_can_be_loaded_individually() -> None:
 
 
 def test_default_and_failure_fixtures_expose_expected_taxonomy() -> None:
-    case_ids = [*DEFAULT_CASE_IDS, *FAILURE_CASE_IDS]
+    case_ids = [*DEFAULT_CASE_IDS, *FAILURE_CASE_IDS, *MEMORY_GOVERNANCE_CASE_IDS[1:]]
 
     for case_id in case_ids:
         case = load_benchmark_case(case_id)
@@ -344,10 +408,21 @@ def test_default_case_matrix_summary_counts_are_expected() -> None:
     assert summary.tag_counts == DEFAULT_TAG_COUNTS
 
 
+def test_memory_governance_suite_matrix_summary_counts_are_expected() -> None:
+    summary = build_case_matrix_summary(load_benchmark_suite("memory_governance"))
+
+    assert summary.case_count == 3
+    assert summary.scenario_bucket_counts == MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS
+    assert summary.level_counts == MEMORY_GOVERNANCE_LEVEL_COUNTS
+    assert summary.world_profile_counts == MEMORY_GOVERNANCE_WORLD_PROFILE_COUNTS
+    assert summary.failure_mode_counts == MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS
+    assert summary.tag_counts == MEMORY_GOVERNANCE_TAG_COUNTS
+
+
 def test_all_registered_case_matrix_summary_counts_are_expected() -> None:
     summary = build_case_matrix_summary(load_benchmark_suite("all_registered"))
 
-    assert summary.case_count == 13
+    assert summary.case_count == 15
     assert summary.scenario_bucket_counts == ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
     assert summary.level_counts == ALL_REGISTERED_LEVEL_COUNTS
     assert summary.world_profile_counts == ALL_REGISTERED_WORLD_PROFILE_COUNTS
@@ -471,6 +546,20 @@ def test_build_failure_chain_summary_deduplicates_effects_and_marks_bounded() ->
             "unknown",
             ["budget_limited", "free_activity", "quick_meal"],
             "budget_lite_low_cost_route",
+        ),
+        (
+            "family_memory_advisory_fill_v1",
+            "family_afternoon",
+            "family",
+            ["child_friendly", "light_meal", "memory_advisory", "memory_governance"],
+            "memory_advisory_fill",
+        ),
+        (
+            "family_memory_expired_advisory_v1",
+            "family_afternoon",
+            "family",
+            ["child_friendly", "indoor_activity", "memory_expired", "memory_governance"],
+            "memory_expired_advisory",
         ),
     ],
 )
@@ -793,6 +882,73 @@ def test_recovery_expectation_grader_accepts_expected_recovery_action() -> None:
 
     assert score.passed is True
     assert score.details["observed_recovery_actions"] == ["stop_safely"]
+
+
+def test_memory_governance_grader_passes_for_expected_policy_summary() -> None:
+    case = BenchmarkCase(
+        case_id="case",
+        title="Case",
+        user_input="Plan an afternoon.",
+        taxonomy=_taxonomy_payload(
+            scenario_bucket="family",
+            level="L3",
+            tags=["child_friendly", "memory_governance"],
+        ),
+        expected=BenchmarkExpectedOutcome(
+            required_tool_names=["search_poi"],
+            min_tool_event_count=1,
+            min_action_count=1,
+            memory_governance=BenchmarkMemoryGovernanceExpectation(
+                expected_policy_version="memory_query_policy_v1",
+                expected_dimension_sources={"dining_preferences": "memory"},
+                expected_dimension_tiers={"dining_preferences": "advisory"},
+                expected_memory_outcomes=[
+                    BenchmarkMemoryDecisionExpectation(
+                        memory_key="spouse_lighter_meals",
+                        expected_outcome="applied_advisory",
+                    )
+                ],
+            ),
+        ),
+    )
+    run_metadata = {
+        "workflow": {
+            "memory_policy": {
+                "policy_version": "memory_query_policy_v1",
+                "dimension_outcomes": [
+                    {
+                        "dimension": "dining_preferences",
+                        "winner_source": "memory",
+                        "winner_memory_key": "spouse_lighter_meals",
+                        "winner_tier": "advisory",
+                        "effective_values": ["lighter_options"],
+                        "suppressed_memory_keys": [],
+                    }
+                ],
+                "memory_decisions": [
+                    {
+                        "memory_key": "spouse_lighter_meals",
+                        "dimension": "dining_preferences",
+                        "normalized_value": "lighter_options",
+                        "confidence": "0.7000",
+                        "tier": "advisory",
+                        "expired": False,
+                        "outcome": "applied_advisory",
+                    }
+                ],
+            }
+        }
+    }
+
+    score = grade_memory_governance(case, run_metadata)
+
+    assert score.name == "memory_governance"
+    assert score.passed is True
+    assert score.score == 1.0
+    assert score.details["expected_policy_version"] == "memory_query_policy_v1"
+    assert score.details["observed_dimension_sources"] == {"dining_preferences": "memory"}
+    assert score.details["observed_dimension_tiers"] == {"dining_preferences": "advisory"}
+    assert score.details["observed_memory_outcomes"] == {"spouse_lighter_meals": "applied_advisory"}
 
 
 def test_report_writer_creates_parent_directory_and_json_file() -> None:

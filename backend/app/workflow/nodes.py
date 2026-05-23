@@ -156,7 +156,7 @@ class WeekendPilotWorkflowNodes:
         user_id = self._required_uuid(state, "user_id")
         memories = [
             self._memory_record(memory)
-            for memory in self.repositories.memory.list_active_for_user(user_id)
+            for memory in self.repositories.memory.list_governable_for_user(user_id)
         ]
         return self._updates(state, "load_memory", active_memories=memories)
 

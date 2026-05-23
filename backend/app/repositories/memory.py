@@ -58,3 +58,14 @@ class MemoryItemRepository:
             .order_by(MemoryItem.created_at, MemoryItem.memory_id)
         )
         return list(self.session.scalars(statement).all())
+
+    def list_governable_for_user(self, user_id: UUID) -> list[MemoryItem]:
+        statement = (
+            select(MemoryItem)
+            .where(
+                MemoryItem.user_id == user_id,
+                MemoryItem.status == "active",
+            )
+            .order_by(MemoryItem.created_at, MemoryItem.memory_id)
+        )
+        return list(self.session.scalars(statement).all())

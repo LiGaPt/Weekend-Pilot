@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 import re
 from typing import Any, Literal
@@ -14,7 +15,14 @@ from backend.app.workflow.timing import WorkflowTimingSummary
 
 BenchmarkCaseStatus = Literal["passed", "failed", "error"]
 BenchmarkReplayStatus = Literal["passed", "failed", "error"]
-BenchmarkSuiteId = Literal["baseline", "expanded", "recovery_focused", "default", "all_registered"]
+BenchmarkSuiteId = Literal[
+    "baseline",
+    "expanded",
+    "recovery_focused",
+    "memory_governance",
+    "default",
+    "all_registered",
+]
 _LOWER_SNAKE_CASE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
@@ -24,7 +32,20 @@ class BenchmarkMemoryItem(BaseModel):
     value_json: dict[str, Any]
     text: str | None = None
     confidence: Decimal = Decimal("1.0")
+    expires_at: datetime | None = None
     status: str = "active"
+
+
+class BenchmarkMemoryDecisionExpectation(BaseModel):
+    memory_key: str
+    expected_outcome: str
+
+
+class BenchmarkMemoryGovernanceExpectation(BaseModel):
+    expected_policy_version: str
+    expected_dimension_sources: dict[str, str] = Field(default_factory=dict)
+    expected_dimension_tiers: dict[str, str] = Field(default_factory=dict)
+    expected_memory_outcomes: list[BenchmarkMemoryDecisionExpectation] = Field(default_factory=list)
 
 
 class BenchmarkExpectedOutcome(BaseModel):
@@ -37,6 +58,7 @@ class BenchmarkExpectedOutcome(BaseModel):
     expected_error_type: str | None = None
     expected_recovery_action: str | None = None
     min_injected_failure_count: int = 0
+    memory_governance: BenchmarkMemoryGovernanceExpectation | None = None
 
 
 class BenchmarkCaseTaxonomy(BaseModel):

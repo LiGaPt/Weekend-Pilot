@@ -1,7 +1,7 @@
 {
-  "case_id": "family_memory_override_v1",
-  "title": "Family request overrides older activity memory",
-  "user_input": "This afternoon please plan an indoor child-friendly activity for my partner and our 5-year-old, close to home, with a lighter dinner afterward.",
+  "case_id": "family_memory_advisory_fill_v1",
+  "title": "Family request uses advisory dining memory when the user is vague",
+  "user_input": "This afternoon please arrange a nearby outing for my partner and our 5-year-old for a few hours.",
   "agent_version": "agent-v1",
   "prompt_version": "prompt-v1",
   "tool_profile": "mock_world",
@@ -10,22 +10,12 @@
   "memory_items": [
     {
       "memory_type": "preference",
-      "key": "activity_style",
-      "value_json": {
-        "preference": "outdoor citywalk"
-      },
-      "text": "The family often likes outdoor citywalk plans.",
-      "confidence": "0.7",
-      "status": "active"
-    },
-    {
-      "memory_type": "preference",
       "key": "spouse_lighter_meals",
       "value_json": {
         "preference": "lighter meals"
       },
-      "text": "The spouse prefers lighter meals.",
-      "confidence": "1.0",
+      "text": "The spouse often prefers lighter meals.",
+      "confidence": "0.7000",
       "status": "active"
     }
   ],
@@ -47,18 +37,15 @@
     "memory_governance": {
       "expected_policy_version": "memory_query_policy_v1",
       "expected_dimension_sources": {
-        "activity_preferences": "user_input",
-        "dining_preferences": "user_input"
+        "dining_preferences": "memory"
       },
-      "expected_dimension_tiers": {},
+      "expected_dimension_tiers": {
+        "dining_preferences": "advisory"
+      },
       "expected_memory_outcomes": [
         {
-          "memory_key": "activity_style",
-          "expected_outcome": "suppressed_user_override"
-        },
-        {
           "memory_key": "spouse_lighter_meals",
-          "expected_outcome": "suppressed_user_override"
+          "expected_outcome": "applied_advisory"
         }
       ]
     }
@@ -66,16 +53,16 @@
   "taxonomy": {
     "suite": "locallife_bench_v1",
     "scenario_bucket": "family",
-    "level": "L2",
+    "level": "L3",
     "tags": [
       "child_friendly",
-      "indoor_activity",
       "light_meal",
-      "memory_override"
+      "memory_advisory",
+      "memory_governance"
     ],
     "failure_mode": null
   },
   "metadata": {
-    "focus": "current_request_overrides_memory"
+    "focus": "memory_advisory_fill"
   }
 }

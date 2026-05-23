@@ -154,15 +154,16 @@ Local trace JSONL summaries now also embed the canonical `run_summary` envelope,
 
 The benchmark harness runs file-based cases through the official LangGraph workflow and bounded deterministic agent adapters, then writes local JSON reports. Case reports stay under `var/benchmarks/`. Ad hoc `run_cases(...)` runs still write `var/benchmarks/run-report.json`, while named `run_suite(...)` runs write `var/benchmarks/suite-<suite_id>-run-report.json`. It does not require LangSmith credentials or live provider access.
 
-Each benchmark case fixture now requires a structured `taxonomy` block that captures suite, scenario bucket, benchmark level, tags, and failure mode. Each benchmark case report now includes both `run_summary` and `taxonomy`. Failure-profile cases also add a sanitized `failure_chain_summary` so injected effects, bounded recovery actions, and terminal workflow state stay directly reviewable in case reports. Each suite summary now includes both `matrix_summary` coverage counts and additive `outcome_rollup` pass-rate buckets by scenario family, constraint tag, and failure mode so coverage and benchmark pass rate can be compared directly as the suite catalog expands.
+Each benchmark case fixture now requires a structured `taxonomy` block that captures suite, scenario bucket, benchmark level, tags, and failure mode. Each benchmark case report now includes both `run_summary` and `taxonomy`. Failure-profile cases also add a sanitized `failure_chain_summary` so injected effects, bounded recovery actions, and terminal workflow state stay directly reviewable in case reports. Memory-governed cases now also persist `workflow.memory_policy` as `memory_query_policy_v1`, including per-dimension winners and per-memory outcomes so memory behavior stays auditable without exposing raw memory text or payloads. Each suite summary now includes both `matrix_summary` coverage counts and additive `outcome_rollup` pass-rate buckets by scenario family, constraint tag, and failure mode so coverage and benchmark pass rate can be compared directly as the suite catalog expands.
 
-The repository now keeps five canonical named benchmark suites in code:
+The repository now keeps six canonical named benchmark suites in code:
 
 - `baseline` for the historical six-case family-plus-solo non-failure baseline
 - `expanded` for the added couple, friends-group, rainy-day fallback, and budget-lite scenario pack
 - `recovery_focused` for the explicit three-case failure-injection recovery pack: the legacy route failure case plus two composite chaos cases
+- `memory_governance` for the focused three-case suite that proves explicit user input beats memory, advisory memory helps vague requests, and expired high-confidence memory is downgraded but still visible
 - `default` for the ten-case non-failure union of `baseline + expanded`
-- `all_registered` for the full 13-case registered fixture inventory
+- `all_registered` for the full 15-case registered fixture inventory
 
 The legacy `failures` suite name remains loadable as a compatibility alias to `recovery_focused`, and `load_failure_benchmark_cases()` now resolves to that canonical recovery-focused suite. Replay stable comparison now also includes `failure_chain_signature`, which mirrors the ordered injected-effect chain from `failure_chain_summary.injected_effects`. Suite descriptions still derive their `matrix_summary` from the existing case taxonomy so expansion stays reviewable.
 
