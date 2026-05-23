@@ -9,12 +9,23 @@ class DeterministicQueryPlanner:
     planner_version = "deterministic_query_planner_v1"
     _SUPPORTED_PROFILES = {"mock_world", "amap"}
     _ACTIVITY_STYLE_PREFERENCES = ("citywalk", "indoor", "outdoor")
+    _DEFAULT_MOCK_WORLD_LIMIT = 5
 
-    def build(self, intent: LocalLifeIntent, provider_profile: str = "mock_world") -> QueryPlan:
+    def build(
+        self,
+        intent: LocalLifeIntent,
+        provider_profile: str = "mock_world",
+        *,
+        search_limit_override: int | None = None,
+    ) -> QueryPlan:
         if provider_profile not in self._SUPPORTED_PROFILES:
             raise QueryPlanError(f"Unsupported provider_profile: {provider_profile}")
 
-        initial_tool_calls = self._build_initial_tool_calls(intent, provider_profile)
+        initial_tool_calls = self._build_initial_tool_calls(
+            intent,
+            provider_profile,
+            search_limit_override=search_limit_override,
+        )
 
         if provider_profile == "mock_world":
             enrichment_templates = self._build_mock_world_enrichment_templates(provider_profile)
@@ -36,9 +47,17 @@ class DeterministicQueryPlanner:
             notes=notes,
         )
 
-    def _build_initial_tool_calls(self, intent: LocalLifeIntent, provider_profile: str) -> list[PlannedToolCall]:
+    def _build_initial_tool_calls(
+        self,
+        intent: LocalLifeIntent,
+        provider_profile: str,
+        *,
+        search_limit_override: int | None = None,
+    ) -> list[PlannedToolCall]:
         if provider_profile == "amap":
             return self._build_amap_initial_tool_calls(intent, provider_profile)
+
+        search_limit = search_limit_override or self._DEFAULT_MOCK_WORLD_LIMIT
 
         activity_tags = []
         if intent.constraints.child_friendly:
@@ -62,7 +81,7 @@ class DeterministicQueryPlanner:
                     "query": self._mock_world_activity_query(intent),
                     "category": "activity",
                     "tags": activity_tags,
-                    "limit": 5,
+                    "limit": search_limit,
                 },
             ),
             PlannedToolCall(
@@ -72,7 +91,7 @@ class DeterministicQueryPlanner:
                     "query": self._mock_world_dining_query(intent),
                     "category": "dining",
                     "tags": dining_tags,
-                    "limit": 5,
+                    "limit": search_limit,
                 },
             ),
             PlannedToolCall(

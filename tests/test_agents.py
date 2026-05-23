@@ -20,6 +20,7 @@ from backend.app.agents import (
     sanitize_agent_metadata,
     validate_agent_tool_usage,
 )
+from backend.app.agents.schemas import RecoveryEvaluationContext
 from backend.app.planning import (
     Candidate,
     CandidateCollectionResult,
@@ -27,8 +28,12 @@ from backend.app.planning import (
     DeterministicItineraryGenerator,
     EnrichedCandidate,
     EnrichmentToolResult,
+    FeasibilitySummary,
     IntentConstraints,
+    ItineraryCandidateRef,
+    ItineraryDraft,
     ItineraryDraftResult,
+    ItineraryRouteRef,
     LocalLifeIntent,
     ParticipantProfile,
     QueryPlan,
@@ -37,7 +42,7 @@ from backend.app.planning import (
     ToolCallTemplate,
 )
 from backend.app.review import FinalReviewGate
-from backend.app.review.schemas import FinalReviewResult, ReviewCheck
+from backend.app.review.schemas import FinalReviewResult, ReviewCheck, ReviewedDraft
 from backend.app.tool_gateway.registry import WRITE_TOOLS
 
 
@@ -194,6 +199,54 @@ def _enrichment() -> CandidateEnrichmentResult:
     )
 
 
+def _draft(
+    draft_id: str,
+    *,
+    activity_id: str,
+    dining_id: str,
+) -> ItineraryDraft:
+    return ItineraryDraft(
+        draft_id=draft_id,
+        title=f"{activity_id} + {dining_id}",
+        summary="test draft",
+        activity=ItineraryCandidateRef(
+            candidate_id=activity_id,
+            name=activity_id,
+            category="activity",
+            provider="mock_world",
+        ),
+        dining=ItineraryCandidateRef(
+            candidate_id=dining_id,
+            name=dining_id,
+            category="dining",
+            provider="mock_world",
+        ),
+        route=ItineraryRouteRef(
+            origin_candidate_id=activity_id,
+            destination_candidate_id=dining_id,
+            provider="mock_world",
+            mode="walking",
+            distance_meters=900,
+            duration_minutes=12,
+        ),
+        feasibility=FeasibilitySummary(
+            is_feasible=True,
+            reasons=["usable"],
+            total_duration_minutes=300,
+            route_duration_minutes=12,
+        ),
+    )
+
+
+class _StaticGate(FinalReviewGate):
+    def __init__(self, review: FinalReviewResult) -> None:
+        self._review = review
+
+    def review(self, *args, **kwargs):
+        del args, kwargs
+        return self._review
+
+
 def test_all_five_roles_exist_and_import_cleanly() -> None:
     assert set(default_agent_policies()) == ALL_ROLES
     assert AGENT_METADATA_VERSION == "bounded_agents_v1"
@@ -294,17 +347,16 @@ def test_validator_recovery_returns_passed_decision_for_safe_review() -> None:
     assert decision.retry_budget == 0
 
 
-def test_validator_recovery_returns_stop_safely_for_blocked_review() -> None:
-    class _BlockedGate(FinalReviewGate):
-        def review(self, *args, **kwargs):
-            del args, kwargs
-            failed_check = ReviewCheck(
-                check_name="route_verified",
-                status="failed",
-                severity="error",
-                message="Route cannot be verified.",
-            )
-            return FinalReviewResult(
+def test_validator_recovery_returns_stop_safely_for_boundary_failure() -> None:
+    failed_check = ReviewCheck(
+        check_name="run_id_consistency",
+        status="failed",
+        severity="error",
+        message="Run metadata is inconsistent.",
+    )
+    result, review, decision = DeterministicValidatorRecoveryAgent(
+        gate=_StaticGate(
+            FinalReviewResult(
                 run_id=uuid4(),
                 provider_profile="mock_world",
                 decision="blocked",
@@ -313,8 +365,8 @@ def test_validator_recovery_returns_stop_safely_for_blocked_review() -> None:
                 errors=[failed_check],
                 gate_version="test-gate",
             )
-
-    result, review, decision = DeterministicValidatorRecoveryAgent(gate=_BlockedGate()).review(
+        )
+    ).review(
         _plan(),
         _enrichment(),
         DeterministicItineraryGenerator().generate(_plan(), _enrichment()),
@@ -325,10 +377,136 @@ def test_validator_recovery_returns_stop_safely_for_blocked_review() -> None:
     assert result.status == "blocked"
     assert review.safe_to_present is False
     assert decision.verdict == "failed"
-    assert decision.error_type == "route_verified"
+    assert decision.error_type == "run_id_consistency"
     assert decision.recovery_action == "stop_safely"
     assert decision.retry_budget == 0
     assert "does not execute recovery routes" not in decision.reason
+
+
+def test_validator_recovery_returns_replace_candidate_for_blocked_first_draft_with_alternative() -> None:
+    draft_1 = _draft("draft_1", activity_id="activity_1", dining_id="dining_1")
+    draft_2 = _draft("draft_2", activity_id="activity_2", dining_id="dining_2")
+    failed_check = ReviewCheck(
+        check_name="route_verified",
+        status="failed",
+        severity="error",
+        message="First draft route is blocked.",
+        draft_id="draft_1",
+    )
+    review = FinalReviewResult(
+        run_id=uuid4(),
+        provider_profile="mock_world",
+        decision="blocked",
+        safe_to_present=False,
+        reviewed_drafts=[
+            ReviewedDraft(
+                draft_id="draft_1",
+                decision="blocked",
+                safe_to_present=False,
+                checks=[failed_check],
+                errors=[failed_check],
+            ),
+            ReviewedDraft(
+                draft_id="draft_2",
+                decision="approved",
+                safe_to_present=True,
+            ),
+        ],
+        checks=[failed_check],
+        errors=[failed_check],
+        gate_version="test-gate",
+    )
+
+    result, _, decision = DeterministicValidatorRecoveryAgent(gate=_StaticGate(review)).review(
+        _plan(),
+        _enrichment(),
+        ItineraryDraftResult(
+            run_id=uuid4(),
+            provider_profile="mock_world",
+            drafts=[draft_1, draft_2],
+            generator_version="test-generator",
+        ),
+        pre_confirmation_action_count=0,
+        recovery_context=RecoveryEvaluationContext(),
+    )
+
+    assert result.status == "blocked"
+    assert decision.recovery_action == "replace_candidate"
+    assert decision.route_to == "logical_planner_agent"
+    assert decision.retry_budget == 1
+
+
+def test_validator_recovery_returns_expand_search_radius_when_no_drafts_exist() -> None:
+    failed_check = ReviewCheck(
+        check_name="draft_exists",
+        status="failed",
+        severity="error",
+        message="No draft is available.",
+    )
+    review = FinalReviewResult(
+        run_id=uuid4(),
+        provider_profile="mock_world",
+        decision="blocked",
+        safe_to_present=False,
+        checks=[failed_check],
+        errors=[failed_check],
+        gate_version="test-gate",
+    )
+
+    _, _, decision = DeterministicValidatorRecoveryAgent(gate=_StaticGate(review)).review(
+        _plan(),
+        _enrichment(),
+        ItineraryDraftResult(
+            run_id=uuid4(),
+            provider_profile="mock_world",
+            drafts=[],
+            generator_version="test-generator",
+        ),
+        pre_confirmation_action_count=0,
+        recovery_context=RecoveryEvaluationContext(search_expansion_level=0),
+    )
+
+    assert decision.recovery_action == "expand_search_radius"
+    assert decision.route_to == "generate_queries"
+    assert decision.retry_budget == 1
+
+
+def test_validator_recovery_returns_ask_user_after_search_expansion_is_exhausted() -> None:
+    failed_check = ReviewCheck(
+        check_name="draft_exists",
+        status="failed",
+        severity="error",
+        message="No draft is available.",
+    )
+    review = FinalReviewResult(
+        run_id=uuid4(),
+        provider_profile="mock_world",
+        decision="blocked",
+        safe_to_present=False,
+        checks=[failed_check],
+        errors=[failed_check],
+        gate_version="test-gate",
+    )
+
+    _, _, decision = DeterministicValidatorRecoveryAgent(gate=_StaticGate(review)).review(
+        _plan(),
+        _enrichment(),
+        ItineraryDraftResult(
+            run_id=uuid4(),
+            provider_profile="mock_world",
+            drafts=[],
+            generator_version="test-generator",
+        ),
+        pre_confirmation_action_count=0,
+        recovery_context=RecoveryEvaluationContext(
+            attempted_actions=["expand_search_radius"],
+            search_expansion_level=1,
+        ),
+    )
+
+    assert decision.recovery_action == "ask_user"
+    assert decision.route_to is None
+    assert decision.retry_budget == 0
 
 
 def test_sanitizer_removes_sensitive_keys_and_raw_ids() -> None:

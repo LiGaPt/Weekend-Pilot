@@ -441,7 +441,7 @@ def test_internal_observability_route_returns_recovery_path_summary_for_recovery
     payload = response.json()
     assert payload["recovery_path_summary"] is not None
     assert payload["recovery_path_summary"]["attempt_count"] == 1
-    assert payload["recovery_path_summary"]["max_attempts"] == 1
+    assert payload["recovery_path_summary"]["max_attempts"] == 2
     assert payload["recovery_path_summary"]["attempts"][0]["recovery_action"] == "stop_safely"
     assert payload["recovery_path_summary"]["attempts"][0]["status"] == "stopped"
     assert payload["recovery_path_summary"]["attempts"][0]["error_type"] == "draft_exists"

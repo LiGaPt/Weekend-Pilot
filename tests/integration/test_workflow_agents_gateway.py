@@ -170,8 +170,16 @@ def test_workflow_recovery_metadata_is_sanitized(
     trace_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def _blocked_review(self, plan, enrichment, drafts, pre_confirmation_action_count=0, context=None):
-        del self, plan, enrichment, pre_confirmation_action_count, context
+    def _blocked_review(
+        self,
+        plan,
+        enrichment,
+        drafts,
+        pre_confirmation_action_count=0,
+        recovery_context=None,
+        context=None,
+    ):
+        del self, plan, enrichment, pre_confirmation_action_count, recovery_context, context
         failed_check = ReviewCheck(
             check_name="route_verified",
             status="failed",
@@ -226,6 +234,10 @@ def test_workflow_recovery_metadata_is_sanitized(
     run = db_session.get(AgentRun, result.run_id)
     assert run is not None
     assert "recovery" in run.metadata_json["workflow"]
+    recovery = run.metadata_json["workflow"]["recovery"]
+    assert recovery["policy_version"] == "recovery_routing_v1"
+    assert recovery["search_expansion_level"] == 0
+    assert recovery["excluded_candidate_pairs"] == []
     metadata_text = _metadata_text(run.metadata_json["workflow"]["recovery"])
     assert "action_id" not in metadata_text
     assert "tool_event_id" not in metadata_text

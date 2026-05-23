@@ -13,6 +13,8 @@ from backend.app.agents import (
     AgentResult,
     sanitized_agent_payload,
 )
+from backend.app.agents.recovery_policy import build_recovery_clarification
+from backend.app.agents.schemas import RecoveryEvaluationContext, RecoveryExcludedCandidatePair
 from backend.app.agents.factory import build_agent_adapters
 from backend.app.confirmation import HumanConfirmationService
 from backend.app.core.config import get_settings
@@ -70,7 +72,7 @@ _RECOVERY_SENSITIVE_FRAGMENTS = (
 
 
 class WeekendPilotWorkflowNodes:
-    workflow_version = "recovery_routing_v0"
+    workflow_version = "recovery_routing_v1"
 
     def __init__(self, dependencies: WeekendPilotWorkflowDependencies) -> None:
         self.dependencies = dependencies
@@ -185,6 +187,7 @@ class WeekendPilotWorkflowNodes:
         query_plan = DeterministicQueryPlanner().build(
             effective_intent,
             provider_profile=self._required_text(state, "tool_profile"),
+            search_limit_override=self._search_limit_override(state),
         )
         agent_result, assignment_plan = self.supervisor_agent.assign(
             query_plan,
@@ -254,6 +257,10 @@ class WeekendPilotWorkflowNodes:
             self._required_value(state, "enrichment_result"),
             context=self._agent_context(state, "itinerary_planner"),
         )
+        drafts = self._filter_excluded_drafts(
+            drafts,
+            self._excluded_candidate_pairs(state),
+        )
         agent_results = self._append_agent_result(state, agent_result)
         self._persist_agent_metadata(self._required_uuid(state, "run_id"), agent_results)
         return self._updates(
@@ -281,6 +288,7 @@ class WeekendPilotWorkflowNodes:
             self._required_value(state, "enrichment_result"),
             self._required_value(state, "itinerary_drafts"),
             pre_confirmation_action_count=self._action_count(run_id),
+            recovery_context=self._recovery_context(state),
             context=self._agent_context(state, "validator_recovery"),
         )
         agent_results = self._append_agent_result(state, agent_result)
@@ -296,28 +304,108 @@ class WeekendPilotWorkflowNodes:
     def apply_recovery(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
         run_id = self._required_uuid(state, "run_id")
         attempts = self._recovery_attempts(state)
+        max_attempts = int(state.get("max_recovery_attempts") or 1)
+        search_expansion_level = int(state.get("search_expansion_level") or 0)
+        excluded_candidate_pairs = [
+            pair.model_dump(mode="json")
+            for pair in self._excluded_candidate_pairs(state)
+        ]
         route_result = resolve_recovery_route(
             state.get("recovery_decision"),
             attempt_count=len(attempts),
-            max_attempts=int(state.get("max_recovery_attempts") or 1),
+            max_attempts=max_attempts,
         )
         updated_attempts = [*attempts]
         if route_result.attempt is not None:
             updated_attempts.append(route_result.attempt)
 
-        self._persist_recovery_metadata(
-            run_id,
-            updated_attempts,
-            int(state.get("max_recovery_attempts") or 1),
-        )
         if route_result.route_to in {"generate_queries", "execute_searches", "logical_planner_agent"}:
+            next_search_expansion_level = search_expansion_level
+            next_excluded_candidate_pairs = list(excluded_candidate_pairs)
+            if route_result.route_to == "generate_queries":
+                next_search_expansion_level = min(search_expansion_level + 1, 1)
+            elif route_result.route_to == "logical_planner_agent":
+                excluded_pair = self._current_draft_excluded_pair(
+                    self._required_value(state, "itinerary_drafts")
+                )
+                if excluded_pair is None:
+                    self._persist_recovery_metadata(
+                        run_id,
+                        updated_attempts,
+                        max_attempts,
+                        search_expansion_level=search_expansion_level,
+                        excluded_candidate_pairs=excluded_candidate_pairs,
+                    )
+                    self.repositories.runs.update_status(run_id, "failed")
+                    return self._updates(
+                        state,
+                        "apply_recovery",
+                        status="failed",
+                        recovery_attempts=updated_attempts,
+                        active_recovery_route=None,
+                        error_json={
+                            "error_type": "recovery_stopped",
+                            "message": "Recovery stopped safely.",
+                            "details": {
+                                "reason": "replace_candidate was selected without a current draft pair.",
+                            },
+                        },
+                    )
+                if excluded_pair not in next_excluded_candidate_pairs:
+                    next_excluded_candidate_pairs.append(excluded_pair)
+
+            self._persist_recovery_metadata(
+                run_id,
+                updated_attempts,
+                max_attempts,
+                search_expansion_level=next_search_expansion_level,
+                excluded_candidate_pairs=next_excluded_candidate_pairs,
+            )
             return self._updates(
                 state,
                 "apply_recovery",
                 recovery_attempts=updated_attempts,
+                search_expansion_level=next_search_expansion_level,
+                excluded_candidate_pairs=next_excluded_candidate_pairs,
                 active_recovery_route=route_result.route_to,
             )
 
+        if route_result.route_to == "awaiting_clarification":
+            query_plan = self._required_value(state, "query_plan")
+            intent = (
+                query_plan.intent
+                if hasattr(query_plan, "intent")
+                else LocalLifeIntent.model_validate(query_plan["intent"])
+            )
+            clarification = build_recovery_clarification(intent)
+            self._persist_workflow_clarification(
+                run_id,
+                clarification.model_dump(mode="json"),
+            )
+            self._persist_recovery_metadata(
+                run_id,
+                updated_attempts,
+                max_attempts,
+                search_expansion_level=search_expansion_level,
+                excluded_candidate_pairs=excluded_candidate_pairs,
+            )
+            self.repositories.runs.update_status(run_id, "awaiting_clarification")
+            return self._updates(
+                state,
+                "apply_recovery",
+                status="awaiting_clarification",
+                recovery_attempts=updated_attempts,
+                active_recovery_route=None,
+                error_json=None,
+            )
+
+        self._persist_recovery_metadata(
+            run_id,
+            updated_attempts,
+            max_attempts,
+            search_expansion_level=search_expansion_level,
+            excluded_candidate_pairs=excluded_candidate_pairs,
+        )
         self.repositories.runs.update_status(run_id, "failed")
         return self._updates(
             state,
@@ -555,6 +643,9 @@ class WeekendPilotWorkflowNodes:
         run_id: UUID,
         recovery_attempts: list[RecoveryAttempt],
         max_attempts: int,
+        *,
+        search_expansion_level: int,
+        excluded_candidate_pairs: list[dict[str, str]],
     ) -> None:
         run = self.repositories.runs.get_by_id(run_id)
         if run is None:
@@ -565,8 +656,11 @@ class WeekendPilotWorkflowNodes:
             workflow = {}
         workflow["workflow_version"] = self.workflow_version
         workflow["recovery"] = self._sanitize_recovery_metadata({
+            "policy_version": self.workflow_version,
             "attempt_count": len(recovery_attempts),
             "max_attempts": max_attempts,
+            "search_expansion_level": search_expansion_level,
+            "excluded_candidate_pairs": excluded_candidate_pairs,
             "attempts": [attempt.model_dump(mode="json") for attempt in recovery_attempts],
         })
         metadata["workflow"] = workflow
@@ -751,6 +845,87 @@ class WeekendPilotWorkflowNodes:
             elif isinstance(attempt, dict):
                 attempts.append(RecoveryAttempt.model_validate(attempt))
         return attempts
+
+    def _recovery_context(self, state: WeekendPilotWorkflowState) -> RecoveryEvaluationContext:
+        blackboard = self._required_value(state, "candidate_blackboard")
+        if isinstance(blackboard, dict):
+            blackboard = CandidateBlackboard.model_validate(blackboard)
+        return RecoveryEvaluationContext(
+            attempted_actions=[attempt.recovery_action for attempt in self._recovery_attempts(state)],
+            search_expansion_level=int(state.get("search_expansion_level") or 0),
+            excluded_candidate_pairs=self._excluded_candidate_pairs(state),
+            screened_candidate_ids=list(blackboard.screened_candidate_ids),
+            route_failure_codes=self._route_failure_codes(state),
+        )
+
+    def _route_failure_codes(self, state: WeekendPilotWorkflowState) -> list[str]:
+        codes: list[str] = []
+        blackboard = state.get("candidate_blackboard")
+        if isinstance(blackboard, CandidateBlackboard):
+            for entry in [
+                *blackboard.activity_candidates,
+                *blackboard.dining_candidates,
+                *blackboard.other_candidates,
+            ]:
+                codes.extend(str(code) for code in entry.risk_codes if isinstance(code, str))
+
+        enrichment = state.get("enrichment_result")
+        if enrichment is None:
+            return list(dict.fromkeys(codes))
+
+        for tool_result in getattr(enrichment, "failed_tool_results", []) or []:
+            code = self._tool_failure_code(getattr(tool_result, "error_json", None))
+            if code:
+                codes.append(code)
+        for route in getattr(enrichment, "route_matrix", []) or []:
+            route_error = self._tool_failure_code(getattr(route, "error_json", None))
+            if route_error:
+                codes.append(route_error)
+            elif getattr(route, "status", None) not in {"succeeded", "cached"}:
+                codes.append("route_infeasible")
+        return list(dict.fromkeys(codes))
+
+    def _excluded_candidate_pairs(
+        self,
+        state: WeekendPilotWorkflowState,
+    ) -> list[RecoveryExcludedCandidatePair]:
+        pairs = []
+        for pair in state.get("excluded_candidate_pairs", []) or []:
+            if isinstance(pair, RecoveryExcludedCandidatePair):
+                pairs.append(pair)
+            elif isinstance(pair, dict):
+                pairs.append(RecoveryExcludedCandidatePair.model_validate(pair))
+        return pairs
+
+    def _filter_excluded_drafts(
+        self,
+        drafts,
+        excluded_candidate_pairs: list[RecoveryExcludedCandidatePair],
+    ):
+        if not excluded_candidate_pairs or not getattr(drafts, "drafts", None):
+            return drafts
+        excluded = {
+            (pair.activity_candidate_id, pair.dining_candidate_id)
+            for pair in excluded_candidate_pairs
+        }
+        filtered = [
+            draft
+            for draft in drafts.drafts
+            if (draft.activity.candidate_id, draft.dining.candidate_id) not in excluded
+        ]
+        return drafts.model_copy(update={"drafts": filtered})
+
+    def _current_draft_excluded_pair(self, drafts) -> dict[str, str] | None:
+        if not getattr(drafts, "drafts", None):
+            return None
+        first_draft = drafts.drafts[0]
+        return {
+            "activity_candidate_id": first_draft.activity.candidate_id,
+            "dining_candidate_id": first_draft.dining.candidate_id,
+        }
+
+    def _search_limit_override(self, state: WeekendPilotWorkflowState) -> int | None:
+        return 8 if int(state.get("search_expansion_level") or 0) >= 1 else None
 
     def _recovery_error_json(self, route_result: Any) -> dict[str, Any]:
         attempt = route_result.attempt

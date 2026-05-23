@@ -72,3 +72,16 @@ class RecoveryDecision(BaseModel):
     route_to: str | None = None
     retry_budget: int = 0
     reason: str
+
+
+class RecoveryExcludedCandidatePair(BaseModel):
+    activity_candidate_id: str
+    dining_candidate_id: str
+
+
+class RecoveryEvaluationContext(BaseModel):
+    attempted_actions: list[str] = Field(default_factory=list)
+    search_expansion_level: int = 0
+    excluded_candidate_pairs: list[RecoveryExcludedCandidatePair] = Field(default_factory=list)
+    screened_candidate_ids: list[str] = Field(default_factory=list)
+    route_failure_codes: list[str] = Field(default_factory=list)

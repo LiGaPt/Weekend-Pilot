@@ -4,7 +4,7 @@
 
 The Web demo is the primary MVP review path for WeekendPilot. It runs the React/Vite frontend against the FastAPI demo API, uses the Mock World provider only, pauses before write tools, and continues execution only after explicit confirmation. The visible demo copy and Mock World family-afternoon content are localized in Chinese for competition review.
 
-The public demo API now also supports `POST /demo/runs/{run_id}/clarify` for pre-planning clarification replies and `POST /demo/runs/{run_id}/replan` for follow-up replanning. A vague start request can now stop in `awaiting_clarification` with `plans = []`, `selected_plan_id = null`, and a compact `clarification` summary that contains the public follow-up prompt plus the missing supported fields.
+The public demo API now also supports `POST /demo/runs/{run_id}/clarify` for clarification replies and `POST /demo/runs/{run_id}/replan` for follow-up replanning. A vague start request, or a bounded recovery path that needs an explicit user tradeoff, can stop in `awaiting_clarification` with `plans = []`, `selected_plan_id = null`, and a compact `clarification` summary that contains the public follow-up prompt plus the missing supported fields.
 Every public `DemoRunSummary` includes a compact `plan_version` object: the initial run starts at `v1`, and each follow-up replan returns a new `run_id` with the next visible version label. Clarification-only turns do not advance that visible version. A source run that ends in `awaiting_clarification` stays at `v1`, and the first clarification continuation that produces real plans also remains at `v1`. The internal conversation session is reused, but that session state remains internal and is still not exposed in `DemoRunSummary`.
 Every public `DemoPlanPreview` now includes `action_manifest`, a stable execution-preview summary with this shape:
 
@@ -226,6 +226,7 @@ PostgreSQL, Redis, and migrations must already be ready.
 
 - Planning stops at `awaiting_confirmation` before any write action.
 - Vague start requests can stop at `awaiting_clarification` before any plan is generated.
+- Bounded recovery can also stop at `awaiting_clarification` when deterministic recovery is exhausted and user tradeoff input is required.
 - The initial public run shows `plan_version.version_label = v1`.
 - Clarification-only turns keep the visible version label at `v1` until the first real plan is produced.
 - Action count is `0` before confirmation.

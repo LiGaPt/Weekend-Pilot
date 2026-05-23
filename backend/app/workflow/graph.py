@@ -85,6 +85,7 @@ def build_weekend_pilot_graph(nodes: WeekendPilotWorkflowNodes):
             "generate_queries": "generate_queries",
             "execute_searches": "execute_searches",
             "logical_planner_agent": "logical_planner_agent",
+            "awaiting_clarification": END,
             "failed": END,
             "error": END,
         },
@@ -133,6 +134,8 @@ def route_after_recovery(state: WeekendPilotWorkflowState | dict[str, Any]) -> s
     status = _state_value(state, "status")
     if status == "error":
         return "error"
+    if status == "awaiting_clarification":
+        return "awaiting_clarification"
     if status == "failed":
         return "failed"
     route = _state_value(state, "active_recovery_route")

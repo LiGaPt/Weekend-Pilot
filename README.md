@@ -270,7 +270,7 @@ Expected response:
 ## Web Demo API
 
 The Web demo API starts the official workflow, pauses before write tools, and continues execution only after explicit confirmation. The MVP review path uses Chinese Mock World demo content for the family afternoon scenario.
-When a start request is still missing key supported constraints, the workflow now stops early in `awaiting_clarification` instead of fabricating a plan. In that state the public `DemoRunSummary` returns `plans = []`, `selected_plan_id = null`, and a compact `clarification` object with the user-visible follow-up prompt plus the missing supported fields.
+When a start request is still missing key supported constraints, or when bounded recovery needs an explicit user tradeoff, the workflow stops in `awaiting_clarification` instead of fabricating a plan. In that state the public `DemoRunSummary` returns `plans = []`, `selected_plan_id = null`, and a compact `clarification` object with the user-visible follow-up prompt plus the missing supported fields.
 Every public demo run summary includes a compact `plan_version` object. The initial run starts at `v1`, and each follow-up replan increments the visible version label.
 Clarification-only turns do not advance the visible plan version. A vague `v1` run that stops in `awaiting_clarification` stays at `v1`, and the first clarification continuation that produces actual plans also remains at `v1`.
 Every public `DemoPlanPreview` now also includes `action_manifest`, which is the stable execution-preview contract for the Web demo. Before confirmation it summarizes `draft.proposed_actions` as `source = "proposed_actions"`. After confirmation or execution it summarizes persisted `confirmed_actions` as `source = "confirmed_actions"`. The older `proposed_actions` field remains present for compatibility, but the public frontend now renders action previews from `action_manifest.actions`.
@@ -335,7 +335,7 @@ curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/replan \
 
 The replan response returns a new `run_id`. The internal conversation session is reused across the original run and the follow-up run, but that session state remains non-public and is not exposed in `DemoRunSummary`.
 Each replan also advances the public version label to `v2`, `v3`, and so on.
-If the source run is `awaiting_clarification`, use `/clarify` instead of `/replan`. The clarification continuation also returns a new `run_id`, reuses the same internal session, and keeps the public version label at `v1` until the first real plan is produced.
+If the source run is `awaiting_clarification`, use `/clarify` instead of `/replan`. This applies to both pre-planning clarification stops and recovery-driven clarification stops. The clarification continuation also returns a new `run_id`, reuses the same internal session, and keeps the public version label at `v1` until the first real plan is produced.
 
 ## Minimal Web UI Demo
 

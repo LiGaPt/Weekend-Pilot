@@ -9,9 +9,11 @@ from redis import Redis
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from backend.app.agents import AgentResult, DeterministicValidatorRecoveryAgent, RecoveryDecision
 from backend.app.core.config import Settings, get_settings
 from backend.app.db.session import SessionLocal, get_db
 from backend.app.models.runtime import ActionLedger, AgentRun, ConversationSession, ConversationTurn, ToolEvent, User
+from backend.app.review.schemas import FinalReviewResult, ReviewCheck
 from backend.app.runtime import get_redis_client
 from backend.app.main import create_app
 
@@ -518,6 +520,155 @@ def test_demo_run_clarification_flow_reuses_session_and_keeps_version_v1(client)
             "policy_version": "clarification_policy_v0",
             "missing_fields": ["scenario_or_participants", "time_window"],
             "question_text": "为了继续规划，请补充这次是谁一起去，以及大概什么时间出发、准备玩多久。",
+        }
+    finally:
+        db.close()
+
+
+def test_demo_run_recovery_clarification_flow_reuses_public_clarify_contract(
+    client,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_review = DeterministicValidatorRecoveryAgent.review
+    call_count = {"count": 0}
+
+    def _ask_then_restore(
+        self,
+        plan,
+        enrichment,
+        drafts,
+        pre_confirmation_action_count=0,
+        recovery_context=None,
+        context=None,
+    ):
+        call_count["count"] += 1
+        if call_count["count"] > 1:
+            return original_review(
+                self,
+                plan,
+                enrichment,
+                drafts,
+                pre_confirmation_action_count=pre_confirmation_action_count,
+                recovery_context=recovery_context,
+                context=context,
+            )
+
+        failed_check = ReviewCheck(
+            check_name="draft_exists",
+            status="failed",
+            severity="error",
+            message="Need distance flexibility.",
+        )
+        review = FinalReviewResult(
+            run_id=drafts.run_id,
+            provider_profile=drafts.provider_profile,
+            decision="blocked",
+            safe_to_present=False,
+            checks=[failed_check],
+            errors=[failed_check],
+            gate_version="test-gate",
+        )
+        decision = RecoveryDecision(
+            verdict="failed",
+            error_type="draft_exists",
+            recovery_action="ask_user",
+            retry_budget=0,
+            reason="Need distance flexibility.",
+        )
+        return (
+            AgentResult(
+                role="validator_recovery",
+                status="blocked",
+                summary="Need distance flexibility.",
+                adapter_version="test-validator",
+                output_json={"recovery_decision": decision.model_dump(mode="json")},
+            ),
+            review,
+            decision,
+        )
+
+    monkeypatch.setattr(DeterministicValidatorRecoveryAgent, "review", _ask_then_restore)
+    test_client, case_ids, external_user_ids = client
+
+    start_response = test_client.post("/demo/runs", json=_start_payload(case_ids, external_user_ids))
+
+    assert start_response.status_code == 200
+    start_body = start_response.json()
+    _assert_no_forbidden_keys(start_body)
+    _assert_public_run_redaction(start_body)
+    assert start_body["status"] == "awaiting_clarification"
+    assert start_body["selected_plan_id"] is None
+    assert start_body["plans"] == []
+    assert start_body["action_count"] == 0
+    assert start_body["clarification"] == {
+        "prompt": (
+            "\u4e3a\u4e86\u7ee7\u7eed\u89c4\u5212\uff0c\u8bf7\u544a\u8bc9\u6211\u662f\u5426\u53ef\u4ee5"
+            "\u63a5\u53d7\u66f4\u8fdc\u4e00\u70b9\uff0c\u6216\u8005\u4ecd\u7136\u9700\u8981\u63a7\u5236"
+            "\u5728\u5f53\u524d\u8ddd\u79bb\u5185\u3002"
+        ),
+        "missing_fields": ["distance_flexibility"],
+    }
+    source_run_id = UUID(start_body["run_id"])
+
+    clarify_response = test_client.post(
+        f"/demo/runs/{source_run_id}/clarify",
+        json={
+            "user_input": "可以稍微远一点，但还是想要轻松一点、晚饭清淡一些。",
+            "selected_plan_index": 0,
+        },
+    )
+
+    assert clarify_response.status_code == 200
+    clarify_body = clarify_response.json()
+    _assert_no_forbidden_keys(clarify_body)
+    _assert_public_run_redaction(clarify_body)
+    assert UUID(clarify_body["run_id"]) != source_run_id
+    assert clarify_body["status"] == "awaiting_confirmation"
+    assert clarify_body["clarification"] is None
+    assert clarify_body["selected_plan_id"] is not None
+    _assert_plan_version(
+        clarify_body,
+        version_number=1,
+        source_run_id=str(source_run_id),
+        source_selected_plan_id=None,
+    )
+
+    db = SessionLocal()
+    try:
+        source_run = _load_run(db, source_run_id)
+        clarified_run = _load_run(db, UUID(clarify_body["run_id"]))
+        assert clarified_run.user_id == source_run.user_id
+        assert clarified_run.session_id == source_run.session_id
+        turns = list(
+            db.scalars(
+                select(ConversationTurn)
+                .where(ConversationTurn.session_id == source_run.session_id)
+                .order_by(ConversationTurn.turn_index, ConversationTurn.turn_id)
+            ).all()
+        )
+        assert [turn.turn_type for turn in turns] == [
+            "user_request",
+            "assistant_clarification_request",
+            "user_clarification_reply",
+            "assistant_plan_options",
+        ]
+        assert turns[1].payload_json == {
+            "missing_fields": ["distance_flexibility"],
+            "run_status": "awaiting_clarification",
+        }
+        assert turns[2].payload_json == {
+            "mode": "clarify",
+            "source_run_id": str(source_run.run_id),
+            "source_missing_fields": ["distance_flexibility"],
+        }
+        assert source_run.metadata_json["workflow"]["clarification"] == {
+            "policy_version": "recovery_clarification_v1",
+            "missing_fields": ["distance_flexibility"],
+            "question_text": (
+                "\u4e3a\u4e86\u7ee7\u7eed\u89c4\u5212\uff0c\u8bf7\u544a\u8bc9\u6211\u662f\u5426\u53ef\u4ee5"
+                "\u63a5\u53d7\u66f4\u8fdc\u4e00\u70b9\uff0c\u6216\u8005\u4ecd\u7136\u9700\u8981\u63a7\u5236"
+                "\u5728\u5f53\u524d\u8ddd\u79bb\u5185\u3002"
+            ),
         }
     finally:
         db.close()

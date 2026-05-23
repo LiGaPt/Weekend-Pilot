@@ -40,6 +40,8 @@ def test_mock_world_query_plan_includes_initial_read_calls() -> None:
     ]
     assert len(activity_calls) == 1
     assert len(dining_calls) == 1
+    assert activity_calls[0].payload["limit"] == 5
+    assert dining_calls[0].payload["limit"] == 5
     assert activity_calls[0].payload["tags"] == ["child_friendly"]
     assert "lighter_options" in dining_calls[0].payload["tags"]
     assert "child_friendly" in dining_calls[0].payload["tags"]
@@ -115,3 +117,17 @@ def test_mock_world_query_plan_uses_effective_activity_style_preferences() -> No
 
     assert activity_call.payload["query"] == "indoor"
     assert activity_call.payload["tags"] == ["child_friendly", "indoor"]
+
+
+def test_mock_world_query_plan_supports_bounded_recovery_search_expansion() -> None:
+    intent = _family_intent()
+
+    plan = DeterministicQueryPlanner().build(intent, search_limit_override=8)
+
+    search_calls = [call for call in plan.initial_tool_calls if call.tool_name == "search_poi"]
+    assert len(search_calls) == 2
+    assert all(call.payload["limit"] == 8 for call in search_calls)
+    assert search_calls[0].payload["query"] == "child_friendly"
+    assert search_calls[0].payload["tags"] == ["child_friendly"]
+    assert "lighter_options" in search_calls[1].payload["tags"]
+    assert "child_friendly" in search_calls[1].payload["tags"]
