@@ -13,9 +13,11 @@ from backend.app.agents import AgentResult, DeterministicValidatorRecoveryAgent,
 from backend.app.core.config import Settings, get_settings
 from backend.app.db.session import SessionLocal, get_db
 from backend.app.models.runtime import ActionLedger, AgentRun, ConversationSession, ConversationTurn, ToolEvent, User
+from backend.app.providers.amap.errors import AMapConfigurationError
 from backend.app.review.schemas import FinalReviewResult, ReviewCheck
 from backend.app.runtime import get_redis_client
 from backend.app.main import create_app
+from backend.app.tool_gateway import build_default_registry
 
 
 TEST_PREFIX = "demo-api-gateway"
@@ -43,6 +45,64 @@ REDACTED_PUBLIC_RUN_FIELDS = {
     "agent_roles",
 }
 VAGUE_USER_INPUT = "想周末出去玩一下。"
+
+
+class _FakeAmapPreviewProvider:
+    name = "amap"
+
+    def invoke(self, tool_name: str, payload: dict[str, object]) -> dict[str, object]:
+        if tool_name == "search_poi":
+            if payload.get("canonical_category") == "activity":
+                return {
+                    "results": [
+                        {
+                            "id": "amap-activity-1",
+                            "name": "Riverside Family Park",
+                            "category": "Park",
+                            "address": "1 Riverside Road",
+                            "location": "121.480,31.230",
+                            "source": "amap",
+                        }
+                    ]
+                }
+            return {
+                "results": [
+                    {
+                        "id": "amap-dining-1",
+                        "name": "Light Kitchen",
+                        "category": "Restaurant",
+                        "address": "8 Dining Road",
+                        "location": "121.486,31.232",
+                        "source": "amap",
+                    }
+                ]
+            }
+        if tool_name == "get_poi_detail":
+            poi_id = str(payload.get("poi_id") or "")
+            return {
+                "poi": {
+                    "poi_id": poi_id,
+                    "description": f"Preview detail for {poi_id}.",
+                }
+            }
+        if tool_name == "check_weather":
+            return {"weather": {"city": "Shanghai", "condition": "Sunny"}}
+        if tool_name == "check_route":
+            return {
+                "route": {
+                    "mode": "walking",
+                    "distance_meters": 1200,
+                    "duration_minutes": 15,
+                    "summary": "Walkable route between the preview POIs.",
+                }
+            }
+        raise AssertionError(f"Unexpected tool {tool_name!r} for fake AMAP preview provider.")
+
+
+def _build_fake_amap_registry():
+    registry = build_default_registry(default_provider="amap")
+    registry.register_provider(_FakeAmapPreviewProvider())
+    return registry
 
 
 @pytest.fixture()
@@ -120,6 +180,18 @@ def _count_actions(session: Session, run_id: UUID) -> int:
     return int(
         session.scalar(
             select(func.count()).select_from(ActionLedger).where(ActionLedger.run_id == run_id)
+        )
+        or 0
+    )
+
+
+def _count_write_tool_events(session: Session, run_id: UUID) -> int:
+    return int(
+        session.scalar(
+            select(func.count()).select_from(ToolEvent).where(
+                ToolEvent.run_id == run_id,
+                ToolEvent.tool_type == "write",
+            )
         )
         or 0
     )
@@ -270,6 +342,97 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
     finally:
         db.close()
 
+
+def test_demo_run_start_with_amap_reports_safe_configuration_error(
+    client,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    test_client, case_ids, external_user_ids = client
+    payload = _start_payload(case_ids, external_user_ids)
+    payload["read_profile"] = "amap"
+
+    def _raise_missing_config():
+        raise AMapConfigurationError("AMAP API key is not configured.")
+
+    monkeypatch.setattr("backend.app.workflow.nodes.build_amap_registry", _raise_missing_config)
+
+    response = test_client.post("/demo/runs", json=payload)
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": "AMAP read path is not configured for this environment."
+    }
+
+
+def test_demo_run_amap_preview_stays_read_only_and_preserves_profile(
+    client,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("backend.app.workflow.nodes.build_amap_registry", _build_fake_amap_registry)
+    test_client, case_ids, external_user_ids = client
+    payload = _start_payload(case_ids, external_user_ids)
+    payload["read_profile"] = "amap"
+
+    start_response = test_client.post("/demo/runs", json=payload)
+
+    assert start_response.status_code == 200
+    start_body = start_response.json()
+    assert start_body["status"] == "awaiting_confirmation"
+    assert start_body["read_profile"] == "amap"
+    assert start_body["action_count"] == 0
+    run_id = UUID(start_body["run_id"])
+
+    db = SessionLocal()
+    try:
+        run = _load_run(db, run_id)
+        assert run.tool_profile == "amap"
+        assert run.world_profile == "amap_shanghai_live"
+        assert _count_actions(db, run_id) == 0
+        assert _count_write_tool_events(db, run_id) == 0
+    finally:
+        db.close()
+
+    confirm_response = test_client.post(
+        f"/demo/runs/{run_id}/confirm",
+        json={"confirmed_by": "web-demo-user"},
+    )
+
+    assert confirm_response.status_code == 409
+    assert confirm_response.json() == {
+        "detail": "AMAP read-only demo runs cannot be confirmed."
+    }
+
+    db = SessionLocal()
+    try:
+        assert _count_actions(db, run_id) == 0
+        assert _count_write_tool_events(db, run_id) == 0
+    finally:
+        db.close()
+
+    replan_response = test_client.post(
+        f"/demo/runs/{run_id}/replan",
+        json={
+            "user_input": "Keep it nearby, but make the plan even lighter.",
+            "selected_plan_index": 0,
+        },
+    )
+
+    assert replan_response.status_code == 200
+    replan_body = replan_response.json()
+    assert replan_body["read_profile"] == "amap"
+    assert replan_body["status"] == "awaiting_confirmation"
+    assert replan_body["run_id"] != start_body["run_id"]
+
+    db = SessionLocal()
+    try:
+        replan_run = _load_run(db, UUID(replan_body["run_id"]))
+        assert replan_run.tool_profile == "amap"
+        assert replan_run.world_profile == "amap_shanghai_live"
+        assert _count_actions(db, replan_run.run_id) == 0
+        assert _count_write_tool_events(db, replan_run.run_id) == 0
+    finally:
+        db.close()
+
     status_response = test_client.get(f"/demo/runs/{run_id}")
 
     assert status_response.status_code == 200
@@ -285,63 +448,19 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
         source_selected_plan_id=None,
     )
     status_selected_plan = next(plan for plan in status_body["plans"] if plan["selected"])
-    _assert_action_manifest_preview(status_selected_plan)
-
-    confirm_response = test_client.post(
-        f"/demo/runs/{run_id}/confirm",
-        json={"confirmed_by": "web-demo-user"},
-    )
-
-    assert confirm_response.status_code == 200
-    confirm_body = confirm_response.json()
-    _assert_no_forbidden_keys(confirm_body)
-    _assert_public_run_redaction(confirm_body)
-    assert confirm_body["run_id"] == str(run_id)
-    assert confirm_body["status"] == "completed"
-    assert confirm_body["action_count"] > 0
-    assert confirm_body["feedback_status"] == "completed"
-    _assert_plan_version(
-        confirm_body,
-        version_number=1,
-        source_run_id=None,
-        source_selected_plan_id=None,
-    )
-    selected = next(plan for plan in confirm_body["plans"] if plan["selected"])
-    _assert_action_manifest_confirmed(selected)
-    assert selected["confirmation"]["status"] == "confirmed"
-    assert selected["execution"]["status"] == "succeeded"
-    assert selected["feedback"]["status"] == "completed"
+    manifest = status_selected_plan["action_manifest"]
+    assert manifest == {
+        "source": "none",
+        "action_count": 0,
+        "actions": [],
+    }
+    assert status_selected_plan["proposed_actions"] == []
 
     db = SessionLocal()
     try:
-        first_action_count = _count_actions(db, run_id)
-        demo_trace_id = _demo_trace_id(db, run_id)
-        write_trace_ids = set(
-            db.scalars(
-                select(ToolEvent.langsmith_trace_id).where(
-                    ToolEvent.run_id == run_id,
-                    ToolEvent.tool_type == "write",
-                )
-            ).all()
-        )
-        assert first_action_count == confirm_body["action_count"]
-        assert demo_trace_id is not None
-        assert write_trace_ids == {demo_trace_id}
-    finally:
-        db.close()
-
-    second_confirm_response = test_client.post(
-        f"/demo/runs/{run_id}/confirm",
-        json={"confirmed_by": "web-demo-user"},
-    )
-
-    assert second_confirm_response.status_code == 200
-    second_confirm_body = second_confirm_response.json()
-    assert second_confirm_body["action_count"] == confirm_body["action_count"]
-
-    db = SessionLocal()
-    try:
-        assert _count_actions(db, run_id) == first_action_count
+        assert _count_actions(db, run_id) == 0
+        assert _count_write_tool_events(db, run_id) == 0
+        assert _demo_trace_id(db, run_id) is not None
     finally:
         db.close()
 

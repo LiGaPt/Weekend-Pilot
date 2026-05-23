@@ -25,9 +25,10 @@ from backend.app.planning import (
     ItineraryDraftResult,
     ItineraryRouteRef,
 )
-from backend.app.repositories import ConversationSessionRepository, UserRepository
+from backend.app.repositories import ConversationSessionRepository, PlanRepository, UserRepository
 from backend.app.review.schemas import FinalReviewResult, ReviewCheck
 from backend.app.runtime import FixedWindowRateLimiter, JsonRedisCache, RedisKeyBuilder, get_redis_client
+from backend.app.tool_gateway import build_default_registry
 from backend.app.workflow import (
     WeekendPilotWorkflowDependencies,
     WeekendPilotWorkflowRequest,
@@ -40,6 +41,64 @@ USER_INPUT = (
     "This afternoon I want to go out with my wife and child for a few hours. "
     "Not too far. My child is 5, and my wife is trying to eat lighter."
 )
+
+
+class _FakeAmapPreviewProvider:
+    name = "amap"
+
+    def invoke(self, tool_name: str, payload: dict[str, object]) -> dict[str, object]:
+        if tool_name == "search_poi":
+            if payload.get("canonical_category") == "activity":
+                return {
+                    "results": [
+                        {
+                            "id": "amap-activity-1",
+                            "name": "Riverside Family Park",
+                            "category": "Park",
+                            "address": "1 Riverside Road",
+                            "location": "121.480,31.230",
+                            "source": "amap",
+                        }
+                    ]
+                }
+            return {
+                "results": [
+                    {
+                        "id": "amap-dining-1",
+                        "name": "Light Kitchen",
+                        "category": "Restaurant",
+                        "address": "8 Dining Road",
+                        "location": "121.486,31.232",
+                        "source": "amap",
+                    }
+                ]
+            }
+        if tool_name == "get_poi_detail":
+            poi_id = str(payload.get("poi_id") or "")
+            return {
+                "poi": {
+                    "poi_id": poi_id,
+                    "description": f"Preview detail for {poi_id}.",
+                }
+            }
+        if tool_name == "check_weather":
+            return {"weather": {"city": "Shanghai", "condition": "Sunny"}}
+        if tool_name == "check_route":
+            return {
+                "route": {
+                    "mode": "walking",
+                    "distance_meters": 1200,
+                    "duration_minutes": 15,
+                    "summary": "Walkable route between the preview POIs.",
+                }
+            }
+        raise AssertionError(f"Unexpected tool {tool_name!r} for fake AMAP preview provider.")
+
+
+def _build_fake_amap_registry():
+    registry = build_default_registry(default_provider="amap")
+    registry.register_provider(_FakeAmapPreviewProvider())
+    return registry
 
 
 @pytest.fixture()
@@ -751,3 +810,54 @@ def test_workflow_reuses_existing_user_and_session_with_intent_override(
     assert run.user_id == user.user_id
     assert run.session_id == conversation_session.session_id
     assert db_session.scalar(select(func.count()).select_from(User)) == original_user_count
+
+
+def test_workflow_amap_preview_reaches_confirmation_without_write_actions(
+    db_session: Session,
+    redis_runtime,
+    trace_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("backend.app.workflow.nodes.build_amap_registry", _build_fake_amap_registry)
+    runner = _build_runner(db_session, redis_runtime, trace_path)
+
+    result = runner.run(
+        WeekendPilotWorkflowRequest(
+            user_input=USER_INPUT,
+            external_user_id=f"workflow-amap-preview-{uuid4()}",
+            display_name="Workflow AMAP Preview Tester",
+            case_id="case-langgraph-amap-preview",
+            tool_profile="amap",
+            world_profile="amap_shanghai_live",
+            auto_confirm=False,
+        )
+    )
+
+    assert result.status == "awaiting_confirmation"
+    assert result.run_id is not None
+    assert result.selected_plan_id is not None
+    assert result.action_count == 0
+    assert _action_count(db_session, result.run_id) == 0
+    assert "wait_confirmation" in result.node_history
+    assert "saga_execution_engine" not in result.node_history
+
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    assert run.tool_profile == "amap"
+    assert run.world_profile == "amap_shanghai_live"
+    assert PlanRepository(db_session).get_selected_for_run(result.run_id) is not None
+
+    providers = set(
+        db_session.scalars(select(ToolEvent.provider).where(ToolEvent.run_id == result.run_id)).all()
+    )
+    write_event_count = int(
+        db_session.scalar(
+            select(func.count()).select_from(ToolEvent).where(
+                ToolEvent.run_id == result.run_id,
+                ToolEvent.tool_type == "write",
+            )
+        )
+        or 0
+    )
+    assert providers == {"amap"}
+    assert write_event_count == 0

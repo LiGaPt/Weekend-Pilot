@@ -39,7 +39,7 @@ export async function declineRun(runId: string, planId?: string | null): Promise
     body: JSON.stringify({
       plan_id: planId ?? null,
       declined_by: "web-demo-user",
-      reason: "用户选择暂不继续。",
+      reason: "\u7528\u6237\u9009\u62e9\u6682\u4e0d\u7ee7\u7eed\u3002",
     }),
   });
 }
@@ -82,19 +82,23 @@ async function responseMessage(response: Response): Promise<string> {
 
 function connectionMessage(error: unknown): string {
   void error;
-  return "无法连接演示服务，请确认后端正在运行。";
+  return "\u65e0\u6cd5\u8fde\u63a5\u6f14\u793a\u670d\u52a1\uff0c\u8bf7\u786e\u8ba4\u540e\u7aef\u6b63\u5728\u8fd0\u884c\u3002";
 }
 
 function localizedResponseMessage(message: string, status: number): string {
   const knownMessages: Record<string, string> = {
-    "Run not found.": "未找到对应的演示运行。",
-    "Demo run was not found.": "未找到对应的演示运行。",
+    "Run not found.": "\u672a\u627e\u5230\u5bf9\u5e94\u7684\u6f14\u793a\u8fd0\u884c\u3002",
+    "Demo run was not found.": "\u672a\u627e\u5230\u5bf9\u5e94\u7684\u6f14\u793a\u8fd0\u884c\u3002",
+    "AMAP read path is not configured for this environment.":
+      "\u672c\u5730\u73af\u5883\u672a\u914d\u7f6e AMap \u53ea\u8bfb\u9884\u89c8\u6240\u9700\u7684\u5bc6\u94a5\u3002",
+    "AMAP read-only demo runs cannot be confirmed.":
+      "AMap \u53ea\u8bfb\u9884\u89c8\u8def\u5f84\u4e0d\u652f\u6301\u786e\u8ba4\u6267\u884c\u3002",
   };
   return knownMessages[message] ?? statusFallbackMessage(status);
 }
 
 function statusFallbackMessage(status: number): string {
-  return `演示请求失败（HTTP ${status}）。`;
+  return `\u6f14\u793a\u8bf7\u6c42\u5931\u8d25\uff08HTTP ${status}\uff09\u3002`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

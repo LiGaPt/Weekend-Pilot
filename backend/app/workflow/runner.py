@@ -21,6 +21,12 @@ from backend.app.workflow.state import CandidateBlackboard, RouteTimeSummary, We
 from backend.app.workflow.timing import WorkflowTimingSummary
 
 
+AMAP_WORLD_PROFILE = "amap_shanghai_live"
+AMAP_UNSUPPORTED_MESSAGE = (
+    "WeekendPilot workflow supports AMAP only as a read-only pre-confirmation preview path."
+)
+
+
 class WeekendPilotWorkflowRunner:
     def __init__(self, dependencies: WeekendPilotWorkflowDependencies) -> None:
         self.dependencies = dependencies
@@ -31,7 +37,12 @@ class WeekendPilotWorkflowRunner:
             return unsupported
 
         try:
-            dependencies = self.dependencies.model_copy(update={"world_profile": request.world_profile})
+            dependencies = self.dependencies.model_copy(
+                update={
+                    "tool_profile": request.tool_profile,
+                    "world_profile": request.world_profile,
+                }
+            )
             nodes = WeekendPilotWorkflowNodes(dependencies)
             graph = build_weekend_pilot_graph(nodes)
             final_state = graph.invoke(self._initial_state(request))
@@ -53,8 +64,22 @@ class WeekendPilotWorkflowRunner:
         self,
         request: WeekendPilotWorkflowRequest,
     ) -> WeekendPilotWorkflowResult | None:
-        if request.tool_profile == "mock_world" and request.world_profile in SUPPORTED_PROFILES:
-            return None
+        if request.tool_profile == "mock_world":
+            if request.world_profile in SUPPORTED_PROFILES:
+                return None
+            message = (
+                "WeekendPilot workflow supports only "
+                "tool_profile='mock_world' with a supported Mock World profile."
+            )
+        elif request.tool_profile == "amap":
+            if request.world_profile == AMAP_WORLD_PROFILE and request.auto_confirm is False:
+                return None
+            message = AMAP_UNSUPPORTED_MESSAGE
+        else:
+            message = (
+                "WeekendPilot workflow supports only "
+                "tool_profile='mock_world' with a supported Mock World profile."
+            )
 
         return WeekendPilotWorkflowResult(
             run_id=None,
@@ -62,12 +87,10 @@ class WeekendPilotWorkflowRunner:
             status="error",
             error_json={
                 "error_type": "unsupported_profile",
-                "message": (
-                    "WeekendPilot workflow supports only "
-                    "tool_profile='mock_world' with a supported Mock World profile."
-                ),
+                "message": message,
                 "tool_profile": request.tool_profile,
                 "world_profile": request.world_profile,
+                "auto_confirm": request.auto_confirm,
             },
         )
 

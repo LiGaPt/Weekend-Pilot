@@ -24,6 +24,8 @@ Set the key in local `.env` only:
 AMAP_MAPS_API_KEY=your-local-key
 ```
 
+The local demo still defaults to `Mock World`. `AMap` is available only as an explicit read-only preview path for local review, and that path stops before confirmation instead of executing write tools. Benchmark cases, benchmark suites, and benchmark defaults remain on `Mock World`.
+
 Default tests do not call live AMAP APIs:
 
 ```bash
@@ -271,6 +273,7 @@ Expected response:
 ## Web Demo API
 
 The Web demo API starts the official workflow, pauses before write tools, and continues execution only after explicit confirmation. The MVP review path uses Chinese Mock World demo content for the family afternoon scenario.
+The default start path stays on `Mock World`. To preview the live read provider locally, send `read_profile="amap"` and keep `AMAP_MAPS_API_KEY` in local `.env`; that AMAP path is read-only and cannot be confirmed into execution.
 When a start request is still missing key supported constraints, or when bounded recovery needs an explicit user tradeoff, the workflow stops in `awaiting_clarification` instead of fabricating a plan. In that state the public `DemoRunSummary` returns `plans = []`, `selected_plan_id = null`, and a compact `clarification` object with the user-visible follow-up prompt plus the missing supported fields.
 Every public demo run summary includes a compact `plan_version` object. The initial run starts at `v1`, and each follow-up replan increments the visible version label.
 Clarification-only turns do not advance the visible plan version. A vague `v1` run that stops in `awaiting_clarification` stays at `v1`, and the first clarification continuation that produces actual plans also remains at `v1`.
@@ -288,6 +291,14 @@ Start a run:
 curl -X POST http://127.0.0.1:8000/demo/runs \
   -H "Content-Type: application/json" \
   -d "{\"user_input\":\"今天下午想和爱人、5岁的孩子出门玩几个小时，别离家太远。孩子要适合亲子活动，爱人最近想吃清淡一点，帮我安排一下。\"}"
+```
+
+Start an explicit AMap read-only preview run:
+
+```bash
+curl -X POST http://127.0.0.1:8000/demo/runs \
+  -H "Content-Type: application/json" \
+  -d "{\"user_input\":\"Plan a light family afternoon nearby.\",\"external_user_id\":\"web-demo-user\",\"display_name\":\"Web Demo User\",\"case_id\":\"web-demo\",\"selected_plan_index\":0,\"read_profile\":\"amap\"}"
 ```
 
 Read status:
@@ -361,6 +372,7 @@ The frontend defaults to `http://127.0.0.1:8000` for the API. To override it loc
 The public demo page only shows customer-safe run details. Internal trace and node history review lives at `http://127.0.0.1:5173/observability`.
 The visible run inspector includes the current plan version label for the loaded run.
 The visible action preview for each plan tab now comes from `plans[*].action_manifest`, so pre-confirmation and post-confirmation states share one normalized public shape.
+The page now also exposes an explicit read-path selector. Leave it on `Mock World` for the default deterministic demo and benchmark-aligned checks. Switch it to `AMap 只读预览` only when you want a local live-provider preview that stays pre-confirmation and does not execute writes.
 
 For internal review, open `http://127.0.0.1:5173/observability` and paste a `run_id` to inspect the internal run summary, workflow timing, tool-event details, action-ledger details, benchmark artifact context, and bounded recovery-path details. Benchmark-backed recovery runs also surface the persisted benchmark case report path as replay input context for later inspection tooling.
 

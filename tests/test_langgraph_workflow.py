@@ -402,6 +402,77 @@ def test_supported_solo_profile_is_not_rejected_by_runner() -> None:
     assert runner._unsupported_profile_result(request) is None
 
 
+def test_workflow_request_accepts_supported_amap_preview_profile() -> None:
+    request = WeekendPilotWorkflowRequest(
+        user_input="Preview a Shanghai family afternoon.",
+        tool_profile="amap",
+        world_profile="amap_shanghai_live",
+        auto_confirm=False,
+    )
+
+    assert request.tool_profile == "amap"
+    assert request.world_profile == "amap_shanghai_live"
+
+
+def test_supported_amap_preview_profile_is_not_rejected_by_runner() -> None:
+    runner = WeekendPilotWorkflowRunner(cast(WeekendPilotWorkflowDependencies, object()))
+    request = WeekendPilotWorkflowRequest(
+        user_input="Preview a Shanghai family afternoon.",
+        tool_profile="amap",
+        world_profile="amap_shanghai_live",
+        auto_confirm=False,
+    )
+
+    assert runner._unsupported_profile_result(request) is None
+
+
+def test_amap_preview_profile_rejects_auto_confirm() -> None:
+    runner = WeekendPilotWorkflowRunner(cast(WeekendPilotWorkflowDependencies, object()))
+    request = WeekendPilotWorkflowRequest(
+        user_input="Preview a Shanghai family afternoon.",
+        tool_profile="amap",
+        world_profile="amap_shanghai_live",
+        auto_confirm=True,
+    )
+
+    result = runner._unsupported_profile_result(request)
+
+    assert result is not None
+    assert result.error_json is not None
+    assert result.error_json["error_type"] == "unsupported_profile"
+    assert (
+        result.error_json["message"]
+        == "WeekendPilot workflow supports AMAP only as a read-only pre-confirmation preview path."
+    )
+
+
+def test_amap_preview_profile_rejects_wrong_world_profile() -> None:
+    runner = WeekendPilotWorkflowRunner(cast(WeekendPilotWorkflowDependencies, object()))
+    request = WeekendPilotWorkflowRequest.model_construct(
+        user_input="Preview a Shanghai family afternoon.",
+        external_user_id=None,
+        display_name=None,
+        case_id=None,
+        agent_version="agent-v1",
+        prompt_version="prompt-v1",
+        tool_profile="amap",
+        world_profile="family_afternoon",
+        failure_profile=None,
+        auto_confirm=False,
+        selected_plan_index=0,
+    )
+
+    result = runner._unsupported_profile_result(request)
+
+    assert result is not None
+    assert result.error_json is not None
+    assert result.error_json["error_type"] == "unsupported_profile"
+    assert (
+        result.error_json["message"]
+        == "WeekendPilot workflow supports AMAP only as a read-only pre-confirmation preview path."
+    )
+
+
 def test_unsupported_profile_result_is_typed_and_does_not_raise() -> None:
     runner = WeekendPilotWorkflowRunner(cast(WeekendPilotWorkflowDependencies, object()))
     request = WeekendPilotWorkflowRequest.model_construct(

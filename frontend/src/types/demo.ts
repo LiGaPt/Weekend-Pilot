@@ -1,9 +1,12 @@
+export type DemoReadProfile = "mock_world" | "amap";
+
 export type DemoStartRunRequest = {
   user_input: string;
   external_user_id: string;
   display_name: string;
   case_id: string;
   selected_plan_index: number;
+  read_profile?: DemoReadProfile;
 };
 
 export type DemoCandidateSummary = {
@@ -130,6 +133,7 @@ export type DemoPlanPreview = {
 export type DemoRunSummary = {
   run_id: string;
   status: string;
+  read_profile: DemoReadProfile;
   selected_plan_id: string | null;
   plan_version: DemoPlanVersionSummary;
   plans: DemoPlanPreview[];

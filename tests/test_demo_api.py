@@ -45,6 +45,12 @@ def test_start_request_rejects_empty_user_input() -> None:
         DemoStartRunRequest(user_input="")
 
 
+def test_start_request_defaults_read_profile_to_mock_world() -> None:
+    request = DemoStartRunRequest(user_input="Family afternoon")
+
+    assert request.read_profile == "mock_world"
+
+
 def test_replan_request_rejects_empty_user_input() -> None:
     with pytest.raises(ValidationError):
         DemoReplanRunRequest(user_input="")
@@ -90,6 +96,7 @@ def test_demo_run_summary_serializes_minimal_web_safe_payload() -> None:
     summary = DemoRunSummary(
         run_id=run_id,
         status="awaiting_confirmation",
+        read_profile="mock_world",
         selected_plan_id=plan_id,
         plan_version={
             "version_number": 1,
@@ -129,6 +136,7 @@ def test_demo_run_summary_serializes_minimal_web_safe_payload() -> None:
     dumped = summary.model_dump(mode="json")
 
     assert dumped["run_id"] == str(run_id)
+    assert dumped["read_profile"] == "mock_world"
     assert dumped["selected_plan_id"] == str(plan_id)
     assert dumped["plan_version"] == {
         "version_number": 1,
@@ -165,6 +173,7 @@ def test_demo_run_summary_requires_plan_version() -> None:
         DemoRunSummary(
             run_id=uuid4(),
             status="awaiting_confirmation",
+            read_profile="mock_world",
             selected_plan_id=None,
             plans=[],
             action_count=0,
@@ -178,6 +187,7 @@ def test_demo_run_summary_serializes_clarification_payload() -> None:
     summary = DemoRunSummary(
         run_id=uuid4(),
         status="awaiting_clarification",
+        read_profile="mock_world",
         selected_plan_id=None,
         plan_version={
             "version_number": 1,
@@ -208,6 +218,7 @@ def test_demo_run_summary_serializes_recovery_clarification_payload() -> None:
     summary = DemoRunSummary(
         run_id=uuid4(),
         status="awaiting_clarification",
+        read_profile="mock_world",
         selected_plan_id=None,
         plan_version={
             "version_number": 1,
@@ -246,6 +257,7 @@ def test_demo_run_summary_allows_null_clarification_for_non_clarification_runs()
     summary = DemoRunSummary(
         run_id=uuid4(),
         status="awaiting_confirmation",
+        read_profile="mock_world",
         selected_plan_id=None,
         plan_version={
             "version_number": 1,
@@ -272,6 +284,7 @@ def test_demo_plan_preview_requires_action_manifest() -> None:
             {
                 "run_id": str(uuid4()),
                 "status": "awaiting_confirmation",
+                "read_profile": "mock_world",
                 "selected_plan_id": None,
                 "plan_version": {
                     "version_number": 1,

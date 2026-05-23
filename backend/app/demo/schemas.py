@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+
+
+DemoReadProfile = Literal["mock_world", "amap"]
 
 
 class DemoStartRunRequest(BaseModel):
@@ -12,6 +15,7 @@ class DemoStartRunRequest(BaseModel):
     display_name: str | None = None
     case_id: str | None = "web-demo"
     selected_plan_index: int = Field(default=0, ge=0)
+    read_profile: DemoReadProfile = "mock_world"
 
 
 class DemoReplanRunRequest(BaseModel):
@@ -164,6 +168,7 @@ class DemoPlanPreview(BaseModel):
 class DemoRunSummary(BaseModel):
     run_id: UUID
     status: str
+    read_profile: DemoReadProfile
     selected_plan_id: UUID | None = None
     plan_version: DemoPlanVersionSummary
     plans: list[DemoPlanPreview] = Field(default_factory=list)

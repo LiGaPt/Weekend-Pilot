@@ -2,7 +2,12 @@
 
 ## Overview
 
-The Web demo is the primary MVP review path for WeekendPilot. It runs the React/Vite frontend against the FastAPI demo API, uses the Mock World provider only, pauses before write tools, and continues execution only after explicit confirmation. The visible demo copy and Mock World family-afternoon content are localized in Chinese for competition review.
+The Web demo is the primary MVP review path for WeekendPilot. It runs the React/Vite frontend against the FastAPI demo API, defaults to the Mock World provider, pauses before write tools, and continues execution only after explicit confirmation. The visible demo copy and Mock World family-afternoon content are localized in Chinese for competition review.
+
+The public page now exposes two explicit read paths:
+
+- `Mock World`: the default deterministic demo and the unchanged benchmark baseline
+- `AMap 只读预览`: an explicit local preview path that uses live read tools only, returns reviewed plans, and stops before confirmation
 
 The public demo API now also supports `POST /demo/runs/{run_id}/clarify` for clarification replies and `POST /demo/runs/{run_id}/replan` for follow-up replanning. A vague start request, or a bounded recovery path that needs an explicit user tradeoff, can stop in `awaiting_clarification` with `plans = []`, `selected_plan_id = null`, and a compact `clarification` summary that contains the public follow-up prompt plus the missing supported fields.
 Every public `DemoRunSummary` includes a compact `plan_version` object: the initial run starts at `v1`, and each follow-up replan returns a new `run_id` with the next visible version label. Clarification-only turns do not advance that visible version. A source run that ends in `awaiting_clarification` stays at `v1`, and the first clarification continuation that produces real plans also remains at `v1`. The internal conversation session is reused, but that session state remains internal and is still not exposed in `DemoRunSummary`.
@@ -29,7 +34,7 @@ Every public `DemoPlanPreview` now includes `action_manifest`, a stable executio
 
 `source = "proposed_actions"` is used for safe pre-confirmation previews, `source = "confirmed_actions"` is used after confirmation when persisted confirmed actions exist, and `source = "none"` is used when no valid public action preview is available.
 
-No external local-life provider, map provider, LangSmith upload, API key, token, or secret is required.
+No external local-life provider, map provider, LangSmith upload, API key, token, or secret is required for the default Mock World path.
 
 ## Prerequisites
 
@@ -40,6 +45,8 @@ No external local-life provider, map provider, LangSmith upload, API key, token,
 - Chromium installed through Playwright before browser tests.
 
 Playwright does not start Docker and does not run migrations. Keep these prerequisites explicit so failures are easy to diagnose.
+
+If you want to exercise the `AMap 只读预览` selector locally, set `AMAP_MAPS_API_KEY` in local `.env`. That key is not required for Mock World runs, benchmark runs, or the default test suite.
 
 ## Backend Setup
 
@@ -121,6 +128,19 @@ The internal review page now also shows sanitized tool-event and action-ledger d
 11. Confirm execution and feedback are visible.
 12. Confirm the action count is greater than `0`.
 13. Confirm the selected plan now shows `action_manifest.source = confirmed_actions`.
+
+### AMap Read-only Preview Path
+
+1. Open `http://127.0.0.1:5173`.
+2. Change the read-path selector from `Mock World` to `AMap 只读预览`.
+3. Start the run.
+4. Confirm the run reaches `awaiting_confirmation`.
+5. Confirm the run inspector shows the active read path as `AMap 只读预览`.
+6. Confirm the page shows the read-only preview notice and does not render a confirm action.
+7. Confirm refresh is still available.
+8. Confirm decline is still available.
+9. If you call `POST /demo/runs/<run_id>/confirm`, confirm the API returns HTTP `409` with `AMAP read-only demo runs cannot be confirmed.`.
+10. Confirm the run still has `action_count = 0` and no write-side effects.
 
 ### Clarification Path
 
@@ -225,6 +245,8 @@ PostgreSQL, Redis, and migrations must already be ready.
 ## Expected Results
 
 - Planning stops at `awaiting_confirmation` before any write action.
+- `Mock World` remains the default read path for the public demo and for benchmark-aligned checks.
+- The explicit `AMap 只读预览` path also stops at `awaiting_confirmation`, keeps `action_count = 0`, and never exposes a working confirm action in the UI.
 - Vague start requests can stop at `awaiting_clarification` before any plan is generated.
 - Bounded recovery can also stop at `awaiting_clarification` when deterministic recovery is exhausted and user tradeoff input is required.
 - The initial public run shows `plan_version.version_label = v1`.
@@ -248,6 +270,7 @@ PostgreSQL, Redis, and migrations must already be ready.
 - Browser launch fails: rerun `npm --prefix frontend run e2e:install`.
 - Frontend points at the wrong API: set `VITE_API_BASE_URL` in `frontend/.env`.
 - LangSmith is unavailable: no action is required for the Mock World demo path.
+- AMap preview start fails with a configuration error: set `AMAP_MAPS_API_KEY` in local `.env`, or switch the selector back to `Mock World`.
 
 ## What Not To Commit
 

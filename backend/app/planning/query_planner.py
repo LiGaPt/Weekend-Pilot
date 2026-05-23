@@ -110,6 +110,7 @@ class DeterministicQueryPlanner:
                     "keywords": self._activity_query(intent),
                     "city": "Shanghai",
                     "page_size": 5,
+                    "canonical_category": "activity",
                 },
             ),
             PlannedToolCall(
@@ -119,6 +120,7 @@ class DeterministicQueryPlanner:
                     "keywords": self._dining_query(intent),
                     "city": "Shanghai",
                     "page_size": 5,
+                    "canonical_category": "dining",
                 },
             ),
             PlannedToolCall(
