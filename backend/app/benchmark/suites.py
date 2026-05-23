@@ -26,12 +26,22 @@ _RECOVERY_FOCUSED_CASE_IDS = [
     "family_route_and_dining_unavailable_v1",
     "rainy_day_ticket_sold_out_v1",
 ]
+_MEMORY_GOVERNANCE_CASE_IDS = [
+    "family_memory_override_v1",
+    "family_memory_advisory_fill_v1",
+    "family_memory_expired_advisory_v1",
+]
 _DEFAULT_CASE_IDS = [*_BASELINE_CASE_IDS, *_EXPANDED_CASE_IDS]
-_ALL_REGISTERED_CASE_IDS = [*_DEFAULT_CASE_IDS, *_RECOVERY_FOCUSED_CASE_IDS]
+_ALL_REGISTERED_CASE_IDS = [
+    *_DEFAULT_CASE_IDS,
+    *_RECOVERY_FOCUSED_CASE_IDS,
+    *_MEMORY_GOVERNANCE_CASE_IDS[1:],
+]
 _ORDERED_SUITE_IDS: tuple[BenchmarkSuiteId, ...] = (
     "baseline",
     "expanded",
     "recovery_focused",
+    "memory_governance",
     "default",
     "all_registered",
 )
@@ -54,6 +64,11 @@ _SUITE_DEFINITIONS: dict[BenchmarkSuiteId, dict[str, Any]] = {
         "description": "Recovery-focused benchmark cases kept outside the non-failure suites.",
         "case_ids": _RECOVERY_FOCUSED_CASE_IDS,
     },
+    "memory_governance": {
+        "title": "Memory governance benchmark suite",
+        "description": "Focused cases that prove memory helps when useful without overriding explicit user input.",
+        "case_ids": _MEMORY_GOVERNANCE_CASE_IDS,
+    },
     "default": {
         "title": "Default benchmark suite",
         "description": "Current ten-case non-failure benchmark suite used by repository examples.",
@@ -61,7 +76,7 @@ _SUITE_DEFINITIONS: dict[BenchmarkSuiteId, dict[str, Any]] = {
     },
     "all_registered": {
         "title": "All registered benchmark cases",
-        "description": "Current default plus recovery-focused cases in canonical repository order.",
+        "description": "Current default, recovery-focused, and memory-governance cases in canonical repository order.",
         "case_ids": _ALL_REGISTERED_CASE_IDS,
     },
 }

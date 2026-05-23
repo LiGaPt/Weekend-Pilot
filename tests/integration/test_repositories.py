@@ -156,7 +156,7 @@ def test_memory_item_repository_creates_and_lists_active_memory(db_session: Sess
         expires_at=datetime.now(UTC) + timedelta(days=1),
         status="active",
     )
-    repo.create(
+    expired = repo.create(
         user_id=user.user_id,
         memory_type="preference",
         key="expired",
@@ -183,7 +183,12 @@ def test_memory_item_repository_creates_and_lists_active_memory(db_session: Sess
 
     assert repo.get_by_id(active.memory_id) is active
     assert repo.list_active_for_user(user.user_id) == [active]
+    assert {item.memory_id for item in repo.list_governable_for_user(user.user_id)} == {
+        active.memory_id,
+        expired.memory_id,
+    }
     assert repo.list_active_for_user(uuid4()) == []
+    assert repo.list_governable_for_user(uuid4()) == []
 
 
 def test_tool_event_repository_creates_gets_and_lists_by_run(db_session: Session) -> None:

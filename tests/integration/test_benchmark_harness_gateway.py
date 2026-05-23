@@ -46,6 +46,11 @@ RECOVERY_CASE_IDS = {
     "family_route_and_dining_unavailable_v1",
     "rainy_day_ticket_sold_out_v1",
 }
+MEMORY_GOVERNANCE_CASE_IDS = {
+    "family_memory_override_v1",
+    "family_memory_advisory_fill_v1",
+    "family_memory_expired_advisory_v1",
+}
 DEFAULT_CASE_IDS = {
     "family_afternoon_v1",
     "family_indoor_light_meal_v1",
@@ -76,6 +81,17 @@ DEFAULT_WORLD_PROFILE_COUNTS = {
     "solo_afternoon": 1,
 }
 DEFAULT_FAILURE_MODE_COUNTS = {"none": 10}
+MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS = {"family": 3}
+MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS = {"none": 3}
+MEMORY_GOVERNANCE_CONSTRAINT_TAG_COUNTS = {
+    "child_friendly": 3,
+    "indoor_activity": 2,
+    "light_meal": 2,
+    "memory_advisory": 1,
+    "memory_expired": 1,
+    "memory_governance": 2,
+    "memory_override": 1,
+}
 BASELINE_SCENARIO_BUCKET_COUNTS = {"family": 5, "solo": 1}
 BASELINE_FAILURE_MODE_COUNTS = {"none": 6}
 BASELINE_CONSTRAINT_TAG_COUNTS = {
@@ -166,23 +182,23 @@ DEFAULT_CONSTRAINT_TAG_COUNTS = {
 }
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
-    "family": 7,
+    "family": 9,
     "friends": 1,
     "mixed": 2,
     "solo": 1,
     "unknown": 1,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L5": 2}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L3": 2, "L5": 2}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
-    "family_afternoon": 7,
+    "family_afternoon": 9,
     "friends_gathering": 1,
     "rainy_day_fallback": 2,
     "solo_afternoon": 1,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
-    "none": 10,
+    "none": 12,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
@@ -193,7 +209,7 @@ ALL_REGISTERED_TAG_COUNTS = {
     "baseline": 2,
     "budget_limited": 1,
     "casual_dining": 1,
-    "child_friendly": 7,
+    "child_friendly": 9,
     "citywalk": 2,
     "composite_failure": 2,
     "date_friendly": 1,
@@ -202,9 +218,12 @@ ALL_REGISTERED_TAG_COUNTS = {
     "fallback": 1,
     "free_activity": 1,
     "friends_group": 1,
-    "indoor_activity": 3,
+    "indoor_activity": 4,
     "light_activity": 1,
-    "light_meal": 6,
+    "light_meal": 7,
+    "memory_advisory": 1,
+    "memory_expired": 1,
+    "memory_governance": 2,
     "memory_override": 1,
     "outdoor_activity": 2,
     "quick_dinner": 1,
@@ -218,7 +237,7 @@ ALL_REGISTERED_CONSTRAINT_TAG_COUNTS = {
     "bad_weather": 1,
     "budget_limited": 1,
     "casual_dining": 1,
-    "child_friendly": 7,
+    "child_friendly": 9,
     "citywalk": 2,
     "composite_failure": 2,
     "date_friendly": 1,
@@ -226,9 +245,12 @@ ALL_REGISTERED_CONSTRAINT_TAG_COUNTS = {
     "fallback": 1,
     "free_activity": 1,
     "friends_group": 1,
-    "indoor_activity": 3,
+    "indoor_activity": 4,
     "light_activity": 1,
-    "light_meal": 6,
+    "light_meal": 7,
+    "memory_advisory": 1,
+    "memory_expired": 1,
+    "memory_governance": 2,
     "memory_override": 1,
     "outdoor_activity": 2,
     "quick_dinner": 1,
@@ -420,11 +442,151 @@ def test_benchmark_harness_records_memory_policy_for_override_case(
     assert result.run_id is not None
     run = db_session.get(AgentRun, result.run_id)
     assert run is not None
+    memory_score = next(score for score in result.scores if score.name == "memory_governance")
 
     memory_policy = run.metadata_json["workflow"]["memory_policy"]
-    assert memory_policy["policy_version"] == "memory_query_policy_v0"
-    assert "activity_style" in memory_policy["ignored_low_confidence_keys"]
-    assert "activity_preferences" in memory_policy["user_override_dimensions"]
+    assert memory_policy["policy_version"] == "memory_query_policy_v1"
+    assert sorted(memory_policy["user_override_dimensions"]) == [
+        "activity_preferences",
+        "dining_preferences",
+    ]
+    assert memory_policy["dimension_outcomes"] == [
+        {
+            "dimension": "activity_preferences",
+            "winner_source": "user_input",
+            "winner_memory_key": None,
+            "winner_tier": None,
+            "effective_values": ["child_friendly", "indoor"],
+            "suppressed_memory_keys": ["activity_style"],
+        },
+        {
+            "dimension": "dining_preferences",
+            "winner_source": "user_input",
+            "winner_memory_key": None,
+            "winner_tier": None,
+            "effective_values": ["lighter_options"],
+            "suppressed_memory_keys": ["spouse_lighter_meals"],
+        },
+    ]
+    assert [decision["outcome"] for decision in memory_policy["memory_decisions"]] == [
+        "suppressed_user_override",
+        "suppressed_user_override",
+    ]
+    assert memory_score.passed is True
+    assert memory_score.details["observed_dimension_sources"] == {
+        "activity_preferences": "user_input",
+        "dining_preferences": "user_input",
+    }
+
+
+def test_benchmark_harness_records_memory_policy_for_advisory_fill_case(
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    case = load_benchmark_case("family_memory_advisory_fill_v1")
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    result = harness.run_case(case)
+
+    assert result.status == "passed"
+    assert result.run_id is not None
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    memory_score = next(score for score in result.scores if score.name == "memory_governance")
+
+    memory_policy = run.metadata_json["workflow"]["memory_policy"]
+    assert memory_policy["policy_version"] == "memory_query_policy_v1"
+    assert memory_policy["advisory_memory_keys"] == ["spouse_lighter_meals"]
+    assert memory_policy["downgraded_low_confidence_keys"] == ["spouse_lighter_meals"]
+    assert memory_policy["dimension_outcomes"] == [
+        {
+            "dimension": "dining_preferences",
+            "winner_source": "memory",
+            "winner_memory_key": "spouse_lighter_meals",
+            "winner_tier": "advisory",
+            "effective_values": ["lighter_options"],
+            "suppressed_memory_keys": [],
+        }
+    ]
+    assert memory_policy["memory_decisions"] == [
+        {
+            "memory_key": "spouse_lighter_meals",
+            "dimension": "dining_preferences",
+            "normalized_value": "lighter_options",
+            "confidence": "0.7000",
+            "tier": "advisory",
+            "expired": False,
+            "outcome": "applied_advisory",
+        }
+    ]
+    assert memory_score.passed is True
+    assert memory_score.details["observed_dimension_tiers"] == {
+        "dining_preferences": "advisory",
+    }
+
+
+def test_benchmark_harness_records_memory_policy_for_expired_advisory_case(
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    case = load_benchmark_case("family_memory_expired_advisory_v1")
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    result = harness.run_case(case)
+
+    assert result.status == "passed"
+    assert result.run_id is not None
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    memory_score = next(score for score in result.scores if score.name == "memory_governance")
+
+    memory_policy = run.metadata_json["workflow"]["memory_policy"]
+    assert memory_policy["policy_version"] == "memory_query_policy_v1"
+    assert memory_policy["advisory_memory_keys"] == ["activity_style"]
+    assert memory_policy["downgraded_expired_keys"] == ["activity_style"]
+    assert memory_policy["dimension_outcomes"] == [
+        {
+            "dimension": "activity_preferences",
+            "winner_source": "memory",
+            "winner_memory_key": "activity_style",
+            "winner_tier": "advisory",
+            "effective_values": ["child_friendly", "indoor"],
+            "suppressed_memory_keys": [],
+        }
+    ]
+    assert memory_policy["memory_decisions"] == [
+        {
+            "memory_key": "activity_style",
+            "dimension": "activity_preferences",
+            "normalized_value": "indoor",
+            "confidence": "1.0000",
+            "tier": "advisory",
+            "expired": True,
+            "outcome": "applied_advisory",
+        }
+    ]
+    assert memory_score.passed is True
+    assert memory_score.details["observed_dimension_tiers"] == {
+        "activity_preferences": "advisory",
+    }
 
 
 @pytest.mark.parametrize(
@@ -453,6 +615,14 @@ def test_benchmark_harness_records_memory_policy_for_override_case(
             RECOVERY_SCENARIO_BUCKET_COUNTS,
             RECOVERY_FAILURE_MODE_COUNTS,
             RECOVERY_CONSTRAINT_TAG_COUNTS,
+        ),
+        (
+            "memory_governance",
+            MEMORY_GOVERNANCE_CASE_IDS,
+            3,
+            MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS,
+            MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS,
+            MEMORY_GOVERNANCE_CONSTRAINT_TAG_COUNTS,
         ),
     ],
 )
@@ -659,9 +829,9 @@ def test_benchmark_harness_runs_all_registered_suite(
 
     report = harness.run_suite("all_registered")
 
-    assert len(report.case_results) == 13
+    assert len(report.case_results) == 15
     assert report.run_status == "passed"
-    assert report.passed_count == 13
+    assert report.passed_count == 15
     assert report.failed_count == 0
     assert report.error_count == 0
     assert report.report_path is not None

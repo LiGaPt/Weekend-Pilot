@@ -306,6 +306,82 @@ def grade_recovery_expectation(case: BenchmarkCase, run_metadata: Any) -> Benchm
     )
 
 
+def grade_memory_governance(case: BenchmarkCase, run_metadata: Any) -> BenchmarkScore:
+    expectation = case.expected.memory_governance
+    if expectation is None:
+        raise ValueError("Memory-governance grading requires case.expected.memory_governance.")
+
+    workflow_metadata = _value(run_metadata, "workflow", {}) or {}
+    memory_policy = _value(workflow_metadata, "memory_policy", {}) or {}
+    observed_policy_version = _value(memory_policy, "policy_version")
+
+    raw_dimension_outcomes = _value(memory_policy, "dimension_outcomes", []) or []
+    raw_memory_decisions = _value(memory_policy, "memory_decisions", []) or []
+    observed_dimension_sources = {
+        str(_value(outcome, "dimension")): str(_value(outcome, "winner_source"))
+        for outcome in raw_dimension_outcomes
+        if _value(outcome, "dimension") and _value(outcome, "winner_source")
+    }
+    observed_dimension_tiers = {
+        str(_value(outcome, "dimension")): str(_value(outcome, "winner_tier"))
+        for outcome in raw_dimension_outcomes
+        if _value(outcome, "dimension") and _value(outcome, "winner_tier") is not None
+    }
+    observed_memory_outcomes = {
+        str(_value(decision, "memory_key")): str(_value(decision, "outcome"))
+        for decision in raw_memory_decisions
+        if _value(decision, "memory_key") and _value(decision, "outcome")
+    }
+
+    failures: list[str] = []
+    if observed_policy_version != expectation.expected_policy_version:
+        failures.append(
+            f"Policy version {observed_policy_version!r} did not match expected {expectation.expected_policy_version!r}."
+        )
+    for dimension, expected_source in expectation.expected_dimension_sources.items():
+        observed_source = observed_dimension_sources.get(dimension)
+        if observed_source != expected_source:
+            failures.append(
+                f"Dimension source for {dimension!r} was {observed_source!r}, expected {expected_source!r}."
+            )
+    for dimension, expected_tier in expectation.expected_dimension_tiers.items():
+        observed_tier = observed_dimension_tiers.get(dimension)
+        if observed_tier != expected_tier:
+            failures.append(
+                f"Dimension tier for {dimension!r} was {observed_tier!r}, expected {expected_tier!r}."
+            )
+    for decision in expectation.expected_memory_outcomes:
+        observed_outcome = observed_memory_outcomes.get(decision.memory_key)
+        if observed_outcome != decision.expected_outcome:
+            failures.append(
+                f"Memory outcome for {decision.memory_key!r} was {observed_outcome!r}, expected {decision.expected_outcome!r}."
+            )
+
+    passed = not failures
+    reason = "Memory governance summary matched expected policy decisions."
+    if failures:
+        reason = failures[0]
+    return BenchmarkScore(
+        name="memory_governance",
+        score=1.0 if passed else 0.0,
+        passed=passed,
+        reason=reason,
+        details={
+            "expected_policy_version": expectation.expected_policy_version,
+            "observed_policy_version": observed_policy_version,
+            "expected_dimension_sources": dict(expectation.expected_dimension_sources),
+            "observed_dimension_sources": observed_dimension_sources,
+            "expected_dimension_tiers": dict(expectation.expected_dimension_tiers),
+            "observed_dimension_tiers": observed_dimension_tiers,
+            "expected_memory_outcomes": {
+                decision.memory_key: decision.expected_outcome
+                for decision in expectation.expected_memory_outcomes
+            },
+            "observed_memory_outcomes": observed_memory_outcomes,
+        },
+    )
+
+
 def _value(source: Any, key: str, default: Any = None) -> Any:
     if isinstance(source, dict):
         return source.get(key, default)
