@@ -7,10 +7,17 @@ import pytest
 from backend.app.benchmark.errors import BenchmarkHarnessError
 from backend.app.benchmark.failure_profiles import (
     ROUTE_UNAVAILABLE_PROFILE_ID,
+    ROUTE_AND_DINING_UNAVAILABLE_PROFILE_ID,
+    TICKET_SOLD_OUT_AND_BAD_WEATHER_PROFILE_ID,
     build_benchmark_failure_injector,
     failure_profile_metadata,
 )
-from backend.app.tool_gateway import ToolDefinition, ToolGatewayRequest
+from backend.app.tool_gateway import (
+    StaticToolFailureInjector,
+    ToolDefinition,
+    ToolFailureInjectionRule,
+    ToolGatewayRequest,
+)
 
 
 def test_no_failure_profile_returns_no_injector() -> None:
@@ -39,7 +46,8 @@ def test_route_unavailable_profile_injects_check_route_failure() -> None:
         "profile_id": "route_unavailable_v0",
         "rule_id": "route_unavailable_v0.check_route",
         "tool_name": "check_route",
-        "injected_error_type": "route_infeasible",
+        "effect_kind": "hard_failure",
+        "effect_type": "route_infeasible",
     }
 
 
@@ -89,6 +97,116 @@ def test_failure_profile_metadata_is_sanitized() -> None:
         {
             "rule_id": "route_unavailable_v0.check_route",
             "tool_name": "check_route",
-            "injected_error_type": "route_infeasible",
+            "effect_kind": "hard_failure",
+            "effect_type": "route_infeasible",
+            "gateway_status": "failed",
         }
     ]
+
+
+def test_route_and_dining_unavailable_profile_overrides_queue_response() -> None:
+    injector = build_benchmark_failure_injector(ROUTE_AND_DINING_UNAVAILABLE_PROFILE_ID)
+    assert injector is not None
+
+    decision = injector.maybe_inject(
+        ToolGatewayRequest(
+            run_id=uuid4(),
+            tool_name="check_queue",
+            payload={"poi_id": "restaurant-queue-1"},
+        ),
+        ToolDefinition(name="check_queue", tool_type="read", default_provider="mock_world"),
+        "mock_world",
+    )
+
+    assert decision is not None
+    assert decision.status == "succeeded"
+    assert decision.response_json == {
+        "queue": {
+            "poi_id": "restaurant-queue-1",
+            "status": "closed",
+            "wait_minutes": 90,
+            "parties_ahead": 18,
+        }
+    }
+    assert decision.error_json == {
+        "error_type": "failure_injected_response",
+        "message": "Benchmark response override injected for tool call.",
+        "details": {
+            "profile_id": "route_and_dining_unavailable_v0",
+            "rule_id": "route_and_dining_unavailable_v0.check_queue",
+            "tool_name": "check_queue",
+            "effect_kind": "response_override",
+            "effect_type": "dining_unavailable",
+        },
+    }
+
+
+def test_ticket_sold_out_and_bad_weather_profile_overrides_weather_with_location_placeholder() -> None:
+    injector = build_benchmark_failure_injector(TICKET_SOLD_OUT_AND_BAD_WEATHER_PROFILE_ID)
+    assert injector is not None
+
+    decision = injector.maybe_inject(
+        ToolGatewayRequest(
+            run_id=uuid4(),
+            tool_name="check_weather",
+            payload={"location": "Shanghai"},
+        ),
+        ToolDefinition(name="check_weather", tool_type="read", default_provider="mock_world"),
+        "mock_world",
+    )
+
+    assert decision is not None
+    assert decision.status == "succeeded"
+    assert decision.response_json == {
+        "weather": {
+            "location": "Shanghai",
+            "date": "2026-05-16",
+            "condition": "中雨",
+            "temperature_c": 20,
+            "precipitation_chance": 0.92,
+            "advisory": "强降雨，建议室内或取消户外活动。",
+        }
+    }
+
+
+def test_response_override_resolves_restaurant_id_placeholder() -> None:
+    injector = StaticToolFailureInjector(
+        profile_id="test_profile",
+        rules=[
+            ToolFailureInjectionRule(
+                rule_id="test_profile.check_table_availability",
+                tool_name="check_table_availability",
+                effect_kind="response_override",
+                effect_type="dining_unavailable",
+                gateway_status="succeeded",
+                response_json_template={
+                    "table_availability": {
+                        "restaurant_id": "{restaurant_id}",
+                        "available": False,
+                        "time_slots": [],
+                        "max_party_size": 0,
+                    }
+                },
+            )
+        ],
+    )
+
+    decision = injector.maybe_inject(
+        ToolGatewayRequest(
+            run_id=uuid4(),
+            tool_name="check_table_availability",
+            payload={"restaurant_id": "restaurant-9"},
+        ),
+        ToolDefinition(name="check_table_availability", tool_type="read", default_provider="mock_world"),
+        "mock_world",
+    )
+
+    assert decision is not None
+    assert decision.response_json == {
+        "table_availability": {
+            "restaurant_id": "restaurant-9",
+            "available": False,
+            "time_slots": [],
+            "max_party_size": 0,
+        }
+    }

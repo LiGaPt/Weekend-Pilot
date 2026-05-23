@@ -93,6 +93,16 @@ class BenchmarkScore(BaseModel):
     details: dict[str, Any] = Field(default_factory=dict)
 
 
+class BenchmarkFailureChainSummary(BaseModel):
+    profile_id: str
+    injected_effects: list[str] = Field(default_factory=list)
+    recovery_actions: list[str] = Field(default_factory=list)
+    attempt_count: int
+    max_attempts: int
+    bounded: bool
+    terminal_workflow_status: str | None = None
+
+
 class BenchmarkCaseResult(BaseModel):
     schema_version: str = "weekendpilot_benchmark_case_result_v1"
     case_id: str
@@ -101,6 +111,7 @@ class BenchmarkCaseResult(BaseModel):
     trace_id: str | None = None
     run_summary: RunSummary | None = None
     taxonomy: BenchmarkCaseTaxonomy | None = None
+    failure_chain_summary: BenchmarkFailureChainSummary | None = None
     scores: list[BenchmarkScore]
     overall_score: float
     tool_event_count: int
@@ -185,6 +196,7 @@ class BenchmarkReplaySummary(BaseModel):
     action_count: int = 0
     injected_failure_count: int = 0
     recovery_actions: list[str] = Field(default_factory=list)
+    failure_chain_signature: list[str] = Field(default_factory=list)
 
 
 class BenchmarkReplayMismatch(BaseModel):

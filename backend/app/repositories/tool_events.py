@@ -1,7 +1,7 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.app.models.runtime import ToolEvent
@@ -25,12 +25,15 @@ class ToolEventRepository:
         latency_ms: int | None,
         langsmith_trace_id: str | None,
     ) -> ToolEvent:
+        request_json_with_sequence = dict(request_json)
+        if "event_sequence" not in request_json_with_sequence:
+            request_json_with_sequence["event_sequence"] = self._next_event_sequence(run_id)
         event = ToolEvent(
             run_id=run_id,
             tool_name=tool_name,
             tool_type=tool_type,
             provider=provider,
-            request_json=request_json,
+            request_json=request_json_with_sequence,
             response_json=response_json,
             error_json=error_json,
             status=status,
@@ -47,9 +50,27 @@ class ToolEventRepository:
         return self.session.get(ToolEvent, event_id)
 
     def list_for_run(self, run_id: UUID) -> list[ToolEvent]:
-        statement = (
-            select(ToolEvent)
-            .where(ToolEvent.run_id == run_id)
-            .order_by(ToolEvent.created_at, ToolEvent.event_id)
+        statement = select(ToolEvent).where(ToolEvent.run_id == run_id)
+        events = list(self.session.scalars(statement).all())
+        return sorted(
+            events,
+            key=lambda event: (
+                self._event_sequence(event),
+                str(event.event_id),
+            ),
         )
-        return list(self.session.scalars(statement).all())
+
+    def _next_event_sequence(self, run_id: UUID) -> int:
+        current_count = self.session.scalar(
+            select(func.count()).select_from(ToolEvent).where(ToolEvent.run_id == run_id)
+        )
+        return int(current_count or 0) + 1
+
+    @staticmethod
+    def _event_sequence(event: ToolEvent) -> int:
+        request_json = event.request_json if isinstance(event.request_json, dict) else {}
+        value = request_json.get("event_sequence")
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 1_000_000_000

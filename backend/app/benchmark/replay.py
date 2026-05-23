@@ -25,6 +25,7 @@ _COMPARE_FIELDS = (
     "action_count",
     "injected_failure_count",
     "recovery_actions",
+    "failure_chain_signature",
 )
 _SENSITIVE_TEXT_PARTS = (
     "api_key",
@@ -174,6 +175,11 @@ def stable_replay_summary(result: BenchmarkCaseResult) -> BenchmarkReplaySummary
         ),
         recovery_actions=_string_list(
             _score_detail(result, "recovery_expectation", "observed_recovery_actions", [])
+        ),
+        failure_chain_signature=list(
+            result.failure_chain_summary.injected_effects
+            if result.failure_chain_summary is not None
+            else []
         ),
     )
 

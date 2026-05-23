@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.benchmark.errors import BenchmarkHarnessError
+from backend.app.benchmark.failure_chain import build_failure_chain_summary
 from backend.app.benchmark.graders import (
     combine_scores,
     grade_agent_coverage,
@@ -256,6 +257,16 @@ class BenchmarkHarness:
         selected_plan = repositories.plans.get_selected_for_run(run.run_id)
         tool_events = repositories.tool_events.list_for_run(run.run_id)
         action_count = self._action_count(run.run_id)
+        failure_chain_summary = (
+            build_failure_chain_summary(
+                failure_profile=case.failure_profile,
+                tool_events=tool_events,
+                run_metadata=run_metadata,
+                workflow_status=workflow_result.status,
+            )
+            if case.failure_profile is not None
+            else None
+        )
         run_summary = self._run_summary(
             run=persisted_run,
             selected_plan=selected_plan,
@@ -266,7 +277,12 @@ class BenchmarkHarness:
         )
 
         if workflow_result.status == "error":
-            result = self._workflow_error_result(case, workflow_result, run_summary=run_summary)
+            result = self._workflow_error_result(
+                case,
+                workflow_result,
+                run_summary=run_summary,
+                failure_chain_summary=failure_chain_summary,
+            )
             return self._finalize_case_result(result, repositories)
 
         plan_json = selected_plan.plan_json if selected_plan is not None and isinstance(selected_plan.plan_json, dict) else {}
@@ -292,6 +308,7 @@ class BenchmarkHarness:
             trace_id=workflow_result.trace_id,
             run_summary=run_summary,
             taxonomy=case.taxonomy,
+            failure_chain_summary=failure_chain_summary,
             scores=scores,
             overall_score=overall,
             tool_event_count=len(tool_events),
@@ -313,6 +330,7 @@ class BenchmarkHarness:
         workflow_result: WeekendPilotWorkflowResult,
         *,
         run_summary: RunSummary | None = None,
+        failure_chain_summary=None,
     ) -> BenchmarkCaseResult:
         return BenchmarkCaseResult(
             case_id=case.case_id,
@@ -321,6 +339,7 @@ class BenchmarkHarness:
             trace_id=workflow_result.trace_id,
             run_summary=run_summary,
             taxonomy=case.taxonomy,
+            failure_chain_summary=failure_chain_summary,
             scores=[],
             overall_score=0.0,
             tool_event_count=workflow_result.tool_event_count,
