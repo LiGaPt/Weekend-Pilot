@@ -215,7 +215,7 @@ This task should close that M3 gap without widening into parser redesign, public
 - Do not add new public demo routes, frontend controls, or `world_profile` selection UI.
 - Do not redesign benchmark suite IDs or add a new suite type beyond updating existing registered/default/all_registered membership.
 - Do not modify recovery routing, replay behavior, failure injection semantics, or observability contracts.
-- Do not mix unrelated local doc drafts, `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, or generated `var/` artifacts into this task.
+- Do not mix the currently untracked `047` spec/plan docs, `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, or generated `var/` artifacts into this task.
 - Do not add new package dependencies or migrations.
 
 ## 5. Interfaces and Contracts
@@ -402,7 +402,7 @@ The important boundaries are:
 
 - do not widen natural-language intent parsing just to make these scenarios more semantically explicit
 - do not change the public demo family default
-- do not mix unrelated local doc drafts or other local files into this task
+- do not mix the untracked `047` docs or unrelated local files into this task
 - keep elder coverage for a later follow-up task after this 4-scenario pack lands cleanly
 
 If implementation reveals a remaining hardcoded profile whitelist outside the loader introduced before Task `038`, update only that smallest blocking code path and do not turn this task into a broader workflow refactor.

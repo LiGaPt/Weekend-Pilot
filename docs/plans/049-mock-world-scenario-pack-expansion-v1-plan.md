@@ -26,8 +26,10 @@ docs/NEXT_PHASE_ROADMAP.md
 - Latest tracked numbered task is `048`.
 - Latest commit is `5c1d227 feat: add demo clarification turn workflow`, and it matches Task `048`.
 - In the current workspace, `docs/specs/` and `docs/plans/` are continuous and matched through `048`.
-- At authoring time in git-tracked history, the doc chain was not fully converged because the Task `047` spec/plan pair still existed only as local state.
-- Those local-only Task `047` docs were not part of Task `049` and had to remain unstaged.
+- In git-tracked history, the doc chain is not fully converged because:
+  - `docs/specs/047-memory-query-policy-baseline-v0.md` is currently untracked
+  - `docs/plans/047-memory-query-policy-baseline-v0-plan.md` is currently untracked
+- Those untracked `047` docs are not part of Task `049` and must remain unstaged.
 - Additional unrelated local paths currently outside this task also remain unstaged:
   - `docs/NEXT_PHASE_ROADMAP.md`
   - `docs/TASK_WORKFLOW_PROMPTS.md`
@@ -83,7 +85,7 @@ docs/NEXT_PHASE_ROADMAP.md
    - `friends_gathering: "friends_gathering.json"`
    - `rainy_day_fallback: "rainy_day_fallback.json"`
    - `budget_lite: "budget_lite.json"`
-
+   
    Keep:
    - `family_afternoon` registered
    - `solo_afternoon` registered
@@ -100,7 +102,7 @@ docs/NEXT_PHASE_ROADMAP.md
    - provide at least 2 walking routes from likely top-ranked activities to dining
    - keep `weather`, `queues`, `table_availability`, `ticket_availability`, and `addons` present
    - make the top-ranked activity+dining pair feasible under the current deterministic harness
-
+   
    Required profile-level design:
    - `couple_afternoon.json`
      - primary activity should support `citywalk` or a quieter light outing
@@ -328,7 +330,7 @@ git commit -m "feat: expand mock world scenario pack"
 git push -u origin codex/mock-world-scenario-pack-expansion-v1
 ```
 
-The implementer must confirm that `.env`, secrets, `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, `var/`, and any unrelated local doc drafts are not staged.
+The implementer must confirm that `.env`, secrets, the untracked `047` docs, `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, and `var/` are not staged.
 
 ## 9. Out-of-scope Changes
 
@@ -373,5 +375,5 @@ After implementation, report back with:
 - The exact `default` and `all_registered` matrix summary counts as serialized by the implementation.
 - The verification commands that were run and their results.
 - The commit hash and push result.
-- Confirmation that unrelated local doc drafts and other unrelated local files remained unstaged.
+- Confirmation that the untracked `047` docs and other unrelated local files remained unstaged.
 - The follow-up recommendation that elder coverage and first-class couple/budget/rain parsing remain separate future tasks.

@@ -31,7 +31,7 @@ docs/NEXT_PHASE_ROADMAP.md
 - Current suite catalog exposes only `default`, `failures`, and `all_registered`.
 - Current suite reports expose `matrix_summary` coverage counts but do not expose direct per-dimension pass-rate rollups.
 - `docs/specs` and `docs/plans` are continuous and matched on disk through `049`.
-- At authoring time, only `048` docs were tracked in git; the Task `047` and `049` docs still existed only as local state.
+- Only `048` docs are tracked in git; local `047` and `049` docs are currently untracked.
 - Focused benchmark verification already passes at the current baseline:
   - `python -m pytest tests/test_benchmark_suites.py tests/test_benchmark_harness.py tests/test_mock_world_loader.py -q` -> `57 passed`
   - `python -m pytest tests/integration/test_benchmark_harness_gateway.py -q` -> `6 passed`
@@ -274,5 +274,5 @@ After implementation, report back with:
 - The exact `registered_suite_ids` arrays observed for `solo_afternoon_v1` and `family_route_failure_v1`.
 - The verification commands that were run and their results.
 - The commit hash and push result.
-- Confirmation that unrelated local doc drafts and other local files remained unstaged.
+- Confirmation that the unrelated untracked `047` and `049` docs and other local files remained unstaged.
 - The follow-up recommendation that true multi-turn L3 benchmark case authoring should remain a separate task after this suite/report layer lands cleanly.
