@@ -101,7 +101,12 @@ def benchmark_paths():
             directory.rmdir()
 
 
-def _create_run(session: Session):
+def _create_run(
+    session: Session,
+    *,
+    tool_profile: str = "mock_world",
+    world_profile: str = "family_afternoon",
+):
     user = UserRepository(session).create(
         external_id=f"observability-gateway-user-{uuid4()}",
         display_name="Observability Gateway Tester",
@@ -111,8 +116,8 @@ def _create_run(session: Session):
         case_id="case-observability-gateway",
         agent_version="agent-v1",
         prompt_version="prompt-v1",
-        tool_profile="mock_world",
-        world_profile="family_afternoon",
+        tool_profile=tool_profile,
+        world_profile=world_profile,
         failure_profile=None,
         status="running",
         metadata_json={"source": "observability-gateway-test", "api_key": "must-redact"},
@@ -335,7 +340,7 @@ def test_internal_observability_route_returns_sanitized_run_summary(
             "cache_hit": False,
             "latency_ms": 10,
             "created_at": payload["tool_event_summaries"][0]["created_at"],
-            "request_preview": {"query": "museum"},
+            "request_preview": {"query": "museum", "event_sequence": 1},
             "response_preview": {"candidate_count": 2},
             "error_preview": None,
         }
@@ -358,6 +363,7 @@ def test_internal_observability_route_returns_sanitized_run_summary(
         "token": "[REDACTED]",
         "message": "none",
     }
+    assert payload["preview_diagnostics"] is None
     serialized = json.dumps(payload, sort_keys=True)
     assert "idempotency_key" not in serialized
     assert "tool_event_id" not in serialized
@@ -408,6 +414,65 @@ def test_internal_observability_route_returns_benchmark_artifact_summary_for_ben
     assert payload["benchmark_artifact_summary"]["report_path"] == result.report_path
     assert payload["benchmark_artifact_summary"]["taxonomy"]["scenario_bucket"] == "solo"
     assert payload["benchmark_artifact_summary"]["score_summaries"]
+
+
+def test_internal_observability_route_returns_amap_preview_diagnostics(
+    db_session: Session,
+    observability_client: TestClient,
+) -> None:
+    run = _create_run(
+        db_session,
+        tool_profile="amap",
+        world_profile="amap_shanghai_live",
+    )
+    ToolEventRepository(db_session).create(
+        run_id=run.run_id,
+        tool_name="search_poi",
+        tool_type="read",
+        provider="amap",
+        request_json={"query": "museum"},
+        response_json={"candidate_count": 2},
+        error_json=None,
+        status="completed",
+        cache_hit=False,
+        latency_ms=10,
+        langsmith_trace_id="trace-internal-amap",
+    )
+    ToolEventRepository(db_session).create(
+        run_id=run.run_id,
+        tool_name="check_route",
+        tool_type="read",
+        provider="amap",
+        request_json={"origin": "a", "destination": "b"},
+        response_json=None,
+        error_json={"error_type": "rate_limited", "api_key": "hide-me"},
+        status="failed",
+        cache_hit=False,
+        latency_ms=12,
+        langsmith_trace_id="trace-internal-amap",
+    )
+    db_session.commit()
+
+    response = observability_client.get(f"/internal/runs/{run.run_id}/observability")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["tool_profile"] == "amap"
+    assert payload["world_profile"] == "amap_shanghai_live"
+    assert payload["preview_diagnostics"] == {
+        "schema_version": "weekendpilot_preview_diagnostics_v1",
+        "read_profile": "amap",
+        "mode": "read_only_preview",
+        "confirmation_allowed": False,
+        "confirmation_block_reason": "AMAP read-only demo runs cannot be confirmed.",
+        "benchmark_eligible": False,
+        "benchmark_block_reason": "Canonical benchmark suites support Mock World only.",
+        "observed_provider_names": ["amap"],
+        "provider_event_count": 2,
+        "write_tool_event_count": 0,
+        "provider_error_types": ["rate_limited"],
+        "cross_provider_fallback_detected": False,
+    }
     serialized = json.dumps(payload, sort_keys=True)
     assert "action_id" not in serialized
     assert "tool_event_id" not in serialized

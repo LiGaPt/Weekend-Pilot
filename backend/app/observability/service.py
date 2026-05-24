@@ -22,7 +22,7 @@ from backend.app.observability.schemas import (
     InternalObservabilitySummary,
     InternalToolEventSummary,
 )
-from backend.app.observability.summary import RunSummary, load_run_summary
+from backend.app.observability.summary import RunSummary, build_preview_diagnostics, load_run_summary
 from backend.app.repositories import (
     ActionLedgerRepository,
     AgentRunRepository,
@@ -49,6 +49,7 @@ class InternalObservabilityService:
         selected_plan_json = self._plan_json(selected_plan)
         metadata = self._metadata(run)
         canonical_summary = load_run_summary(metadata)
+        tool_events = ToolEventRepository(self.session).list_for_run(run_id)
 
         return InternalObservabilityRunSummary(
             run_id=run.run_id,
@@ -69,7 +70,8 @@ class InternalObservabilityService:
             observability_status=self._observability_status(metadata),
             agent_roles=self._agent_roles(metadata, canonical_summary),
             node_history=self._node_history(metadata),
-            tool_event_summaries=self._tool_event_summaries(run.run_id),
+            preview_diagnostics=self._preview_diagnostics(run, canonical_summary, tool_events),
+            tool_event_summaries=self._tool_event_summaries(tool_events),
             action_ledger_summaries=self._action_ledger_summaries(run.run_id),
             workflow_timing_summary=self._workflow_timing_summary(metadata, canonical_summary),
             observability_summary=self._observability_summary(metadata),
@@ -111,7 +113,7 @@ class InternalObservabilityService:
             if isinstance(item, str)
         ]
 
-    def _tool_event_summaries(self, run_id: UUID) -> list[InternalToolEventSummary]:
+    def _tool_event_summaries(self, tool_events: list[ToolEvent]) -> list[InternalToolEventSummary]:
         return [
             InternalToolEventSummary(
                 tool_name=event.tool_name,
@@ -125,7 +127,7 @@ class InternalObservabilityService:
                 response_preview=_preview_payload(event.response_json),
                 error_preview=_preview_payload(event.error_json),
             )
-            for event in ToolEventRepository(self.session).list_for_run(run_id)
+            for event in tool_events
         ]
 
     def _action_ledger_summaries(self, run_id: UUID) -> list[InternalActionLedgerSummary]:
@@ -328,6 +330,16 @@ class InternalObservabilityService:
             self.session.scalar(select(func.count()).select_from(ActionLedger).where(ActionLedger.run_id == run_id))
             or 0
         )
+
+    def _preview_diagnostics(
+        self,
+        run: AgentRun,
+        canonical_summary: RunSummary | None,
+        tool_events: list[ToolEvent],
+    ):
+        if canonical_summary is not None and canonical_summary.preview_diagnostics is not None:
+            return canonical_summary.preview_diagnostics
+        return build_preview_diagnostics(run, tool_events)
 
 
 def _preview_payload(value: Any) -> dict[str, Any] | None:

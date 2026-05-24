@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+from uuid import uuid4
+
 import pytest
 
 from backend.app.benchmark import (
     BenchmarkHarnessError,
     BenchmarkSuiteDescription,
     list_benchmark_suites,
+    load_benchmark_case,
     load_benchmark_suite,
     load_default_benchmark_cases,
     load_failure_benchmark_cases,
     load_registered_benchmark_cases,
 )
+import backend.app.benchmark.fixtures as benchmark_fixtures
 import backend.app.benchmark.suites as benchmark_suites
 
 
@@ -61,6 +67,7 @@ CANONICAL_SUITE_IDS = [
 ]
 BASELINE_SCENARIO_BUCKET_COUNTS = {"family": 5, "solo": 1}
 BASELINE_LEVEL_COUNTS = {"L1": 3, "L2": 3}
+BASELINE_TOOL_PROFILE_COUNTS = {"mock_world": 6}
 BASELINE_WORLD_PROFILE_COUNTS = {"family_afternoon": 5, "solo_afternoon": 1}
 BASELINE_FAILURE_MODE_COUNTS = {"none": 6}
 BASELINE_TAG_COUNTS = {
@@ -82,6 +89,7 @@ EXPANDED_SCENARIO_BUCKET_COUNTS = {
     "unknown": 1,
 }
 EXPANDED_LEVEL_COUNTS = {"L2": 4}
+EXPANDED_TOOL_PROFILE_COUNTS = {"mock_world": 4}
 EXPANDED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
@@ -105,6 +113,7 @@ EXPANDED_TAG_COUNTS = {
 }
 RECOVERY_SCENARIO_BUCKET_COUNTS = {"family": 2, "mixed": 1}
 RECOVERY_LEVEL_COUNTS = {"L2": 1, "L5": 2}
+RECOVERY_TOOL_PROFILE_COUNTS = {"mock_world": 3}
 RECOVERY_WORLD_PROFILE_COUNTS = {"family_afternoon": 2, "rainy_day_fallback": 1}
 RECOVERY_FAILURE_MODE_COUNTS = {
     "route_and_dining_unavailable": 1,
@@ -131,6 +140,7 @@ DEFAULT_SCENARIO_BUCKET_COUNTS = {
     "unknown": 1,
 }
 DEFAULT_LEVEL_COUNTS = {"L1": 3, "L2": 7}
+DEFAULT_TOOL_PROFILE_COUNTS = {"mock_world": 10}
 DEFAULT_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
@@ -162,6 +172,7 @@ DEFAULT_TAG_COUNTS = {
 }
 MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS = {"family": 3}
 MEMORY_GOVERNANCE_LEVEL_COUNTS = {"L2": 1, "L3": 2}
+MEMORY_GOVERNANCE_TOOL_PROFILE_COUNTS = {"mock_world": 3}
 MEMORY_GOVERNANCE_WORLD_PROFILE_COUNTS = {"family_afternoon": 3}
 MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS = {"none": 3}
 MEMORY_GOVERNANCE_TAG_COUNTS = {
@@ -175,6 +186,7 @@ MEMORY_GOVERNANCE_TAG_COUNTS = {
 }
 CONVERSATION_CONTINUATION_SCENARIO_BUCKET_COUNTS = {"family": 1, "solo": 1}
 CONVERSATION_CONTINUATION_LEVEL_COUNTS = {"L3": 2}
+CONVERSATION_CONTINUATION_TOOL_PROFILE_COUNTS = {"mock_world": 2}
 CONVERSATION_CONTINUATION_WORLD_PROFILE_COUNTS = {
     "family_afternoon": 1,
     "solo_afternoon": 1,
@@ -198,6 +210,7 @@ ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "unknown": 1,
 }
 ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L3": 4, "L5": 2}
+ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 17}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
@@ -321,6 +334,7 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
         case_count=6,
         scenario_bucket_counts=BASELINE_SCENARIO_BUCKET_COUNTS,
         level_counts=BASELINE_LEVEL_COUNTS,
+        tool_profile_counts=BASELINE_TOOL_PROFILE_COUNTS,
         world_profile_counts=BASELINE_WORLD_PROFILE_COUNTS,
         failure_mode_counts=BASELINE_FAILURE_MODE_COUNTS,
         tag_counts=BASELINE_TAG_COUNTS,
@@ -331,6 +345,7 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
         case_count=4,
         scenario_bucket_counts=EXPANDED_SCENARIO_BUCKET_COUNTS,
         level_counts=EXPANDED_LEVEL_COUNTS,
+        tool_profile_counts=EXPANDED_TOOL_PROFILE_COUNTS,
         world_profile_counts=EXPANDED_WORLD_PROFILE_COUNTS,
         failure_mode_counts=EXPANDED_FAILURE_MODE_COUNTS,
         tag_counts=EXPANDED_TAG_COUNTS,
@@ -341,6 +356,7 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
         case_count=3,
         scenario_bucket_counts=RECOVERY_SCENARIO_BUCKET_COUNTS,
         level_counts=RECOVERY_LEVEL_COUNTS,
+        tool_profile_counts=RECOVERY_TOOL_PROFILE_COUNTS,
         world_profile_counts=RECOVERY_WORLD_PROFILE_COUNTS,
         failure_mode_counts=RECOVERY_FAILURE_MODE_COUNTS,
         tag_counts=RECOVERY_TAG_COUNTS,
@@ -351,6 +367,7 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
         case_count=3,
         scenario_bucket_counts=MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS,
         level_counts=MEMORY_GOVERNANCE_LEVEL_COUNTS,
+        tool_profile_counts=MEMORY_GOVERNANCE_TOOL_PROFILE_COUNTS,
         world_profile_counts=MEMORY_GOVERNANCE_WORLD_PROFILE_COUNTS,
         failure_mode_counts=MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS,
         tag_counts=MEMORY_GOVERNANCE_TAG_COUNTS,
@@ -361,6 +378,7 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
         case_count=2,
         scenario_bucket_counts=CONVERSATION_CONTINUATION_SCENARIO_BUCKET_COUNTS,
         level_counts=CONVERSATION_CONTINUATION_LEVEL_COUNTS,
+        tool_profile_counts=CONVERSATION_CONTINUATION_TOOL_PROFILE_COUNTS,
         world_profile_counts=CONVERSATION_CONTINUATION_WORLD_PROFILE_COUNTS,
         failure_mode_counts=CONVERSATION_CONTINUATION_FAILURE_MODE_COUNTS,
         tag_counts=CONVERSATION_CONTINUATION_TAG_COUNTS,
@@ -371,6 +389,7 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
         case_count=10,
         scenario_bucket_counts=DEFAULT_SCENARIO_BUCKET_COUNTS,
         level_counts=DEFAULT_LEVEL_COUNTS,
+        tool_profile_counts=DEFAULT_TOOL_PROFILE_COUNTS,
         world_profile_counts=DEFAULT_WORLD_PROFILE_COUNTS,
         failure_mode_counts=DEFAULT_FAILURE_MODE_COUNTS,
         tag_counts=DEFAULT_TAG_COUNTS,
@@ -381,10 +400,69 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
         case_count=17,
         scenario_bucket_counts=ALL_REGISTERED_SCENARIO_BUCKET_COUNTS,
         level_counts=ALL_REGISTERED_LEVEL_COUNTS,
+        tool_profile_counts=ALL_REGISTERED_TOOL_PROFILE_COUNTS,
         world_profile_counts=ALL_REGISTERED_WORLD_PROFILE_COUNTS,
         failure_mode_counts=ALL_REGISTERED_FAILURE_MODE_COUNTS,
         tag_counts=ALL_REGISTERED_TAG_COUNTS,
     )
+
+
+def test_canonical_fixture_and_suite_loading_reject_non_mock_world_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    case_id = "family_afternoon_v1"
+    fixture_payload = load_benchmark_case(case_id).model_dump(mode="json")
+    fixture_payload["tool_profile"] = "amap"
+    fixture_root = Path("var/test-benchmark-fixtures") / str(uuid4())
+
+    try:
+        cases_dir = fixture_root / "cases"
+        cases_dir.mkdir(parents=True)
+        (cases_dir / f"{case_id}.json").write_text(json.dumps(fixture_payload), encoding="utf-8")
+
+        monkeypatch.setattr(benchmark_fixtures, "_REGISTERED_CASE_IDS", (case_id,))
+        monkeypatch.setattr(benchmark_fixtures.resources, "files", lambda _: fixture_root)
+        monkeypatch.setattr(benchmark_suites, "_ORDERED_SUITE_IDS", ("default",))
+        monkeypatch.setattr(
+            benchmark_suites,
+            "_SUITE_DEFINITIONS",
+            {
+                "default": {
+                    "title": "Default suite",
+                    "description": "Invalid canonical suite",
+                    "case_ids": [case_id],
+                }
+            },
+        )
+        message = "Canonical benchmark case must use tool_profile='mock_world': family_afternoon_v1 -> amap"
+
+        with pytest.raises(BenchmarkHarnessError) as exc_info:
+            load_benchmark_case(case_id)
+        assert str(exc_info.value) == message
+
+        with pytest.raises(BenchmarkHarnessError) as exc_info:
+            load_registered_benchmark_cases()
+        assert str(exc_info.value) == message
+
+        with pytest.raises(BenchmarkHarnessError) as exc_info:
+            load_benchmark_suite("default")
+        assert str(exc_info.value) == message
+
+        with pytest.raises(BenchmarkHarnessError) as exc_info:
+            list_benchmark_suites()
+        assert str(exc_info.value) == message
+    finally:
+        fixture_file = fixture_root / "cases" / f"{case_id}.json"
+        if fixture_file.exists():
+            fixture_file.unlink()
+        cases_dir = fixture_root / "cases"
+        if cases_dir.exists():
+            cases_dir.rmdir()
+        if fixture_root.exists():
+            fixture_root.rmdir()
+        parent = fixture_root.parent
+        if parent.exists() and not any(parent.iterdir()):
+            parent.rmdir()
 
 
 def test_load_benchmark_suite_rejects_unknown_suite_id() -> None:
@@ -495,6 +573,7 @@ def _assert_suite_description(
     case_count: int,
     scenario_bucket_counts: dict[str, int],
     level_counts: dict[str, int],
+    tool_profile_counts: dict[str, int],
     world_profile_counts: dict[str, int],
     failure_mode_counts: dict[str, int],
     tag_counts: dict[str, int],
@@ -503,6 +582,7 @@ def _assert_suite_description(
     assert suite.case_count == case_count
     assert suite.matrix_summary.scenario_bucket_counts == scenario_bucket_counts
     assert suite.matrix_summary.level_counts == level_counts
+    assert suite.matrix_summary.tool_profile_counts == tool_profile_counts
     assert suite.matrix_summary.world_profile_counts == world_profile_counts
     assert suite.matrix_summary.failure_mode_counts == failure_mode_counts
     assert suite.matrix_summary.tag_counts == tag_counts

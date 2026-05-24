@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any
+from typing import Sequence
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -9,11 +10,30 @@ from backend.app.models.runtime import AgentRun, Plan
 from backend.app.observability.redaction import sanitize_trace_payload
 
 
+AMAP_PREVIEW_CONFIRMATION_BLOCK_REASON = "AMAP read-only demo runs cannot be confirmed."
+CANONICAL_BENCHMARK_BLOCK_REASON = "Canonical benchmark suites support Mock World only."
+
+
 class RunErrorSummary(BaseModel):
     error_type: str
     message: str
     source: str
     details: dict[str, Any] | None = None
+
+
+class PreviewDiagnostics(BaseModel):
+    schema_version: str = "weekendpilot_preview_diagnostics_v1"
+    read_profile: str
+    mode: str
+    confirmation_allowed: bool
+    confirmation_block_reason: str
+    benchmark_eligible: bool
+    benchmark_block_reason: str
+    observed_provider_names: list[str] = Field(default_factory=list)
+    provider_event_count: int = 0
+    write_tool_event_count: int = 0
+    provider_error_types: list[str] = Field(default_factory=list)
+    cross_provider_fallback_detected: bool = False
 
 
 class RunSummary(BaseModel):
@@ -35,6 +55,7 @@ class RunSummary(BaseModel):
     action_count: int = 0
     agent_roles: list[str] = Field(default_factory=list)
     workflow_timing_summary: dict[str, Any] | None = None
+    preview_diagnostics: PreviewDiagnostics | None = None
     error: RunErrorSummary | None = None
 
 
@@ -44,11 +65,19 @@ def load_run_summary(metadata: dict[str, Any]) -> RunSummary | None:
     summary = metadata.get("summary")
     if not isinstance(summary, dict):
         return None
+
+    summary_payload = deepcopy(summary)
+    preview_diagnostics = _validated_preview_diagnostics(summary_payload.get("preview_diagnostics"))
+    summary_payload["preview_diagnostics"] = (
+        preview_diagnostics.model_dump(mode="json") if preview_diagnostics is not None else None
+    )
+
     try:
-        parsed = RunSummary.model_validate(summary)
+        parsed = RunSummary.model_validate(summary_payload)
         return parsed.model_copy(
             update={
                 "workflow_timing_summary": _validated_workflow_timing_summary(parsed.workflow_timing_summary),
+                "preview_diagnostics": preview_diagnostics,
             }
         )
     except ValidationError:
@@ -61,6 +90,7 @@ def build_run_summary(
     metadata: dict[str, Any],
     *,
     trace_id_override: str | None,
+    tool_events: Sequence[Any],
     tool_event_count: int,
     action_count: int,
 ) -> RunSummary:
@@ -86,7 +116,40 @@ def build_run_summary(
         action_count=max(0, int(action_count)),
         agent_roles=_agent_roles(metadata),
         workflow_timing_summary=_workflow_timing_summary_from_metadata(metadata),
+        preview_diagnostics=build_preview_diagnostics(run, tool_events),
         error=_run_error_summary(metadata),
+    )
+
+
+def build_preview_diagnostics(
+    run: AgentRun,
+    tool_events: Sequence[Any],
+) -> PreviewDiagnostics | None:
+    if run.tool_profile != "amap":
+        return None
+
+    observed_provider_names = sorted(
+        {
+            provider
+            for provider in (_tool_event_text(event, "provider") for event in tool_events)
+            if provider is not None
+        }
+    )
+    provider_event_count = sum(1 for event in tool_events if _tool_event_text(event, "provider") == "amap")
+    write_tool_event_count = sum(1 for event in tool_events if _tool_event_text(event, "tool_type") == "write")
+
+    return PreviewDiagnostics(
+        read_profile="amap",
+        mode="read_only_preview",
+        confirmation_allowed=False,
+        confirmation_block_reason=AMAP_PREVIEW_CONFIRMATION_BLOCK_REASON,
+        benchmark_eligible=False,
+        benchmark_block_reason=CANONICAL_BENCHMARK_BLOCK_REASON,
+        observed_provider_names=observed_provider_names,
+        provider_event_count=provider_event_count,
+        write_tool_event_count=write_tool_event_count,
+        provider_error_types=_provider_error_types(tool_events),
+        cross_provider_fallback_detected=any(provider != "amap" for provider in observed_provider_names),
     )
 
 
@@ -191,3 +254,45 @@ def _validated_workflow_timing_summary(value: Any) -> dict[str, Any] | None:
     if isinstance(value, WorkflowTimingSummary):
         return value.model_dump(mode="json")
     return WorkflowTimingSummary.model_validate(value).model_dump(mode="json")
+
+
+def _validated_preview_diagnostics(value: Any) -> PreviewDiagnostics | None:
+    if value is None:
+        return None
+    try:
+        return PreviewDiagnostics.model_validate(value)
+    except ValidationError:
+        return None
+
+
+def _provider_error_types(tool_events: Sequence[Any]) -> list[str]:
+    error_types: set[str] = set()
+    for event in tool_events:
+        if _tool_event_text(event, "provider") != "amap":
+            continue
+        raw_error = _tool_event_mapping(event, "error_json")
+        if raw_error is None:
+            continue
+        sanitized_error = sanitize_trace_payload(deepcopy(raw_error))
+        for key in ("error_type", "code", "exception_type", "type"):
+            value = sanitized_error.get(key)
+            if isinstance(value, str) and value:
+                error_types.add(value)
+                break
+    return sorted(error_types)
+
+
+def _tool_event_text(event: Any, key: str) -> str | None:
+    value = _tool_event_value(event, key)
+    return value if isinstance(value, str) and value else None
+
+
+def _tool_event_mapping(event: Any, key: str) -> dict[str, Any] | None:
+    value = _tool_event_value(event, key)
+    return value if isinstance(value, dict) else None
+
+
+def _tool_event_value(event: Any, key: str) -> Any:
+    if isinstance(event, dict):
+        return event.get(key)
+    return getattr(event, key, None)

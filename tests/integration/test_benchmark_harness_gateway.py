@@ -51,10 +51,12 @@ MEMORY_GOVERNANCE_CASE_IDS = {
     "family_memory_advisory_fill_v1",
     "family_memory_expired_advisory_v1",
 }
+MEMORY_GOVERNANCE_TOOL_PROFILE_COUNTS = {"mock_world": 3}
 CONVERSATION_CONTINUATION_CASE_IDS = {
     "solo_clarification_continuation_v1",
     "family_replan_version_continuation_v1",
 }
+CONVERSATION_CONTINUATION_TOOL_PROFILE_COUNTS = {"mock_world": 2}
 DEFAULT_CASE_IDS = {
     "family_afternoon_v1",
     "family_indoor_light_meal_v1",
@@ -76,6 +78,7 @@ DEFAULT_SCENARIO_BUCKET_COUNTS = {
     "unknown": 1,
 }
 DEFAULT_LEVEL_COUNTS = {"L1": 3, "L2": 7}
+DEFAULT_TOOL_PROFILE_COUNTS = {"mock_world": 10}
 DEFAULT_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
@@ -127,6 +130,7 @@ EXPANDED_SCENARIO_BUCKET_COUNTS = {
     "unknown": 1,
 }
 EXPANDED_FAILURE_MODE_COUNTS = {"none": 4}
+EXPANDED_TOOL_PROFILE_COUNTS = {"mock_world": 4}
 EXPANDED_CONSTRAINT_TAG_COUNTS = {
     "budget_limited": 1,
     "casual_dining": 1,
@@ -147,6 +151,7 @@ RECOVERY_FAILURE_MODE_COUNTS = {
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
 }
+RECOVERY_TOOL_PROFILE_COUNTS = {"mock_world": 3}
 RECOVERY_CONSTRAINT_TAG_COUNTS = {
     "bad_weather": 1,
     "child_friendly": 2,
@@ -204,6 +209,7 @@ ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "unknown": 1,
 }
 ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L3": 4, "L5": 2}
+ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 17}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
@@ -758,12 +764,21 @@ def test_benchmark_harness_runs_family_replan_version_continuation_case(
 
 
 @pytest.mark.parametrize(
-    ("suite_id", "expected_case_ids", "expected_case_count", "scenario_counts", "failure_mode_counts", "constraint_tag_counts"),
+    (
+        "suite_id",
+        "expected_case_ids",
+        "expected_case_count",
+        "tool_profile_counts",
+        "scenario_counts",
+        "failure_mode_counts",
+        "constraint_tag_counts",
+    ),
     [
         (
             "baseline",
             BASELINE_CASE_IDS,
             6,
+            {"mock_world": 6},
             BASELINE_SCENARIO_BUCKET_COUNTS,
             BASELINE_FAILURE_MODE_COUNTS,
             BASELINE_CONSTRAINT_TAG_COUNTS,
@@ -772,6 +787,7 @@ def test_benchmark_harness_runs_family_replan_version_continuation_case(
             "expanded",
             EXPANDED_CASE_IDS,
             4,
+            EXPANDED_TOOL_PROFILE_COUNTS,
             EXPANDED_SCENARIO_BUCKET_COUNTS,
             EXPANDED_FAILURE_MODE_COUNTS,
             EXPANDED_CONSTRAINT_TAG_COUNTS,
@@ -780,6 +796,7 @@ def test_benchmark_harness_runs_family_replan_version_continuation_case(
             "recovery_focused",
             RECOVERY_CASE_IDS,
             3,
+            RECOVERY_TOOL_PROFILE_COUNTS,
             RECOVERY_SCENARIO_BUCKET_COUNTS,
             RECOVERY_FAILURE_MODE_COUNTS,
             RECOVERY_CONSTRAINT_TAG_COUNTS,
@@ -788,6 +805,7 @@ def test_benchmark_harness_runs_family_replan_version_continuation_case(
             "memory_governance",
             MEMORY_GOVERNANCE_CASE_IDS,
             3,
+            MEMORY_GOVERNANCE_TOOL_PROFILE_COUNTS,
             MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS,
             MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS,
             MEMORY_GOVERNANCE_CONSTRAINT_TAG_COUNTS,
@@ -796,6 +814,7 @@ def test_benchmark_harness_runs_family_replan_version_continuation_case(
             "conversation_continuations",
             CONVERSATION_CONTINUATION_CASE_IDS,
             2,
+            CONVERSATION_CONTINUATION_TOOL_PROFILE_COUNTS,
             CONVERSATION_CONTINUATION_SCENARIO_BUCKET_COUNTS,
             CONVERSATION_CONTINUATION_FAILURE_MODE_COUNTS,
             CONVERSATION_CONTINUATION_CONSTRAINT_TAG_COUNTS,
@@ -806,6 +825,7 @@ def test_benchmark_harness_runs_named_mock_world_suite(
     suite_id: str,
     expected_case_ids: set[str],
     expected_case_count: int,
+    tool_profile_counts: dict[str, int],
     scenario_counts: dict[str, int],
     failure_mode_counts: dict[str, int],
     constraint_tag_counts: dict[str, int],
@@ -836,6 +856,8 @@ def test_benchmark_harness_runs_named_mock_world_suite(
     assert report.benchmark_summary is not None
     assert report.benchmark_summary.suite_id == suite_id
     assert report.benchmark_summary.suite_title is not None
+    assert report.benchmark_summary.matrix_summary is not None
+    assert report.benchmark_summary.matrix_summary.tool_profile_counts == tool_profile_counts
     assert report.benchmark_summary.outcome_rollup is not None
     _assert_rollup_counts(
         report.benchmark_summary.outcome_rollup.scenario_bucket_outcomes,
@@ -853,6 +875,7 @@ def test_benchmark_harness_runs_named_mock_world_suite(
     suite_payload = json.loads(Path(report.report_path).read_text(encoding="utf-8"))
     assert suite_payload["benchmark_summary"]["suite_id"] == suite_id
     assert suite_payload["benchmark_summary"]["suite_title"]
+    assert suite_payload["benchmark_summary"]["matrix_summary"]["tool_profile_counts"] == tool_profile_counts
     assert suite_payload["benchmark_summary"]["outcome_rollup"]["schema_version"] == (
         "weekendpilot_benchmark_outcome_rollup_v1"
     )
@@ -905,6 +928,7 @@ def test_benchmark_harness_runs_default_mock_world_suite(
     assert report.benchmark_summary.matrix_summary is not None
     assert report.benchmark_summary.matrix_summary.scenario_bucket_counts == DEFAULT_SCENARIO_BUCKET_COUNTS
     assert report.benchmark_summary.matrix_summary.level_counts == DEFAULT_LEVEL_COUNTS
+    assert report.benchmark_summary.matrix_summary.tool_profile_counts == DEFAULT_TOOL_PROFILE_COUNTS
     assert report.benchmark_summary.matrix_summary.world_profile_counts == DEFAULT_WORLD_PROFILE_COUNTS
     assert report.benchmark_summary.matrix_summary.failure_mode_counts == DEFAULT_FAILURE_MODE_COUNTS
     assert report.benchmark_summary.matrix_summary.tag_counts == DEFAULT_TAG_COUNTS
@@ -964,6 +988,7 @@ def test_benchmark_harness_runs_default_mock_world_suite(
     assert suite_payload["benchmark_summary"]["run_status"] == "passed"
     assert suite_payload["benchmark_summary"]["matrix_summary"]["scenario_bucket_counts"] == DEFAULT_SCENARIO_BUCKET_COUNTS
     assert suite_payload["benchmark_summary"]["matrix_summary"]["level_counts"] == DEFAULT_LEVEL_COUNTS
+    assert suite_payload["benchmark_summary"]["matrix_summary"]["tool_profile_counts"] == DEFAULT_TOOL_PROFILE_COUNTS
     assert suite_payload["benchmark_summary"]["matrix_summary"]["world_profile_counts"] == DEFAULT_WORLD_PROFILE_COUNTS
     assert suite_payload["benchmark_summary"]["matrix_summary"]["failure_mode_counts"] == DEFAULT_FAILURE_MODE_COUNTS
     assert suite_payload["benchmark_summary"]["matrix_summary"]["tag_counts"] == DEFAULT_TAG_COUNTS
@@ -1017,6 +1042,7 @@ def test_benchmark_harness_runs_all_registered_suite(
     assert report.benchmark_summary.matrix_summary is not None
     assert report.benchmark_summary.matrix_summary.scenario_bucket_counts == ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
     assert report.benchmark_summary.matrix_summary.level_counts == ALL_REGISTERED_LEVEL_COUNTS
+    assert report.benchmark_summary.matrix_summary.tool_profile_counts == ALL_REGISTERED_TOOL_PROFILE_COUNTS
     assert report.benchmark_summary.matrix_summary.world_profile_counts == ALL_REGISTERED_WORLD_PROFILE_COUNTS
     assert report.benchmark_summary.matrix_summary.failure_mode_counts == ALL_REGISTERED_FAILURE_MODE_COUNTS
     assert report.benchmark_summary.matrix_summary.tag_counts == ALL_REGISTERED_TAG_COUNTS
@@ -1040,6 +1066,9 @@ def test_benchmark_harness_runs_all_registered_suite(
         ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
     )
     assert suite_payload["benchmark_summary"]["matrix_summary"]["level_counts"] == ALL_REGISTERED_LEVEL_COUNTS
+    assert suite_payload["benchmark_summary"]["matrix_summary"]["tool_profile_counts"] == (
+        ALL_REGISTERED_TOOL_PROFILE_COUNTS
+    )
     assert suite_payload["benchmark_summary"]["matrix_summary"]["world_profile_counts"] == (
         ALL_REGISTERED_WORLD_PROFILE_COUNTS
     )

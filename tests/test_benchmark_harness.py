@@ -121,6 +121,7 @@ DEFAULT_SCENARIO_BUCKET_COUNTS = {
     "unknown": 1,
 }
 DEFAULT_LEVEL_COUNTS = {"L1": 3, "L2": 7}
+DEFAULT_TOOL_PROFILE_COUNTS = {"mock_world": 10}
 DEFAULT_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
@@ -152,6 +153,7 @@ DEFAULT_TAG_COUNTS = {
 }
 MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS = {"family": 3}
 MEMORY_GOVERNANCE_LEVEL_COUNTS = {"L2": 1, "L3": 2}
+MEMORY_GOVERNANCE_TOOL_PROFILE_COUNTS = {"mock_world": 3}
 MEMORY_GOVERNANCE_WORLD_PROFILE_COUNTS = {"family_afternoon": 3}
 MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS = {"none": 3}
 MEMORY_GOVERNANCE_TAG_COUNTS = {
@@ -172,6 +174,7 @@ ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "unknown": 1,
 }
 ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L3": 4, "L5": 2}
+ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 17}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
@@ -474,6 +477,7 @@ def test_default_case_matrix_summary_counts_are_expected() -> None:
     assert summary.case_count == 10
     assert summary.scenario_bucket_counts == DEFAULT_SCENARIO_BUCKET_COUNTS
     assert summary.level_counts == DEFAULT_LEVEL_COUNTS
+    assert summary.tool_profile_counts == DEFAULT_TOOL_PROFILE_COUNTS
     assert summary.world_profile_counts == DEFAULT_WORLD_PROFILE_COUNTS
     assert summary.failure_mode_counts == DEFAULT_FAILURE_MODE_COUNTS
     assert summary.tag_counts == DEFAULT_TAG_COUNTS
@@ -485,6 +489,7 @@ def test_memory_governance_suite_matrix_summary_counts_are_expected() -> None:
     assert summary.case_count == 3
     assert summary.scenario_bucket_counts == MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS
     assert summary.level_counts == MEMORY_GOVERNANCE_LEVEL_COUNTS
+    assert summary.tool_profile_counts == MEMORY_GOVERNANCE_TOOL_PROFILE_COUNTS
     assert summary.world_profile_counts == MEMORY_GOVERNANCE_WORLD_PROFILE_COUNTS
     assert summary.failure_mode_counts == MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS
     assert summary.tag_counts == MEMORY_GOVERNANCE_TAG_COUNTS
@@ -496,6 +501,7 @@ def test_all_registered_case_matrix_summary_counts_are_expected() -> None:
     assert summary.case_count == 17
     assert summary.scenario_bucket_counts == ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
     assert summary.level_counts == ALL_REGISTERED_LEVEL_COUNTS
+    assert summary.tool_profile_counts == ALL_REGISTERED_TOOL_PROFILE_COUNTS
     assert summary.world_profile_counts == ALL_REGISTERED_WORLD_PROFILE_COUNTS
     assert summary.failure_mode_counts == ALL_REGISTERED_FAILURE_MODE_COUNTS
     assert summary.tag_counts == ALL_REGISTERED_TAG_COUNTS
@@ -507,6 +513,7 @@ def test_conversation_continuation_suite_matrix_summary_counts_are_expected() ->
     assert summary.case_count == 2
     assert summary.scenario_bucket_counts == {"family": 1, "solo": 1}
     assert summary.level_counts == {"L3": 2}
+    assert summary.tool_profile_counts == {"mock_world": 2}
     assert summary.world_profile_counts == {"family_afternoon": 1, "solo_afternoon": 1}
     assert summary.failure_mode_counts == {"none": 2}
     assert summary.tag_counts == {
@@ -1747,6 +1754,7 @@ def test_run_report_writer_includes_benchmark_summary_envelope() -> None:
                     "case_count": 1,
                     "scenario_bucket_counts": {"family": 1},
                     "level_counts": {"L1": 1},
+                    "tool_profile_counts": {"mock_world": 1},
                     "world_profile_counts": {"family_afternoon": 1},
                     "failure_mode_counts": {"none": 1},
                     "tag_counts": {"baseline": 1},
@@ -1777,6 +1785,7 @@ def test_run_report_writer_includes_benchmark_summary_envelope() -> None:
         assert payload["benchmark_summary"]["schema_version"] == "weekendpilot_benchmark_summary_v1"
         assert payload["benchmark_summary"]["case_count"] == 1
         assert payload["benchmark_summary"]["matrix_summary"]["scenario_bucket_counts"] == {"family": 1}
+        assert payload["benchmark_summary"]["matrix_summary"]["tool_profile_counts"] == {"mock_world": 1}
         assert payload["benchmark_summary"]["benchmark_timing_summary"]["case_count"] == 1
     finally:
         _cleanup_report_dir(report_dir)
@@ -2003,6 +2012,53 @@ def test_harness_uses_legacy_path_when_case_has_no_continuations(
 
     assert result.status == "passed"
     assert calls == ["legacy:case"]
+
+
+def test_harness_rejects_non_mock_world_case_before_dispatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    harness = BenchmarkHarness(session=None, cache=None, rate_limiter=None)
+    case = BenchmarkCase(
+        case_id="ad_hoc_preview_case",
+        title="Ad hoc preview case",
+        user_input="Plan an AMAP preview outing.",
+        tool_profile="amap",
+        world_profile="amap_shanghai_live",
+        taxonomy=_taxonomy_payload(),
+        expected=BenchmarkExpectedOutcome(
+            required_tool_names=["search_poi"],
+            min_tool_event_count=1,
+            min_action_count=0,
+        ),
+    )
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        harness,
+        "_run_legacy_case",
+        lambda benchmark_case: calls.append(f"legacy:{benchmark_case.case_id}") or _benchmark_case_result(
+            benchmark_case,
+            status="passed",
+        ),
+    )
+    monkeypatch.setattr(
+        harness,
+        "_run_continuation_case",
+        lambda benchmark_case: calls.append(f"continuation:{benchmark_case.case_id}") or _benchmark_case_result(
+            benchmark_case,
+            status="passed",
+        ),
+    )
+
+    result = harness.run_case(case)
+
+    assert result.status == "error"
+    assert result.run_id is None
+    assert result.trace_id is None
+    assert result.tool_event_count == 0
+    assert result.action_count == 0
+    assert result.failure_reasons == ["Unsupported benchmark tool_profile: amap"]
+    assert calls == []
 
 
 def _benchmark_case() -> BenchmarkCase:

@@ -75,6 +75,7 @@ class ObservabilityRecorder:
             selected_plan=selected_plan,
             metadata=metadata,
             trace_id=context.trace_id,
+            tool_events=tool_events,
             tool_event_count=len(tool_events),
             action_count=action_count,
         )
@@ -180,6 +181,7 @@ class ObservabilityRecorder:
         selected_plan,
         metadata: dict[str, Any],
         trace_id: str,
+        tool_events,
         tool_event_count: int,
         action_count: int,
     ) -> RunSummary | None:
@@ -189,6 +191,7 @@ class ObservabilityRecorder:
                 selected_plan,
                 metadata,
                 trace_id_override=trace_id,
+                tool_events=tool_events,
                 tool_event_count=tool_event_count,
                 action_count=action_count,
             )
