@@ -38,7 +38,9 @@ def load_benchmark_case(case_id: str) -> BenchmarkCase:
     path = resources.files("backend.app.benchmark").joinpath("cases", f"{case_id}.json")
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-        return BenchmarkCase.model_validate(payload)
+        case = BenchmarkCase.model_validate(payload)
+        _validate_canonical_case(case)
+        return case
     except FileNotFoundError as exc:
         raise BenchmarkHarnessError(f"Benchmark fixture not found: {case_id}") from exc
     except JSONDecodeError as exc:
@@ -49,3 +51,10 @@ def load_benchmark_case(case_id: str) -> BenchmarkCase:
 
 def load_registered_benchmark_cases() -> list[BenchmarkCase]:
     return [load_benchmark_case(case_id) for case_id in _REGISTERED_CASE_IDS]
+
+
+def _validate_canonical_case(case: BenchmarkCase) -> None:
+    if case.tool_profile != "mock_world":
+        raise BenchmarkHarnessError(
+            f"Canonical benchmark case must use tool_profile='mock_world': {case.case_id} -> {case.tool_profile}"
+        )

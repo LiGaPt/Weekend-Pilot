@@ -184,6 +184,7 @@ class BenchmarkCaseMatrixSummary(BaseModel):
     case_count: int
     scenario_bucket_counts: dict[str, int] = Field(default_factory=dict)
     level_counts: dict[str, int] = Field(default_factory=dict)
+    tool_profile_counts: dict[str, int] = Field(default_factory=dict)
     world_profile_counts: dict[str, int] = Field(default_factory=dict)
     failure_mode_counts: dict[str, int] = Field(default_factory=dict)
     tag_counts: dict[str, int] = Field(default_factory=dict)

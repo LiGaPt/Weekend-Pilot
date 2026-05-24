@@ -93,6 +93,19 @@ class BenchmarkHarness:
 
     def run_case(self, case: BenchmarkCase) -> BenchmarkCaseResult:
         try:
+            if case.tool_profile != "mock_world":
+                return self._finalize_case_result(
+                    BenchmarkCaseResult(
+                        case_id=case.case_id,
+                        status="error",
+                        taxonomy=case.taxonomy,
+                        scores=[],
+                        overall_score=0.0,
+                        tool_event_count=0,
+                        action_count=0,
+                        failure_reasons=[f"Unsupported benchmark tool_profile: {case.tool_profile}"],
+                    )
+                )
             if case.continuations:
                 return self._run_continuation_case(case)
             return self._run_legacy_case(case)
@@ -176,7 +189,7 @@ class BenchmarkHarness:
         return report.model_copy(update={"report_path": str(report_path)})
 
     def _run_legacy_case(self, case: BenchmarkCase) -> BenchmarkCaseResult:
-        if case.tool_profile != "mock_world" or case.world_profile not in SUPPORTED_PROFILES:
+        if case.world_profile not in SUPPORTED_PROFILES:
             result = BenchmarkCaseResult(
                 case_id=case.case_id,
                 status="error",
@@ -266,6 +279,7 @@ class BenchmarkHarness:
             selected_plan=selected_plan,
             metadata=run_metadata,
             trace_id=workflow_result.trace_id,
+            tool_events=tool_events,
             tool_event_count=len(tool_events),
             action_count=action_count,
         )
@@ -502,6 +516,7 @@ class BenchmarkHarness:
             selected_plan=selected_plan,
             metadata=run_metadata,
             trace_id=self._trace_id_from_metadata(run_metadata),
+            tool_events=final_run_tool_events,
             tool_event_count=len(final_run_tool_events),
             action_count=final_run_action_count,
         )
@@ -872,6 +887,7 @@ class BenchmarkHarness:
         selected_plan,
         metadata: dict[str, Any],
         trace_id: str | None,
+        tool_events,
         tool_event_count: int,
         action_count: int,
     ) -> RunSummary | None:
@@ -884,6 +900,7 @@ class BenchmarkHarness:
                 selected_plan,
                 metadata,
                 trace_id_override=trace_id,
+                tool_events=tool_events,
                 tool_event_count=tool_event_count,
                 action_count=action_count,
             )

@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from backend.app.observability.summary import PreviewDiagnostics
+
 
 class RunTraceContext(BaseModel):
     run_id: UUID
@@ -149,6 +151,7 @@ class InternalObservabilityRunSummary(BaseModel):
     observability_status: str | None = None
     agent_roles: list[str] = Field(default_factory=list)
     node_history: list[str] = Field(default_factory=list)
+    preview_diagnostics: PreviewDiagnostics | None = None
     tool_event_summaries: list[InternalToolEventSummary] = Field(default_factory=list)
     action_ledger_summaries: list[InternalActionLedgerSummary] = Field(default_factory=list)
     workflow_timing_summary: Any | None = None

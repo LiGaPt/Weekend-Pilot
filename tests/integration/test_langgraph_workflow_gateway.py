@@ -861,3 +861,17 @@ def test_workflow_amap_preview_reaches_confirmation_without_write_actions(
     )
     assert providers == {"amap"}
     assert write_event_count == 0
+    assert run.metadata_json["summary"]["preview_diagnostics"] == {
+        "schema_version": "weekendpilot_preview_diagnostics_v1",
+        "read_profile": "amap",
+        "mode": "read_only_preview",
+        "confirmation_allowed": False,
+        "confirmation_block_reason": "AMAP read-only demo runs cannot be confirmed.",
+        "benchmark_eligible": False,
+        "benchmark_block_reason": "Canonical benchmark suites support Mock World only.",
+        "observed_provider_names": ["amap"],
+        "provider_event_count": result.tool_event_count,
+        "write_tool_event_count": 0,
+        "provider_error_types": [],
+        "cross_provider_fallback_detected": False,
+    }

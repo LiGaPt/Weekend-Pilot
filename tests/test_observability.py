@@ -52,7 +52,13 @@ def trace_path():
             directory.rmdir()
 
 
-def _create_run(session: Session, *, metadata_json: dict | None = None):
+def _create_run(
+    session: Session,
+    *,
+    metadata_json: dict | None = None,
+    tool_profile: str = "mock_world",
+    world_profile: str = "family_afternoon",
+):
     user = UserRepository(session).create(
         external_id=f"observability-user-{uuid4()}",
         display_name="Observability Tester",
@@ -62,8 +68,8 @@ def _create_run(session: Session, *, metadata_json: dict | None = None):
         case_id="case-observability",
         agent_version="agent-v1",
         prompt_version="prompt-v1",
-        tool_profile="mock_world",
-        world_profile="family_afternoon",
+        tool_profile=tool_profile,
+        world_profile=world_profile,
         failure_profile=None,
         status="completed",
         metadata_json=metadata_json or {"source": "observability-test"},
@@ -233,6 +239,7 @@ def test_record_run_summary_writes_buffer_and_updates_run_metadata(db_session: S
     assert summary["action_count"] == 1
     assert summary["agent_roles"] == ["supervisor", "discovery"]
     assert summary["workflow_timing_summary"] == timing_summary
+    assert summary["preview_diagnostics"] is None
     assert summary["error"] == {
         "error_type": "tool_timeout",
         "message": "Request failed",
@@ -252,6 +259,65 @@ def test_record_run_summary_writes_buffer_and_updates_run_metadata(db_session: S
     assert payload["metadata"]["nested"]["secret_token"] == "[REDACTED]"
     assert "action_id" not in json.dumps(payload)
     assert "tool_event_id" not in json.dumps(payload)
+
+
+def test_record_run_summary_adds_amap_preview_diagnostics(
+    db_session: Session,
+    trace_path,
+) -> None:
+    run = _create_run(
+        db_session,
+        metadata_json={"source": "observability-test"},
+        tool_profile="amap",
+        world_profile="amap_shanghai_live",
+    )
+    ToolEventRepository(db_session).create(
+        run_id=run.run_id,
+        tool_name="search_poi",
+        tool_type="read",
+        provider="amap",
+        request_json={"query": "museum"},
+        response_json={"candidate_count": 2},
+        error_json=None,
+        status="completed",
+        cache_hit=False,
+        latency_ms=12,
+        langsmith_trace_id="trace-amap",
+    )
+    ToolEventRepository(db_session).create(
+        run_id=run.run_id,
+        tool_name="check_route",
+        tool_type="read",
+        provider="amap",
+        request_json={"origin": "a", "destination": "b"},
+        response_json=None,
+        error_json={"error_type": "rate_limited", "api_key": "hide-me"},
+        status="failed",
+        cache_hit=False,
+        latency_ms=25,
+        langsmith_trace_id="trace-amap",
+    )
+
+    context = _recorder(db_session, trace_path).build_context(run.run_id)
+    _recorder(db_session, trace_path).record_run_summary(context)
+
+    row = AgentRunRepository(db_session).get_by_id(run.run_id)
+    assert row is not None
+    summary = row.metadata_json["summary"]
+    assert summary["preview_diagnostics"] == {
+        "schema_version": "weekendpilot_preview_diagnostics_v1",
+        "read_profile": "amap",
+        "mode": "read_only_preview",
+        "confirmation_allowed": False,
+        "confirmation_block_reason": "AMAP read-only demo runs cannot be confirmed.",
+        "benchmark_eligible": False,
+        "benchmark_block_reason": "Canonical benchmark suites support Mock World only.",
+        "observed_provider_names": ["amap"],
+        "provider_event_count": 2,
+        "write_tool_event_count": 0,
+        "provider_error_types": ["rate_limited"],
+        "cross_provider_fallback_detected": False,
+    }
 
 
 def test_record_run_summary_uses_latest_sanitized_agent_metadata(
@@ -477,7 +543,10 @@ def test_internal_observability_service_builds_sanitized_run_summary(db_session:
     ]
     assert len(summary.tool_event_summaries) == 1
     assert summary.tool_event_summaries[0].tool_name == "search_poi"
-    assert summary.tool_event_summaries[0].request_preview == {"query": "museum"}
+    assert summary.tool_event_summaries[0].request_preview == {
+        "query": "museum",
+        "event_sequence": 1,
+    }
     assert summary.tool_event_summaries[0].response_preview == {"candidate_count": 3}
     assert summary.tool_event_summaries[0].error_preview is None
     assert len(summary.action_ledger_summaries) == 1
@@ -558,6 +627,20 @@ def test_internal_observability_service_prefers_canonical_summary_when_present(d
                         }
                     ],
                 },
+                "preview_diagnostics": {
+                    "schema_version": "weekendpilot_preview_diagnostics_v1",
+                    "read_profile": "amap",
+                    "mode": "read_only_preview",
+                    "confirmation_allowed": False,
+                    "confirmation_block_reason": "AMAP read-only demo runs cannot be confirmed.",
+                    "benchmark_eligible": False,
+                    "benchmark_block_reason": "Canonical benchmark suites support Mock World only.",
+                    "observed_provider_names": ["amap"],
+                    "provider_event_count": 9,
+                    "write_tool_event_count": 0,
+                    "provider_error_types": [],
+                    "cross_provider_fallback_detected": False,
+                },
                 "error": None,
             },
             "workflow": {
@@ -634,6 +717,75 @@ def test_internal_observability_service_prefers_canonical_summary_when_present(d
     assert summary.workflow_timing_summary.total_duration_ms == 99
     assert summary.observability_status == "completed"
     assert summary.observability_summary.trace_id == "trace-observability"
+    assert summary.preview_diagnostics is not None
+    assert summary.preview_diagnostics.provider_event_count == 9
+
+
+def test_internal_observability_service_recomputes_missing_preview_diagnostics_for_amap_runs(
+    db_session: Session,
+) -> None:
+    run = _create_run(
+        db_session,
+        metadata_json={
+            "summary": {
+                "schema_version": "weekendpilot_run_summary_v1",
+                "run_id": str(uuid4()),
+                "trace_id": "trace-from-summary",
+                "case_id": "case-observability",
+                "agent_version": "agent-v1",
+                "prompt_version": "prompt-v1",
+                "tool_profile": "amap",
+                "world_profile": "amap_shanghai_live",
+                "failure_profile": None,
+                "workflow_status": "awaiting_confirmation",
+                "selected_plan_id": None,
+                "plan_status": None,
+                "execution_status": None,
+                "feedback_status": None,
+                "tool_event_count": 2,
+                "action_count": 0,
+                "agent_roles": ["summary-supervisor"],
+                "workflow_timing_summary": None,
+                "preview_diagnostics": None,
+                "error": None,
+            }
+        },
+        tool_profile="amap",
+        world_profile="amap_shanghai_live",
+    )
+    ToolEventRepository(db_session).create(
+        run_id=run.run_id,
+        tool_name="search_poi",
+        tool_type="read",
+        provider="amap",
+        request_json={"query": "museum"},
+        response_json={"candidate_count": 1},
+        error_json=None,
+        status="completed",
+        cache_hit=False,
+        latency_ms=10,
+        langsmith_trace_id="trace-observability",
+    )
+    ToolEventRepository(db_session).create(
+        run_id=run.run_id,
+        tool_name="check_route",
+        tool_type="read",
+        provider="amap",
+        request_json={"origin": "a", "destination": "b"},
+        response_json=None,
+        error_json={"code": "route_infeasible", "api_key": "hide-me"},
+        status="failed",
+        cache_hit=False,
+        latency_ms=11,
+        langsmith_trace_id="trace-observability",
+    )
+
+    summary = InternalObservabilityService(db_session).get_run_summary(run.run_id)
+
+    assert summary.preview_diagnostics is not None
+    assert summary.preview_diagnostics.provider_event_count == 2
+    assert summary.preview_diagnostics.provider_error_types == ["route_infeasible"]
+    assert summary.preview_diagnostics.cross_provider_fallback_detected is False
 
 
 def test_internal_observability_service_raises_for_missing_run(db_session: Session) -> None:

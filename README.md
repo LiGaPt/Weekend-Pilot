@@ -24,7 +24,7 @@ Set the key in local `.env` only:
 AMAP_MAPS_API_KEY=your-local-key
 ```
 
-The local demo still defaults to `Mock World`. `AMap` is available only as an explicit read-only preview path for local review, and that path stops before confirmation instead of executing write tools. Benchmark cases, benchmark suites, and benchmark defaults remain on `Mock World`.
+The local demo still defaults to `Mock World`. `AMap` is available only as an explicit read-only preview path for local review, and that path stops before confirmation instead of executing write tools. Internal observability review now also exposes a compact `preview_diagnostics` block for these AMAP runs so provider names, sanitized provider error types, and write-tool absence stay directly auditable. Benchmark cases, benchmark suites, and benchmark defaults remain on `Mock World`.
 
 Default tests do not call live AMAP APIs:
 
@@ -155,6 +155,8 @@ Local trace JSONL summaries now also embed the canonical `run_summary` envelope,
 ## LocalLife-Bench Harness
 
 The benchmark harness runs file-based cases through the official LangGraph workflow and bounded deterministic agent adapters, then writes local JSON reports. Case reports stay under `var/benchmarks/`. Ad hoc `run_cases(...)` runs still write `var/benchmarks/run-report.json`, while named `run_suite(...)` runs write `var/benchmarks/suite-<suite_id>-run-report.json`. It does not require LangSmith credentials or live provider access.
+
+Canonical benchmark fixtures and suites remain `Mock World` only in this v0 task. Registered benchmark cases now fail fast during fixture or suite loading if `tool_profile != "mock_world"`, and ad hoc harness calls also reject non-Mock-World cases before workflow execution. Suite `matrix_summary` payloads now include `tool_profile_counts` so this provider boundary stays auditable in reports.
 
 Each benchmark case fixture now requires a structured `taxonomy` block that captures suite, scenario bucket, benchmark level, tags, and failure mode. Each benchmark case report now includes both `run_summary` and `taxonomy`. Failure-profile cases also add a sanitized `failure_chain_summary` so injected effects, bounded recovery actions, and terminal workflow state stay directly reviewable in case reports. Memory-governed cases now also persist `workflow.memory_policy` as `memory_query_policy_v1`, including per-dimension winners and per-memory outcomes so memory behavior stays auditable without exposing raw memory text or payloads. Continuation cases now also add sanitized `conversation_trace` step summaries and ordered `conversation_turn_types` so status transitions and plan-version evolution stay reviewable without exposing raw conversation payloads. Each suite summary now includes both `matrix_summary` coverage counts and additive `outcome_rollup` pass-rate buckets by scenario family, constraint tag, and failure mode so coverage and benchmark pass rate can be compared directly as the suite catalog expands.
 
@@ -321,6 +323,8 @@ Internal observability review:
 ```bash
 curl http://127.0.0.1:8000/internal/runs/<run_id>/observability
 ```
+
+For successful AMAP preview runs, this internal review route now returns `preview_diagnostics` directly from the canonical persisted run summary, with a recomputed fallback when stored diagnostics are missing or malformed.
 
 Confirm the selected plan:
 
