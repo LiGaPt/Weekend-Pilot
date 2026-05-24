@@ -380,6 +380,7 @@ The public demo page only shows customer-safe run details. Internal trace and no
 The visible run inspector includes the current plan version label for the loaded run.
 The visible action preview for each plan tab now comes from `plans[*].action_manifest`, so pre-confirmation and post-confirmation states share one normalized public shape.
 The page now also exposes an explicit read-path selector. Leave it on `Mock World` for the default deterministic demo and benchmark-aligned checks. Switch it to `AMap 只读预览` only when you want a local live-provider preview that stays pre-confirmation and does not execute writes.
+客户演示面的 reviewer-facing 可见控件默认使用中文文案，例如 `开始规划`、`确认当前方案`、`暂不继续` 和 `刷新状态`。
 
 For internal review, open `http://127.0.0.1:5174/` and paste a `run_id` to inspect the internal run summary, workflow timing, tool-event details, action-ledger details, benchmark artifact context, and bounded recovery-path details. Benchmark-backed recovery runs also surface the persisted benchmark case report path as replay input context for later inspection tooling.
 

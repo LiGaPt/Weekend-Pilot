@@ -28,24 +28,24 @@ const awaitingRun: DemoRunSummary = {
       plan_id: "plan-1",
       status: "reviewed",
       selected: true,
-      title: "Family science afternoon",
-      summary: "Start with a family activity, then stop for a lighter dinner.",
+      title: "徐汇亲子科学半日行",
+      summary: "先安排亲子活动，再去吃一顿清淡晚餐。",
       activity: {
-        name: "Science House",
+        name: "徐汇亲子科学馆",
         category: "activity",
-        address: "100 Museum Road",
+        address: "上海市徐汇区亲子科普路100号",
         tags: ["child_friendly", "indoor"],
       },
       dining: {
-        name: "Light Kitchen",
+        name: "绿碗家庭轻食",
         category: "dining",
-        address: "6 Healthy Lane",
+        address: "上海市徐汇区健康弄66号",
         tags: ["lighter_options", "family_tables"],
       },
       timeline: [
         {
           sequence: 1,
-          title: "Science visit",
+          title: "体验徐汇亲子科学馆",
           start_label: "14:00",
           end_label: "16:00",
           duration_minutes: 120,
@@ -55,11 +55,11 @@ const awaitingRun: DemoRunSummary = {
         mode: "driving",
         distance_meters: 3200,
         duration_minutes: 18,
-        summary: "Short walk between stops.",
+        summary: "活动与餐厅之间车程很短，适合带孩子轻松衔接。",
       },
       feasibility: {
         is_feasible: true,
-        reasons: ["Fits the afternoon time window."],
+        reasons: ["符合下午半日出行时长。"],
         warnings: [],
         total_duration_minutes: 270,
         route_duration_minutes: 18,
@@ -76,7 +76,7 @@ const awaitingRun: DemoRunSummary = {
             action_type: "reserve_restaurant",
             target_id: "green-table",
             payload_preview: { party_size: 3 },
-            reason: "Lock the dinner table after confirmation.",
+            reason: "确认后可提前锁定晚餐座位。",
           },
         ],
       },
@@ -86,18 +86,18 @@ const awaitingRun: DemoRunSummary = {
       plan_id: "plan-2",
       status: "reviewed",
       selected: false,
-      title: "Park fallback",
-      summary: "Outdoor play plus a quick coffee shop dinner.",
+      title: "滨江轻松备选方案",
+      summary: "先去户外活动，再简单吃一顿轻便晚餐。",
       activity: {
-        name: "Riverside Park",
+        name: "滨江亲子乐园",
         category: "activity",
-        address: "Riverside Walk",
+        address: "上海市徐汇区滨江步道28号",
         tags: [],
       },
       dining: {
-        name: "Corner Cafe",
+        name: "街角轻食小馆",
         category: "dining",
-        address: "Coffee Street",
+        address: "上海市徐汇区咖啡街8号",
         tags: [],
       },
       timeline: [],
@@ -156,11 +156,11 @@ const completedRun: DemoRunSummary = {
       },
       feedback: {
         status: "written",
-        headline: "Execution complete",
-        message: "Reservation and message steps finished.",
+        headline: "安排已完成",
+        message: "订座和通知都已处理完成。",
         completed_actions: [{ action_type: "reserve_restaurant", status: "succeeded" }],
         failed_actions: [],
-        next_steps: ["Leave at 13:40."],
+        next_steps: ["建议 13:40 左右出发。"],
       },
     },
   ],
@@ -192,6 +192,7 @@ describe("App", () => {
   it("renders the default prompt, default read profile, and start button", () => {
     render(<App />);
 
+    expect(screen.getByRole("heading", { name: "周末出行规划预览" })).toBeInTheDocument();
     expect(screen.getByRole("textbox")).toHaveValue(
       "\u4eca\u5929\u4e0b\u5348\u60f3\u548c\u7231\u4eba\u30015\u5c81\u7684\u5b69\u5b50\u51fa\u95e8\u73a9\u51e0\u4e2a\u5c0f\u65f6\uff0c\u522b\u79bb\u5bb6\u592a\u8fdc\u3002\u5b69\u5b50\u8981\u9002\u5408\u4eb2\u5b50\u6d3b\u52a8\uff0c\u7231\u4eba\u6700\u8fd1\u60f3\u5403\u6e05\u6de1\u4e00\u70b9\uff0c\u5e2e\u6211\u5b89\u6392\u4e00\u4e0b\u3002",
     );
@@ -218,12 +219,12 @@ describe("App", () => {
 
     await user.click(screen.getByTestId("start-button"));
 
-    expect(await screen.findByRole("heading", { name: "Family science afternoon" })).toBeInTheDocument();
-    expect(screen.getAllByText("awaiting_confirmation").length).toBeGreaterThan(0);
+    expect(await screen.findByRole("heading", { name: "徐汇亲子科学半日行" })).toBeInTheDocument();
+    expect(screen.getAllByText("等待确认").length).toBeGreaterThan(0);
     expect(screen.getByTestId("plan-version")).toHaveTextContent("v1");
-    expect(screen.getByText("Science House")).toBeInTheDocument();
-    expect(screen.getByText("Light Kitchen")).toBeInTheDocument();
-    expect(screen.getByText("Short walk between stops.")).toBeInTheDocument();
+    expect(screen.getByText("徐汇亲子科学馆")).toBeInTheDocument();
+    expect(screen.getByText("绿碗家庭轻食")).toBeInTheDocument();
+    expect(screen.getByText("活动与餐厅之间车程很短，适合带孩子轻松衔接。")).toBeInTheDocument();
     expect(screen.getByText("green-table")).toBeInTheDocument();
     expect(screen.getByTestId("active-read-profile")).toHaveTextContent("Mock World");
   });
@@ -241,10 +242,10 @@ describe("App", () => {
     render(<App />);
 
     await user.click(screen.getByTestId("start-button"));
-    await user.click(await screen.findByRole("tab", { name: /Park fallback/ }));
+    await user.click(await screen.findByRole("tab", { name: /滨江轻松备选方案/ }));
 
-    expect(screen.getByText("Riverside Park")).toBeInTheDocument();
-    expect(screen.queryByText("Science House")).not.toBeInTheDocument();
+    expect(screen.getByText("滨江亲子乐园")).toBeInTheDocument();
+    expect(screen.queryByText("徐汇亲子科学馆")).not.toBeInTheDocument();
   });
 
   it("confirms a selected plan and renders completed feedback", async () => {
@@ -257,8 +258,8 @@ describe("App", () => {
     await user.click(await screen.findByTestId("confirm-button"));
 
     expect(confirmRun).toHaveBeenCalledWith("run-1", "plan-1");
-    expect(await screen.findByText("Execution complete")).toBeInTheDocument();
-    expect(screen.getByText("Reservation and message steps finished.")).toBeInTheDocument();
+    expect(await screen.findByText("安排已完成")).toBeInTheDocument();
+    expect(screen.getByText("订座和通知都已处理完成。")).toBeInTheDocument();
   });
 
   it("declines a selected plan and hides confirm action", async () => {

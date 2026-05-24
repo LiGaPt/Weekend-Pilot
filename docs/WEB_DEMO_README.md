@@ -130,7 +130,7 @@ The internal review page now also shows sanitized tool-event and action-ledger d
 6. Confirm the action count is `0`.
 7. Review the selected plan, timeline, route, feasibility, and the visible `action_manifest` preview.
 8. Confirm the selected plan shows `action_manifest.source = proposed_actions`.
-9. Click `确认所选方案`.
+9. Click `确认当前方案`.
 10. Confirm the run reaches `completed`.
 11. Confirm execution and feedback are visible.
 12. Confirm the action count is greater than `0`.
@@ -174,7 +174,7 @@ curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/clarify \
 2. Wait for `awaiting_confirmation`.
 3. Click `暂不继续`.
 4. Confirm the run reaches `declined`.
-5. Confirm `确认所选方案` is no longer available.
+5. Confirm `确认当前方案` is no longer available.
 6. Confirm the action count remains `0`.
 
 ### Follow-up Replan Path
