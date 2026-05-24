@@ -430,4 +430,4 @@ The key boundaries are:
 - no generic recovery `ask_user` conversion belongs here
 - clarification-only runs must not consume a new visible plan version number
 
-If the current working tree still contains untracked `047` task docs or other unrelated local files, do not mix them into this task’s staged set.
+If the current working tree still contains unrelated local files or doc drafts, do not mix them into this task’s staged set.

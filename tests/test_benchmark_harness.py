@@ -21,6 +21,7 @@ import backend.app.benchmark.graders as benchmark_graders
 import backend.app.benchmark.harness as benchmark_harness
 from backend.app.benchmark.graders import (
     combine_scores,
+    grade_conversation_path,
     grade_execution_safety,
     grade_failure_injection,
     grade_feedback,
@@ -33,6 +34,10 @@ from backend.app.benchmark.reporting import write_case_report, write_run_report
 from backend.app.benchmark.schemas import (
     BenchmarkCase,
     BenchmarkCaseResult,
+    BenchmarkConversationExpectation,
+    BenchmarkConversationExpectedStep,
+    BenchmarkConversationTraceStep,
+    BenchmarkContinuationRequest,
     BenchmarkMemoryDecisionExpectation,
     BenchmarkMemoryGovernanceExpectation,
     BenchmarkExpectedOutcome,
@@ -92,6 +97,10 @@ MEMORY_GOVERNANCE_CASE_IDS = (
     "family_memory_override_v1",
     "family_memory_advisory_fill_v1",
     "family_memory_expired_advisory_v1",
+)
+CONTINUATION_CASE_IDS = (
+    "solo_clarification_continuation_v1",
+    "family_replan_version_continuation_v1",
 )
 REQUIRED_CASE_TOOL_NAMES = {
     "search_poi",
@@ -156,23 +165,23 @@ MEMORY_GOVERNANCE_TAG_COUNTS = {
 }
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
-    "family": 9,
+    "family": 10,
     "friends": 1,
     "mixed": 2,
-    "solo": 1,
+    "solo": 2,
     "unknown": 1,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L3": 2, "L5": 2}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L3": 4, "L5": 2}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
-    "family_afternoon": 9,
+    "family_afternoon": 10,
     "friends_gathering": 1,
     "rainy_day_fallback": 2,
-    "solo_afternoon": 1,
+    "solo_afternoon": 2,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
-    "none": 12,
+    "none": 14,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
@@ -183,9 +192,11 @@ ALL_REGISTERED_TAG_COUNTS = {
     "baseline": 2,
     "budget_limited": 1,
     "casual_dining": 1,
-    "child_friendly": 9,
+    "child_friendly": 10,
     "citywalk": 2,
+    "clarification_turn": 1,
     "composite_failure": 2,
+    "conversation_continuation": 2,
     "date_friendly": 1,
     "dining_unavailable": 1,
     "failure_injected": 3,
@@ -193,16 +204,18 @@ ALL_REGISTERED_TAG_COUNTS = {
     "free_activity": 1,
     "friends_group": 1,
     "indoor_activity": 4,
-    "light_activity": 1,
-    "light_meal": 7,
+    "light_activity": 2,
+    "light_meal": 9,
     "memory_advisory": 1,
     "memory_expired": 1,
     "memory_governance": 2,
     "memory_override": 1,
     "outdoor_activity": 2,
+    "plan_versioning": 1,
     "quick_dinner": 1,
     "quick_meal": 1,
     "rainy_day": 2,
+    "replan_turn": 1,
     "route_failure": 2,
     "ticket_sold_out": 1,
 }
@@ -297,6 +310,16 @@ EXPECTED_TAXONOMY_BY_CASE = {
         ],
         failure_mode="ticket_sold_out_and_bad_weather",
     ),
+    "solo_clarification_continuation_v1": _taxonomy_payload(
+        scenario_bucket="solo",
+        level="L3",
+        tags=["clarification_turn", "conversation_continuation", "light_activity", "light_meal"],
+    ),
+    "family_replan_version_continuation_v1": _taxonomy_payload(
+        scenario_bucket="family",
+        level="L3",
+        tags=["child_friendly", "conversation_continuation", "light_meal", "plan_versioning", "replan_turn"],
+    ),
 }
 
 
@@ -366,6 +389,54 @@ def test_memory_governance_fixtures_are_loadable_but_not_default() -> None:
     }
 
 
+def test_continuation_fixtures_are_loadable_but_not_default() -> None:
+    default_case_ids = {case.case_id for case in load_default_benchmark_cases()}
+    clarification_case = load_benchmark_case("solo_clarification_continuation_v1")
+    replan_case = load_benchmark_case("family_replan_version_continuation_v1")
+
+    assert clarification_case.case_id not in default_case_ids
+    assert clarification_case.continuations == [
+        BenchmarkContinuationRequest(
+            mode="clarify",
+            user_input="This afternoon I want a nearby solo outing for a few hours.",
+            selected_plan_index=0,
+        )
+    ]
+    assert clarification_case.expected.conversation is not None
+    assert [step.mode for step in clarification_case.expected.conversation.steps] == [
+        "start",
+        "clarify",
+        "confirm",
+    ]
+    assert clarification_case.expected.conversation.required_turn_types == [
+        "user_request",
+        "assistant_clarification_request",
+        "user_clarification_reply",
+        "assistant_plan_options",
+    ]
+
+    assert replan_case.case_id not in default_case_ids
+    assert replan_case.continuations == [
+        BenchmarkContinuationRequest(
+            mode="replan",
+            user_input="Keep it nearby, but make it indoor this time.",
+            selected_plan_index=0,
+        )
+    ]
+    assert replan_case.expected.conversation is not None
+    assert [step.mode for step in replan_case.expected.conversation.steps] == [
+        "start",
+        "replan",
+        "confirm",
+    ]
+    assert replan_case.expected.conversation.required_turn_types == [
+        "user_request",
+        "assistant_plan_options",
+        "user_follow_up",
+        "assistant_replan_options",
+    ]
+
+
 def test_default_fixtures_can_be_loaded_individually() -> None:
     for case_id in DEFAULT_CASE_IDS:
         case = load_benchmark_case(case_id)
@@ -375,7 +446,7 @@ def test_default_fixtures_can_be_loaded_individually() -> None:
 
 
 def test_default_and_failure_fixtures_expose_expected_taxonomy() -> None:
-    case_ids = [*DEFAULT_CASE_IDS, *FAILURE_CASE_IDS, *MEMORY_GOVERNANCE_CASE_IDS[1:]]
+    case_ids = [*DEFAULT_CASE_IDS, *FAILURE_CASE_IDS, *MEMORY_GOVERNANCE_CASE_IDS[1:], *CONTINUATION_CASE_IDS]
 
     for case_id in case_ids:
         case = load_benchmark_case(case_id)
@@ -422,12 +493,31 @@ def test_memory_governance_suite_matrix_summary_counts_are_expected() -> None:
 def test_all_registered_case_matrix_summary_counts_are_expected() -> None:
     summary = build_case_matrix_summary(load_benchmark_suite("all_registered"))
 
-    assert summary.case_count == 15
+    assert summary.case_count == 17
     assert summary.scenario_bucket_counts == ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
     assert summary.level_counts == ALL_REGISTERED_LEVEL_COUNTS
     assert summary.world_profile_counts == ALL_REGISTERED_WORLD_PROFILE_COUNTS
     assert summary.failure_mode_counts == ALL_REGISTERED_FAILURE_MODE_COUNTS
     assert summary.tag_counts == ALL_REGISTERED_TAG_COUNTS
+
+
+def test_conversation_continuation_suite_matrix_summary_counts_are_expected() -> None:
+    summary = build_case_matrix_summary(load_benchmark_suite("conversation_continuations"))
+
+    assert summary.case_count == 2
+    assert summary.scenario_bucket_counts == {"family": 1, "solo": 1}
+    assert summary.level_counts == {"L3": 2}
+    assert summary.world_profile_counts == {"family_afternoon": 1, "solo_afternoon": 1}
+    assert summary.failure_mode_counts == {"none": 2}
+    assert summary.tag_counts == {
+        "child_friendly": 1,
+        "clarification_turn": 1,
+        "conversation_continuation": 2,
+        "light_activity": 1,
+        "light_meal": 2,
+        "plan_versioning": 1,
+        "replan_turn": 1,
+    }
 
 
 def test_default_fixtures_include_v1_metadata_and_expected_tools() -> None:
@@ -561,6 +651,20 @@ def test_build_failure_chain_summary_deduplicates_effects_and_marks_bounded() ->
             ["child_friendly", "indoor_activity", "memory_expired", "memory_governance"],
             "memory_expired_advisory",
         ),
+        (
+            "solo_clarification_continuation_v1",
+            "solo_afternoon",
+            "solo",
+            ["clarification_turn", "conversation_continuation", "light_activity", "light_meal"],
+            "clarification_continuation_solo",
+        ),
+        (
+            "family_replan_version_continuation_v1",
+            "family_afternoon",
+            "family",
+            ["child_friendly", "conversation_continuation", "light_meal", "plan_versioning", "replan_turn"],
+            "replan_version_continuation_family",
+        ),
     ],
 )
 def test_fixture_uses_expected_profile_taxonomy_and_focus(
@@ -610,6 +714,119 @@ def test_benchmark_case_rejects_duplicate_and_malformed_taxonomy_tags() -> None:
     )
     with pytest.raises(ValidationError):
         BenchmarkCase.model_validate(payload)
+
+
+def test_benchmark_case_supports_additive_continuation_contracts() -> None:
+    payload = {
+        "case_id": "continuation_case",
+        "title": "Continuation case",
+        "user_input": "Plan something nearby.",
+        "continuations": [
+            {
+                "mode": "clarify",
+                "user_input": "This afternoon I want a nearby solo outing for a few hours.",
+                "selected_plan_index": 0,
+            }
+        ],
+        "expected": {
+            "required_tool_names": ["search_poi"],
+            "min_tool_event_count": 1,
+            "min_action_count": 1,
+            "conversation": {
+                "steps": [
+                    {"mode": "start", "expected_status": "awaiting_clarification", "expected_version_label": "v1"},
+                    {"mode": "clarify", "expected_status": "awaiting_confirmation", "expected_version_label": "v1"},
+                    {"mode": "confirm", "expected_status": "completed", "expected_version_label": "v1"},
+                ],
+                "required_turn_types": [
+                    "user_request",
+                    "assistant_clarification_request",
+                    "user_clarification_reply",
+                    "assistant_plan_options",
+                ],
+            },
+        },
+        "taxonomy": _taxonomy_payload(
+            scenario_bucket="solo",
+            level="L3",
+            tags=["clarification_turn", "conversation_continuation"],
+        ),
+    }
+
+    case = BenchmarkCase.model_validate(payload)
+
+    assert case.continuations == [
+        BenchmarkContinuationRequest(
+            mode="clarify",
+            user_input="This afternoon I want a nearby solo outing for a few hours.",
+            selected_plan_index=0,
+        )
+    ]
+    assert case.expected.conversation == BenchmarkConversationExpectation(
+        steps=[
+            BenchmarkConversationExpectedStep(
+                mode="start",
+                expected_status="awaiting_clarification",
+                expected_version_label="v1",
+            ),
+            BenchmarkConversationExpectedStep(
+                mode="clarify",
+                expected_status="awaiting_confirmation",
+                expected_version_label="v1",
+            ),
+            BenchmarkConversationExpectedStep(
+                mode="confirm",
+                expected_status="completed",
+                expected_version_label="v1",
+            ),
+        ],
+        required_turn_types=[
+            "user_request",
+            "assistant_clarification_request",
+            "user_clarification_reply",
+            "assistant_plan_options",
+        ],
+    )
+
+
+def test_benchmark_case_result_exposes_conversation_trace_and_turn_types() -> None:
+    result = BenchmarkCaseResult.model_validate(
+        {
+            "case_id": "solo_clarification_continuation_v1",
+            "status": "passed",
+            "scores": [],
+            "overall_score": 1.0,
+            "tool_event_count": 8,
+            "action_count": 1,
+            "conversation_trace": [
+                {
+                    "mode": "start",
+                    "source_run_id": None,
+                    "run_id": str(uuid4()),
+                    "status": "awaiting_clarification",
+                    "version_label": "v1",
+                }
+            ],
+            "conversation_turn_types": [
+                "user_request",
+                "assistant_clarification_request",
+            ],
+        }
+    )
+
+    assert result.conversation_trace == [
+        BenchmarkConversationTraceStep(
+            mode="start",
+            source_run_id=None,
+            run_id=result.conversation_trace[0].run_id,
+            status="awaiting_clarification",
+            version_label="v1",
+        )
+    ]
+    assert result.conversation_turn_types == [
+        "user_request",
+        "assistant_clarification_request",
+    ]
 
 
 def test_trajectory_grader_passes_when_required_tools_are_present() -> None:
@@ -949,6 +1166,186 @@ def test_memory_governance_grader_passes_for_expected_policy_summary() -> None:
     assert score.details["observed_dimension_sources"] == {"dining_preferences": "memory"}
     assert score.details["observed_dimension_tiers"] == {"dining_preferences": "advisory"}
     assert score.details["observed_memory_outcomes"] == {"spouse_lighter_meals": "applied_advisory"}
+
+
+def test_conversation_path_grader_passes_for_exact_status_version_and_turn_types() -> None:
+    case = BenchmarkCase(
+        case_id="case",
+        title="Case",
+        user_input="Plan something nearby.",
+        continuations=[
+            BenchmarkContinuationRequest(
+                mode="clarify",
+                user_input="This afternoon I want a nearby solo outing for a few hours.",
+            )
+        ],
+        taxonomy=_taxonomy_payload(
+            scenario_bucket="solo",
+            level="L3",
+            tags=["clarification_turn", "conversation_continuation"],
+        ),
+        expected=BenchmarkExpectedOutcome(
+            required_tool_names=["search_poi"],
+            min_tool_event_count=1,
+            min_action_count=1,
+            conversation=BenchmarkConversationExpectation(
+                steps=[
+                    BenchmarkConversationExpectedStep(
+                        mode="start",
+                        expected_status="awaiting_clarification",
+                        expected_version_label="v1",
+                    ),
+                    BenchmarkConversationExpectedStep(
+                        mode="clarify",
+                        expected_status="awaiting_confirmation",
+                        expected_version_label="v1",
+                    ),
+                    BenchmarkConversationExpectedStep(
+                        mode="confirm",
+                        expected_status="completed",
+                        expected_version_label="v1",
+                    ),
+                ],
+                required_turn_types=[
+                    "user_request",
+                    "assistant_clarification_request",
+                    "user_clarification_reply",
+                    "assistant_plan_options",
+                ],
+            ),
+        ),
+    )
+
+    score = grade_conversation_path(
+        case,
+        [
+            BenchmarkConversationTraceStep(
+                mode="start",
+                source_run_id=None,
+                run_id=uuid4(),
+                status="awaiting_clarification",
+                version_label="v1",
+            ),
+            BenchmarkConversationTraceStep(
+                mode="clarify",
+                source_run_id=uuid4(),
+                run_id=uuid4(),
+                status="awaiting_confirmation",
+                version_label="v1",
+            ),
+            BenchmarkConversationTraceStep(
+                mode="confirm",
+                source_run_id=uuid4(),
+                run_id=uuid4(),
+                status="completed",
+                version_label="v1",
+            ),
+        ],
+        [
+            "user_request",
+            "assistant_clarification_request",
+            "user_clarification_reply",
+            "assistant_plan_options",
+        ],
+    )
+
+    assert score.name == "conversation_path"
+    assert score.passed is True
+    assert score.score == 1.0
+
+
+def test_conversation_path_grader_fails_for_step_count_mismatch() -> None:
+    case = BenchmarkCase(
+        case_id="case",
+        title="Case",
+        user_input="Plan something nearby.",
+        taxonomy=_taxonomy_payload(
+            scenario_bucket="solo",
+            level="L3",
+            tags=["clarification_turn", "conversation_continuation"],
+        ),
+        expected=BenchmarkExpectedOutcome(
+            required_tool_names=["search_poi"],
+            min_tool_event_count=1,
+            min_action_count=1,
+            conversation=BenchmarkConversationExpectation(
+                steps=[
+                    BenchmarkConversationExpectedStep(mode="start", expected_status="awaiting_clarification"),
+                    BenchmarkConversationExpectedStep(mode="clarify", expected_status="awaiting_confirmation"),
+                ],
+                required_turn_types=[],
+            ),
+        ),
+    )
+
+    score = grade_conversation_path(
+        case,
+        [
+            BenchmarkConversationTraceStep(
+                mode="start",
+                source_run_id=None,
+                run_id=uuid4(),
+                status="awaiting_clarification",
+            )
+        ],
+        [],
+    )
+
+    assert score.passed is False
+    assert "step count" in score.reason
+
+
+def test_conversation_path_grader_fails_when_required_turn_type_is_missing() -> None:
+    case = BenchmarkCase(
+        case_id="case",
+        title="Case",
+        user_input="Plan something nearby.",
+        taxonomy=_taxonomy_payload(
+            scenario_bucket="family",
+            level="L3",
+            tags=["conversation_continuation", "replan_turn"],
+        ),
+        expected=BenchmarkExpectedOutcome(
+            required_tool_names=["search_poi"],
+            min_tool_event_count=1,
+            min_action_count=1,
+            conversation=BenchmarkConversationExpectation(
+                steps=[
+                    BenchmarkConversationExpectedStep(mode="start", expected_status="awaiting_confirmation"),
+                    BenchmarkConversationExpectedStep(
+                        mode="replan",
+                        expected_status="awaiting_confirmation",
+                        expected_version_label="v2",
+                    ),
+                ],
+                required_turn_types=["user_follow_up", "assistant_replan_options"],
+            ),
+        ),
+    )
+
+    score = grade_conversation_path(
+        case,
+        [
+            BenchmarkConversationTraceStep(
+                mode="start",
+                source_run_id=None,
+                run_id=uuid4(),
+                status="awaiting_confirmation",
+                version_label="v1",
+            ),
+            BenchmarkConversationTraceStep(
+                mode="replan",
+                source_run_id=uuid4(),
+                run_id=uuid4(),
+                status="awaiting_confirmation",
+                version_label="v2",
+            ),
+        ],
+        ["user_follow_up"],
+    )
+
+    assert score.passed is False
+    assert "assistant_replan_options" in score.reason
 
 
 def test_report_writer_creates_parent_directory_and_json_file() -> None:
@@ -1535,6 +1932,77 @@ def test_run_suite_uses_canonical_suite_report_filename_and_normalizes_failures_
     assert report.benchmark_summary.outcome_rollup.failure_mode_outcomes["route_unavailable"].case_count == 1
     assert report.benchmark_summary.outcome_rollup.failure_mode_outcomes["route_unavailable"].passed_count == 1
     assert report.benchmark_summary.outcome_rollup.failure_mode_outcomes["route_unavailable"].pass_rate == 1.0
+
+
+def test_harness_uses_continuation_path_when_case_has_continuations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    harness = BenchmarkHarness(session=None, cache=None, rate_limiter=None)
+    case = BenchmarkCase(
+        case_id="continuation_case",
+        title="Continuation case",
+        user_input="Plan something nearby.",
+        continuations=[
+            BenchmarkContinuationRequest(
+                mode="clarify",
+                user_input="This afternoon I want a nearby solo outing for a few hours.",
+            )
+        ],
+        taxonomy=_taxonomy_payload(
+            scenario_bucket="solo",
+            level="L3",
+            tags=["clarification_turn", "conversation_continuation"],
+        ),
+        expected=BenchmarkExpectedOutcome(
+            required_tool_names=["search_poi"],
+            min_tool_event_count=1,
+            min_action_count=1,
+        ),
+    )
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        harness,
+        "_run_legacy_case",
+        lambda benchmark_case: calls.append(f"legacy:{benchmark_case.case_id}"),
+    )
+    monkeypatch.setattr(
+        harness,
+        "_run_continuation_case",
+        lambda benchmark_case: _benchmark_case_result(benchmark_case, status="passed"),
+    )
+
+    result = harness.run_case(case)
+
+    assert result.status == "passed"
+    assert calls == []
+
+
+def test_harness_uses_legacy_path_when_case_has_no_continuations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    harness = BenchmarkHarness(session=None, cache=None, rate_limiter=None)
+    case = _benchmark_case()
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        harness,
+        "_run_legacy_case",
+        lambda benchmark_case: calls.append(f"legacy:{benchmark_case.case_id}") or _benchmark_case_result(
+            benchmark_case,
+            status="passed",
+        ),
+    )
+    monkeypatch.setattr(
+        harness,
+        "_run_continuation_case",
+        lambda benchmark_case: _benchmark_case_result(benchmark_case, status="failed"),
+    )
+
+    result = harness.run_case(case)
+
+    assert result.status == "passed"
+    assert calls == ["legacy:case"]
 
 
 def _benchmark_case() -> BenchmarkCase:

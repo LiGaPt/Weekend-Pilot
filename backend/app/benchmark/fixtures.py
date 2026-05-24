@@ -26,6 +26,8 @@ _REGISTERED_CASE_IDS = (
     "rainy_day_ticket_sold_out_v1",
     "family_memory_advisory_fill_v1",
     "family_memory_expired_advisory_v1",
+    "solo_clarification_continuation_v1",
+    "family_replan_version_continuation_v1",
 )
 
 

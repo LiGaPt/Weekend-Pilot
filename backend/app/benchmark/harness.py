@@ -4,7 +4,7 @@ from copy import deepcopy
 from pathlib import Path
 from statistics import mean
 from typing import Any, Sequence
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -15,6 +15,7 @@ from backend.app.benchmark.failure_chain import build_failure_chain_summary
 from backend.app.benchmark.graders import (
     combine_scores,
     grade_agent_coverage,
+    grade_conversation_path,
     grade_execution_safety,
     grade_failure_injection,
     grade_feedback,
@@ -34,10 +35,18 @@ from backend.app.benchmark.reporting import write_case_report, write_run_report
 from backend.app.benchmark.schemas import (
     BenchmarkCase,
     BenchmarkCaseResult,
+    BenchmarkConversationTraceStep,
     BenchmarkRunReport,
     BenchmarkSummary,
     BenchmarkSuiteId,
 )
+from backend.app.demo.schemas import (
+    DemoClarifyRunRequest,
+    DemoConfirmRunRequest,
+    DemoReplanRunRequest,
+    DemoStartRunRequest,
+)
+from backend.app.demo.service import DemoServiceError, DemoStartRunOverride, DemoWorkflowService
 from backend.app.benchmark.suites import (
     canonical_benchmark_suite_id,
     list_benchmark_suites,
@@ -50,6 +59,7 @@ from backend.app.providers.mock_world.loader import SUPPORTED_PROFILES
 from backend.app.repositories import (
     ActionLedgerRepository,
     AgentRunRepository,
+    ConversationTurnRepository,
     MemoryItemRepository,
     PlanRepository,
     ToolEventRepository,
@@ -83,7 +93,9 @@ class BenchmarkHarness:
 
     def run_case(self, case: BenchmarkCase) -> BenchmarkCaseResult:
         try:
-            return self._run_case(case)
+            if case.continuations:
+                return self._run_continuation_case(case)
+            return self._run_legacy_case(case)
         except BenchmarkHarnessError:
             raise
         except Exception as exc:
@@ -163,7 +175,7 @@ class BenchmarkHarness:
         report_path = write_run_report(report, self.report_dir, filename=report_filename)
         return report.model_copy(update={"report_path": str(report_path)})
 
-    def _run_case(self, case: BenchmarkCase) -> BenchmarkCaseResult:
+    def _run_legacy_case(self, case: BenchmarkCase) -> BenchmarkCaseResult:
         if case.tool_profile != "mock_world" or case.world_profile not in SUPPORTED_PROFILES:
             result = BenchmarkCaseResult(
                 case_id=case.case_id,
@@ -179,26 +191,7 @@ class BenchmarkHarness:
 
         failure_injector = build_benchmark_failure_injector(case.failure_profile)
         repositories = _Repositories(self.session)
-        external_user_id = f"benchmark-{case.case_id}-{uuid4()}"
-        user = repositories.users.get_by_external_id(external_user_id)
-        if user is None:
-            user = repositories.users.create(
-                external_id=external_user_id,
-                display_name=f"Benchmark {case.case_id}",
-            )
-        for item in case.memory_items:
-            repositories.memory.create(
-                user_id=user.user_id,
-                memory_type=item.memory_type,
-                key=item.key,
-                value_json=item.value_json,
-                text=item.text,
-                confidence=item.confidence,
-                source_run_id=None,
-                source_langsmith_trace_id=None,
-                expires_at=item.expires_at,
-                status=item.status,
-            )
+        external_user_id, _ = self._prepare_case_user(case, repositories)
 
         workflow_result = WeekendPilotWorkflowRunner(
             WeekendPilotWorkflowDependencies(
@@ -327,6 +320,249 @@ class BenchmarkHarness:
         )
         return self._finalize_case_result(result, repositories)
 
+    def _run_continuation_case(self, case: BenchmarkCase) -> BenchmarkCaseResult:
+        if case.tool_profile != "mock_world":
+            return self._finalize_case_result(
+                BenchmarkCaseResult(
+                    case_id=case.case_id,
+                    status="error",
+                    taxonomy=case.taxonomy,
+                    scores=[],
+                    overall_score=0.0,
+                    tool_event_count=0,
+                    action_count=0,
+                    failure_reasons=["Continuation benchmark cases currently support only tool_profile='mock_world'."],
+                )
+            )
+        if case.failure_profile is not None:
+            return self._finalize_case_result(
+                BenchmarkCaseResult(
+                    case_id=case.case_id,
+                    status="error",
+                    taxonomy=case.taxonomy,
+                    scores=[],
+                    overall_score=0.0,
+                    tool_event_count=0,
+                    action_count=0,
+                    failure_reasons=["Continuation benchmark cases do not support failure profiles in v0."],
+                )
+            )
+        if case.world_profile not in SUPPORTED_PROFILES:
+            return self._finalize_case_result(
+                BenchmarkCaseResult(
+                    case_id=case.case_id,
+                    status="error",
+                    taxonomy=case.taxonomy,
+                    scores=[],
+                    overall_score=0.0,
+                    tool_event_count=0,
+                    action_count=0,
+                    failure_reasons=[f"Unsupported benchmark profile: {case.tool_profile}/{case.world_profile}"],
+                )
+            )
+
+        repositories = _Repositories(self.session)
+        external_user_id, user = self._prepare_case_user(case, repositories)
+        service = DemoWorkflowService(
+            session=self.session,
+            cache=self.cache,
+            rate_limiter=_BenchmarkCaseRateLimiter(self.rate_limiter, external_user_id),
+            trace_buffer_path=self._trace_path(case.case_id),
+        )
+        conversation_trace: list[BenchmarkConversationTraceStep] = []
+        conversation_run_ids: list[UUID] = []
+        current_run_id: UUID | None = None
+
+        try:
+            start_summary = service.start_run(
+                DemoStartRunRequest(
+                    user_input=case.user_input,
+                    external_user_id=external_user_id,
+                    display_name=user.display_name,
+                    case_id=case.case_id,
+                    selected_plan_index=0,
+                    read_profile="mock_world",
+                ),
+                override=DemoStartRunOverride(
+                    tool_profile=case.tool_profile,
+                    world_profile=case.world_profile,
+                    agent_version=case.agent_version,
+                    prompt_version=case.prompt_version,
+                ),
+            )
+            current_run_id = start_summary.run_id
+            if repositories.runs.get_by_id(current_run_id) is None:
+                return self._finalize_case_result(
+                    self._continuation_error_result(
+                        case,
+                        "Continuation start step did not persist a run.",
+                        conversation_trace=conversation_trace,
+                    ),
+                    repositories,
+                )
+            conversation_run_ids.append(current_run_id)
+            conversation_trace.append(
+                self._conversation_trace_step(
+                    mode="start",
+                    source_run_id=None,
+                    summary=start_summary,
+                )
+            )
+
+            current_summary = start_summary
+            for continuation in case.continuations:
+                source_run_id = current_run_id
+                if continuation.mode == "clarify":
+                    current_summary = service.clarify_run(
+                        source_run_id,
+                        DemoClarifyRunRequest(
+                            user_input=continuation.user_input,
+                            selected_plan_index=continuation.selected_plan_index,
+                        ),
+                    )
+                else:
+                    current_summary = service.replan_run(
+                        source_run_id,
+                        DemoReplanRunRequest(
+                            user_input=continuation.user_input,
+                            selected_plan_index=continuation.selected_plan_index,
+                        ),
+                    )
+                current_run_id = current_summary.run_id
+                if repositories.runs.get_by_id(current_run_id) is None:
+                    return self._finalize_case_result(
+                        self._continuation_error_result(
+                            case,
+                            f"Continuation step {continuation.mode!r} did not persist a run.",
+                            run_id=source_run_id,
+                            conversation_trace=conversation_trace,
+                        ),
+                        repositories,
+                    )
+                conversation_run_ids.append(current_run_id)
+                conversation_trace.append(
+                    self._conversation_trace_step(
+                        mode=continuation.mode,
+                        source_run_id=source_run_id,
+                        summary=current_summary,
+                    )
+                )
+
+            if current_summary.status == "awaiting_confirmation":
+                source_run_id = current_run_id
+                current_summary = service.confirm_run(
+                    source_run_id,
+                    DemoConfirmRunRequest(),
+                )
+                current_run_id = current_summary.run_id
+                conversation_trace.append(
+                    self._conversation_trace_step(
+                        mode="confirm",
+                        source_run_id=source_run_id,
+                        summary=current_summary,
+                    )
+                )
+        except DemoServiceError as exc:
+            return self._finalize_case_result(
+                self._continuation_error_result(
+                    case,
+                    exc.message,
+                    run_id=current_run_id,
+                    conversation_trace=conversation_trace,
+                ),
+                repositories,
+            )
+
+        final_run = repositories.runs.get_by_id(current_run_id) if current_run_id is not None else None
+        if final_run is None:
+            return self._finalize_case_result(
+                self._continuation_error_result(
+                    case,
+                    "Continuation chain did not leave a persisted final run.",
+                    conversation_trace=conversation_trace,
+                ),
+                repositories,
+            )
+
+        ordered_run_ids = self._dedupe_run_ids(conversation_run_ids)
+        for run_id in ordered_run_ids:
+            self._record_benchmark_metadata(repositories, run_id, case)
+
+        updated_final_run = repositories.runs.get_by_id(final_run.run_id)
+        persisted_final_run = updated_final_run if updated_final_run is not None else final_run
+        run_metadata = persisted_final_run.metadata_json if isinstance(persisted_final_run.metadata_json, dict) else {}
+        selected_plan = repositories.plans.get_selected_for_run(persisted_final_run.run_id)
+        aggregated_tool_events = self._tool_events_for_run_ids(repositories, ordered_run_ids)
+        aggregated_action_count = self._action_count_for_run_ids(repositories, ordered_run_ids)
+        final_run_tool_events = repositories.tool_events.list_for_run(persisted_final_run.run_id)
+        final_run_action_count = len(repositories.action_ledger.list_for_run(persisted_final_run.run_id))
+        conversation_turn_types = self._conversation_turn_types(repositories, persisted_final_run.session_id)
+        run_summary = self._run_summary(
+            run=persisted_final_run,
+            selected_plan=selected_plan,
+            metadata=run_metadata,
+            trace_id=self._trace_id_from_metadata(run_metadata),
+            tool_event_count=len(final_run_tool_events),
+            action_count=final_run_action_count,
+        )
+
+        plan_json = selected_plan.plan_json if selected_plan is not None and isinstance(selected_plan.plan_json, dict) else {}
+        execution = plan_json.get("execution") if isinstance(plan_json, dict) else None
+        feedback = plan_json.get("feedback") if isinstance(plan_json, dict) else None
+        workflow_result = {
+            "status": persisted_final_run.status,
+            "node_history": self._workflow_node_history_from_metadata(run_metadata),
+            "agent_results": self._agent_results_from_metadata(run_metadata),
+            "error_json": self._workflow_error_from_metadata(run_metadata),
+        }
+        scores = [
+            grade_workflow_path(workflow_result, case),
+            grade_agent_coverage(workflow_result),
+            grade_trajectory(case, aggregated_tool_events),
+            grade_failure_injection(case, aggregated_tool_events),
+            grade_execution_safety(case, execution),
+            grade_feedback(case, feedback),
+        ]
+        if case.expected.expected_workflow_status == "completed":
+            scores.insert(3, grade_plan_quality(selected_plan))
+        if case.expected.expected_recovery_action is not None:
+            scores.append(grade_recovery_expectation(case, run_metadata))
+        if case.expected.memory_governance is not None:
+            scores.append(grade_memory_governance(case, run_metadata))
+        if case.expected.conversation is not None:
+            scores.append(
+                grade_conversation_path(
+                    case,
+                    conversation_trace,
+                    conversation_turn_types,
+                )
+            )
+
+        status, overall, failure_reasons = combine_scores(scores)
+        result = BenchmarkCaseResult(
+            case_id=case.case_id,
+            status=status,
+            run_id=persisted_final_run.run_id,
+            trace_id=self._trace_id_from_metadata(run_metadata),
+            run_summary=run_summary,
+            taxonomy=case.taxonomy,
+            scores=scores,
+            overall_score=overall,
+            tool_event_count=len(aggregated_tool_events),
+            action_count=aggregated_action_count,
+            plan_status=getattr(selected_plan, "status", None),
+            feedback_status=current_summary.feedback_status or self._metadata_status(feedback),
+            observability_status=self._observability_status_from_metadata(run_metadata),
+            workflow_status=persisted_final_run.status,
+            workflow_timing_summary=run_summary.workflow_timing_summary if run_summary is not None else None,
+            workflow_node_history=self._workflow_node_history_from_metadata(run_metadata),
+            conversation_trace=conversation_trace,
+            conversation_turn_types=conversation_turn_types,
+            agent_roles=self._agent_roles(workflow_result),
+            failure_reasons=failure_reasons,
+        )
+        return self._finalize_case_result(result, repositories)
+
     def _workflow_error_result(
         self,
         case: BenchmarkCase,
@@ -355,6 +591,171 @@ class BenchmarkHarness:
             agent_roles=self._agent_roles(workflow_result),
             failure_reasons=[self._workflow_failure_reason(workflow_result)],
         )
+
+    def _prepare_case_user(
+        self,
+        case: BenchmarkCase,
+        repositories: "_Repositories",
+    ):
+        external_user_id = f"benchmark-{case.case_id}-{uuid4()}"
+        user = repositories.users.get_by_external_id(external_user_id)
+        if user is None:
+            user = repositories.users.create(
+                external_id=external_user_id,
+                display_name=f"Benchmark {case.case_id}",
+            )
+        for item in case.memory_items:
+            repositories.memory.create(
+                user_id=user.user_id,
+                memory_type=item.memory_type,
+                key=item.key,
+                value_json=item.value_json,
+                text=item.text,
+                confidence=item.confidence,
+                source_run_id=None,
+                source_langsmith_trace_id=None,
+                expires_at=item.expires_at,
+                status=item.status,
+            )
+        return external_user_id, user
+
+    def _continuation_error_result(
+        self,
+        case: BenchmarkCase,
+        message: str,
+        *,
+        run_id: UUID | None = None,
+        conversation_trace: Sequence[BenchmarkConversationTraceStep] | None = None,
+    ) -> BenchmarkCaseResult:
+        return BenchmarkCaseResult(
+            case_id=case.case_id,
+            status="error",
+            run_id=run_id,
+            taxonomy=case.taxonomy,
+            scores=[],
+            overall_score=0.0,
+            tool_event_count=0,
+            action_count=0,
+            conversation_trace=list(conversation_trace or []),
+            failure_reasons=[str(message)],
+        )
+
+    def _conversation_trace_step(
+        self,
+        *,
+        mode: str,
+        source_run_id: UUID | None,
+        summary: Any,
+    ) -> BenchmarkConversationTraceStep:
+        plan_version = getattr(summary, "plan_version", None)
+        version_label = getattr(plan_version, "version_label", None)
+        return BenchmarkConversationTraceStep(
+            mode=mode,
+            source_run_id=source_run_id,
+            run_id=getattr(summary, "run_id", None),
+            status=str(getattr(summary, "status", "")),
+            version_label=version_label,
+        )
+
+    def _dedupe_run_ids(self, run_ids: Sequence[UUID]) -> list[UUID]:
+        seen: set[UUID] = set()
+        ordered: list[UUID] = []
+        for run_id in run_ids:
+            if run_id in seen:
+                continue
+            seen.add(run_id)
+            ordered.append(run_id)
+        return ordered
+
+    def _tool_events_for_run_ids(
+        self,
+        repositories: "_Repositories",
+        run_ids: Sequence[UUID],
+    ) -> list[Any]:
+        events: list[Any] = []
+        for run_id in run_ids:
+            events.extend(repositories.tool_events.list_for_run(run_id))
+        return events
+
+    def _action_count_for_run_ids(
+        self,
+        repositories: "_Repositories",
+        run_ids: Sequence[UUID],
+    ) -> int:
+        return sum(len(repositories.action_ledger.list_for_run(run_id)) for run_id in run_ids)
+
+    def _conversation_turn_types(
+        self,
+        repositories: "_Repositories",
+        session_id: UUID | None,
+    ) -> list[str]:
+        if session_id is None:
+            return []
+        return [
+            str(turn.turn_type)
+            for turn in repositories.conversation_turns.list_for_session(session_id)
+            if getattr(turn, "turn_type", None)
+        ]
+
+    def _workflow_node_history_from_metadata(self, metadata: dict[str, Any]) -> list[str]:
+        demo = metadata.get("demo")
+        if isinstance(demo, dict):
+            initial = demo.get("initial_node_history")
+            continuation = demo.get("continuation_history")
+            if isinstance(initial, list) or isinstance(continuation, list):
+                return [
+                    str(node)
+                    for node in [*(initial or []), *(continuation or [])]
+                    if node is not None
+                ]
+        workflow = metadata.get("workflow")
+        if isinstance(workflow, dict) and isinstance(workflow.get("node_history"), list):
+            return [str(node) for node in workflow.get("node_history", []) if node is not None]
+        return []
+
+    def _agent_results_from_metadata(self, metadata: dict[str, Any]) -> list[Any]:
+        agents = metadata.get("agents")
+        if not isinstance(agents, dict):
+            return []
+        results = agents.get("results")
+        if not isinstance(results, list):
+            return []
+        return results
+
+    def _workflow_error_from_metadata(self, metadata: dict[str, Any]) -> dict[str, Any] | None:
+        workflow = metadata.get("workflow")
+        if isinstance(workflow, dict) and isinstance(workflow.get("error"), dict):
+            return workflow.get("error")
+        demo = metadata.get("demo")
+        if isinstance(demo, dict) and isinstance(demo.get("initial_error"), dict):
+            return demo.get("initial_error")
+        return None
+
+    def _trace_id_from_metadata(self, metadata: dict[str, Any]) -> str | None:
+        demo = metadata.get("demo")
+        if isinstance(demo, dict):
+            trace_id = demo.get("trace_id")
+            if isinstance(trace_id, str) and trace_id:
+                return trace_id
+        observability = metadata.get("observability")
+        if isinstance(observability, dict):
+            trace_id = observability.get("trace_id")
+            if isinstance(trace_id, str) and trace_id:
+                return trace_id
+        stored = load_run_summary(metadata)
+        if stored is not None and stored.trace_id:
+            return stored.trace_id
+        return None
+
+    def _observability_status_from_metadata(self, metadata: dict[str, Any]) -> str | None:
+        observability = metadata.get("observability")
+        if isinstance(observability, dict):
+            status = observability.get("status")
+            if isinstance(status, str):
+                return status
+            if isinstance(observability.get("trace_id"), str):
+                return "completed"
+        return None
 
     def _record_benchmark_metadata(
         self,
@@ -425,10 +826,11 @@ class BenchmarkHarness:
         metadata["benchmark"] = benchmark_metadata
         repositories.runs.update_metadata_json(result.run_id, metadata)
 
-    def _workflow_failure_reason(self, workflow_result: WeekendPilotWorkflowResult) -> str:
-        error_json = workflow_result.error_json
+    def _workflow_failure_reason(self, workflow_result: Any) -> str:
+        error_json = _value(workflow_result, "error_json")
+        status = _value(workflow_result, "status")
         if not isinstance(error_json, dict):
-            return f"Workflow returned status {workflow_result.status!r}."
+            return f"Workflow returned status {status!r}."
         error_type = error_json.get("error_type")
         message = error_json.get("message")
         if error_type and message:
@@ -437,14 +839,14 @@ class BenchmarkHarness:
             return str(message)
         if error_type:
             return str(error_type)
-        return f"Workflow returned status {workflow_result.status!r}."
+        return f"Workflow returned status {status!r}."
 
-    def _agent_roles(self, workflow_result: WeekendPilotWorkflowResult) -> list[str]:
+    def _agent_roles(self, workflow_result: Any) -> list[str]:
         return sorted(
             {
-                str(agent.role)
-                for agent in workflow_result.agent_results
-                if getattr(agent, "role", None)
+                str(_value(agent, "role"))
+                for agent in (_value(workflow_result, "agent_results", []) or [])
+                if _value(agent, "role")
             }
         )
 
@@ -489,6 +891,12 @@ class BenchmarkHarness:
             return None
 
 
+def _value(source: Any, key: str, default: Any = None) -> Any:
+    if isinstance(source, dict):
+        return source.get(key, default)
+    return getattr(source, key, default)
+
+
 class _Repositories:
     def __init__(self, session: Session) -> None:
         self.users = UserRepository(session)
@@ -496,6 +904,7 @@ class _Repositories:
         self.memory = MemoryItemRepository(session)
         self.tool_events = ToolEventRepository(session)
         self.action_ledger = ActionLedgerRepository(session)
+        self.conversation_turns = ConversationTurnRepository(session)
         self.plans = PlanRepository(session)
 
 

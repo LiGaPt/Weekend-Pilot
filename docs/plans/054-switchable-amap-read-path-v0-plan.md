@@ -25,12 +25,8 @@ docs/NEXT_PHASE_ROADMAP.md
 - Current branch is `codex/memory-governance-v1`.
 - Latest code commit is `2c8e6f0 feat: add memory governance v1`.
 - The latest completed task on this branch is `053`.
-- `docs/specs/` and `docs/plans/` are matched but not continuous on this branch; both are missing `047`, `049`, and `050`.
-- The missing `047`, `049`, and `050` docs already exist on separate doc-only branches:
-  - `codex/memory-query-policy-baseline-v0`
-  - `codex/mock-world-scenario-pack-expansion-v1`
-  - `codex/benchmark-l2-l3-suite-expansion-v0`
-- Those branches are documentation convergence debt only and must not be folded into Task `054`.
+- At authoring time, `docs/specs/` and `docs/plans/` on this branch were matched but not continuous because Tasks `047`, `049`, and `050` were still pending doc backfill.
+- At authoring time, that documentation convergence debt lived on separate doc-only branches and stayed outside Task `054`.
 - The runtime state before this task is:
   - `backend/app/providers/amap` already exists and its unit/integration tests pass.
   - the deterministic query planner already accepts `provider_profile="amap"`.
@@ -259,7 +255,7 @@ git push -u origin codex/switchable-amap-read-path-v0
 ```
 
 - If Task `053` is not yet merged upstream, branch from the current `2c8e6f0` tip or its merged equivalent.
-- Do not stage `.env`, secrets, `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, `var/`, or the separate `047/049/050` doc-only backfill work.
+- Do not stage `.env`, secrets, `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, `var/`, or any unrelated local doc drafts.
 
 ## 9. Out-of-scope Changes
 
@@ -270,7 +266,7 @@ git push -u origin codex/switchable-amap-read-path-v0
 - Do not generalize the live provider path beyond the single explicit `amap_shanghai_live` profile.
 - Do not change recovery routing, replay behavior, Chaos Harness semantics, or observability API shapes.
 - Do not add dependencies or Alembic revisions.
-- Do not backfill the missing `047`, `049`, or `050` docs here.
+- Do not backfill unrelated task-doc convergence work here.
 - Do not commit generated caches, secrets, or unrelated local files.
 
 ## 10. Review Checklist
@@ -307,4 +303,4 @@ After implementation, report back with:
 - The benchmark-default regression command results.
 - The frontend unit test and build results.
 - The commit hash and push result.
-- Confirmation that `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, `var/`, and the `047/049/050` doc-only work were not staged.
+- Confirmation that `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, `var/`, and any unrelated local doc drafts were not staged.

@@ -336,7 +336,7 @@ family_memory_expired_advisory_v1
 - Do not change query planner behavior outside what naturally follows from the effective intent it already consumes.
 - Do not change recovery routing, replay, failure injection, provider selection, or action-manifest behavior.
 - Do not remove or loosen the existing `memory_items` uniqueness constraint.
-- Do not merge or backfill missing `047`, `049`, or `050` task docs inside this implementation.
+- Do not merge or backfill unrelated task-doc convergence work inside this implementation.
 - Do not stage `.env`, secrets, `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, or `var/`.
 
 ## 5. Interfaces and Contracts

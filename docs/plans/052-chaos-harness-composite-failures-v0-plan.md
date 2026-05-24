@@ -25,12 +25,8 @@ docs/NEXT_PHASE_ROADMAP.md
 - Current branch is `codex/recovery-routing-v1`.
 - Latest code commit is `3c2822b feat: add bounded recovery routing v1`.
 - Latest completed product task in code history is `051`.
-- `docs/specs/` and `docs/plans/` on disk are matched but not continuous; both are missing `047`, `049`, and `050`.
-- The missing `047`, `049`, and `050` docs already exist on unmerged doc-only branch tips:
-  - `a5ce24f docs: add task 047 spec and plan`
-  - `2865960 docs: add task 049 spec and plan`
-  - `e7a98d9 docs: add task 050 spec and plan`
-- Those doc-only branches are convergence debt and must stay out of Task `052`.
+- At authoring time, `docs/specs/` and `docs/plans/` on disk were matched but not continuous because Tasks `047`, `049`, and `050` were still pending doc backfill.
+- At authoring time, that pending doc-only work was convergence debt and stayed out of Task `052`.
 - Current benchmark suite state before this task is:
   - `default`: 10 non-failure cases
   - `recovery_focused`: 1 failure case
@@ -243,7 +239,7 @@ docs/NEXT_PHASE_ROADMAP.md
     - `docs/TASK_WORKFLOW_PROMPTS.md`
     - `qc`
     - `var/`
-    - any local backfill docs for Tasks `047`, `049`, or `050`
+    - any unrelated local doc drafts
 
 ## 6. Testing Plan
 
@@ -306,7 +302,7 @@ git commit -m "feat: add chaos harness composite failures"
 git push -u origin codex/chaos-harness-composite-failures-v0
 ```
 
-The implementer must confirm that `.env`, secrets, `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, `var/`, and any local backfill docs for `047`, `049`, and `050` are not staged.
+The implementer must confirm that `.env`, secrets, `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, `var/`, and any unrelated local doc drafts are not staged.
 
 ## 9. Out-of-scope Changes
 
@@ -317,7 +313,7 @@ The implementer must confirm that `.env`, secrets, `docs/NEXT_PHASE_ROADMAP.md`,
 - Do not change the default 10-case non-failure suite.
 - Do not add public API routes, frontend UI, or observability page changes.
 - Do not add new dependencies or migrations.
-- Do not backfill or merge the missing `047`, `049`, or `050` docs in this task.
+- Do not backfill or merge unrelated task-doc convergence work in this task.
 - Do not stage unrelated local docs or runtime artifacts.
 
 ## 10. Review Checklist

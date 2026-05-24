@@ -26,7 +26,7 @@ However, the runtime path is still blocked:
 - The public frontend has no explicit provider selector.
 - AMAP search results currently normalize into `other_candidates` instead of usable `activity` / `dining` buckets, so even a simple profile toggle would not produce plans.
 
-`docs/specs/` and `docs/plans/` on the current branch are matched but not continuous because `047`, `049`, and `050` are missing. Those gaps already exist on separate doc-only branches and are not the runtime blocker this task should solve.
+At authoring time, `docs/specs/` and `docs/plans/` on the branch were not yet continuous because Tasks `047`, `049`, and `050` were still pending doc backfill. That documentation gap was not the runtime blocker this task needed to solve.
 
 ## 3. Requirements
 
@@ -169,7 +169,7 @@ AMAP read path is not configured for this environment.
 - Do not add live-provider replay behavior, provider-specific recovery routing, or Chaos Harness provider failover.
 - Do not generalize the live provider path beyond the single explicit local profile `amap_shanghai_live`.
 - Do not add new dependencies or Alembic revisions.
-- Do not backfill missing `047`, `049`, or `050` docs in this task.
+- Do not backfill unrelated task-doc convergence work in this task.
 - Do not stage `.env`, API keys, `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, or `var/`.
 
 ## 5. Interfaces and Contracts

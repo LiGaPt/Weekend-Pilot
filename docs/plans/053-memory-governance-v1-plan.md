@@ -25,11 +25,8 @@ docs/NEXT_PHASE_ROADMAP.md
 - Current branch is `codex/chaos-harness-composite-failures-v0`.
 - Latest code commit is `6f13ce5 feat: add chaos harness composite failures`.
 - Latest completed product task in code history is `052`.
-- `docs/specs/` and `docs/plans/` on disk are matched but not continuous; both are missing `047`, `049`, and `050`.
-- The missing `047`, `049`, and `050` docs already exist on isolated doc-only branch tips:
-  - `a5ce24f docs: add task 047 spec and plan`
-  - `2865960 docs: add task 049 spec and plan`
-  - `e7a98d9 docs: add task 050 spec and plan`
+- At authoring time, `docs/specs/` and `docs/plans/` on disk were matched but not continuous because Tasks `047`, `049`, and `050` were still pending doc backfill.
+- At authoring time, that backfill work lived on isolated doc-only branch tips outside Task `053`.
 - Those branch tips are convergence debt only and must stay out of Task `053`.
 - Current memory behavior before this task is:
   - `load_memory(...)` only loads non-expired active memory through `list_active_for_user(...)`
@@ -223,7 +220,7 @@ docs/NEXT_PHASE_ROADMAP.md
     - `docs/TASK_WORKFLOW_PROMPTS.md`
     - `qc`
     - `var/`
-    - any local backfill docs for `047`, `049`, and `050`
+    - any unrelated local doc drafts
 
 ## 6. Testing Plan
 
@@ -296,7 +293,7 @@ git push -u origin codex/memory-governance-v1
 ```
 
 - If Task `052` is not merged yet, branch from the current `6f13ce5` tip or its merged equivalent.
-- Do not stage `.env`, secrets, `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, `var/`, or the missing `047/049/050` backfill docs.
+- Do not stage `.env`, secrets, `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, `var/`, or any unrelated local doc drafts.
 
 ## 9. Out-of-scope Changes
 
@@ -306,7 +303,7 @@ git push -u origin codex/memory-governance-v1
 - Do not change recovery routing, replay behavior, or benchmark failure injection.
 - Do not add new dependencies.
 - Do not add or modify Alembic revisions, tables, columns, or indexes.
-- Do not merge the `047`, `049`, or `050` doc-only branches as part of this task.
+- Do not merge unrelated task-doc convergence branches as part of this task.
 - Do not commit generated caches, secrets, or unrelated local files.
 
 ## 10. Review Checklist
@@ -341,5 +338,5 @@ After implementation, report back with:
 - The verification commands that were run and their results.
 - The commit hash and push result.
 - Confirmation that no migration changed.
-- Confirmation that `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, `var/`, and the missing `047/049/050` backfill docs were not staged.
+- Confirmation that `docs/NEXT_PHASE_ROADMAP.md`, `docs/TASK_WORKFLOW_PROMPTS.md`, `qc`, `var/`, and any unrelated local doc drafts were not staged.
 - Any remaining follow-up limitation, especially that memory CRUD, sensitive-data minimization, and user-editable controls remain future work.
