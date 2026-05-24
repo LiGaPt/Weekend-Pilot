@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DemoApiError, confirmRun, declineRun, getRun, startRun } from "./demo";
+import { confirmRun, declineRun, getRun, startRun } from "./demo";
+import { FrontendApiError } from "../shared/http";
 import type { DemoRunSummary } from "../types/demo";
 
 const summary: DemoRunSummary = {
@@ -113,7 +114,7 @@ describe("demo API client", () => {
     );
   });
 
-  it("throws DemoApiError with localized message for connection failures", async () => {
+  it("throws FrontendApiError with localized message for connection failures", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -125,10 +126,10 @@ describe("demo API client", () => {
       name: "DemoApiError",
       status: 0,
       message: "\u65e0\u6cd5\u8fde\u63a5\u6f14\u793a\u670d\u52a1\uff0c\u8bf7\u786e\u8ba4\u540e\u7aef\u6b63\u5728\u8fd0\u884c\u3002",
-    } satisfies Partial<DemoApiError>);
+    } satisfies Partial<FrontendApiError>);
   });
 
-  it("throws DemoApiError with backend detail for non-2xx responses", async () => {
+  it("throws FrontendApiError with backend detail for non-2xx responses", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response(JSON.stringify({ detail: "Run not found." }), { status: 404 })),
@@ -138,7 +139,7 @@ describe("demo API client", () => {
       name: "DemoApiError",
       status: 404,
       message: "\u672a\u627e\u5230\u5bf9\u5e94\u7684\u6f14\u793a\u8fd0\u884c\u3002",
-    } satisfies Partial<DemoApiError>);
+    } satisfies Partial<FrontendApiError>);
   });
 
   it("localizes the AMAP configuration error detail", async () => {
@@ -157,7 +158,7 @@ describe("demo API client", () => {
       name: "DemoApiError",
       status: 500,
       message: "\u672c\u5730\u73af\u5883\u672a\u914d\u7f6e AMap \u53ea\u8bfb\u9884\u89c8\u6240\u9700\u7684\u5bc6\u94a5\u3002",
-    } satisfies Partial<DemoApiError>);
+    } satisfies Partial<FrontendApiError>);
   });
 
   it("localizes the AMAP read-only confirm rejection detail", async () => {
@@ -176,6 +177,6 @@ describe("demo API client", () => {
       name: "DemoApiError",
       status: 409,
       message: "AMap \u53ea\u8bfb\u9884\u89c8\u8def\u5f84\u4e0d\u652f\u6301\u786e\u8ba4\u6267\u884c\u3002",
-    } satisfies Partial<DemoApiError>);
+    } satisfies Partial<FrontendApiError>);
   });
 });

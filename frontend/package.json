@@ -4,12 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "test": "vitest --exclude e2e/**",
-    "e2e": "playwright test",
-    "e2e:headed": "playwright test --headed",
+    "dev": "npm run dev:customer",
+    "dev:customer": "vite --config vite.config.ts",
+    "dev:internal": "vite --config vite.internal.config.ts",
+    "build": "npm run build:customer && npm run build:internal",
+    "build:customer": "tsc -b && vite build --config vite.config.ts",
+    "build:internal": "tsc -b && vite build --config vite.internal.config.ts",
+    "preview": "vite preview --config vite.config.ts",
+    "preview:internal": "vite preview --config vite.internal.config.ts",
+    "test": "vitest --config vitest.config.ts --exclude e2e/**",
+    "e2e": "node ./scripts/run-e2e.mjs",
+    "e2e:headed": "node ./scripts/run-e2e.mjs --headed",
     "e2e:install": "playwright install chromium"
   },
   "dependencies": {

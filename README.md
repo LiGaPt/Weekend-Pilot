@@ -365,17 +365,32 @@ Run the frontend:
 ```bash
 npm --prefix frontend install
 npm --prefix frontend run dev
+npm --prefix frontend run dev:internal
 ```
 
-Open `http://127.0.0.1:5173`.
+Open the customer surface at `http://127.0.0.1:5173/`.
+Open the internal review surface at `http://127.0.0.1:5174/`.
 
 The frontend defaults to `http://127.0.0.1:8000` for the API. To override it locally, set `VITE_API_BASE_URL` in `frontend/.env`.
-The public demo page only shows customer-safe run details. Internal trace and node history review lives at `http://127.0.0.1:5173/observability`.
+The public demo page only shows customer-safe run details. Internal trace and node history review now lives on the separate internal frontend surface at `http://127.0.0.1:5174/`.
 The visible run inspector includes the current plan version label for the loaded run.
 The visible action preview for each plan tab now comes from `plans[*].action_manifest`, so pre-confirmation and post-confirmation states share one normalized public shape.
 The page now also exposes an explicit read-path selector. Leave it on `Mock World` for the default deterministic demo and benchmark-aligned checks. Switch it to `AMap 只读预览` only when you want a local live-provider preview that stays pre-confirmation and does not execute writes.
 
-For internal review, open `http://127.0.0.1:5173/observability` and paste a `run_id` to inspect the internal run summary, workflow timing, tool-event details, action-ledger details, benchmark artifact context, and bounded recovery-path details. Benchmark-backed recovery runs also surface the persisted benchmark case report path as replay input context for later inspection tooling.
+For internal review, open `http://127.0.0.1:5174/` and paste a `run_id` to inspect the internal run summary, workflow timing, tool-event details, action-ledger details, benchmark artifact context, and bounded recovery-path details. Benchmark-backed recovery runs also surface the persisted benchmark case report path as replay input context for later inspection tooling.
+
+Frontend surface scripts:
+
+```bash
+npm --prefix frontend run dev:customer
+npm --prefix frontend run dev:internal
+npm --prefix frontend run build
+```
+
+Build outputs:
+
+- customer: `frontend/dist/customer/index.html`
+- internal: `frontend/dist/internal/index.html`
 
 For the full Web demo runbook, see `docs/WEB_DEMO_README.md`.
 

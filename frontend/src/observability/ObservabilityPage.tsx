@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { DemoApiError } from "../api/demo";
 import { getObservabilityRun } from "./api";
+import { FrontendApiError } from "../shared/http";
 import type {
   InternalActionLedgerSummary,
   InternalBenchmarkArtifactSummary,
@@ -36,7 +36,7 @@ export function ObservabilityPage() {
       const next = await getObservabilityRun(trimmed);
       setResult(next);
     } catch (error) {
-      if (error instanceof DemoApiError) {
+      if (error instanceof FrontendApiError) {
         setErrorMessage(error.message);
       } else {
         setErrorMessage(GENERIC_ERROR_MESSAGE);

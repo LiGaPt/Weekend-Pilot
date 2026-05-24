@@ -84,13 +84,20 @@ Install frontend dependencies:
 npm --prefix frontend install
 ```
 
-Start Vite:
+Start the customer surface:
 
 ```bash
 npm --prefix frontend run dev
 ```
 
-Open `http://127.0.0.1:5173`.
+Start the internal review surface in a second terminal:
+
+```bash
+npm --prefix frontend run dev:internal
+```
+
+Open the customer surface at `http://127.0.0.1:5173/`.
+Open the internal review surface at `http://127.0.0.1:5174/`.
 
 The frontend defaults to `http://127.0.0.1:8000` for API calls. To override it locally, create `frontend/.env` with:
 
@@ -104,10 +111,10 @@ Do not commit local `.env` files.
 
 The repository now includes a separate internal observability review page for reviewers and developers:
 
-- page: `http://127.0.0.1:5173/observability`
+- page: `http://127.0.0.1:5174/`
 - backend endpoint: `GET /internal/runs/{run_id}/observability`
 
-Paste a `run_id` from the public demo flow into `/observability` to inspect the internal workflow summary, including timing, node history, agent roles, observability status, and benchmark artifact context for benchmark-backed runs. The customer-facing demo at `/` stays customer-safe and no longer renders those internal fields.
+Paste a `run_id` from the public demo flow into the internal surface to inspect the internal workflow summary, including timing, node history, agent roles, observability status, and benchmark artifact context for benchmark-backed runs. The customer-facing demo at `http://127.0.0.1:5173/` stays customer-safe and no longer renders those internal fields.
 
 The internal review page now also shows sanitized tool-event and action-ledger detail panels, a real benchmark-artifact panel populated from persisted run metadata, and a real recovery-path panel populated from persisted bounded recovery metadata. For benchmark-backed recovery runs, the page also shows the persisted benchmark case report path as replay input context. Replay execution and replay report browsing remain separate tooling.
 
@@ -238,7 +245,8 @@ npm --prefix frontend run e2e
 The E2E config starts:
 
 - backend: `uvicorn backend.app.main:app --host 127.0.0.1 --port 8000`
-- frontend: Vite on `127.0.0.1:5173`
+- customer frontend: Vite on `127.0.0.1:5173`
+- internal frontend: Vite on `127.0.0.1:5174`
 
 PostgreSQL, Redis, and migrations must already be ready.
 
@@ -266,7 +274,7 @@ PostgreSQL, Redis, and migrations must already be ready.
 
 - Backend health check fails: confirm `uvicorn backend.app.main:app --reload` starts and `http://127.0.0.1:8000/health` returns `ok`.
 - API requests fail: confirm PostgreSQL and Redis are running and migrations were applied.
-- E2E server startup fails: stop any stale process already using ports `8000` or `5173`, then rerun the command.
+- E2E server startup fails: stop any stale process already using ports `8000`, `5173`, or `5174`, then rerun the command.
 - Browser launch fails: rerun `npm --prefix frontend run e2e:install`.
 - Frontend points at the wrong API: set `VITE_API_BASE_URL` in `frontend/.env`.
 - LangSmith is unavailable: no action is required for the Mock World demo path.

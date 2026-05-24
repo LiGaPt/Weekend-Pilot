@@ -1,8 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DemoApiError } from "../api/demo";
 import { getObservabilityRun } from "./api";
+import { FrontendApiError } from "../shared/http";
 import { ObservabilityPage } from "./ObservabilityPage";
 import type { InternalObservabilityRunSummary } from "./types";
 
@@ -271,7 +271,7 @@ describe("ObservabilityPage", () => {
 
   it("renders not found errors from the backend", async () => {
     const user = userEvent.setup();
-    vi.mocked(getObservabilityRun).mockRejectedValue(new DemoApiError("未找到对应的内部观测运行。", 404));
+    vi.mocked(getObservabilityRun).mockRejectedValue(new FrontendApiError("未找到对应的内部观测运行。", 404));
     render(<ObservabilityPage />);
 
     await user.type(screen.getByRole("textbox", { name: "Run ID" }), "missing");
