@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     demo_cors_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
     ]
     langchain_tracing_v2: bool = False
     llm_enabled: bool = False

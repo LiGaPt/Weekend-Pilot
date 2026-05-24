@@ -1,4 +1,4 @@
-import { API_BASE_URL, DemoApiError } from "../api/demo";
+import { API_BASE_URL, FrontendApiError } from "../shared/http";
 import type { InternalObservabilityRunSummary } from "./types";
 
 export async function getObservabilityRun(runId: string): Promise<InternalObservabilityRunSummary> {
@@ -14,11 +14,11 @@ async function request<T>(path: string): Promise<T> {
   try {
     response = await fetch(url);
   } catch (error) {
-    throw new DemoApiError(connectionMessage(error), 0);
+    throw new FrontendApiError(connectionMessage(error), 0);
   }
 
   if (!response.ok) {
-    throw new DemoApiError(await responseMessage(response), response.status);
+    throw new FrontendApiError(await responseMessage(response), response.status);
   }
 
   return (await response.json()) as T;

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DemoApiError } from "../api/demo";
 import { getObservabilityRun } from "./api";
+import { FrontendApiError } from "../shared/http";
 import type { InternalObservabilityRunSummary } from "./types";
 
 const summary: InternalObservabilityRunSummary = {
@@ -59,7 +59,7 @@ describe("internal observability API client", () => {
     expect(fetch).toHaveBeenCalledWith("http://127.0.0.1:8000/internal/runs/run-1/observability");
   });
 
-  it("throws DemoApiError with a reviewer-readable message for connection failures", async () => {
+  it("throws FrontendApiError with a reviewer-readable message for connection failures", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -71,10 +71,10 @@ describe("internal observability API client", () => {
       name: "DemoApiError",
       status: 0,
       message: "无法连接内部观测服务，请确认后端正在运行。",
-    } satisfies Partial<DemoApiError>);
+    } satisfies Partial<FrontendApiError>);
   });
 
-  it("throws DemoApiError with backend detail for not found responses", async () => {
+  it("throws FrontendApiError with backend detail for not found responses", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response(JSON.stringify({ detail: "Observability run was not found." }), { status: 404 })),
@@ -84,6 +84,6 @@ describe("internal observability API client", () => {
       name: "DemoApiError",
       status: 404,
       message: "未找到对应的内部观测运行。",
-    } satisfies Partial<DemoApiError>);
+    } satisfies Partial<FrontendApiError>);
   });
 });

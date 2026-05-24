@@ -1,16 +1,5 @@
 import type { DemoRunSummary, DemoStartRunRequest } from "../types/demo";
-
-export class DemoApiError extends Error {
-  status: number;
-
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = "DemoApiError";
-    this.status = status;
-  }
-}
-
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
+import { API_BASE_URL, FrontendApiError } from "../shared/http";
 
 export async function startRun(input: DemoStartRunRequest): Promise<DemoRunSummary> {
   return request<DemoRunSummary>("/demo/runs", {
@@ -51,11 +40,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     response = init ? await fetch(url, init) : await fetch(url);
   } catch (error) {
-    throw new DemoApiError(connectionMessage(error), 0);
+    throw new FrontendApiError(connectionMessage(error), 0);
   }
 
   if (!response.ok) {
-    throw new DemoApiError(await responseMessage(response), response.status);
+    throw new FrontendApiError(await responseMessage(response), response.status);
   }
 
   return (await response.json()) as T;
