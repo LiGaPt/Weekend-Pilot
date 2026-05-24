@@ -15,7 +15,7 @@ const forbiddenVisibleText = [
 async function startDemoRun(page: Page) {
   await page.goto("/");
   await page.getByTestId("start-button").click();
-  await expect(page.getByTestId("run-status")).toHaveText("awaiting_confirmation", { timeout: 60_000 });
+  await expect(page.getByTestId("run-status")).toHaveText("等待确认", { timeout: 60_000 });
   await expect(page.getByTestId("action-count")).toHaveText("0");
 }
 
@@ -42,17 +42,17 @@ test.describe("desktop web demo", () => {
   test("starts a run, preserves confirmation boundary, confirms, and shows feedback", async ({ page }) => {
     await startDemoRun(page);
 
-    await expect(page.getByText("Confirmation boundary")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Action preview" })).toBeVisible();
+    await expect(page.getByText("确认边界")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "行程时间线" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "执行动作预览" })).toBeVisible();
     await expect(page.getByTestId("confirm-button")).toBeVisible();
     expect(await visibleActionCount(page)).toBe(0);
 
     await page.getByTestId("confirm-button").click();
 
-    await expect(page.getByTestId("run-status")).toHaveText("completed", { timeout: 60_000 });
-    await expect(page.getByText("Execution and feedback")).toBeVisible();
-    await expect(page.getByText("Completed actions")).toBeVisible();
+    await expect(page.getByTestId("run-status")).toHaveText("已完成", { timeout: 60_000 });
+    await expect(page.getByText("执行与反馈")).toBeVisible();
+    await expect(page.getByText("已完成动作")).toBeVisible();
     expect(await visibleActionCount(page)).toBeGreaterThan(0);
     await expect(page.getByTestId("confirm-button")).toHaveCount(0);
   });
@@ -62,7 +62,7 @@ test.describe("desktop web demo", () => {
 
     await page.getByTestId("decline-button").click();
 
-    await expect(page.getByTestId("run-status")).toHaveText("declined", { timeout: 60_000 });
+    await expect(page.getByTestId("run-status")).toHaveText("已放弃", { timeout: 60_000 });
     await expect(page.getByTestId("confirm-button")).toHaveCount(0);
   });
 
@@ -72,7 +72,7 @@ test.describe("desktop web demo", () => {
 
     await page.getByTestId("refresh-button").click();
 
-    await expect(page.getByTestId("run-status")).toHaveText("awaiting_confirmation", { timeout: 60_000 });
+    await expect(page.getByTestId("run-status")).toHaveText("等待确认", { timeout: 60_000 });
     await expect(page.getByTestId("run-id")).toHaveText(runId);
   });
 
@@ -82,7 +82,7 @@ test.describe("desktop web demo", () => {
 
     await page.getByTestId("confirm-button").click();
 
-    await expect(page.getByTestId("run-status")).toHaveText("completed", { timeout: 60_000 });
+    await expect(page.getByTestId("run-status")).toHaveText("已完成", { timeout: 60_000 });
     await expectNoForbiddenVisibleText(page);
   });
 });
@@ -96,7 +96,7 @@ test.describe("mobile web demo", () => {
     await startDemoRun(page);
 
     await expect(page.getByTestId("confirm-button")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "行程时间线" })).toBeVisible();
 
     const hasHorizontalOverflow = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
