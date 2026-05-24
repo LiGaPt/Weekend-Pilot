@@ -2,12 +2,13 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { confirmRun, declineRun, startRun } from "./api/demo";
+import { clarifyRun, confirmRun, declineRun, startRun } from "./api/demo";
 import type { DemoRunSummary } from "./types/demo";
 
 vi.mock("./api/demo", () => ({
   startRun: vi.fn(),
   getRun: vi.fn(),
+  clarifyRun: vi.fn(),
   confirmRun: vi.fn(),
   declineRun: vi.fn(),
 }));
@@ -116,12 +117,50 @@ const awaitingRun: DemoRunSummary = {
   execution_status: null,
   feedback_status: null,
   error: null,
+  clarification: null,
+};
+
+const awaitingClarificationRun: DemoRunSummary = {
+  run_id: "run-clarify-1",
+  status: "awaiting_clarification",
+  read_profile: "mock_world",
+  selected_plan_id: null,
+  plan_version: {
+    version_number: 1,
+    version_label: "v1",
+    source_run_id: null,
+    source_selected_plan_id: null,
+  },
+  plans: [],
+  action_count: 0,
+  execution_status: null,
+  feedback_status: null,
+  error: null,
+  clarification: {
+    prompt: "为了继续规划，请补充这次是谁一起去，以及大概什么时间出发、准备玩多久。",
+    missing_fields: ["scenario_or_participants", "time_window"],
+  },
+};
+
+const awaitingClarificationRunRoundTwo: DemoRunSummary = {
+  ...awaitingClarificationRun,
+  run_id: "run-clarify-2",
+  clarification: {
+    prompt: "为了继续规划，请补充大概什么时间出发、准备玩多久。",
+    missing_fields: ["time_window"],
+  },
 };
 
 const awaitingAmapRun: DemoRunSummary = {
   ...awaitingRun,
   run_id: "run-amap",
   read_profile: "amap",
+};
+
+const clarifiedRun: DemoRunSummary = {
+  ...awaitingRun,
+  run_id: "run-2",
+  clarification: null,
 };
 
 const completedRun: DemoRunSummary = {
@@ -185,6 +224,7 @@ const declinedRun: DemoRunSummary = {
 describe("App", () => {
   beforeEach(() => {
     vi.mocked(startRun).mockReset();
+    vi.mocked(clarifyRun).mockReset();
     vi.mocked(confirmRun).mockReset();
     vi.mocked(declineRun).mockReset();
   });
@@ -284,6 +324,82 @@ describe("App", () => {
 
     const alert = await screen.findByRole("alert");
     expect(within(alert).getByText(/./)).toBeInTheDocument();
+  });
+
+  it("renders a clarification panel when the run is awaiting clarification", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startRun).mockResolvedValue(awaitingClarificationRun);
+    render(<App />);
+
+    await user.click(screen.getByTestId("start-button"));
+
+    expect(await screen.findByTestId("clarification-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("run-status")).toHaveTextContent("等待补充信息");
+    expect(screen.getByTestId("plan-version")).toHaveTextContent("v1");
+    expect(screen.getByTestId("action-count")).toHaveTextContent("0");
+    expect(
+      screen.getByText("为了继续规划，请补充这次是谁一起去，以及大概什么时间出发、准备玩多久。"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("clarification-fields")).toHaveTextContent("出行人/场景");
+    expect(screen.getByTestId("clarification-fields")).toHaveTextContent("时间安排");
+    expect(screen.queryByTestId("confirm-button")).not.toBeInTheDocument();
+  });
+
+  it("disables clarification submit when the reply is empty", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startRun).mockResolvedValue(awaitingClarificationRun);
+    render(<App />);
+
+    await user.click(screen.getByTestId("start-button"));
+
+    const replyInput = await screen.findByTestId("clarification-reply-input");
+    const submitButton = screen.getByTestId("clarification-submit-button");
+
+    expect(submitButton).toBeDisabled();
+
+    await user.type(replyInput, "   ");
+
+    expect(submitButton).toBeDisabled();
+  });
+
+  it("submits a clarification reply and returns to plan review while keeping v1", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startRun).mockResolvedValue(awaitingClarificationRun);
+    vi.mocked(clarifyRun).mockResolvedValue(clarifiedRun);
+    render(<App />);
+
+    await user.click(screen.getByTestId("start-button"));
+    await user.type(
+      await screen.findByTestId("clarification-reply-input"),
+      "今天下午一个人出门玩几个小时，别太远。",
+    );
+    await user.click(screen.getByTestId("clarification-submit-button"));
+
+    expect(clarifyRun).toHaveBeenCalledWith("run-clarify-1", {
+      user_input: "今天下午一个人出门玩几个小时，别太远。",
+      selected_plan_index: 0,
+    });
+    expect(await screen.findByRole("heading", { name: /徐汇亲子科学半日行/ })).toBeInTheDocument();
+    expect(screen.getByTestId("run-status")).toHaveTextContent("等待确认");
+    expect(screen.getByTestId("run-id")).toHaveTextContent("run-2");
+    expect(screen.getByTestId("plan-version")).toHaveTextContent("v1");
+  });
+
+  it("keeps the clarification panel visible when clarification is still required", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startRun).mockResolvedValue(awaitingClarificationRun);
+    vi.mocked(clarifyRun).mockResolvedValue(awaitingClarificationRunRoundTwo);
+    render(<App />);
+
+    await user.click(screen.getByTestId("start-button"));
+    await user.type(await screen.findByTestId("clarification-reply-input"), "和朋友一起去。");
+    await user.click(screen.getByTestId("clarification-submit-button"));
+
+    expect(await screen.findByTestId("clarification-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("run-id")).toHaveTextContent("run-clarify-2");
+    expect(screen.getByTestId("clarification-fields")).toHaveTextContent("时间安排");
+    expect(screen.getByText("为了继续规划，请补充大概什么时间出发、准备玩多久。")).toBeInTheDocument();
+    expect(screen.queryByTestId("confirm-button")).not.toBeInTheDocument();
   });
 
   it("sends the selected read profile when starting a run", async () => {

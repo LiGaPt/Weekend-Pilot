@@ -1,4 +1,4 @@
-import type { DemoRunSummary, DemoStartRunRequest } from "../types/demo";
+import type { DemoClarifyRunRequest, DemoRunSummary, DemoStartRunRequest } from "../types/demo";
 import { API_BASE_URL, FrontendApiError } from "../shared/http";
 
 export async function startRun(input: DemoStartRunRequest): Promise<DemoRunSummary> {
@@ -18,6 +18,14 @@ export async function confirmRun(runId: string, planId?: string | null): Promise
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ plan_id: planId ?? null, confirmed_by: "web-demo-user" }),
+  });
+}
+
+export async function clarifyRun(runId: string, input: DemoClarifyRunRequest): Promise<DemoRunSummary> {
+  return request<DemoRunSummary>(`/demo/runs/${encodeURIComponent(runId)}/clarify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
   });
 }
 
@@ -82,6 +90,14 @@ function localizedResponseMessage(message: string, status: number): string {
       "\u672c\u5730\u73af\u5883\u672a\u914d\u7f6e AMap \u53ea\u8bfb\u9884\u89c8\u6240\u9700\u7684\u5bc6\u94a5\u3002",
     "AMAP read-only demo runs cannot be confirmed.":
       "AMap \u53ea\u8bfb\u9884\u89c8\u8def\u5f84\u4e0d\u652f\u6301\u786e\u8ba4\u6267\u884c\u3002",
+    "Source run status does not allow clarification.":
+      "\u5f53\u524d\u8fd0\u884c\u5df2\u4e0d\u80fd\u7ee7\u7eed\u8865\u5145\u4fe1\u606f\uff0c\u8bf7\u5237\u65b0\u72b6\u6001\u540e\u91cd\u8bd5\u3002",
+    "Source run is missing session persistence for clarification.":
+      "\u5f53\u524d\u8fd0\u884c\u7f3a\u5c11\u8865\u5145\u4fe1\u606f\u4f1a\u8bdd\uff0c\u8bf7\u91cd\u65b0\u5f00\u59cb\u89c4\u5212\u3002",
+    "Source run session is unavailable for clarification.":
+      "\u5f53\u524d\u8fd0\u884c\u7f3a\u5c11\u8865\u5145\u4fe1\u606f\u4f1a\u8bdd\uff0c\u8bf7\u91cd\u65b0\u5f00\u59cb\u89c4\u5212\u3002",
+    "Source run user is unavailable for clarification.":
+      "\u5f53\u524d\u8fd0\u884c\u7f3a\u5c11\u5173\u8054\u7528\u6237\uff0c\u8bf7\u91cd\u65b0\u5f00\u59cb\u89c4\u5212\u3002",
   };
   return knownMessages[message] ?? statusFallbackMessage(status);
 }

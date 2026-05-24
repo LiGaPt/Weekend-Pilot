@@ -112,6 +112,16 @@ export type DemoPlanVersionSummary = {
   source_selected_plan_id: string | null;
 };
 
+export type DemoClarificationSummary = {
+  prompt: string;
+  missing_fields: string[];
+};
+
+export type DemoClarifyRunRequest = {
+  user_input: string;
+  selected_plan_index: number;
+};
+
 export type DemoPlanPreview = {
   plan_id: string;
   status: string;
@@ -141,4 +151,5 @@ export type DemoRunSummary = {
   execution_status: string | null;
   feedback_status: string | null;
   error: Record<string, unknown> | null;
+  clarification: DemoClarificationSummary | null;
 };

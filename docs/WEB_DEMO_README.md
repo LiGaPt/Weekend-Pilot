@@ -155,18 +155,25 @@ The internal review page now also shows sanitized tool-event and action-ledger d
 2. Confirm the run reaches `awaiting_clarification`.
 3. Confirm the visible response shows `plans = []`, `selected_plan_id = null`, and a non-null `clarification` summary.
 4. Confirm the visible plan version label still shows `v1`.
-5. Send the clarification reply:
+5. Confirm the page renders the `需要补充信息` panel with:
+   - the backend `clarification.prompt`
+   - a visible `待补充项` list
+   - a dedicated `补充说明` textarea
+   - a `提交补充信息` button
+6. Enter a reply such as `今天下午一个人出门玩几个小时，别太远。`
+7. Click `提交补充信息`.
+8. Confirm the page updates to a different `run_id`.
+9. Confirm the continuation run reaches `awaiting_confirmation`.
+10. Confirm the continuation run still shows `plan_version.version_label = v1`.
+11. Confirm the public response still does not expose `session_id` or conversation history.
+
+If you want an API-level fallback check for the same continuation, you can still send:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/clarify \
   -H "Content-Type: application/json" \
   -d "{\"user_input\":\"今天下午一个人出门玩几个小时，别太远。\",\"selected_plan_index\":0}"
 ```
-
-6. Confirm the response returns a different `run_id`.
-7. Confirm the continuation run reaches `awaiting_confirmation`.
-8. Confirm the continuation run still shows `plan_version.version_label = v1`.
-9. Confirm the public response still does not expose `session_id` or conversation history.
 
 ### Decline Path
 

@@ -451,6 +451,34 @@ dd {
   padding-top: 16px;
 }
 
+.clarification-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.clarification-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.clarification-chip {
+  background: #f3f7fb;
+  border: 1px solid #d5e2ef;
+  border-radius: 999px;
+  color: #26415c;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 12px;
+}
+
+.clarification-textarea {
+  min-height: 96px;
+}
+
 .plan-grid .candidate-section {
   border-top: 0;
   padding-top: 0;
@@ -555,9 +583,11 @@ dd {
 }
 
 .status-starting,
+.status-clarifying,
 .status-refreshing,
 .status-confirming,
 .status-declining,
+.status-awaiting_clarification,
 .status-awaiting_confirmation {
   background: #fff8e6;
   border-color: #ffe0a3;

@@ -280,6 +280,7 @@ The default start path stays on `Mock World`. To preview the live read provider 
 When a start request is still missing key supported constraints, or when bounded recovery needs an explicit user tradeoff, the workflow stops in `awaiting_clarification` instead of fabricating a plan. In that state the public `DemoRunSummary` returns `plans = []`, `selected_plan_id = null`, and a compact `clarification` object with the user-visible follow-up prompt plus the missing supported fields.
 Every public demo run summary includes a compact `plan_version` object. The initial run starts at `v1`, and each follow-up replan increments the visible version label.
 Clarification-only turns do not advance the visible plan version. A vague `v1` run that stops in `awaiting_clarification` stays at `v1`, and the first clarification continuation that produces actual plans also remains at `v1`.
+The customer page at `http://127.0.0.1:5173/` now consumes that clarification contract directly through a dedicated follow-up panel, so the main demo path no longer needs `curl` just to continue planning. The `curl /clarify` example below remains useful for API-level verification.
 Every public `DemoPlanPreview` now also includes `action_manifest`, which is the stable execution-preview contract for the Web demo. Before confirmation it summarizes `draft.proposed_actions` as `source = "proposed_actions"`. After confirmation or execution it summarizes persisted `confirmed_actions` as `source = "confirmed_actions"`. The older `proposed_actions` field remains present for compatibility, but the public frontend now renders action previews from `action_manifest.actions`.
 
 ```bash
@@ -379,6 +380,7 @@ The frontend defaults to `http://127.0.0.1:8000` for the API. To override it loc
 The public demo page only shows customer-safe run details. Internal trace and node history review now lives on the separate internal frontend surface at `http://127.0.0.1:5174/`.
 The visible run inspector includes the current plan version label for the loaded run.
 The visible action preview for each plan tab now comes from `plans[*].action_manifest`, so pre-confirmation and post-confirmation states share one normalized public shape.
+If a run stops in `awaiting_clarification`, the customer page now renders a `需要补充信息` panel with the backend prompt, localized missing-field chips, and a dedicated clarification reply textarea. Submitting that reply continues the same internal conversation session without exposing `session_id` or conversation history, and the first continuation that produces real plans still shows `plan_version.version_label = v1`.
 The page now also exposes an explicit read-path selector. Leave it on `Mock World` for the default deterministic demo and benchmark-aligned checks. Switch it to `AMap 只读预览` only when you want a local live-provider preview that stays pre-confirmation and does not execute writes.
 客户演示面的 reviewer-facing 可见控件默认使用中文文案，例如 `开始规划`、`确认当前方案`、`暂不继续` 和 `刷新状态`。
 
