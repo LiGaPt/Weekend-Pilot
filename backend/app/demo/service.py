@@ -79,6 +79,13 @@ class DemoServiceError(RuntimeError):
         self.message = message
 
 
+class DemoStartRunOverride(BaseModel):
+    tool_profile: str | None = None
+    world_profile: str | None = None
+    agent_version: str | None = None
+    prompt_version: str | None = None
+
+
 def sanitize_demo_payload(value: Any) -> Any:
     if isinstance(value, BaseModel):
         return sanitize_demo_payload(value.model_dump(mode="json"))
@@ -112,8 +119,21 @@ class DemoWorkflowService:
         self.rate_limiter = rate_limiter
         self.trace_buffer_path = trace_buffer_path
 
-    def start_run(self, request: DemoStartRunRequest) -> DemoRunSummary:
-        tool_profile, world_profile = self._workflow_profiles_for_read_profile(request.read_profile)
+    def start_run(
+        self,
+        request: DemoStartRunRequest,
+        *,
+        override: DemoStartRunOverride | None = None,
+    ) -> DemoRunSummary:
+        default_tool_profile, default_world_profile = self._workflow_profiles_for_read_profile(request.read_profile)
+        tool_profile = override.tool_profile if override is not None and override.tool_profile else default_tool_profile
+        world_profile = (
+            override.world_profile if override is not None and override.world_profile else default_world_profile
+        )
+        agent_version = override.agent_version if override is not None and override.agent_version else "agent-v1"
+        prompt_version = (
+            override.prompt_version if override is not None and override.prompt_version else "prompt-v1"
+        )
         runner = WeekendPilotWorkflowRunner(
             WeekendPilotWorkflowDependencies(
                 session=self.session,
@@ -130,8 +150,8 @@ class DemoWorkflowService:
                 case_id=request.case_id,
                 tool_profile=tool_profile,
                 world_profile=world_profile,
-                agent_version="agent-v1",
-                prompt_version="prompt-v1",
+                agent_version=agent_version,
+                prompt_version=prompt_version,
                 auto_confirm=False,
                 selected_plan_index=request.selected_plan_index,
             )
@@ -357,7 +377,10 @@ class DemoWorkflowService:
             )
             self._append_continuation_history(run_id, ["confirm_plan"])
 
-            gateway = self._gateway()
+            gateway = self._gateway(
+                tool_profile=run.tool_profile,
+                world_profile=run.world_profile,
+            )
             execution = DeterministicExecutionWorkflow(plans, gateway).execute_confirmed_plan(
                 run_id,
                 plan.plan_id,
@@ -429,9 +452,17 @@ class DemoWorkflowService:
             clarification=self._clarification_summary(run),
         )
 
-    def _gateway(self) -> ToolGateway:
+    def _gateway(
+        self,
+        *,
+        tool_profile: str = "mock_world",
+        world_profile: str = "family_afternoon",
+    ) -> ToolGateway:
+        registry = build_mock_world_registry(world_profile)
+        if tool_profile != "mock_world":
+            registry = build_mock_world_registry()
         return ToolGateway(
-            registry=build_mock_world_registry(),
+            registry=registry,
             tool_events=ToolEventRepository(self.session),
             action_ledger=ActionLedgerRepository(self.session),
             cache=self.cache,

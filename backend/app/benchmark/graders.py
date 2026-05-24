@@ -241,6 +241,91 @@ def grade_feedback(case: BenchmarkCase, feedback_result: Any) -> BenchmarkScore:
     )
 
 
+def grade_conversation_path(
+    case: BenchmarkCase,
+    conversation_trace: Sequence[Any],
+    conversation_turn_types: Sequence[str],
+) -> BenchmarkScore:
+    expectation = case.expected.conversation
+    if expectation is None:
+        raise ValueError("Conversation-path grading requires case.expected.conversation.")
+
+    expected_steps = list(expectation.steps)
+    observed_steps = list(conversation_trace)
+    expected_step_signatures = [
+        {
+            "mode": step.mode,
+            "status": step.expected_status,
+            "version_label": step.expected_version_label,
+        }
+        for step in expected_steps
+    ]
+    observed_step_signatures = [
+        {
+            "mode": str(_value(step, "mode")),
+            "status": str(_value(step, "status")),
+            "version_label": _value(step, "version_label"),
+        }
+        for step in observed_steps
+    ]
+
+    failures: list[str] = []
+    if len(observed_steps) != len(expected_steps):
+        failures.append(
+            f"Observed conversation step count {len(observed_steps)} did not match expected {len(expected_steps)}."
+        )
+    else:
+        for index, (expected_step, observed_step) in enumerate(zip(expected_steps, observed_steps), start=1):
+            observed_mode = str(_value(observed_step, "mode"))
+            observed_status = str(_value(observed_step, "status"))
+            observed_version_label = _value(observed_step, "version_label")
+            if observed_mode != expected_step.mode:
+                failures.append(
+                    f"Conversation step {index} mode {observed_mode!r} did not match expected {expected_step.mode!r}."
+                )
+                break
+            if observed_status != expected_step.expected_status:
+                failures.append(
+                    "Conversation step "
+                    f"{index} status {observed_status!r} did not match expected {expected_step.expected_status!r}."
+                )
+                break
+            if (
+                expected_step.expected_version_label is not None
+                and observed_version_label != expected_step.expected_version_label
+            ):
+                failures.append(
+                    "Conversation step "
+                    f"{index} version label {observed_version_label!r} did not match expected "
+                    f"{expected_step.expected_version_label!r}."
+                )
+                break
+
+    observed_turn_types = [str(turn_type) for turn_type in conversation_turn_types]
+    missing_turn_types = [
+        turn_type for turn_type in expectation.required_turn_types if turn_type not in observed_turn_types
+    ]
+    if missing_turn_types:
+        failures.append(f"Missing required conversation turn types: {', '.join(missing_turn_types)}")
+
+    passed = not failures
+    reason = "Conversation path matched expected statuses, versions, and turn types."
+    if failures:
+        reason = failures[0]
+    return BenchmarkScore(
+        name="conversation_path",
+        score=1.0 if passed else 0.0,
+        passed=passed,
+        reason=reason,
+        details={
+            "expected_step_signatures": expected_step_signatures,
+            "observed_step_signatures": observed_step_signatures,
+            "required_turn_types": list(expectation.required_turn_types),
+            "observed_turn_types": observed_turn_types,
+        },
+    )
+
+
 def grade_failure_injection(case: BenchmarkCase, tool_events: Sequence[Any]) -> BenchmarkScore:
     injected_events = [
         event

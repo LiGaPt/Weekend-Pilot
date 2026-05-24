@@ -51,6 +51,10 @@ MEMORY_GOVERNANCE_CASE_IDS = {
     "family_memory_advisory_fill_v1",
     "family_memory_expired_advisory_v1",
 }
+CONVERSATION_CONTINUATION_CASE_IDS = {
+    "solo_clarification_continuation_v1",
+    "family_replan_version_continuation_v1",
+}
 DEFAULT_CASE_IDS = {
     "family_afternoon_v1",
     "family_indoor_light_meal_v1",
@@ -91,6 +95,17 @@ MEMORY_GOVERNANCE_CONSTRAINT_TAG_COUNTS = {
     "memory_expired": 1,
     "memory_governance": 2,
     "memory_override": 1,
+}
+CONVERSATION_CONTINUATION_SCENARIO_BUCKET_COUNTS = {"family": 1, "solo": 1}
+CONVERSATION_CONTINUATION_FAILURE_MODE_COUNTS = {"none": 2}
+CONVERSATION_CONTINUATION_CONSTRAINT_TAG_COUNTS = {
+    "child_friendly": 1,
+    "clarification_turn": 1,
+    "conversation_continuation": 2,
+    "light_activity": 1,
+    "light_meal": 2,
+    "plan_versioning": 1,
+    "replan_turn": 1,
 }
 BASELINE_SCENARIO_BUCKET_COUNTS = {"family": 5, "solo": 1}
 BASELINE_FAILURE_MODE_COUNTS = {"none": 6}
@@ -182,23 +197,23 @@ DEFAULT_CONSTRAINT_TAG_COUNTS = {
 }
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
-    "family": 9,
+    "family": 10,
     "friends": 1,
     "mixed": 2,
-    "solo": 1,
+    "solo": 2,
     "unknown": 1,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L3": 2, "L5": 2}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L3": 4, "L5": 2}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
-    "family_afternoon": 9,
+    "family_afternoon": 10,
     "friends_gathering": 1,
     "rainy_day_fallback": 2,
-    "solo_afternoon": 1,
+    "solo_afternoon": 2,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
-    "none": 12,
+    "none": 14,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
@@ -209,9 +224,11 @@ ALL_REGISTERED_TAG_COUNTS = {
     "baseline": 2,
     "budget_limited": 1,
     "casual_dining": 1,
-    "child_friendly": 9,
+    "child_friendly": 10,
     "citywalk": 2,
+    "clarification_turn": 1,
     "composite_failure": 2,
+    "conversation_continuation": 2,
     "date_friendly": 1,
     "dining_unavailable": 1,
     "failure_injected": 3,
@@ -219,16 +236,18 @@ ALL_REGISTERED_TAG_COUNTS = {
     "free_activity": 1,
     "friends_group": 1,
     "indoor_activity": 4,
-    "light_activity": 1,
-    "light_meal": 7,
+    "light_activity": 2,
+    "light_meal": 9,
     "memory_advisory": 1,
     "memory_expired": 1,
     "memory_governance": 2,
     "memory_override": 1,
     "outdoor_activity": 2,
+    "plan_versioning": 1,
     "quick_dinner": 1,
     "quick_meal": 1,
     "rainy_day": 2,
+    "replan_turn": 1,
     "route_failure": 2,
     "ticket_sold_out": 1,
 }
@@ -237,25 +256,29 @@ ALL_REGISTERED_CONSTRAINT_TAG_COUNTS = {
     "bad_weather": 1,
     "budget_limited": 1,
     "casual_dining": 1,
-    "child_friendly": 9,
+    "child_friendly": 10,
     "citywalk": 2,
+    "clarification_turn": 1,
     "composite_failure": 2,
+    "conversation_continuation": 2,
     "date_friendly": 1,
     "dining_unavailable": 1,
     "fallback": 1,
     "free_activity": 1,
     "friends_group": 1,
     "indoor_activity": 4,
-    "light_activity": 1,
-    "light_meal": 7,
+    "light_activity": 2,
+    "light_meal": 9,
     "memory_advisory": 1,
     "memory_expired": 1,
     "memory_governance": 2,
     "memory_override": 1,
     "outdoor_activity": 2,
+    "plan_versioning": 1,
     "quick_dinner": 1,
     "quick_meal": 1,
     "rainy_day": 2,
+    "replan_turn": 1,
     "ticket_sold_out": 1,
 }
 FORBIDDEN_REPORT_TEXT = ("action_id", "tool_event_id", "api_key", "token", "secret", "debug_trace")
@@ -335,6 +358,7 @@ def test_benchmark_harness_runs_full_mock_world_case(
     assert result.run_summary.prompt_version == "prompt-v1"
     assert result.feedback_status == "completed"
     assert result.workflow_status == "completed"
+    assert all(score.name != "conversation_path" for score in result.scores)
     assert result.workflow_timing_summary is not None
     assert result.taxonomy is not None
     assert result.taxonomy.scenario_bucket == "family"
@@ -589,6 +613,150 @@ def test_benchmark_harness_records_memory_policy_for_expired_advisory_case(
     }
 
 
+def test_benchmark_harness_runs_solo_clarification_continuation_case(
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    case = load_benchmark_case("solo_clarification_continuation_v1")
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    result = harness.run_case(case)
+
+    assert result.status == "passed"
+    assert result.workflow_status == "completed"
+    assert result.feedback_status == "completed"
+    assert result.tool_event_count >= case.expected.min_tool_event_count
+    assert result.action_count >= case.expected.min_action_count
+    assert [score.name for score in result.scores].count("conversation_path") == 1
+    assert [(step.mode, step.status, step.version_label) for step in result.conversation_trace] == [
+        ("start", "awaiting_clarification", "v1"),
+        ("clarify", "awaiting_confirmation", "v1"),
+        ("confirm", "completed", "v1"),
+    ]
+    assert result.conversation_turn_types == [
+        "user_request",
+        "assistant_clarification_request",
+        "user_clarification_reply",
+        "assistant_plan_options",
+    ]
+    trace_run_ids = [step.run_id for step in result.conversation_trace if step.run_id is not None]
+    assert len(trace_run_ids) == 3
+    assert len({*trace_run_ids}) == 2
+    assert result.report_path is not None
+
+    report_payload = json.loads(Path(result.report_path).read_text(encoding="utf-8"))
+    assert report_payload["conversation_trace"] == [
+        {
+            "mode": "start",
+            "source_run_id": None,
+            "run_id": str(result.conversation_trace[0].run_id),
+            "status": "awaiting_clarification",
+            "version_label": "v1",
+        },
+        {
+            "mode": "clarify",
+            "source_run_id": str(result.conversation_trace[1].source_run_id),
+            "run_id": str(result.conversation_trace[1].run_id),
+            "status": "awaiting_confirmation",
+            "version_label": "v1",
+        },
+        {
+            "mode": "confirm",
+            "source_run_id": str(result.conversation_trace[2].source_run_id),
+            "run_id": str(result.conversation_trace[2].run_id),
+            "status": "completed",
+            "version_label": "v1",
+        },
+    ]
+    assert report_payload["conversation_turn_types"] == result.conversation_turn_types
+    serialized_report = json.dumps(report_payload, sort_keys=True)
+    assert "session_id" not in serialized_report
+    assert "payload_json" not in serialized_report
+    for forbidden in FORBIDDEN_REPORT_TEXT:
+        assert forbidden not in serialized_report
+
+
+def test_benchmark_harness_runs_family_replan_version_continuation_case(
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    case = load_benchmark_case("family_replan_version_continuation_v1")
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    result = harness.run_case(case)
+
+    assert result.status == "passed"
+    assert result.workflow_status == "completed"
+    assert result.feedback_status == "completed"
+    assert result.tool_event_count >= case.expected.min_tool_event_count
+    assert result.action_count >= case.expected.min_action_count
+    assert [score.name for score in result.scores].count("conversation_path") == 1
+    assert [(step.mode, step.status, step.version_label) for step in result.conversation_trace] == [
+        ("start", "awaiting_confirmation", "v1"),
+        ("replan", "awaiting_confirmation", "v2"),
+        ("confirm", "completed", "v2"),
+    ]
+    assert result.conversation_turn_types == [
+        "user_request",
+        "assistant_plan_options",
+        "user_follow_up",
+        "assistant_replan_options",
+    ]
+    trace_run_ids = [step.run_id for step in result.conversation_trace if step.run_id is not None]
+    assert len(trace_run_ids) == 3
+    assert len({*trace_run_ids}) == 2
+    assert result.report_path is not None
+
+    report_payload = json.loads(Path(result.report_path).read_text(encoding="utf-8"))
+    assert report_payload["conversation_trace"] == [
+        {
+            "mode": "start",
+            "source_run_id": None,
+            "run_id": str(result.conversation_trace[0].run_id),
+            "status": "awaiting_confirmation",
+            "version_label": "v1",
+        },
+        {
+            "mode": "replan",
+            "source_run_id": str(result.conversation_trace[1].source_run_id),
+            "run_id": str(result.conversation_trace[1].run_id),
+            "status": "awaiting_confirmation",
+            "version_label": "v2",
+        },
+        {
+            "mode": "confirm",
+            "source_run_id": str(result.conversation_trace[2].source_run_id),
+            "run_id": str(result.conversation_trace[2].run_id),
+            "status": "completed",
+            "version_label": "v2",
+        },
+    ]
+    assert report_payload["conversation_turn_types"] == result.conversation_turn_types
+    serialized_report = json.dumps(report_payload, sort_keys=True)
+    assert "session_id" not in serialized_report
+    assert "payload_json" not in serialized_report
+    for forbidden in FORBIDDEN_REPORT_TEXT:
+        assert forbidden not in serialized_report
+
+
 @pytest.mark.parametrize(
     ("suite_id", "expected_case_ids", "expected_case_count", "scenario_counts", "failure_mode_counts", "constraint_tag_counts"),
     [
@@ -623,6 +791,14 @@ def test_benchmark_harness_records_memory_policy_for_expired_advisory_case(
             MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS,
             MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS,
             MEMORY_GOVERNANCE_CONSTRAINT_TAG_COUNTS,
+        ),
+        (
+            "conversation_continuations",
+            CONVERSATION_CONTINUATION_CASE_IDS,
+            2,
+            CONVERSATION_CONTINUATION_SCENARIO_BUCKET_COUNTS,
+            CONVERSATION_CONTINUATION_FAILURE_MODE_COUNTS,
+            CONVERSATION_CONTINUATION_CONSTRAINT_TAG_COUNTS,
         ),
     ],
 )
@@ -829,9 +1005,9 @@ def test_benchmark_harness_runs_all_registered_suite(
 
     report = harness.run_suite("all_registered")
 
-    assert len(report.case_results) == 15
+    assert len(report.case_results) == 17
     assert report.run_status == "passed"
-    assert report.passed_count == 15
+    assert report.passed_count == 17
     assert report.failed_count == 0
     assert report.error_count == 0
     assert report.report_path is not None

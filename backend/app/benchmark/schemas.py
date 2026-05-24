@@ -20,6 +20,7 @@ BenchmarkSuiteId = Literal[
     "expanded",
     "recovery_focused",
     "memory_governance",
+    "conversation_continuations",
     "default",
     "all_registered",
 ]
@@ -48,6 +49,31 @@ class BenchmarkMemoryGovernanceExpectation(BaseModel):
     expected_memory_outcomes: list[BenchmarkMemoryDecisionExpectation] = Field(default_factory=list)
 
 
+class BenchmarkContinuationRequest(BaseModel):
+    mode: Literal["clarify", "replan"]
+    user_input: str
+    selected_plan_index: int = Field(default=0, ge=0)
+
+
+class BenchmarkConversationExpectedStep(BaseModel):
+    mode: Literal["start", "clarify", "replan", "confirm"]
+    expected_status: str
+    expected_version_label: str | None = None
+
+
+class BenchmarkConversationExpectation(BaseModel):
+    steps: list[BenchmarkConversationExpectedStep]
+    required_turn_types: list[str] = Field(default_factory=list)
+
+
+class BenchmarkConversationTraceStep(BaseModel):
+    mode: Literal["start", "clarify", "replan", "confirm"]
+    source_run_id: UUID | None
+    run_id: UUID | None
+    status: str
+    version_label: str | None = None
+
+
 class BenchmarkExpectedOutcome(BaseModel):
     required_tool_names: list[str]
     min_tool_event_count: int
@@ -59,6 +85,7 @@ class BenchmarkExpectedOutcome(BaseModel):
     expected_recovery_action: str | None = None
     min_injected_failure_count: int = 0
     memory_governance: BenchmarkMemoryGovernanceExpectation | None = None
+    conversation: BenchmarkConversationExpectation | None = None
 
 
 class BenchmarkCaseTaxonomy(BaseModel):
@@ -102,6 +129,7 @@ class BenchmarkCase(BaseModel):
     world_profile: str = "family_afternoon"
     failure_profile: str | None = None
     memory_items: list[BenchmarkMemoryItem] = Field(default_factory=list)
+    continuations: list[BenchmarkContinuationRequest] = Field(default_factory=list)
     expected: BenchmarkExpectedOutcome
     taxonomy: BenchmarkCaseTaxonomy
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -144,6 +172,8 @@ class BenchmarkCaseResult(BaseModel):
     workflow_status: str | None = None
     workflow_timing_summary: WorkflowTimingSummary | None = None
     workflow_node_history: list[str] = Field(default_factory=list)
+    conversation_trace: list[BenchmarkConversationTraceStep] = Field(default_factory=list)
+    conversation_turn_types: list[str] = Field(default_factory=list)
     agent_roles: list[str] = Field(default_factory=list)
     failure_reasons: list[str] = Field(default_factory=list)
     report_path: str | None = None

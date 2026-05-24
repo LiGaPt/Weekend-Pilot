@@ -1,0 +1,75 @@
+{
+  "case_id": "solo_clarification_continuation_v1",
+  "title": "Vague nearby request clarifies into a solo afternoon before confirmation",
+  "user_input": "Plan something nearby for later.",
+  "agent_version": "agent-v1",
+  "prompt_version": "prompt-v1",
+  "tool_profile": "mock_world",
+  "world_profile": "solo_afternoon",
+  "failure_profile": null,
+  "memory_items": [],
+  "continuations": [
+    {
+      "mode": "clarify",
+      "user_input": "This afternoon I want a nearby solo outing for a few hours.",
+      "selected_plan_index": 0
+    }
+  ],
+  "expected": {
+    "required_tool_names": [
+      "search_poi",
+      "check_weather",
+      "get_poi_detail",
+      "check_opening_hours",
+      "check_queue",
+      "check_table_availability",
+      "check_ticket_availability",
+      "check_route"
+    ],
+    "min_tool_event_count": 8,
+    "min_action_count": 1,
+    "expected_workflow_status": "completed",
+    "expected_execution_status": "succeeded",
+    "expected_feedback_status": "completed",
+    "conversation": {
+      "steps": [
+        {
+          "mode": "start",
+          "expected_status": "awaiting_clarification",
+          "expected_version_label": "v1"
+        },
+        {
+          "mode": "clarify",
+          "expected_status": "awaiting_confirmation",
+          "expected_version_label": "v1"
+        },
+        {
+          "mode": "confirm",
+          "expected_status": "completed",
+          "expected_version_label": "v1"
+        }
+      ],
+      "required_turn_types": [
+        "user_request",
+        "assistant_clarification_request",
+        "user_clarification_reply",
+        "assistant_plan_options"
+      ]
+    }
+  },
+  "taxonomy": {
+    "suite": "locallife_bench_v1",
+    "scenario_bucket": "solo",
+    "level": "L3",
+    "tags": [
+      "clarification_turn",
+      "conversation_continuation",
+      "light_activity",
+      "light_meal"
+    ],
+    "failure_mode": null
+  },
+  "metadata": {
+    "focus": "clarification_continuation_solo"
+  }
+}

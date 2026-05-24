@@ -30,6 +30,8 @@ REGISTERED_CASE_IDS = [
     "rainy_day_ticket_sold_out_v1",
     "family_memory_advisory_fill_v1",
     "family_memory_expired_advisory_v1",
+    "solo_clarification_continuation_v1",
+    "family_replan_version_continuation_v1",
 ]
 BASELINE_CASE_IDS = REGISTERED_CASE_IDS[:6]
 EXPANDED_CASE_IDS = REGISTERED_CASE_IDS[6:10]
@@ -43,12 +45,17 @@ MEMORY_GOVERNANCE_CASE_IDS = [
     "family_memory_advisory_fill_v1",
     "family_memory_expired_advisory_v1",
 ]
+CONVERSATION_CONTINUATION_CASE_IDS = [
+    "solo_clarification_continuation_v1",
+    "family_replan_version_continuation_v1",
+]
 DEFAULT_CASE_IDS = BASELINE_CASE_IDS + EXPANDED_CASE_IDS
 CANONICAL_SUITE_IDS = [
     "baseline",
     "expanded",
     "recovery_focused",
     "memory_governance",
+    "conversation_continuations",
     "default",
     "all_registered",
 ]
@@ -166,25 +173,41 @@ MEMORY_GOVERNANCE_TAG_COUNTS = {
     "memory_governance": 2,
     "memory_override": 1,
 }
+CONVERSATION_CONTINUATION_SCENARIO_BUCKET_COUNTS = {"family": 1, "solo": 1}
+CONVERSATION_CONTINUATION_LEVEL_COUNTS = {"L3": 2}
+CONVERSATION_CONTINUATION_WORLD_PROFILE_COUNTS = {
+    "family_afternoon": 1,
+    "solo_afternoon": 1,
+}
+CONVERSATION_CONTINUATION_FAILURE_MODE_COUNTS = {"none": 2}
+CONVERSATION_CONTINUATION_TAG_COUNTS = {
+    "child_friendly": 1,
+    "clarification_turn": 1,
+    "conversation_continuation": 2,
+    "light_activity": 1,
+    "light_meal": 2,
+    "plan_versioning": 1,
+    "replan_turn": 1,
+}
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
-    "family": 9,
+    "family": 10,
     "friends": 1,
     "mixed": 2,
-    "solo": 1,
+    "solo": 2,
     "unknown": 1,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L3": 2, "L5": 2}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L3": 4, "L5": 2}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
-    "family_afternoon": 9,
+    "family_afternoon": 10,
     "friends_gathering": 1,
     "rainy_day_fallback": 2,
-    "solo_afternoon": 1,
+    "solo_afternoon": 2,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
-    "none": 12,
+    "none": 14,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
@@ -195,9 +218,11 @@ ALL_REGISTERED_TAG_COUNTS = {
     "baseline": 2,
     "budget_limited": 1,
     "casual_dining": 1,
-    "child_friendly": 9,
+    "child_friendly": 10,
     "citywalk": 2,
+    "clarification_turn": 1,
     "composite_failure": 2,
+    "conversation_continuation": 2,
     "date_friendly": 1,
     "dining_unavailable": 1,
     "failure_injected": 3,
@@ -205,16 +230,18 @@ ALL_REGISTERED_TAG_COUNTS = {
     "free_activity": 1,
     "friends_group": 1,
     "indoor_activity": 4,
-    "light_activity": 1,
-    "light_meal": 7,
+    "light_activity": 2,
+    "light_meal": 9,
     "memory_advisory": 1,
     "memory_expired": 1,
     "memory_governance": 2,
     "memory_override": 1,
     "outdoor_activity": 2,
+    "plan_versioning": 1,
     "quick_dinner": 1,
     "quick_meal": 1,
     "rainy_day": 2,
+    "replan_turn": 1,
     "route_failure": 2,
     "ticket_sold_out": 1,
 }
@@ -231,6 +258,9 @@ def test_load_benchmark_suite_returns_expected_named_membership() -> None:
     assert [case.case_id for case in load_benchmark_suite("expanded")] == EXPANDED_CASE_IDS
     assert [case.case_id for case in load_benchmark_suite("recovery_focused")] == RECOVERY_FOCUSED_CASE_IDS
     assert [case.case_id for case in load_benchmark_suite("memory_governance")] == MEMORY_GOVERNANCE_CASE_IDS
+    assert [case.case_id for case in load_benchmark_suite("conversation_continuations")] == (
+        CONVERSATION_CONTINUATION_CASE_IDS
+    )
     assert [case.case_id for case in load_benchmark_suite("default")] == DEFAULT_CASE_IDS
     assert [case.case_id for case in load_benchmark_suite("failures")] == RECOVERY_FOCUSED_CASE_IDS
     assert [case.case_id for case in load_benchmark_suite("all_registered")] == REGISTERED_CASE_IDS
@@ -255,6 +285,14 @@ def test_list_benchmark_suite_ids_for_case_returns_expected_membership() -> None
     ]
     assert benchmark_suites.list_benchmark_suite_ids_for_case("family_route_failure_v1") == [
         "recovery_focused",
+        "all_registered",
+    ]
+    assert benchmark_suites.list_benchmark_suite_ids_for_case("solo_clarification_continuation_v1") == [
+        "conversation_continuations",
+        "all_registered",
+    ]
+    assert benchmark_suites.list_benchmark_suite_ids_for_case("family_replan_version_continuation_v1") == [
+        "conversation_continuations",
         "all_registered",
     ]
     assert benchmark_suites.list_benchmark_suite_ids_for_case("missing_case_v1") == []
@@ -318,6 +356,16 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
         tag_counts=MEMORY_GOVERNANCE_TAG_COUNTS,
     )
     _assert_suite_description(
+        suite_map["conversation_continuations"],
+        case_ids=CONVERSATION_CONTINUATION_CASE_IDS,
+        case_count=2,
+        scenario_bucket_counts=CONVERSATION_CONTINUATION_SCENARIO_BUCKET_COUNTS,
+        level_counts=CONVERSATION_CONTINUATION_LEVEL_COUNTS,
+        world_profile_counts=CONVERSATION_CONTINUATION_WORLD_PROFILE_COUNTS,
+        failure_mode_counts=CONVERSATION_CONTINUATION_FAILURE_MODE_COUNTS,
+        tag_counts=CONVERSATION_CONTINUATION_TAG_COUNTS,
+    )
+    _assert_suite_description(
         suite_map["default"],
         case_ids=DEFAULT_CASE_IDS,
         case_count=10,
@@ -330,7 +378,7 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
     _assert_suite_description(
         suite_map["all_registered"],
         case_ids=REGISTERED_CASE_IDS,
-        case_count=15,
+        case_count=17,
         scenario_bucket_counts=ALL_REGISTERED_SCENARIO_BUCKET_COUNTS,
         level_counts=ALL_REGISTERED_LEVEL_COUNTS,
         world_profile_counts=ALL_REGISTERED_WORLD_PROFILE_COUNTS,
@@ -368,6 +416,11 @@ def test_list_benchmark_suites_rejects_duplicate_case_ids(monkeypatch: pytest.Mo
                 "title": "Memory governance suite",
                 "description": "Memory governance cases",
                 "case_ids": MEMORY_GOVERNANCE_CASE_IDS,
+            },
+            "conversation_continuations": {
+                "title": "Conversation continuations suite",
+                "description": "Continuation cases",
+                "case_ids": CONVERSATION_CONTINUATION_CASE_IDS,
             },
             "default": {
                 "title": "Default suite",
@@ -412,6 +465,11 @@ def test_list_benchmark_suites_rejects_unknown_registered_case_id(
                 "title": "Memory governance suite",
                 "description": "Memory governance cases",
                 "case_ids": MEMORY_GOVERNANCE_CASE_IDS,
+            },
+            "conversation_continuations": {
+                "title": "Conversation continuations suite",
+                "description": "Continuation cases",
+                "case_ids": CONVERSATION_CONTINUATION_CASE_IDS,
             },
             "default": {
                 "title": "Default suite",

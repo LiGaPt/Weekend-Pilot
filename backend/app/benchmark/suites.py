@@ -31,17 +31,23 @@ _MEMORY_GOVERNANCE_CASE_IDS = [
     "family_memory_advisory_fill_v1",
     "family_memory_expired_advisory_v1",
 ]
+_CONVERSATION_CONTINUATION_CASE_IDS = [
+    "solo_clarification_continuation_v1",
+    "family_replan_version_continuation_v1",
+]
 _DEFAULT_CASE_IDS = [*_BASELINE_CASE_IDS, *_EXPANDED_CASE_IDS]
 _ALL_REGISTERED_CASE_IDS = [
     *_DEFAULT_CASE_IDS,
     *_RECOVERY_FOCUSED_CASE_IDS,
     *_MEMORY_GOVERNANCE_CASE_IDS[1:],
+    *_CONVERSATION_CONTINUATION_CASE_IDS,
 ]
 _ORDERED_SUITE_IDS: tuple[BenchmarkSuiteId, ...] = (
     "baseline",
     "expanded",
     "recovery_focused",
     "memory_governance",
+    "conversation_continuations",
     "default",
     "all_registered",
 )
@@ -69,6 +75,11 @@ _SUITE_DEFINITIONS: dict[BenchmarkSuiteId, dict[str, Any]] = {
         "description": "Focused cases that prove memory helps when useful without overriding explicit user input.",
         "case_ids": _MEMORY_GOVERNANCE_CASE_IDS,
     },
+    "conversation_continuations": {
+        "title": "Conversation continuations benchmark suite",
+        "description": "Mock World continuation cases that validate clarification and follow-up replan chains.",
+        "case_ids": _CONVERSATION_CONTINUATION_CASE_IDS,
+    },
     "default": {
         "title": "Default benchmark suite",
         "description": "Current ten-case non-failure benchmark suite used by repository examples.",
@@ -76,7 +87,7 @@ _SUITE_DEFINITIONS: dict[BenchmarkSuiteId, dict[str, Any]] = {
     },
     "all_registered": {
         "title": "All registered benchmark cases",
-        "description": "Current default, recovery-focused, and memory-governance cases in canonical repository order.",
+        "description": "Current default, recovery-focused, memory-governance, and continuation cases in canonical repository order.",
         "case_ids": _ALL_REGISTERED_CASE_IDS,
     },
 }
