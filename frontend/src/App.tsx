@@ -107,9 +107,11 @@ export default function App() {
       return;
     }
 
+    const selectedPlanIndex = resolveSelectedPlanIndex(run, selectedPlanId);
+
     await runAction(
       "replanning",
-      () => replanRun(run.run_id, buildReplanRequest(replanReply)),
+      () => replanRun(run.run_id, buildReplanRequest(replanReply, selectedPlanIndex)),
       () => {
         setReplanReply("");
       },
@@ -815,6 +817,25 @@ function choosePlan(run: DemoRunSummary | null, selectedPlanId: string | null): 
   );
 }
 
+function resolveSelectedPlanIndex(run: DemoRunSummary | null, selectedPlanId: string | null): number {
+  if (!run?.plans.length) {
+    return 0;
+  }
+
+  const directMatchIndex = run.plans.findIndex((plan) => plan.plan_id === selectedPlanId);
+  if (directMatchIndex >= 0) {
+    return directMatchIndex;
+  }
+
+  const resolvedPlan = choosePlan(run, selectedPlanId);
+  if (!resolvedPlan) {
+    return 0;
+  }
+
+  const resolvedPlanIndex = run.plans.findIndex((plan) => plan.plan_id === resolvedPlan.plan_id);
+  return resolvedPlanIndex >= 0 ? resolvedPlanIndex : 0;
+}
+
 function stateFromRun(run: DemoRunSummary): RequestState {
   if (run.status === "awaiting_clarification") {
     return "awaiting_clarification";
@@ -1046,9 +1067,9 @@ function buildDemoExternalUserId() {
   return `web-demo-user-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function buildReplanRequest(reply: string): DemoReplanRunRequest {
+function buildReplanRequest(reply: string, selectedPlanIndex: number): DemoReplanRunRequest {
   return {
     user_input: reply.trim(),
-    selected_plan_index: 0,
+    selected_plan_index: selectedPlanIndex,
   };
 }
