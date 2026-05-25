@@ -176,6 +176,16 @@ const replannedRunV2: DemoRunSummary = {
   clarification: null,
 };
 
+const replannedRunV2FromPlan2: DemoRunSummary = {
+  ...replannedRunV2,
+  plan_version: {
+    version_number: 2,
+    version_label: "v2",
+    source_run_id: "run-1",
+    source_selected_plan_id: "plan-2",
+  },
+};
+
 const replannedRunV3: DemoRunSummary = {
   ...awaitingRun,
   run_id: "run-3",
@@ -487,6 +497,31 @@ describe("App", () => {
     expect(await screen.findByTestId("run-id")).toHaveTextContent("run-2");
     expect(screen.getByTestId("plan-version")).toHaveTextContent("v2");
     expect(screen.getByTestId("confirm-button")).toBeInTheDocument();
+  });
+
+  it("submits the selected second plan index when replanning", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startRun).mockResolvedValue(awaitingRun);
+    vi.mocked(replanRun).mockResolvedValue(replannedRunV2FromPlan2);
+    render(<App />);
+
+    await user.click(screen.getByTestId("start-button"));
+    const tabs = await screen.findAllByRole("tab");
+    await user.click(tabs[1]);
+
+    expect(tabs[0]).toHaveAttribute("aria-selected", "false");
+    expect(tabs[1]).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByText("green-table")).not.toBeInTheDocument();
+
+    await user.type(await screen.findByTestId("replan-reply-input"), "Keep the backup plan, but reduce walking.");
+    await user.click(screen.getByTestId("replan-submit-button"));
+
+    expect(replanRun).toHaveBeenCalledWith("run-1", {
+      user_input: "Keep the backup plan, but reduce walking.",
+      selected_plan_index: 1,
+    });
+    expect(await screen.findByTestId("run-id")).toHaveTextContent("run-2");
+    expect(screen.getByTestId("plan-version")).toHaveTextContent("v2");
   });
 
   it("supports repeated replans and shows v3 on the next run", async () => {

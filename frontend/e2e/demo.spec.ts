@@ -120,6 +120,20 @@ function buildMockPlan(planId: string, selected: boolean) {
   };
 }
 
+function buildMockTwoPlanAwaitingRun() {
+  return {
+    ...mockedStartRun,
+    plans: [
+      buildMockPlan("plan-1", true),
+      {
+        ...buildMockPlan("plan-2", false),
+        title: "Mock backup plan",
+        summary: "A second mock plan used to verify selected-plan follow-up requests.",
+      },
+    ],
+  };
+}
+
 function buildMockAwaitingRun(
   runId: string,
   planId: string,
@@ -151,6 +165,8 @@ function buildMockAwaitingRun(
 const mockedStartRun = buildMockAwaitingRun("run-1", "plan-1", 1, "v1", null, null);
 const mockedReplannedRunV2 = buildMockAwaitingRun("run-2", "plan-2", 2, "v2", "run-1", "plan-1");
 const mockedReplannedRunV3 = buildMockAwaitingRun("run-3", "plan-3", 3, "v3", "run-2", "plan-2");
+const mockedStartRunWithTwoPlans = buildMockTwoPlanAwaitingRun();
+const mockedReplannedRunV2FromPlan2 = buildMockAwaitingRun("run-2", "plan-4", 2, "v2", "run-1", "plan-2");
 
 test.describe("desktop web demo", () => {
   test.beforeEach(({}, testInfo) => {
@@ -292,6 +308,54 @@ test.describe("desktop web demo", () => {
     await expect(page.getByTestId("run-status")).toHaveText("等待确认", { timeout: 60_000 });
     await expect(page.getByTestId("plan-version")).toHaveText("v3");
     await expect(page.getByTestId("run-id")).not.toHaveText(replannedRunId);
+  });
+
+  test("sends the selected second plan index when replanning from the customer page", async ({ page }) => {
+    const replanBodies: Array<Record<string, unknown>> = [];
+
+    await page.route("**/demo/runs", async (route, request) => {
+      if (request.method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(mockedStartRunWithTwoPlans),
+      });
+    });
+
+    await page.route(/\/demo\/runs\/[^/]+\/replan$/, async (route, request) => {
+      if (request.method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+
+      replanBodies.push((request.postDataJSON() as Record<string, unknown>) ?? {});
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(mockedReplannedRunV2FromPlan2),
+      });
+    });
+
+    await startPresentableDemoRun(page);
+
+    const planTabs = page.getByRole("tab");
+    await expect(planTabs).toHaveCount(2);
+    await planTabs.nth(1).click();
+    await expect(planTabs.nth(0)).toHaveAttribute("aria-selected", "false");
+    await expect(planTabs.nth(1)).toHaveAttribute("aria-selected", "true");
+
+    await page.getByTestId("replan-reply-input").fill("Keep the backup plan, but reduce walking.");
+    await page.getByTestId("replan-submit-button").click();
+
+    await continueToAwaitingConfirmation(page, "v2");
+    expect(replanBodies[0]).toEqual({
+      user_input: "Keep the backup plan, but reduce walking.",
+      selected_plan_index: 1,
+    });
   });
 
   test("does not render forbidden internal or sensitive keys", async ({ page }) => {
