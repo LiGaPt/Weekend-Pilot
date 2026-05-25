@@ -36,6 +36,13 @@ _CONVERSATION_CONTINUATION_CASE_IDS = [
     "family_replan_version_continuation_v1",
 ]
 _DEFAULT_CASE_IDS = [*_BASELINE_CASE_IDS, *_EXPANDED_CASE_IDS]
+_RELEASE_GATE_V1_CASE_IDS = [
+    *_DEFAULT_CASE_IDS,
+    "family_route_failure_v1",
+    "family_memory_advisory_fill_v1",
+    "family_memory_expired_advisory_v1",
+    *_CONVERSATION_CONTINUATION_CASE_IDS,
+]
 _ALL_REGISTERED_CASE_IDS = [
     *_DEFAULT_CASE_IDS,
     *_RECOVERY_FOCUSED_CASE_IDS,
@@ -49,6 +56,7 @@ _ORDERED_SUITE_IDS: tuple[BenchmarkSuiteId, ...] = (
     "memory_governance",
     "conversation_continuations",
     "default",
+    "release_gate_v1",
     "all_registered",
 )
 _SUITE_ALIASES: dict[str, BenchmarkSuiteId] = {
@@ -84,6 +92,11 @@ _SUITE_DEFINITIONS: dict[BenchmarkSuiteId, dict[str, Any]] = {
         "title": "Default benchmark suite",
         "description": "Current ten-case non-failure benchmark suite used by repository examples.",
         "case_ids": _DEFAULT_CASE_IDS,
+    },
+    "release_gate_v1": {
+        "title": "Benchmark release gate v1",
+        "description": "Blocking LocalLife-Bench L1-L3 release suite for formal V1 benchmark sign-off.",
+        "case_ids": _RELEASE_GATE_V1_CASE_IDS,
     },
     "all_registered": {
         "title": "All registered benchmark cases",

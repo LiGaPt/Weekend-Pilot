@@ -507,6 +507,60 @@ def test_all_registered_case_matrix_summary_counts_are_expected() -> None:
     assert summary.tag_counts == ALL_REGISTERED_TAG_COUNTS
 
 
+def test_release_gate_v1_case_matrix_summary_counts_are_expected() -> None:
+    summary = build_case_matrix_summary(load_benchmark_suite("release_gate_v1"))
+
+    assert summary.case_count == 15
+    assert summary.scenario_bucket_counts == {
+        "couple": 1,
+        "family": 9,
+        "friends": 1,
+        "mixed": 1,
+        "solo": 2,
+        "unknown": 1,
+    }
+    assert summary.level_counts == {"L1": 3, "L2": 8, "L3": 4}
+    assert summary.tool_profile_counts == {"mock_world": 15}
+    assert summary.world_profile_counts == {
+        "budget_lite": 1,
+        "couple_afternoon": 1,
+        "family_afternoon": 9,
+        "friends_gathering": 1,
+        "rainy_day_fallback": 1,
+        "solo_afternoon": 2,
+    }
+    assert summary.failure_mode_counts == {"none": 14, "route_unavailable": 1}
+    assert summary.tag_counts == {
+        "addon_optional": 1,
+        "baseline": 2,
+        "budget_limited": 1,
+        "casual_dining": 1,
+        "child_friendly": 9,
+        "citywalk": 2,
+        "clarification_turn": 1,
+        "conversation_continuation": 2,
+        "date_friendly": 1,
+        "failure_injected": 1,
+        "fallback": 1,
+        "free_activity": 1,
+        "friends_group": 1,
+        "indoor_activity": 4,
+        "light_activity": 2,
+        "light_meal": 9,
+        "memory_advisory": 1,
+        "memory_expired": 1,
+        "memory_governance": 2,
+        "memory_override": 1,
+        "outdoor_activity": 2,
+        "plan_versioning": 1,
+        "quick_dinner": 1,
+        "quick_meal": 1,
+        "rainy_day": 1,
+        "replan_turn": 1,
+        "route_failure": 1,
+    }
+
+
 def test_conversation_continuation_suite_matrix_summary_counts_are_expected() -> None:
     summary = build_case_matrix_summary(load_benchmark_suite("conversation_continuations"))
 

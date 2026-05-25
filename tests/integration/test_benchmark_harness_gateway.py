@@ -69,6 +69,14 @@ DEFAULT_CASE_IDS = {
     "rainy_day_fallback_v1",
     "budget_lite_v1",
 }
+RELEASE_GATE_V1_CASE_IDS = {
+    *DEFAULT_CASE_IDS,
+    "family_route_failure_v1",
+    "family_memory_advisory_fill_v1",
+    "family_memory_expired_advisory_v1",
+    "solo_clarification_continuation_v1",
+    "family_replan_version_continuation_v1",
+}
 DEFAULT_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
     "family": 5,
@@ -87,7 +95,26 @@ DEFAULT_WORLD_PROFILE_COUNTS = {
     "rainy_day_fallback": 1,
     "solo_afternoon": 1,
 }
+RELEASE_GATE_V1_SCENARIO_BUCKET_COUNTS = {
+    "couple": 1,
+    "family": 9,
+    "friends": 1,
+    "mixed": 1,
+    "solo": 2,
+    "unknown": 1,
+}
+RELEASE_GATE_V1_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L3": 4}
+RELEASE_GATE_V1_TOOL_PROFILE_COUNTS = {"mock_world": 15}
+RELEASE_GATE_V1_WORLD_PROFILE_COUNTS = {
+    "budget_lite": 1,
+    "couple_afternoon": 1,
+    "family_afternoon": 9,
+    "friends_gathering": 1,
+    "rainy_day_fallback": 1,
+    "solo_afternoon": 2,
+}
 DEFAULT_FAILURE_MODE_COUNTS = {"none": 10}
+RELEASE_GATE_V1_FAILURE_MODE_COUNTS = {"none": 14, "route_unavailable": 1}
 MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS = {"family": 3}
 MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS = {"none": 3}
 MEMORY_GOVERNANCE_CONSTRAINT_TAG_COUNTS = {
@@ -180,6 +207,61 @@ DEFAULT_TAG_COUNTS = {
     "quick_dinner": 1,
     "quick_meal": 1,
     "rainy_day": 1,
+}
+RELEASE_GATE_V1_TAG_COUNTS = {
+    "addon_optional": 1,
+    "baseline": 2,
+    "budget_limited": 1,
+    "casual_dining": 1,
+    "child_friendly": 9,
+    "citywalk": 2,
+    "clarification_turn": 1,
+    "conversation_continuation": 2,
+    "date_friendly": 1,
+    "failure_injected": 1,
+    "fallback": 1,
+    "free_activity": 1,
+    "friends_group": 1,
+    "indoor_activity": 4,
+    "light_activity": 2,
+    "light_meal": 9,
+    "memory_advisory": 1,
+    "memory_expired": 1,
+    "memory_governance": 2,
+    "memory_override": 1,
+    "outdoor_activity": 2,
+    "plan_versioning": 1,
+    "quick_dinner": 1,
+    "quick_meal": 1,
+    "rainy_day": 1,
+    "replan_turn": 1,
+    "route_failure": 1,
+}
+RELEASE_GATE_V1_CONSTRAINT_TAG_COUNTS = {
+    "addon_optional": 1,
+    "budget_limited": 1,
+    "casual_dining": 1,
+    "child_friendly": 9,
+    "citywalk": 2,
+    "clarification_turn": 1,
+    "conversation_continuation": 2,
+    "date_friendly": 1,
+    "fallback": 1,
+    "free_activity": 1,
+    "friends_group": 1,
+    "indoor_activity": 4,
+    "light_activity": 2,
+    "light_meal": 9,
+    "memory_advisory": 1,
+    "memory_expired": 1,
+    "memory_governance": 2,
+    "memory_override": 1,
+    "outdoor_activity": 2,
+    "plan_versioning": 1,
+    "quick_dinner": 1,
+    "quick_meal": 1,
+    "rainy_day": 1,
+    "replan_turn": 1,
 }
 DEFAULT_CONSTRAINT_TAG_COUNTS = {
     "addon_optional": 1,
@@ -819,6 +901,15 @@ def test_benchmark_harness_runs_family_replan_version_continuation_case(
             CONVERSATION_CONTINUATION_FAILURE_MODE_COUNTS,
             CONVERSATION_CONTINUATION_CONSTRAINT_TAG_COUNTS,
         ),
+        (
+            "release_gate_v1",
+            RELEASE_GATE_V1_CASE_IDS,
+            15,
+            RELEASE_GATE_V1_TOOL_PROFILE_COUNTS,
+            RELEASE_GATE_V1_SCENARIO_BUCKET_COUNTS,
+            RELEASE_GATE_V1_FAILURE_MODE_COUNTS,
+            RELEASE_GATE_V1_CONSTRAINT_TAG_COUNTS,
+        ),
     ],
 )
 def test_benchmark_harness_runs_named_mock_world_suite(
@@ -894,6 +985,84 @@ def test_benchmark_harness_runs_named_mock_world_suite(
     serialized_suite = json.dumps(suite_payload, sort_keys=True)
     for forbidden in FORBIDDEN_REPORT_TEXT:
         assert forbidden not in serialized_suite
+
+
+def test_benchmark_harness_runs_release_gate_v1_suite(
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    report = harness.run_suite("release_gate_v1")
+
+    assert {result.case_id for result in report.case_results} == RELEASE_GATE_V1_CASE_IDS
+    assert len(report.case_results) == 15
+    assert report.run_status == "passed"
+    assert report.passed_count == 15
+    assert report.failed_count == 0
+    assert report.error_count == 0
+    assert report.report_path is not None
+    assert report.report_path.endswith("suite-release_gate_v1-run-report.json")
+    assert report.benchmark_summary is not None
+    assert report.benchmark_summary.suite_id == "release_gate_v1"
+    assert report.benchmark_summary.matrix_summary is not None
+    assert report.benchmark_summary.matrix_summary.scenario_bucket_counts == RELEASE_GATE_V1_SCENARIO_BUCKET_COUNTS
+    assert report.benchmark_summary.matrix_summary.level_counts == RELEASE_GATE_V1_LEVEL_COUNTS
+    assert report.benchmark_summary.matrix_summary.tool_profile_counts == RELEASE_GATE_V1_TOOL_PROFILE_COUNTS
+    assert report.benchmark_summary.matrix_summary.world_profile_counts == RELEASE_GATE_V1_WORLD_PROFILE_COUNTS
+    assert report.benchmark_summary.matrix_summary.failure_mode_counts == RELEASE_GATE_V1_FAILURE_MODE_COUNTS
+    assert report.benchmark_summary.matrix_summary.tag_counts == RELEASE_GATE_V1_TAG_COUNTS
+    assert report.benchmark_summary.outcome_rollup is not None
+    _assert_rollup_counts(
+        report.benchmark_summary.outcome_rollup.scenario_bucket_outcomes,
+        RELEASE_GATE_V1_SCENARIO_BUCKET_COUNTS,
+    )
+    _assert_rollup_counts(
+        report.benchmark_summary.outcome_rollup.constraint_tag_outcomes,
+        RELEASE_GATE_V1_CONSTRAINT_TAG_COUNTS,
+    )
+    _assert_rollup_counts(
+        report.benchmark_summary.outcome_rollup.failure_mode_outcomes,
+        RELEASE_GATE_V1_FAILURE_MODE_COUNTS,
+    )
+
+    suite_payload = json.loads(Path(report.report_path).read_text(encoding="utf-8"))
+    assert suite_payload["benchmark_summary"]["suite_id"] == "release_gate_v1"
+    assert suite_payload["benchmark_summary"]["matrix_summary"]["scenario_bucket_counts"] == (
+        RELEASE_GATE_V1_SCENARIO_BUCKET_COUNTS
+    )
+    assert suite_payload["benchmark_summary"]["matrix_summary"]["level_counts"] == RELEASE_GATE_V1_LEVEL_COUNTS
+    assert suite_payload["benchmark_summary"]["matrix_summary"]["tool_profile_counts"] == (
+        RELEASE_GATE_V1_TOOL_PROFILE_COUNTS
+    )
+    assert suite_payload["benchmark_summary"]["matrix_summary"]["world_profile_counts"] == (
+        RELEASE_GATE_V1_WORLD_PROFILE_COUNTS
+    )
+    assert suite_payload["benchmark_summary"]["matrix_summary"]["failure_mode_counts"] == (
+        RELEASE_GATE_V1_FAILURE_MODE_COUNTS
+    )
+    assert suite_payload["benchmark_summary"]["matrix_summary"]["tag_counts"] == RELEASE_GATE_V1_TAG_COUNTS
+    _assert_rollup_counts(
+        suite_payload["benchmark_summary"]["outcome_rollup"]["scenario_bucket_outcomes"],
+        RELEASE_GATE_V1_SCENARIO_BUCKET_COUNTS,
+    )
+    _assert_rollup_counts(
+        suite_payload["benchmark_summary"]["outcome_rollup"]["constraint_tag_outcomes"],
+        RELEASE_GATE_V1_CONSTRAINT_TAG_COUNTS,
+    )
+    _assert_rollup_counts(
+        suite_payload["benchmark_summary"]["outcome_rollup"]["failure_mode_outcomes"],
+        RELEASE_GATE_V1_FAILURE_MODE_COUNTS,
+    )
 
 
 def test_benchmark_harness_runs_default_mock_world_suite(

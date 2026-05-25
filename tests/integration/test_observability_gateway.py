@@ -408,6 +408,7 @@ def test_internal_observability_route_returns_benchmark_artifact_summary_for_ben
     assert payload["benchmark_artifact_summary"]["registered_suite_ids"] == [
         "baseline",
         "default",
+        "release_gate_v1",
         "all_registered",
     ]
     assert payload["benchmark_artifact_summary"]["benchmark_status"] == result.status
