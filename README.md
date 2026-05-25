@@ -294,6 +294,7 @@ Expected response:
 ## Web Demo API
 
 The Web demo API starts the official workflow, pauses before write tools, and continues execution only after explicit confirmation. The MVP review path uses Chinese Mock World demo content for the family afternoon scenario.
+The default customer-page sample remains the existing family afternoon request. When `read_profile="mock_world"` and the prompt explicitly describes a nearby friends-group afternoon hangout, the demo start path now resolves to the canonical `friends_gathering` Mock World fixture without changing the public API shape.
 The default start path stays on `Mock World`. To preview the live read provider locally, send `read_profile="amap"` and keep `AMAP_MAPS_API_KEY` in local `.env`; that AMAP path is read-only and cannot be confirmed into execution.
 When a start request is still missing key supported constraints, or when bounded recovery needs an explicit user tradeoff, the workflow stops in `awaiting_clarification` instead of fabricating a plan. In that state the public `DemoRunSummary` returns `plans = []`, `selected_plan_id = null`, and a compact `clarification` object with the user-visible follow-up prompt plus the missing supported fields.
 Every public demo run summary includes a compact `plan_version` object. The initial run starts at `v1`, and each follow-up replan increments the visible version label.
@@ -315,6 +316,16 @@ curl -X POST http://127.0.0.1:8000/demo/runs \
   -H "Content-Type: application/json" \
   -d "{\"user_input\":\"今天下午想和爱人、5岁的孩子出门玩几个小时，别离家太远。孩子要适合亲子活动，爱人最近想吃清淡一点，帮我安排一下。\"}"
 ```
+
+Start an explicit friends-group Mock World run:
+
+```bash
+curl -X POST http://127.0.0.1:8000/demo/runs \
+  -H "Content-Type: application/json" \
+  -d "{\"user_input\":\"This afternoon I want to hang out with friends nearby for a few hours. Start with an outdoor walk and chatting, then find a casual dinner place that's good for sharing. Not too far.\",\"external_user_id\":\"web-demo-user\",\"display_name\":\"Web Demo User\",\"case_id\":\"web-demo-friends\",\"selected_plan_index\":0,\"read_profile\":\"mock_world\"}"
+```
+
+This friends-group sample should still stop at `awaiting_confirmation` with `action_count = 0` before confirmation, but it now persists the canonical Mock World profile `friends_gathering` on the created run.
 
 Start an explicit AMap read-only preview run:
 

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.confirmation import HumanConfirmationService, PlanConfirmationError
 from backend.app.demo.replan import build_follow_up_intent
+from backend.app.demo.world_profile import resolve_mock_world_demo_profile
 from backend.app.execution import DeterministicExecutionWorkflow, ExecutionWorkflowError
 from backend.app.feedback import DeterministicFeedbackWriter, FeedbackWriterError
 from backend.app.demo.action_manifest import summarize_action_manifest
@@ -125,7 +126,7 @@ class DemoWorkflowService:
         *,
         override: DemoStartRunOverride | None = None,
     ) -> DemoRunSummary:
-        default_tool_profile, default_world_profile = self._workflow_profiles_for_read_profile(request.read_profile)
+        default_tool_profile, default_world_profile = self._workflow_profiles_for_start_request(request)
         tool_profile = override.tool_profile if override is not None and override.tool_profile else default_tool_profile
         world_profile = (
             override.world_profile if override is not None and override.world_profile else default_world_profile
@@ -469,10 +470,10 @@ class DemoWorkflowService:
             rate_limiter=self.rate_limiter,
         )
 
-    def _workflow_profiles_for_read_profile(self, read_profile: str) -> tuple[str, str]:
-        if read_profile == "amap":
+    def _workflow_profiles_for_start_request(self, request: DemoStartRunRequest) -> tuple[str, str]:
+        if request.read_profile == "amap":
             return "amap", "amap_shanghai_live"
-        return "mock_world", "family_afternoon"
+        return "mock_world", resolve_mock_world_demo_profile(request.user_input)
 
     def _read_profile_for_tool_profile(self, tool_profile: str) -> str:
         if tool_profile == "amap":

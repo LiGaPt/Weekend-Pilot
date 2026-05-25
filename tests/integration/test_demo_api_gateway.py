@@ -25,6 +25,11 @@ USER_INPUT = (
     "This afternoon I want to go out with my wife and child for a few hours. "
     "Not too far. My child is 5, and my wife is trying to eat lighter."
 )
+FRIENDS_GROUP_INPUT = (
+    "This afternoon I want to hang out with friends nearby for a few hours. "
+    "Start with an outdoor walk and chatting, then find a casual dinner place that's good for sharing. "
+    "Not too far."
+)
 FORBIDDEN_RESPONSE_KEYS = {
     "action_id",
     "tool_event_id",
@@ -162,14 +167,19 @@ def client(redis_client: Redis, trace_path: Path):
         cleanup.close()
 
 
-def _start_payload(case_ids: list[str], external_user_ids: list[str]) -> dict[str, str]:
+def _start_payload(
+    case_ids: list[str],
+    external_user_ids: list[str],
+    *,
+    user_input: str = USER_INPUT,
+) -> dict[str, str]:
     suffix = str(uuid4())
     case_id = f"{TEST_PREFIX}-{suffix}"
     external_user_id = f"{TEST_PREFIX}-user-{suffix}"
     case_ids.append(case_id)
     external_user_ids.append(external_user_id)
     return {
-        "user_input": USER_INPUT,
+        "user_input": user_input,
         "external_user_id": external_user_id,
         "display_name": "Web Demo Gateway Tester",
         "case_id": case_id,
@@ -339,6 +349,67 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
         }
         assert "draft" not in turns[1].payload_json
         assert "plan_json" not in turns[1].payload_json
+    finally:
+        db.close()
+
+
+def test_demo_run_friends_group_start_persists_friends_world_and_confirms_successfully(client) -> None:
+    test_client, case_ids, external_user_ids = client
+
+    start_response = test_client.post(
+        "/demo/runs",
+        json=_start_payload(case_ids, external_user_ids, user_input=FRIENDS_GROUP_INPUT),
+    )
+
+    assert start_response.status_code == 200
+    start_body = start_response.json()
+    _assert_no_forbidden_keys(start_body)
+    _assert_public_run_redaction(start_body)
+    assert start_body["status"] == "awaiting_confirmation"
+    assert start_body["read_profile"] == "mock_world"
+    assert start_body["action_count"] == 0
+    assert start_body["plans"]
+    assert start_body["selected_plan_id"]
+    _assert_plan_version(
+        start_body,
+        version_number=1,
+        source_run_id=None,
+        source_selected_plan_id=None,
+    )
+    selected_start_plan = next(plan for plan in start_body["plans"] if plan["selected"])
+    _assert_action_manifest_preview(selected_start_plan)
+    run_id = UUID(start_body["run_id"])
+
+    db = SessionLocal()
+    try:
+        assert _count_actions(db, run_id) == 0
+        run = _load_run(db, run_id)
+        assert run.tool_profile == "mock_world"
+        assert run.world_profile == "friends_gathering"
+    finally:
+        db.close()
+
+    confirm_response = test_client.post(
+        f"/demo/runs/{run_id}/confirm",
+        json={"confirmed_by": "web-demo-user"},
+    )
+
+    assert confirm_response.status_code == 200
+    confirm_body = confirm_response.json()
+    _assert_no_forbidden_keys(confirm_body)
+    _assert_public_run_redaction(confirm_body)
+    assert confirm_body["run_id"] == str(run_id)
+    assert confirm_body["status"] == "completed"
+    assert confirm_body["action_count"] > 0
+    selected_confirmed_plan = next(plan for plan in confirm_body["plans"] if plan["selected"])
+    _assert_action_manifest_confirmed(selected_confirmed_plan)
+
+    db = SessionLocal()
+    try:
+        run = _load_run(db, run_id)
+        assert run.tool_profile == "mock_world"
+        assert run.world_profile == "friends_gathering"
+        assert _count_actions(db, run_id) > 0
     finally:
         db.close()
 
