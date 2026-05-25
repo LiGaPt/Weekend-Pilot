@@ -178,6 +178,24 @@ python -m alembic upgrade head
 python -m pytest tests/test_benchmark_harness.py tests/integration/test_benchmark_harness_gateway.py -v
 ```
 
+## Formal Verification
+
+The repository now includes a one-click formal verification runner for the canonical `all_registered` benchmark suite. Run it from the repo root:
+
+```bash
+python scripts/run_formal_verification.py
+```
+
+The runner starts `postgres` and `redis` with `docker compose up -d postgres redis`, waits for both services to become reachable, runs `python -m alembic upgrade head`, and then executes `BenchmarkHarness.run_suite("all_registered")`.
+
+Each successful run writes a dedicated output directory under `var/formal-benchmarks/formal-<unique-id>/`, including:
+
+- suite and case JSON reports from the existing benchmark harness
+- a run-local trace buffer file at `formal-traces.jsonl`
+- a stable latest alias at `var/formal-benchmarks/latest-all_registered-run-report.json`
+
+The latest alias is a direct file copy of the passing suite report, so nested `report_path` values continue to point at the unique run directory that produced the result. This task does not publish benchmark outputs into `docs/artifacts/`; formal verification artifacts stay under `var/` only.
+
 ## LangGraph Workflow Skeleton
 
 The workflow package provides the shared product route for the deterministic Mock World flow. It pauses before write-tool execution unless `auto_confirm=True` is supplied by a test or demo caller.
