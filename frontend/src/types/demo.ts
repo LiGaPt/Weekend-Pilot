@@ -122,6 +122,11 @@ export type DemoClarifyRunRequest = {
   selected_plan_index: number;
 };
 
+export type DemoReplanRunRequest = {
+  user_input: string;
+  selected_plan_index: number;
+};
+
 export type DemoPlanPreview = {
   plan_id: string;
   status: string;

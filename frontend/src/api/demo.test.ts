@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clarifyRun, confirmRun, declineRun, getRun, startRun } from "./demo";
+import { clarifyRun, confirmRun, declineRun, getRun, replanRun, startRun } from "./demo";
 import { FrontendApiError } from "../shared/http";
 import type { DemoRunSummary } from "../types/demo";
 
@@ -128,6 +128,25 @@ describe("demo API client", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_input: "今天下午一个人出门玩几个小时，别太远。",
+          selected_plan_index: 0,
+        }),
+      }),
+    );
+  });
+
+  it("posts replanRun with the expected body", async () => {
+    await replanRun("run-1", {
+      user_input: "Keep it nearby, but make it a solo outing this time.",
+      selected_plan_index: 0,
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/demo/runs/run-1/replan",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_input: "Keep it nearby, but make it a solo outing this time.",
           selected_plan_index: 0,
         }),
       }),
@@ -274,6 +293,87 @@ describe("demo API client", () => {
 
     await expect(
       clarifyRun("run-1", { user_input: "补充一下", selected_plan_index: 0 }),
+    ).rejects.toMatchObject({
+      name: "DemoApiError",
+      status: 409,
+      message: "当前运行缺少关联用户，请重新开始规划。",
+    } satisfies Partial<FrontendApiError>);
+  });
+
+  it("localizes replan status conflicts", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ detail: "Source run status does not allow replanning." }), {
+            status: 409,
+          }),
+      ),
+    );
+
+    await expect(
+      replanRun("run-1", { user_input: "调整一下", selected_plan_index: 0 }),
+    ).rejects.toMatchObject({
+      name: "DemoApiError",
+      status: 409,
+      message: "当前运行还不能继续调整方案，请刷新状态后重试。",
+    } satisfies Partial<FrontendApiError>);
+  });
+
+  it("localizes missing replan session errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ detail: "Source run is missing session persistence for replanning." }),
+            { status: 409 },
+          ),
+      ),
+    );
+
+    await expect(
+      replanRun("run-1", { user_input: "调整一下", selected_plan_index: 0 }),
+    ).rejects.toMatchObject({
+      name: "DemoApiError",
+      status: 409,
+      message: "当前运行缺少继续规划会话，请重新开始规划。",
+    } satisfies Partial<FrontendApiError>);
+  });
+
+  it("localizes unavailable replan session errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ detail: "Source run session is unavailable for replanning." }), {
+            status: 409,
+          }),
+      ),
+    );
+
+    await expect(
+      replanRun("run-1", { user_input: "调整一下", selected_plan_index: 0 }),
+    ).rejects.toMatchObject({
+      name: "DemoApiError",
+      status: 409,
+      message: "当前运行缺少继续规划会话，请重新开始规划。",
+    } satisfies Partial<FrontendApiError>);
+  });
+
+  it("localizes unavailable replan user errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ detail: "Source run user is unavailable for replanning." }), {
+            status: 409,
+          }),
+      ),
+    );
+
+    await expect(
+      replanRun("run-1", { user_input: "调整一下", selected_plan_index: 0 }),
     ).rejects.toMatchObject({
       name: "DemoApiError",
       status: 409,

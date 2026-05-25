@@ -187,8 +187,20 @@ curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/clarify \
 ### Follow-up Replan Path
 
 1. Start a fresh run and wait for `awaiting_confirmation`.
-2. Copy the visible `run_id`.
-3. Send a follow-up request:
+2. Confirm the page shows a `继续调整方案` panel with a dedicated textarea and submit button.
+3. Confirm the visible `plan_version.version_label` is `v1`.
+4. Record the visible `run_id`.
+5. Enter a follow-up such as `Keep it nearby, but make it a solo outing this time.`
+6. Click `重新规划当前方案`.
+7. Confirm the page updates to a different `run_id`.
+8. Confirm the new run also reaches `awaiting_confirmation`.
+9. Confirm the visible version label advances to `v2`.
+10. Enter another follow-up such as `Reduce walking even more.`
+11. Click `重新规划当前方案` again.
+12. Confirm the page stays on `awaiting_confirmation` and now shows `plan_version.version_label = v3`.
+13. Confirm the public page still does not expose `session_id` or conversation history.
+
+If you want an API-level fallback check for the same continuation, you can still send:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/replan \
@@ -196,12 +208,11 @@ curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/replan \
   -d "{\"user_input\":\"Keep it nearby, but make it a solo outing this time.\",\"selected_plan_index\":0}"
 ```
 
-4. Confirm the response returns a different `run_id`.
-5. Confirm the new run also reaches `awaiting_confirmation`.
-6. Confirm the original run still shows `plan_version.version_label = v1` and the follow-up run shows `v2`.
-7. Repeat the replan call from the `v2` run if needed and confirm the next run shows `v3`.
-8. Confirm the original run is still readable through `GET /demo/runs/<old_run_id>` with its original selected plan unchanged.
-9. Confirm the public response still does not expose `session_id` or conversation history.
+14. Confirm the response returns a different `run_id`.
+15. Confirm the new run also reaches `awaiting_confirmation`.
+16. Confirm the original run still shows `plan_version.version_label = v1` and the follow-up run shows `v2`.
+17. Repeat the replan call from the `v2` run if needed and confirm the next run shows `v3`.
+18. Confirm the original run is still readable through `GET /demo/runs/<old_run_id>` with its original selected plan unchanged.
 
 ### Refresh Path
 

@@ -16,13 +16,14 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
-import { clarifyRun, confirmRun, declineRun, getRun, startRun } from "./api/demo";
+import { clarifyRun, confirmRun, declineRun, getRun, replanRun, startRun } from "./api/demo";
 import type {
   DemoActionManifestSummary,
   DemoCandidateSummary,
   DemoClarificationSummary,
   DemoPlanPreview,
   DemoReadProfile,
+  DemoReplanRunRequest,
   DemoRunSummary,
 } from "./types/demo";
 
@@ -39,6 +40,7 @@ type RequestState =
   | "awaiting_clarification"
   | "clarifying"
   | "awaiting_confirmation"
+  | "replanning"
   | "refreshing"
   | "confirming"
   | "declining"
@@ -54,6 +56,7 @@ export default function App() {
   const [run, setRun] = useState<DemoRunSummary | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [clarificationReply, setClarificationReply] = useState("");
+  const [replanReply, setReplanReply] = useState("");
   const [requestState, setRequestState] = useState<RequestState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -64,16 +67,21 @@ export default function App() {
   const clarificationPayloadIsInvalid =
     run?.status === "awaiting_clarification" && !isClarificationSummary(run.clarification);
   const visibleErrorMessage = errorMessage ?? (clarificationPayloadIsInvalid ? GENERIC_ERROR_MESSAGE : null);
-  const isInFlight = ["starting", "clarifying", "refreshing", "confirming", "declining"].includes(requestState);
+  const isInFlight = ["starting", "clarifying", "replanning", "refreshing", "confirming", "declining"].includes(
+    requestState,
+  );
   const canRefresh = Boolean(run?.run_id) && !isInFlight;
   const isAwaitingClarification = run?.status === "awaiting_clarification";
   const isAwaitingConfirmation = run?.status === "awaiting_confirmation";
   const isAmapPreview = run?.read_profile === "amap";
   const clarificationReplyIsEmpty = clarificationReply.trim().length === 0;
   const showClarificationPanel = Boolean(isAwaitingClarification && clarificationPayload);
+  const replanReplyIsEmpty = replanReply.trim().length === 0;
   const canClarify = Boolean(showClarificationPanel && run?.run_id && !clarificationReplyIsEmpty && !isInFlight);
   const canConfirm = Boolean(isAwaitingConfirmation && selectedPlan && !isInFlight && !isAmapPreview);
   const canDecline = Boolean(isAwaitingConfirmation && selectedPlan && !isInFlight);
+  const showReplanPanel = Boolean(run?.status === "awaiting_confirmation" && selectedPlan);
+  const canReplan = Boolean(showReplanPanel && run?.run_id && !replanReplyIsEmpty && !isInFlight);
 
   async function handleStart() {
     if (inputIsEmpty || isInFlight) {
@@ -81,6 +89,7 @@ export default function App() {
     }
 
     setClarificationReply("");
+    setReplanReply("");
     await runAction("starting", () =>
       startRun({
         user_input: trimmedInput,
@@ -90,6 +99,20 @@ export default function App() {
         selected_plan_index: 0,
         read_profile: selectedReadProfile,
       }),
+    );
+  }
+
+  async function handleReplan() {
+    if (!run?.run_id || !canReplan) {
+      return;
+    }
+
+    await runAction(
+      "replanning",
+      () => replanRun(run.run_id, buildReplanRequest(replanReply)),
+      () => {
+        setReplanReply("");
+      },
     );
   }
 
@@ -225,6 +248,7 @@ export default function App() {
                   setUserInput(DEFAULT_PROMPT);
                   setSelectedReadProfile("mock_world");
                   setClarificationReply("");
+                  setReplanReply("");
                   setErrorMessage(null);
                 }}
                 disabled={isInFlight}
@@ -278,6 +302,15 @@ export default function App() {
                 onConfirm={handleConfirm}
                 onDecline={handleDecline}
               />
+              {showReplanPanel ? (
+                <ReplanPanel
+                  reply={replanReply}
+                  requestState={requestState}
+                  canReplan={canReplan}
+                  onReplyChange={setReplanReply}
+                  onSubmit={handleReplan}
+                />
+              ) : null}
               <ExecutionResult run={run} plan={selectedPlan} />
             </>
           ) : (
@@ -290,6 +323,56 @@ export default function App() {
         </section>
       </div>
     </main>
+  );
+}
+
+function ReplanPanel({
+  reply,
+  requestState,
+  canReplan,
+  onReplyChange,
+  onSubmit,
+}: {
+  reply: string;
+  requestState: RequestState;
+  canReplan: boolean;
+  onReplyChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <section className="panel replan-panel" aria-labelledby="replan-title" data-testid="replan-panel">
+      <div>
+        <p className="eyebrow">继续规划</p>
+        <h2 id="replan-title">继续调整方案</h2>
+        <p>补充新的限制或偏好后，会基于当前运行创建新的方案版本，并切换到新的 run。</p>
+      </div>
+
+      <label className="field-label" htmlFor="replan-reply-input">
+        新的需求或限制
+      </label>
+      <textarea
+        id="replan-reply-input"
+        className="replan-textarea"
+        value={reply}
+        onChange={(event) => onReplyChange(event.target.value)}
+        rows={4}
+        disabled={requestState === "replanning"}
+        data-testid="replan-reply-input"
+      />
+
+      <div className="button-row align-end">
+        <button
+          className="primary-button"
+          type="button"
+          onClick={onSubmit}
+          disabled={!canReplan}
+          data-testid="replan-submit-button"
+        >
+          {requestState === "replanning" ? <Loader2 className="spin" size={17} /> : <Send size={17} />}
+          <span>{requestState === "replanning" ? "重新规划中..." : "重新规划当前方案"}</span>
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -899,6 +982,7 @@ function statusLabel(value?: string | null) {
     idle: "待开始",
     starting: "规划中",
     clarifying: "提交补充中",
+    replanning: "重新规划中",
     awaiting_confirmation: "等待确认",
     awaiting_clarification: "等待补充信息",
     refreshing: "刷新中",
@@ -960,4 +1044,11 @@ function buildDemoExternalUserId() {
     return `web-demo-user-${crypto.randomUUID()}`;
   }
   return `web-demo-user-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function buildReplanRequest(reply: string): DemoReplanRunRequest {
+  return {
+    user_input: reply.trim(),
+    selected_plan_index: 0,
+  };
 }

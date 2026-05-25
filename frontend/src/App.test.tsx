@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { clarifyRun, confirmRun, declineRun, startRun } from "./api/demo";
+import { clarifyRun, confirmRun, declineRun, replanRun, startRun } from "./api/demo";
 import type { DemoRunSummary } from "./types/demo";
 
 vi.mock("./api/demo", () => ({
@@ -11,6 +11,7 @@ vi.mock("./api/demo", () => ({
   clarifyRun: vi.fn(),
   confirmRun: vi.fn(),
   declineRun: vi.fn(),
+  replanRun: vi.fn(),
 }));
 
 const awaitingRun: DemoRunSummary = {
@@ -163,6 +164,40 @@ const clarifiedRun: DemoRunSummary = {
   clarification: null,
 };
 
+const replannedRunV2: DemoRunSummary = {
+  ...awaitingRun,
+  run_id: "run-2",
+  plan_version: {
+    version_number: 2,
+    version_label: "v2",
+    source_run_id: "run-1",
+    source_selected_plan_id: "plan-1",
+  },
+  clarification: null,
+};
+
+const replannedRunV3: DemoRunSummary = {
+  ...awaitingRun,
+  run_id: "run-3",
+  plan_version: {
+    version_number: 3,
+    version_label: "v3",
+    source_run_id: "run-2",
+    source_selected_plan_id: "plan-1",
+  },
+  clarification: null,
+};
+
+const replannedAwaitingClarificationRun: DemoRunSummary = {
+  ...awaitingClarificationRunRoundTwo,
+  plan_version: {
+    version_number: 2,
+    version_label: "v2",
+    source_run_id: "run-1",
+    source_selected_plan_id: "plan-1",
+  },
+};
+
 const completedRun: DemoRunSummary = {
   ...awaitingRun,
   status: "completed",
@@ -227,6 +262,7 @@ describe("App", () => {
     vi.mocked(clarifyRun).mockReset();
     vi.mocked(confirmRun).mockReset();
     vi.mocked(declineRun).mockReset();
+    vi.mocked(replanRun).mockReset();
   });
 
   it("renders the default prompt, default read profile, and start button", () => {
@@ -400,6 +436,98 @@ describe("App", () => {
     expect(screen.getByTestId("clarification-fields")).toHaveTextContent("时间安排");
     expect(screen.getByText("为了继续规划，请补充大概什么时间出发、准备玩多久。")).toBeInTheDocument();
     expect(screen.queryByTestId("confirm-button")).not.toBeInTheDocument();
+  });
+
+  it("renders a replan panel when the run is awaiting confirmation", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startRun).mockResolvedValue(awaitingRun);
+    render(<App />);
+
+    await user.click(screen.getByTestId("start-button"));
+
+    expect(await screen.findByTestId("replan-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("replan-submit-button")).toBeDisabled();
+    expect(screen.getByText("继续调整方案")).toBeInTheDocument();
+  });
+
+  it("disables replan submit when the reply is empty", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startRun).mockResolvedValue(awaitingRun);
+    render(<App />);
+
+    await user.click(screen.getByTestId("start-button"));
+
+    const replyInput = await screen.findByTestId("replan-reply-input");
+    const submitButton = screen.getByTestId("replan-submit-button");
+
+    expect(submitButton).toBeDisabled();
+
+    await user.type(replyInput, "   ");
+
+    expect(submitButton).toBeDisabled();
+  });
+
+  it("submits a replan request and advances the visible version", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startRun).mockResolvedValue(awaitingRun);
+    vi.mocked(replanRun).mockResolvedValue(replannedRunV2);
+    render(<App />);
+
+    await user.click(screen.getByTestId("start-button"));
+    await user.type(
+      await screen.findByTestId("replan-reply-input"),
+      "Keep it nearby, but make it a solo outing this time.",
+    );
+    await user.click(screen.getByTestId("replan-submit-button"));
+
+    expect(replanRun).toHaveBeenCalledWith("run-1", {
+      user_input: "Keep it nearby, but make it a solo outing this time.",
+      selected_plan_index: 0,
+    });
+    expect(await screen.findByTestId("run-id")).toHaveTextContent("run-2");
+    expect(screen.getByTestId("plan-version")).toHaveTextContent("v2");
+    expect(screen.getByTestId("confirm-button")).toBeInTheDocument();
+  });
+
+  it("supports repeated replans and shows v3 on the next run", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startRun).mockResolvedValue(awaitingRun);
+    vi.mocked(replanRun).mockResolvedValueOnce(replannedRunV2).mockResolvedValueOnce(replannedRunV3);
+    render(<App />);
+
+    await user.click(screen.getByTestId("start-button"));
+    const replanInput = await screen.findByTestId("replan-reply-input");
+
+    await user.type(replanInput, "Keep it nearby, but make it a solo outing this time.");
+    await user.click(screen.getByTestId("replan-submit-button"));
+    expect(await screen.findByTestId("plan-version")).toHaveTextContent("v2");
+
+    const nextInput = screen.getByTestId("replan-reply-input");
+    await user.type(nextInput, "Reduce walking even more.");
+    await user.click(screen.getByTestId("replan-submit-button"));
+
+    expect(replanRun).toHaveBeenNthCalledWith(2, "run-2", {
+      user_input: "Reduce walking even more.",
+      selected_plan_index: 0,
+    });
+    expect(await screen.findByTestId("run-id")).toHaveTextContent("run-3");
+    expect(screen.getByTestId("plan-version")).toHaveTextContent("v3");
+  });
+
+  it("switches back to the clarification panel when replan needs more user input", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startRun).mockResolvedValue(awaitingRun);
+    vi.mocked(replanRun).mockResolvedValue(replannedAwaitingClarificationRun);
+    render(<App />);
+
+    await user.click(screen.getByTestId("start-button"));
+    await user.type(await screen.findByTestId("replan-reply-input"), "改成和朋友一起，但时间还没定。");
+    await user.click(screen.getByTestId("replan-submit-button"));
+
+    expect(await screen.findByTestId("clarification-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("run-id")).toHaveTextContent("run-clarify-2");
+    expect(screen.getByTestId("plan-version")).toHaveTextContent("v2");
+    expect(screen.queryByTestId("replan-panel")).not.toBeInTheDocument();
   });
 
   it("sends the selected read profile when starting a run", async () => {
