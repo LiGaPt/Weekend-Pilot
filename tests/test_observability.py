@@ -834,6 +834,7 @@ def test_internal_observability_service_returns_benchmark_artifact_summary_when_
     assert summary.benchmark_artifact_summary.registered_suite_ids == [
         "baseline",
         "default",
+        "release_gate_v1",
         "all_registered",
     ]
     assert summary.benchmark_artifact_summary.taxonomy is not None
@@ -866,6 +867,7 @@ def test_internal_observability_service_returns_partial_benchmark_summary_when_a
     assert summary.benchmark_artifact_summary.case_id == "family_route_failure_v1"
     assert summary.benchmark_artifact_summary.registered_suite_ids == [
         "recovery_focused",
+        "release_gate_v1",
         "all_registered",
     ]
     assert summary.benchmark_artifact_summary.taxonomy is not None

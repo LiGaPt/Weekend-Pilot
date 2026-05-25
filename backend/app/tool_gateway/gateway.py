@@ -101,7 +101,14 @@ class ToolGateway:
 
         cache_key = None
         if definition.cache_ttl_seconds is not None:
-            cache_key = build_tool_cache_key(definition.name, provider_name, request.payload)
+            cache_key = build_tool_cache_key(
+                definition.name,
+                provider_name,
+                {
+                    "run_id": str(request.run_id),
+                    "payload": request.payload,
+                },
+            )
             cached_value = self._cache.get_json(cache_key)
             if cached_value is not None:
                 response_json = cached_value if isinstance(cached_value, dict) else {"value": cached_value}

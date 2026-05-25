@@ -182,6 +182,43 @@ def test_cacheable_read_tool_uses_redis_cache_on_second_call(db_session: Session
     assert sorted(statuses) == ["cached", "succeeded"]
 
 
+def test_cacheable_read_tool_does_not_reuse_cached_value_across_runs(db_session: Session, redis_runtime) -> None:
+    cache, rate_limiter = redis_runtime
+    provider = FakeProvider()
+    gateway = build_gateway(
+        db_session,
+        ToolDefinition(
+            name="check_ticket_availability",
+            tool_type="read",
+            default_provider="fake",
+            cache_ttl_seconds=60,
+        ),
+        provider,
+        cache,
+        rate_limiter,
+    )
+    first_run = create_run(db_session)
+    second_run = create_run(db_session)
+    first_request = ToolGatewayRequest(
+        run_id=first_run.run_id,
+        tool_name="check_ticket_availability",
+        payload={"poi_id": "activity_walk_001", "quantity": 2},
+    )
+    second_request = ToolGatewayRequest(
+        run_id=second_run.run_id,
+        tool_name="check_ticket_availability",
+        payload={"poi_id": "activity_walk_001", "quantity": 2},
+    )
+
+    first = gateway.invoke(first_request)
+    second = gateway.invoke(second_request)
+
+    assert first.status == "succeeded"
+    assert second.status == "succeeded"
+    assert second.cache_hit is False
+    assert len(provider.calls) == 2
+
+
 def test_rate_limited_tool_blocks_provider_call(db_session: Session, redis_runtime) -> None:
     cache, rate_limiter = redis_runtime
     provider = FakeProvider()

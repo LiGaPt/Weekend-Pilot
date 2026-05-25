@@ -160,7 +160,7 @@ Canonical benchmark fixtures and suites remain `Mock World` only in this v0 task
 
 Each benchmark case fixture now requires a structured `taxonomy` block that captures suite, scenario bucket, benchmark level, tags, and failure mode. Each benchmark case report now includes both `run_summary` and `taxonomy`. Failure-profile cases also add a sanitized `failure_chain_summary` so injected effects, bounded recovery actions, and terminal workflow state stay directly reviewable in case reports. Memory-governed cases now also persist `workflow.memory_policy` as `memory_query_policy_v1`, including per-dimension winners and per-memory outcomes so memory behavior stays auditable without exposing raw memory text or payloads. Continuation cases now also add sanitized `conversation_trace` step summaries and ordered `conversation_turn_types` so status transitions and plan-version evolution stay reviewable without exposing raw conversation payloads. Each suite summary now includes both `matrix_summary` coverage counts and additive `outcome_rollup` pass-rate buckets by scenario family, constraint tag, and failure mode so coverage and benchmark pass rate can be compared directly as the suite catalog expands.
 
-The repository now keeps seven canonical named benchmark suites in code:
+The repository now keeps eight canonical named benchmark suites in code:
 
 - `baseline` for the historical six-case family-plus-solo non-failure baseline
 - `expanded` for the added couple, friends-group, rainy-day fallback, and budget-lite scenario pack
@@ -168,6 +168,7 @@ The repository now keeps seven canonical named benchmark suites in code:
 - `memory_governance` for the focused three-case suite that proves explicit user input beats memory, advisory memory helps vague requests, and expired high-confidence memory is downgraded but still visible
 - `conversation_continuations` for the focused two-case multi-turn clarification and replan/version suite
 - `default` for the ten-case non-failure union of `baseline + expanded`
+- `release_gate_v1` for the blocking 15-case LocalLife-Bench `L1-L3` V1 release standard
 - `all_registered` for the full 17-case registered fixture inventory
 
 The legacy `failures` suite name remains loadable as a compatibility alias to `recovery_focused`, and `load_failure_benchmark_cases()` now resolves to that canonical recovery-focused suite. The `default` suite remains the historical single-turn ten-case suite. Continuation benchmarking in this v0 task is intentionally limited to non-failure `Mock World` cases, and it uses the demo conversation service only to drive clarification/replan chains before writing benchmark reports. Replay stable comparison now also includes `failure_chain_signature`, which mirrors the ordered injected-effect chain from `failure_chain_summary.injected_effects`. Suite descriptions still derive their `matrix_summary` from the existing case taxonomy so expansion stays reviewable.
@@ -178,9 +179,47 @@ python -m alembic upgrade head
 python -m pytest tests/test_benchmark_harness.py tests/integration/test_benchmark_harness_gateway.py -v
 ```
 
+## Benchmark Release Gate
+
+The repository now includes a blocking benchmark release gate for V1 sign-off. `release_gate_v1` is the formal LocalLife-Bench `L1-L3` release suite: it covers the current 15 Mock World `L1-L3` cases and intentionally excludes the two current `L5` composite chaos cases. Those broader chaos cases remain part of `all_registered`, not the blocking V1 gate.
+
+Run the blocking gate from the repo root:
+
+```bash
+python scripts/run_benchmark_release_gate.py
+```
+
+The release-gate runner starts `postgres` and `redis` with `docker compose up -d postgres redis`, waits for both services to become reachable, runs `python -m alembic upgrade head`, and then executes `BenchmarkHarness.run_suite("release_gate_v1")`.
+
+The gate passes only when all of the following stay true:
+
+- `suite_id == "release_gate_v1"`
+- `run_status == "passed"`
+- `case_count == 15`
+- `passed_count == 15`
+- `failed_count == 0`
+- `error_count == 0`
+- `overall_score == 1.0`
+- `suite-release_gate_v1-run-report.json` exists
+- `var/formal-benchmarks/latest-release_gate_v1-run-report.json` is refreshed successfully
+- `matrix_summary.level_counts == {"L1": 3, "L2": 8, "L3": 4}`
+- `matrix_summary.tool_profile_counts == {"mock_world": 15}`
+- `matrix_summary.failure_mode_counts == {"none": 14, "route_unavailable": 1}`
+
+Any drift from those rules blocks release. Failed runs keep their unique `var/formal-benchmarks/release-gate-v1-<unique-id>/` directory for debugging, and a blocked run must not overwrite `latest-release_gate_v1-run-report.json`.
+
+Release checklist:
+
+- run `python scripts/run_benchmark_release_gate.py`
+- confirm exit code `0`
+- confirm `var/formal-benchmarks/latest-release_gate_v1-run-report.json` was refreshed
+- confirm no secrets or unrelated local artifacts are staged
+- retain or reference the latest release-gate report path for review
+- optionally run `python scripts/run_formal_verification.py` for broader full-inventory validation
+
 ## Formal Verification
 
-The repository now includes a one-click formal verification runner for the canonical `all_registered` benchmark suite. Run it from the repo root:
+The repository now includes a broader one-click formal verification runner for the canonical `all_registered` benchmark suite. `all_registered` remains the full registered fixture inventory, including the two current `L5` composite chaos cases that are intentionally outside the blocking `release_gate_v1` boundary. Run it from the repo root:
 
 ```bash
 python scripts/run_formal_verification.py

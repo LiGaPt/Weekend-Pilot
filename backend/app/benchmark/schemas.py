@@ -22,6 +22,7 @@ BenchmarkSuiteId = Literal[
     "memory_governance",
     "conversation_continuations",
     "default",
+    "release_gate_v1",
     "all_registered",
 ]
 _LOWER_SNAKE_CASE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")

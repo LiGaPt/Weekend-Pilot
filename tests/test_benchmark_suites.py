@@ -56,6 +56,13 @@ CONVERSATION_CONTINUATION_CASE_IDS = [
     "family_replan_version_continuation_v1",
 ]
 DEFAULT_CASE_IDS = BASELINE_CASE_IDS + EXPANDED_CASE_IDS
+RELEASE_GATE_V1_CASE_IDS = [
+    *DEFAULT_CASE_IDS,
+    "family_route_failure_v1",
+    "family_memory_advisory_fill_v1",
+    "family_memory_expired_advisory_v1",
+    *CONVERSATION_CONTINUATION_CASE_IDS,
+]
 CANONICAL_SUITE_IDS = [
     "baseline",
     "expanded",
@@ -63,6 +70,7 @@ CANONICAL_SUITE_IDS = [
     "memory_governance",
     "conversation_continuations",
     "default",
+    "release_gate_v1",
     "all_registered",
 ]
 BASELINE_SCENARIO_BUCKET_COUNTS = {"family": 5, "solo": 1}
@@ -201,6 +209,57 @@ CONVERSATION_CONTINUATION_TAG_COUNTS = {
     "plan_versioning": 1,
     "replan_turn": 1,
 }
+RELEASE_GATE_V1_SCENARIO_BUCKET_COUNTS = {
+    "couple": 1,
+    "family": 9,
+    "friends": 1,
+    "mixed": 1,
+    "solo": 2,
+    "unknown": 1,
+}
+RELEASE_GATE_V1_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L3": 4}
+RELEASE_GATE_V1_TOOL_PROFILE_COUNTS = {"mock_world": 15}
+RELEASE_GATE_V1_WORLD_PROFILE_COUNTS = {
+    "budget_lite": 1,
+    "couple_afternoon": 1,
+    "family_afternoon": 9,
+    "friends_gathering": 1,
+    "rainy_day_fallback": 1,
+    "solo_afternoon": 2,
+}
+RELEASE_GATE_V1_FAILURE_MODE_COUNTS = {
+    "none": 14,
+    "route_unavailable": 1,
+}
+RELEASE_GATE_V1_TAG_COUNTS = {
+    "addon_optional": 1,
+    "baseline": 2,
+    "budget_limited": 1,
+    "casual_dining": 1,
+    "child_friendly": 9,
+    "citywalk": 2,
+    "clarification_turn": 1,
+    "conversation_continuation": 2,
+    "date_friendly": 1,
+    "failure_injected": 1,
+    "fallback": 1,
+    "free_activity": 1,
+    "friends_group": 1,
+    "indoor_activity": 4,
+    "light_activity": 2,
+    "light_meal": 9,
+    "memory_advisory": 1,
+    "memory_expired": 1,
+    "memory_governance": 2,
+    "memory_override": 1,
+    "outdoor_activity": 2,
+    "plan_versioning": 1,
+    "quick_dinner": 1,
+    "quick_meal": 1,
+    "rainy_day": 1,
+    "replan_turn": 1,
+    "route_failure": 1,
+}
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
     "family": 10,
@@ -275,6 +334,7 @@ def test_load_benchmark_suite_returns_expected_named_membership() -> None:
         CONVERSATION_CONTINUATION_CASE_IDS
     )
     assert [case.case_id for case in load_benchmark_suite("default")] == DEFAULT_CASE_IDS
+    assert [case.case_id for case in load_benchmark_suite("release_gate_v1")] == RELEASE_GATE_V1_CASE_IDS
     assert [case.case_id for case in load_benchmark_suite("failures")] == RECOVERY_FOCUSED_CASE_IDS
     assert [case.case_id for case in load_benchmark_suite("all_registered")] == REGISTERED_CASE_IDS
 
@@ -283,29 +343,48 @@ def test_list_benchmark_suite_ids_for_case_returns_expected_membership() -> None
     assert benchmark_suites.list_benchmark_suite_ids_for_case("family_afternoon_v1") == [
         "baseline",
         "default",
+        "release_gate_v1",
         "all_registered",
     ]
     assert benchmark_suites.list_benchmark_suite_ids_for_case("family_memory_override_v1") == [
         "baseline",
         "memory_governance",
         "default",
+        "release_gate_v1",
         "all_registered",
     ]
     assert benchmark_suites.list_benchmark_suite_ids_for_case("couple_afternoon_v1") == [
         "expanded",
         "default",
+        "release_gate_v1",
         "all_registered",
     ]
     assert benchmark_suites.list_benchmark_suite_ids_for_case("family_route_failure_v1") == [
         "recovery_focused",
+        "release_gate_v1",
+        "all_registered",
+    ]
+    assert benchmark_suites.list_benchmark_suite_ids_for_case("family_memory_advisory_fill_v1") == [
+        "memory_governance",
+        "release_gate_v1",
         "all_registered",
     ]
     assert benchmark_suites.list_benchmark_suite_ids_for_case("solo_clarification_continuation_v1") == [
         "conversation_continuations",
+        "release_gate_v1",
         "all_registered",
     ]
     assert benchmark_suites.list_benchmark_suite_ids_for_case("family_replan_version_continuation_v1") == [
         "conversation_continuations",
+        "release_gate_v1",
+        "all_registered",
+    ]
+    assert benchmark_suites.list_benchmark_suite_ids_for_case("family_route_and_dining_unavailable_v1") == [
+        "recovery_focused",
+        "all_registered",
+    ]
+    assert benchmark_suites.list_benchmark_suite_ids_for_case("rainy_day_ticket_sold_out_v1") == [
+        "recovery_focused",
         "all_registered",
     ]
     assert benchmark_suites.list_benchmark_suite_ids_for_case("missing_case_v1") == []
@@ -393,6 +472,17 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
         world_profile_counts=DEFAULT_WORLD_PROFILE_COUNTS,
         failure_mode_counts=DEFAULT_FAILURE_MODE_COUNTS,
         tag_counts=DEFAULT_TAG_COUNTS,
+    )
+    _assert_suite_description(
+        suite_map["release_gate_v1"],
+        case_ids=RELEASE_GATE_V1_CASE_IDS,
+        case_count=15,
+        scenario_bucket_counts=RELEASE_GATE_V1_SCENARIO_BUCKET_COUNTS,
+        level_counts=RELEASE_GATE_V1_LEVEL_COUNTS,
+        tool_profile_counts=RELEASE_GATE_V1_TOOL_PROFILE_COUNTS,
+        world_profile_counts=RELEASE_GATE_V1_WORLD_PROFILE_COUNTS,
+        failure_mode_counts=RELEASE_GATE_V1_FAILURE_MODE_COUNTS,
+        tag_counts=RELEASE_GATE_V1_TAG_COUNTS,
     )
     _assert_suite_description(
         suite_map["all_registered"],
@@ -505,6 +595,11 @@ def test_list_benchmark_suites_rejects_duplicate_case_ids(monkeypatch: pytest.Mo
                 "description": "Default cases",
                 "case_ids": DEFAULT_CASE_IDS,
             },
+            "release_gate_v1": {
+                "title": "Release gate v1 suite",
+                "description": "Blocking V1 release gate cases",
+                "case_ids": RELEASE_GATE_V1_CASE_IDS,
+            },
             "all_registered": {
                 "title": "All registered benchmark cases",
                 "description": "All cases",
@@ -553,6 +648,11 @@ def test_list_benchmark_suites_rejects_unknown_registered_case_id(
                 "title": "Default suite",
                 "description": "Default cases",
                 "case_ids": DEFAULT_CASE_IDS,
+            },
+            "release_gate_v1": {
+                "title": "Release gate v1 suite",
+                "description": "Blocking V1 release gate cases",
+                "case_ids": RELEASE_GATE_V1_CASE_IDS,
             },
             "all_registered": {
                 "title": "All registered benchmark cases",
