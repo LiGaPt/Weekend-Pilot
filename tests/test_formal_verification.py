@@ -1,0 +1,268 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from types import SimpleNamespace
+from uuid import UUID
+from uuid import uuid4
+
+import pytest
+
+import backend.app.benchmark.formal_verification as formal_verification
+
+
+class _FakeSession:
+    def __init__(self) -> None:
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _FakeRedis:
+    def __init__(self) -> None:
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _FakeRedisKeyBuilder:
+    @classmethod
+    def from_settings(cls) -> object:
+        return object()
+
+
+def test_run_formal_verification_creates_unique_run_dir_and_latest_alias(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_root = _make_test_dir()
+    fixed_uuid = UUID("12345678-1234-5678-1234-567812345678")
+    session = _FakeSession()
+    redis_client = _FakeRedis()
+    bootstrap_calls: list[bool] = []
+    captured: dict[str, object] = {}
+
+    def bootstrap(*, start_services: bool = True, timeout_seconds: float = 60.0, poll_interval_seconds: float = 1.0) -> None:
+        bootstrap_calls.append(start_services)
+        captured["timeout_seconds"] = timeout_seconds
+        captured["poll_interval_seconds"] = poll_interval_seconds
+
+    class FakeHarness:
+        def __init__(self, db_session, cache, rate_limiter, *, report_dir, trace_buffer_path) -> None:
+            captured["db_session"] = db_session
+            captured["cache"] = cache
+            captured["rate_limiter"] = rate_limiter
+            captured["report_dir"] = Path(report_dir)
+            captured["trace_buffer_path"] = Path(trace_buffer_path)
+
+        def run_suite(self, suite_id: str):
+            assert suite_id == "all_registered"
+            report_path = Path(captured["report_dir"]) / "suite-all_registered-run-report.json"
+            payload = {
+                "suite_id": "all_registered",
+                "report_path": str(report_path),
+                "nested": {
+                    "report_path": str(report_path),
+                },
+            }
+            report_bytes = json.dumps(payload, indent=2).encode("utf-8")
+            report_path.write_bytes(report_bytes)
+            captured["report_bytes"] = report_bytes
+            return SimpleNamespace(
+                run_status="passed",
+                failed_count=0,
+                error_count=0,
+                report_path=str(report_path),
+                benchmark_summary=SimpleNamespace(
+                    suite_id="all_registered",
+                    case_count=17,
+                    passed_count=17,
+                    failed_count=0,
+                    error_count=0,
+                    overall_score=1.0,
+                ),
+                benchmark_timing_summary=SimpleNamespace(
+                    overall_total_duration_ms=SimpleNamespace(
+                        p50_ms=446,
+                        p95_ms=1564,
+                    )
+                ),
+            )
+
+    monkeypatch.setattr(formal_verification, "_bootstrap_runtime", bootstrap)
+    monkeypatch.setattr(formal_verification, "uuid4", lambda: fixed_uuid)
+    monkeypatch.setattr(formal_verification, "SessionLocal", lambda: session)
+    monkeypatch.setattr(formal_verification, "get_redis_client", lambda: redis_client)
+    monkeypatch.setattr(formal_verification, "RedisKeyBuilder", _FakeRedisKeyBuilder)
+    monkeypatch.setattr(formal_verification, "BenchmarkHarness", FakeHarness)
+
+    try:
+        result = formal_verification.run_formal_verification(output_root=output_root, start_services=False)
+
+        expected_run_dir = output_root / f"formal-{fixed_uuid}"
+        latest_alias = output_root / "latest-all_registered-run-report.json"
+
+        assert bootstrap_calls == [False]
+        assert captured["db_session"] is session
+        assert captured["report_dir"] == expected_run_dir
+        assert captured["trace_buffer_path"] == expected_run_dir / "formal-traces.jsonl"
+        assert session.closed is True
+        assert redis_client.closed is True
+
+        assert result.suite_id == "all_registered"
+        assert result.run_status == "passed"
+        assert result.case_count == 17
+        assert result.passed_count == 17
+        assert result.failed_count == 0
+        assert result.error_count == 0
+        assert result.overall_score == 1.0
+        assert result.run_directory == expected_run_dir
+        assert result.suite_report_path == expected_run_dir / "suite-all_registered-run-report.json"
+        assert result.latest_report_path == latest_alias
+        assert result.trace_buffer_path == expected_run_dir / "formal-traces.jsonl"
+
+        assert latest_alias.read_bytes() == captured["report_bytes"]
+        copied_payload = json.loads(latest_alias.read_text(encoding="utf-8"))
+        assert copied_payload["nested"]["report_path"] == str(result.suite_report_path)
+    finally:
+        _cleanup_test_dir(output_root)
+
+
+def test_run_formal_verification_does_not_overwrite_latest_alias_on_failed_suite(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_root = _make_test_dir()
+    output_root.mkdir(parents=True, exist_ok=True)
+    latest_alias = output_root / "latest-all_registered-run-report.json"
+    latest_alias.write_text('{"status":"keep"}', encoding="utf-8")
+    fixed_uuid = UUID("87654321-4321-8765-4321-876543218765")
+
+    monkeypatch.setattr(formal_verification, "_bootstrap_runtime", lambda **_: None)
+    monkeypatch.setattr(formal_verification, "uuid4", lambda: fixed_uuid)
+    monkeypatch.setattr(formal_verification, "SessionLocal", _FakeSession)
+    monkeypatch.setattr(formal_verification, "get_redis_client", _FakeRedis)
+    monkeypatch.setattr(formal_verification, "RedisKeyBuilder", _FakeRedisKeyBuilder)
+
+    class FakeHarness:
+        def __init__(self, _db_session, _cache, _rate_limiter, *, report_dir, trace_buffer_path) -> None:
+            self.report_dir = Path(report_dir)
+            self.trace_buffer_path = Path(trace_buffer_path)
+
+        def run_suite(self, suite_id: str):
+            report_path = self.report_dir / "suite-all_registered-run-report.json"
+            report_path.write_text(
+                json.dumps(
+                    {
+                        "suite_id": suite_id,
+                        "report_path": str(report_path),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return SimpleNamespace(
+                run_status="failed",
+                failed_count=1,
+                error_count=0,
+                report_path=str(report_path),
+                benchmark_summary=SimpleNamespace(
+                    suite_id="all_registered",
+                    case_count=17,
+                    passed_count=16,
+                    failed_count=1,
+                    error_count=0,
+                    overall_score=0.94,
+                ),
+                benchmark_timing_summary=SimpleNamespace(
+                    overall_total_duration_ms=SimpleNamespace(
+                        p50_ms=446,
+                        p95_ms=1564,
+                    )
+                ),
+            )
+
+    monkeypatch.setattr(formal_verification, "BenchmarkHarness", FakeHarness)
+
+    try:
+        with pytest.raises(formal_verification.FormalVerificationError):
+            formal_verification.run_formal_verification(output_root=output_root, start_services=False)
+
+        assert latest_alias.read_text(encoding="utf-8") == '{"status":"keep"}'
+        assert (
+            output_root / f"formal-{fixed_uuid}" / "suite-all_registered-run-report.json"
+        ).exists()
+    finally:
+        _cleanup_test_dir(output_root)
+
+
+def test_main_returns_non_zero_when_bootstrap_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        formal_verification,
+        "run_formal_verification",
+        lambda **_: (_ for _ in ()).throw(formal_verification.FormalVerificationError("bootstrap failed")),
+    )
+
+    exit_code = formal_verification.main()
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "bootstrap failed" in captured.err
+
+
+def test_main_prints_success_summary(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output_root = _make_test_dir()
+    result = formal_verification.FormalVerificationResult(
+        suite_id="all_registered",
+        run_status="passed",
+        case_count=17,
+        passed_count=17,
+        failed_count=0,
+        error_count=0,
+        overall_score=1.0,
+        run_directory=output_root / "formal-123",
+        suite_report_path=output_root / "formal-123" / "suite-all_registered-run-report.json",
+        latest_report_path=output_root / "latest-all_registered-run-report.json",
+        trace_buffer_path=output_root / "formal-123" / "formal-traces.jsonl",
+        p50_duration_ms=446,
+        p95_duration_ms=1564,
+    )
+    monkeypatch.setattr(formal_verification, "run_formal_verification", lambda **_: result)
+
+    try:
+        exit_code = formal_verification.main()
+        captured = capsys.readouterr()
+
+        assert exit_code == 0
+        assert "Formal verification passed." in captured.out
+        assert "Suite: all_registered" in captured.out
+        assert "Timing: p50=446ms, p95=1564ms" in captured.out
+    finally:
+        _cleanup_test_dir(output_root)
+
+
+def _make_test_dir() -> Path:
+    path = Path("var/test-formal") / str(uuid4())
+    path.mkdir(parents=True, exist_ok=False)
+    return path
+
+
+def _cleanup_test_dir(path: Path) -> None:
+    if path.exists():
+        for child in sorted(path.rglob("*"), reverse=True):
+            if child.is_file():
+                child.unlink()
+            else:
+                child.rmdir()
+        path.rmdir()
+    parent = path.parent
+    if parent.exists() and not any(parent.iterdir()):
+        parent.rmdir()
+    grandparent = parent.parent
+    if grandparent.exists() and not any(grandparent.iterdir()):
+        grandparent.rmdir()
