@@ -143,6 +143,28 @@ The automated desktop browser suite now keeps two happy-path starts in scope:
 
 The Chinese smoke accepts either `awaiting_confirmation` directly or `awaiting_clarification -> clarification reply -> awaiting_confirmation`, but it always starts from a Chinese customer prompt and must end at a confirmable `v1` plan.
 
+### Friends Group Happy Path
+
+1. Open `http://127.0.0.1:5173`.
+2. Keep the read-path selector on `Mock World`.
+3. Replace the default family sample with:
+
+```text
+This afternoon I want to hang out with friends nearby for a few hours. Start with an outdoor walk and chatting, then find a casual dinner place that's good for sharing. Not too far.
+```
+
+4. Click `开始规划`.
+5. Confirm the run reaches `awaiting_confirmation`.
+6. Confirm the visible plan version label is still `v1`.
+7. Confirm the action count is `0` before confirmation.
+8. Confirm the visible plan content reflects the friends-group fixture rather than the family fixture, for example by showing friends-oriented candidate content such as `group_friendly`.
+9. Confirm the page does not show the `AMap 只读预览` notice.
+10. Click `确认当前方案`.
+11. Confirm the run reaches `completed`.
+12. Confirm the action count becomes greater than `0`.
+
+This path is intentionally additive. The default customer-page sample remains the family afternoon request, while explicit friends-group Mock World prompts now route to the canonical `friends_gathering` world.
+
 ### AMap Read-only Preview Path
 
 1. Open `http://127.0.0.1:5173`.
@@ -271,6 +293,12 @@ Run only the additive Chinese reviewer-prompt desktop smoke during local iterati
 
 ```bash
 npm --prefix frontend run e2e -- --project=desktop-chromium --grep "Chinese reviewer prompt"
+```
+
+Run only the additive friends-group desktop smoke during local iteration:
+
+```bash
+npm --prefix frontend run e2e -- --project=desktop-chromium --grep "friends-group"
 ```
 
 Run the full desktop browser regression before committing so the existing English stable smoke and the additive Chinese smoke stay green together:
