@@ -136,6 +136,13 @@ The internal review page now also shows sanitized tool-event and action-ledger d
 12. Confirm the action count is greater than `0`.
 13. Confirm the selected plan now shows `action_manifest.source = confirmed_actions`.
 
+The automated desktop browser suite now keeps two happy-path starts in scope:
+
+- one stable English smoke for regression stability across the existing customer demo flow
+- one additive Chinese reviewer-prompt smoke for the localized competition demo path
+
+The Chinese smoke accepts either `awaiting_confirmation` directly or `awaiting_clarification -> clarification reply -> awaiting_confirmation`, but it always starts from a Chinese customer prompt and must end at a confirmable `v1` plan.
+
 ### AMap Read-only Preview Path
 
 1. Open `http://127.0.0.1:5173`.
@@ -258,6 +265,18 @@ Run browser E2E tests:
 
 ```bash
 npm --prefix frontend run e2e
+```
+
+Run only the additive Chinese reviewer-prompt desktop smoke during local iteration:
+
+```bash
+npm --prefix frontend run e2e -- --project=desktop-chromium --grep "Chinese reviewer prompt"
+```
+
+Run the full desktop browser regression before committing so the existing English stable smoke and the additive Chinese smoke stay green together:
+
+```bash
+npm --prefix frontend run e2e -- --project=desktop-chromium
 ```
 
 The E2E config starts:

@@ -18,7 +18,9 @@ const explicitHappyPathPrompt =
 const stableHappyPathPrompt =
   "This afternoon I want to go out with my wife and child for a few hours. Not too far. My child is 5, and my wife is trying to eat lighter.";
 const stableClarificationReply =
-  "We are going out this afternoon with my wife and 5-year-old child for a few hours. Keep it nearby if possible, but going a bit farther is okay if it keeps the plan relaxed and the dinner light.";
+  "We are leaving around 2pm this afternoon from Xuhui with my wife and 5-year-old child for about 4 hours. Keep it nearby if possible, but going a bit farther is okay if it keeps the plan relaxed. Please start with an indoor child-friendly activity and then a light dinner.";
+const explicitHappyPathClarificationReply =
+  "今天下午14点左右和爱人、5岁的孩子从徐汇出发，在家附近玩4小时，先安排室内亲子活动，再去吃一顿清淡晚餐，全程别太远。";
 
 async function startDemoRun(page: Page, prompt?: string) {
   await page.goto("/");
@@ -28,16 +30,24 @@ async function startDemoRun(page: Page, prompt?: string) {
   await expect(page.getByTestId("action-count")).toHaveText("0");
 }
 
-async function continueToAwaitingConfirmation(page: Page, expectedVersion: string) {
+async function continueToAwaitingConfirmation(
+  page: Page,
+  expectedVersion: string,
+  clarificationReply: string = stableClarificationReply,
+) {
   await expect(page.getByTestId("plan-version")).toHaveText(expectedVersion, { timeout: 60_000 });
-  await expect
-    .poll(async () => (await page.getByTestId("run-status").innerText()).trim(), { timeout: 60_000 })
-    .toMatch(/等待确认|等待补充信息/);
+  for (let clarificationAttempt = 0; clarificationAttempt < 2; clarificationAttempt += 1) {
+    await expect
+      .poll(async () => (await page.getByTestId("run-status").innerText()).trim(), { timeout: 60_000 })
+      .toMatch(/等待确认|等待补充信息/);
 
-  if ((await page.getByTestId("run-status").innerText()).trim() === "等待补充信息") {
+    if ((await page.getByTestId("run-status").innerText()).trim() === "等待确认") {
+      break;
+    }
+
     await expect(page.getByTestId("plan-version")).toHaveText(expectedVersion);
     await expect(page.getByTestId("clarification-panel")).toBeVisible();
-    await page.getByTestId("clarification-reply-input").fill(stableClarificationReply);
+    await page.getByTestId("clarification-reply-input").fill(clarificationReply);
     await page.getByTestId("clarification-submit-button").click();
   }
 
@@ -46,11 +56,15 @@ async function continueToAwaitingConfirmation(page: Page, expectedVersion: strin
   await expect(page.getByTestId("action-count")).toHaveText("0");
 }
 
-async function startPresentableDemoRun(page: Page, prompt?: string) {
+async function startPresentableDemoRun(
+  page: Page,
+  prompt?: string,
+  clarificationReply: string = stableClarificationReply,
+) {
   await page.goto("/");
   await page.getByRole("textbox").fill(prompt ?? stableHappyPathPrompt);
   await page.getByTestId("start-button").click();
-  await continueToAwaitingConfirmation(page, "v1");
+  await continueToAwaitingConfirmation(page, "v1", clarificationReply);
 }
 
 async function expectNoForbiddenVisibleText(page: Page) {
@@ -167,6 +181,50 @@ const mockedReplannedRunV2 = buildMockAwaitingRun("run-2", "plan-2", 2, "v2", "r
 const mockedReplannedRunV3 = buildMockAwaitingRun("run-3", "plan-3", 3, "v3", "run-2", "plan-2");
 const mockedStartRunWithTwoPlans = buildMockTwoPlanAwaitingRun();
 const mockedReplannedRunV2FromPlan2 = buildMockAwaitingRun("run-2", "plan-4", 2, "v2", "run-1", "plan-2");
+const mockedCompletedRun = {
+  ...mockedStartRun,
+  status: "completed",
+  action_count: 1,
+  execution_status: "succeeded",
+  feedback_status: "written",
+  plans: [
+    {
+      ...mockedStartRun.plans[0],
+      status: "executed",
+      action_manifest: {
+        source: "confirmed_actions",
+        action_count: 1,
+        actions: [
+          {
+            action_ref: "draft_1_action_1",
+            execution_order: 1,
+            action_type: "reserve_restaurant",
+            target_id: "green-table",
+            payload_preview: { party_size: 3 },
+            reason: "Confirm to lock dinner seating.",
+          },
+        ],
+      },
+      confirmation: {
+        status: "confirmed",
+        action_count: 1,
+      },
+      execution: {
+        status: "succeeded",
+        succeeded_count: 1,
+        failed_count: 0,
+      },
+      feedback: {
+        status: "written",
+        headline: "Plan completed",
+        message: "The confirmed reservation completed successfully.",
+        completed_actions: [{ action_type: "reserve_restaurant", status: "succeeded" }],
+        failed_actions: [],
+        next_steps: ["Leave a little before 2pm."],
+      },
+    },
+  ],
+};
 
 test.describe("desktop web demo", () => {
   test.beforeEach(({}, testInfo) => {
@@ -208,6 +266,37 @@ test.describe("desktop web demo", () => {
 
     await expect(page.getByTestId("run-status")).toHaveText("等待确认", { timeout: 60_000 });
     await expect(page.getByTestId("run-id")).toHaveText(runId);
+  });
+
+  test("reaches a confirmable plan from the Chinese reviewer prompt", async ({ page }) => {
+    const clarificationBodies: Array<Record<string, unknown>> = [];
+
+    await page.route(/\/demo\/runs\/[^/]+\/clarify$/, async (route, request) => {
+      if (request.method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+
+      clarificationBodies.push((request.postDataJSON() as Record<string, unknown>) ?? {});
+      await route.fallback();
+    });
+
+    await startPresentableDemoRun(page, explicitHappyPathPrompt, explicitHappyPathClarificationReply);
+
+    await expect(page.getByTestId("run-status")).toHaveText("等待确认", { timeout: 60_000 });
+    await expect(page.getByTestId("plan-version")).toHaveText("v1");
+    await expect(page.getByTestId("action-count")).toHaveText("0");
+    await expect(page.getByTestId("confirm-button")).toBeVisible();
+    await expect(page.getByTestId("amap-read-only-notice")).toHaveCount(0);
+
+    if (clarificationBodies.length > 0) {
+      for (const body of clarificationBodies) {
+        expect(body).toEqual({
+          user_input: explicitHappyPathClarificationReply,
+          selected_plan_index: 0,
+        });
+      }
+    }
   });
 
   test("continues a vague request through the clarification flow", async ({ page }) => {
@@ -359,7 +448,33 @@ test.describe("desktop web demo", () => {
   });
 
   test("does not render forbidden internal or sensitive keys", async ({ page }) => {
-    await startPresentableDemoRun(page);
+    await page.route("**/demo/runs", async (route, request) => {
+      if (request.method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(mockedStartRun),
+      });
+    });
+
+    await page.route(/\/demo\/runs\/[^/]+\/confirm$/, async (route, request) => {
+      if (request.method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(mockedCompletedRun),
+      });
+    });
+
+    await startPresentableDemoRun(page, explicitHappyPathPrompt, explicitHappyPathClarificationReply);
     await expectNoForbiddenVisibleText(page);
 
     await page.getByTestId("confirm-button").click();
