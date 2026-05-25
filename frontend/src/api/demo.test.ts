@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { confirmRun, declineRun, getRun, startRun } from "./demo";
+import { clarifyRun, confirmRun, declineRun, getRun, startRun } from "./demo";
 import { FrontendApiError } from "../shared/http";
 import type { DemoRunSummary } from "../types/demo";
 
@@ -42,6 +42,7 @@ const summary: DemoRunSummary = {
   execution_status: null,
   feedback_status: null,
   error: null,
+  clarification: null,
 };
 
 describe("demo API client", () => {
@@ -114,6 +115,25 @@ describe("demo API client", () => {
     );
   });
 
+  it("posts clarifyRun with the expected body", async () => {
+    await clarifyRun("run-clarify-1", {
+      user_input: "今天下午一个人出门玩几个小时，别太远。",
+      selected_plan_index: 0,
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/demo/runs/run-clarify-1/clarify",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_input: "今天下午一个人出门玩几个小时，别太远。",
+          selected_plan_index: 0,
+        }),
+      }),
+    );
+  });
+
   it("throws FrontendApiError with localized message for connection failures", async () => {
     vi.stubGlobal(
       "fetch",
@@ -177,6 +197,87 @@ describe("demo API client", () => {
       name: "DemoApiError",
       status: 409,
       message: "AMap \u53ea\u8bfb\u9884\u89c8\u8def\u5f84\u4e0d\u652f\u6301\u786e\u8ba4\u6267\u884c\u3002",
+    } satisfies Partial<FrontendApiError>);
+  });
+
+  it("localizes clarification status conflicts", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ detail: "Source run status does not allow clarification." }), {
+            status: 409,
+          }),
+      ),
+    );
+
+    await expect(
+      clarifyRun("run-1", { user_input: "补充一下", selected_plan_index: 0 }),
+    ).rejects.toMatchObject({
+      name: "DemoApiError",
+      status: 409,
+      message: "当前运行已不能继续补充信息，请刷新状态后重试。",
+    } satisfies Partial<FrontendApiError>);
+  });
+
+  it("localizes missing clarification session errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ detail: "Source run is missing session persistence for clarification." }),
+            { status: 409 },
+          ),
+      ),
+    );
+
+    await expect(
+      clarifyRun("run-1", { user_input: "补充一下", selected_plan_index: 0 }),
+    ).rejects.toMatchObject({
+      name: "DemoApiError",
+      status: 409,
+      message: "当前运行缺少补充信息会话，请重新开始规划。",
+    } satisfies Partial<FrontendApiError>);
+  });
+
+  it("localizes unavailable clarification session errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ detail: "Source run session is unavailable for clarification." }), {
+            status: 409,
+          }),
+      ),
+    );
+
+    await expect(
+      clarifyRun("run-1", { user_input: "补充一下", selected_plan_index: 0 }),
+    ).rejects.toMatchObject({
+      name: "DemoApiError",
+      status: 409,
+      message: "当前运行缺少补充信息会话，请重新开始规划。",
+    } satisfies Partial<FrontendApiError>);
+  });
+
+  it("localizes unavailable clarification user errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ detail: "Source run user is unavailable for clarification." }), {
+            status: 409,
+          }),
+      ),
+    );
+
+    await expect(
+      clarifyRun("run-1", { user_input: "补充一下", selected_plan_index: 0 }),
+    ).rejects.toMatchObject({
+      name: "DemoApiError",
+      status: 409,
+      message: "当前运行缺少关联用户，请重新开始规划。",
     } satisfies Partial<FrontendApiError>);
   });
 });

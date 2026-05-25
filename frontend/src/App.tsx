@@ -16,10 +16,11 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
-import { confirmRun, declineRun, getRun, startRun } from "./api/demo";
+import { clarifyRun, confirmRun, declineRun, getRun, startRun } from "./api/demo";
 import type {
   DemoActionManifestSummary,
   DemoCandidateSummary,
+  DemoClarificationSummary,
   DemoPlanPreview,
   DemoReadProfile,
   DemoRunSummary,
@@ -35,6 +36,8 @@ const AMAP_READ_ONLY_NOTE =
 type RequestState =
   | "idle"
   | "starting"
+  | "awaiting_clarification"
+  | "clarifying"
   | "awaiting_confirmation"
   | "refreshing"
   | "confirming"
@@ -50,16 +53,25 @@ export default function App() {
   const [selectedReadProfile, setSelectedReadProfile] = useState<DemoReadProfile>("mock_world");
   const [run, setRun] = useState<DemoRunSummary | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [clarificationReply, setClarificationReply] = useState("");
   const [requestState, setRequestState] = useState<RequestState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const selectedPlan = useMemo(() => choosePlan(run, selectedPlanId), [run, selectedPlanId]);
   const trimmedInput = userInput.trim();
   const inputIsEmpty = trimmedInput.length === 0;
-  const isInFlight = ["starting", "refreshing", "confirming", "declining"].includes(requestState);
+  const clarificationPayload = isClarificationSummary(run?.clarification) ? run.clarification : null;
+  const clarificationPayloadIsInvalid =
+    run?.status === "awaiting_clarification" && !isClarificationSummary(run.clarification);
+  const visibleErrorMessage = errorMessage ?? (clarificationPayloadIsInvalid ? GENERIC_ERROR_MESSAGE : null);
+  const isInFlight = ["starting", "clarifying", "refreshing", "confirming", "declining"].includes(requestState);
   const canRefresh = Boolean(run?.run_id) && !isInFlight;
+  const isAwaitingClarification = run?.status === "awaiting_clarification";
   const isAwaitingConfirmation = run?.status === "awaiting_confirmation";
   const isAmapPreview = run?.read_profile === "amap";
+  const clarificationReplyIsEmpty = clarificationReply.trim().length === 0;
+  const showClarificationPanel = Boolean(isAwaitingClarification && clarificationPayload);
+  const canClarify = Boolean(showClarificationPanel && run?.run_id && !clarificationReplyIsEmpty && !isInFlight);
   const canConfirm = Boolean(isAwaitingConfirmation && selectedPlan && !isInFlight && !isAmapPreview);
   const canDecline = Boolean(isAwaitingConfirmation && selectedPlan && !isInFlight);
 
@@ -68,10 +80,11 @@ export default function App() {
       return;
     }
 
+    setClarificationReply("");
     await runAction("starting", () =>
       startRun({
         user_input: trimmedInput,
-        external_user_id: "web-demo-user",
+        external_user_id: buildDemoExternalUserId(),
         display_name: "Web Demo User",
         case_id: "web-demo",
         selected_plan_index: 0,
@@ -85,6 +98,24 @@ export default function App() {
       return;
     }
     await runAction("refreshing", () => getRun(run.run_id));
+  }
+
+  async function handleClarify() {
+    if (!run?.run_id || !canClarify) {
+      return;
+    }
+
+    await runAction(
+      "clarifying",
+      () =>
+        clarifyRun(run.run_id, {
+          user_input: clarificationReply.trim(),
+          selected_plan_index: 0,
+        }),
+      () => {
+        setClarificationReply("");
+      },
+    );
   }
 
   async function handleConfirm() {
@@ -101,12 +132,17 @@ export default function App() {
     await runAction("declining", () => declineRun(run.run_id, selectedPlan.plan_id));
   }
 
-  async function runAction(nextState: RequestState, action: () => Promise<DemoRunSummary>) {
+  async function runAction(
+    nextState: RequestState,
+    action: () => Promise<DemoRunSummary>,
+    onSuccess?: (nextRun: DemoRunSummary) => void,
+  ) {
     setRequestState(nextState);
     setErrorMessage(null);
 
     try {
       const nextRun = await action();
+      onSuccess?.(nextRun);
       setRun(nextRun);
       setSelectedReadProfile(nextRun.read_profile);
       setSelectedPlanId(nextRun.selected_plan_id ?? nextRun.plans[0]?.plan_id ?? null);
@@ -188,6 +224,7 @@ export default function App() {
                 onClick={() => {
                   setUserInput(DEFAULT_PROMPT);
                   setSelectedReadProfile("mock_world");
+                  setClarificationReply("");
                   setErrorMessage(null);
                 }}
                 disabled={isInFlight}
@@ -197,10 +234,10 @@ export default function App() {
               </button>
             </div>
 
-            {errorMessage ? (
+            {visibleErrorMessage ? (
               <div className="error-banner" role="alert">
                 <AlertCircle size={18} aria-hidden="true" />
-                <span>{errorMessage}</span>
+                <span>{visibleErrorMessage}</span>
               </div>
             ) : null}
           </section>
@@ -214,7 +251,16 @@ export default function App() {
         </aside>
 
         <section className="workspace" aria-label="方案预览与确认边界">
-          {run && selectedPlan ? (
+          {showClarificationPanel && clarificationPayload ? (
+            <ClarificationPanel
+              clarification={clarificationPayload}
+              reply={clarificationReply}
+              requestState={requestState}
+              canClarify={canClarify}
+              onReplyChange={setClarificationReply}
+              onSubmit={handleClarify}
+            />
+          ) : run && selectedPlan ? (
             <>
               <PlanTabs
                 plans={run.plans}
@@ -316,6 +362,70 @@ function PlanTabs({
         </button>
       ))}
     </div>
+  );
+}
+
+function ClarificationPanel({
+  clarification,
+  reply,
+  requestState,
+  canClarify,
+  onReplyChange,
+  onSubmit,
+}: {
+  clarification: DemoClarificationSummary;
+  reply: string;
+  requestState: RequestState;
+  canClarify: boolean;
+  onReplyChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <section className="panel clarification-panel" aria-labelledby="clarification-title" data-testid="clarification-panel">
+      <div>
+        <p className="eyebrow">继续规划</p>
+        <h2 id="clarification-title">需要补充信息</h2>
+        <p>{clarification.prompt}</p>
+      </div>
+
+      <div className="field-stack">
+        <p className="field-label">待补充项</p>
+        <ul className="clarification-chip-list" data-testid="clarification-fields">
+          {clarification.missing_fields.map((field) => (
+            <li key={field} className="clarification-chip">
+              {clarificationFieldLabel(field)}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <label className="field-label" htmlFor="clarification-reply-input">
+        补充说明
+      </label>
+      <textarea
+        id="clarification-reply-input"
+        className="clarification-textarea"
+        value={reply}
+        onChange={(event) => onReplyChange(event.target.value)}
+        rows={4}
+        disabled={requestState === "clarifying"}
+        data-testid="clarification-reply-input"
+      />
+      <p className="helper-text">补充后会继续当前规划流程，仍会在确认前停下。</p>
+
+      <div className="button-row align-end">
+        <button
+          className="primary-button"
+          type="button"
+          onClick={onSubmit}
+          disabled={!canClarify}
+          data-testid="clarification-submit-button"
+        >
+          {requestState === "clarifying" ? <Loader2 className="spin" size={17} /> : <Send size={17} />}
+          <span>{requestState === "clarifying" ? "提交中..." : "提交补充信息"}</span>
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -623,6 +733,9 @@ function choosePlan(run: DemoRunSummary | null, selectedPlanId: string | null): 
 }
 
 function stateFromRun(run: DemoRunSummary): RequestState {
+  if (run.status === "awaiting_clarification") {
+    return "awaiting_clarification";
+  }
   if (run.status === "awaiting_confirmation") {
     return "awaiting_confirmation";
   }
@@ -760,6 +873,16 @@ function feedbackStatusLabel(value?: string | null) {
   return value ? labels[value] ?? value : null;
 }
 
+function clarificationFieldLabel(value: string) {
+  const labels: Record<string, string> = {
+    scenario_or_participants: "出行人/场景",
+    time_window: "时间安排",
+    distance_flexibility: "距离取舍",
+    preference_tradeoff: "偏好取舍",
+  };
+  return labels[value] ?? value;
+}
+
 function userFacingText(value?: string | null) {
   if (!value) {
     return null;
@@ -775,6 +898,7 @@ function statusLabel(value?: string | null) {
   const labels: Record<string, string> = {
     idle: "待开始",
     starting: "规划中",
+    clarifying: "提交补充中",
     awaiting_confirmation: "等待确认",
     awaiting_clarification: "等待补充信息",
     refreshing: "刷新中",
@@ -820,4 +944,20 @@ function readProfileHelper(profile: DemoReadProfile) {
     return "AMap \u8def\u5f84\u4ec5\u7528\u4e8e\u672c\u5730\u53ea\u8bfb\u9884\u89c8\uff0c\u5728\u786e\u8ba4\u524d\u505c\u6b62\uff0c\u4e0d\u4f1a\u6267\u884c\u5199\u64cd\u4f5c\u3002";
   }
   return "Mock World \u662f\u9ed8\u8ba4\u8def\u5f84\uff0c\u4e5f\u662f benchmark \u7684\u7a33\u5b9a\u9ed8\u8ba4\u503c\u3002";
+}
+
+function isClarificationSummary(value: DemoRunSummary["clarification"] | undefined): value is DemoClarificationSummary {
+  return Boolean(
+    value &&
+      typeof value.prompt === "string" &&
+      Array.isArray(value.missing_fields) &&
+      value.missing_fields.every((field) => typeof field === "string"),
+  );
+}
+
+function buildDemoExternalUserId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `web-demo-user-${crypto.randomUUID()}`;
+  }
+  return `web-demo-user-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
