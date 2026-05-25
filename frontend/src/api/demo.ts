@@ -1,4 +1,9 @@
-import type { DemoClarifyRunRequest, DemoRunSummary, DemoStartRunRequest } from "../types/demo";
+import type {
+  DemoClarifyRunRequest,
+  DemoReplanRunRequest,
+  DemoRunSummary,
+  DemoStartRunRequest,
+} from "../types/demo";
 import { API_BASE_URL, FrontendApiError } from "../shared/http";
 
 export async function startRun(input: DemoStartRunRequest): Promise<DemoRunSummary> {
@@ -23,6 +28,14 @@ export async function confirmRun(runId: string, planId?: string | null): Promise
 
 export async function clarifyRun(runId: string, input: DemoClarifyRunRequest): Promise<DemoRunSummary> {
   return request<DemoRunSummary>(`/demo/runs/${encodeURIComponent(runId)}/clarify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function replanRun(runId: string, input: DemoReplanRunRequest): Promise<DemoRunSummary> {
+  return request<DemoRunSummary>(`/demo/runs/${encodeURIComponent(runId)}/replan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -97,6 +110,14 @@ function localizedResponseMessage(message: string, status: number): string {
     "Source run session is unavailable for clarification.":
       "\u5f53\u524d\u8fd0\u884c\u7f3a\u5c11\u8865\u5145\u4fe1\u606f\u4f1a\u8bdd\uff0c\u8bf7\u91cd\u65b0\u5f00\u59cb\u89c4\u5212\u3002",
     "Source run user is unavailable for clarification.":
+      "\u5f53\u524d\u8fd0\u884c\u7f3a\u5c11\u5173\u8054\u7528\u6237\uff0c\u8bf7\u91cd\u65b0\u5f00\u59cb\u89c4\u5212\u3002",
+    "Source run status does not allow replanning.":
+      "\u5f53\u524d\u8fd0\u884c\u8fd8\u4e0d\u80fd\u7ee7\u7eed\u8c03\u6574\u65b9\u6848\uff0c\u8bf7\u5237\u65b0\u72b6\u6001\u540e\u91cd\u8bd5\u3002",
+    "Source run is missing session persistence for replanning.":
+      "\u5f53\u524d\u8fd0\u884c\u7f3a\u5c11\u7ee7\u7eed\u89c4\u5212\u4f1a\u8bdd\uff0c\u8bf7\u91cd\u65b0\u5f00\u59cb\u89c4\u5212\u3002",
+    "Source run session is unavailable for replanning.":
+      "\u5f53\u524d\u8fd0\u884c\u7f3a\u5c11\u7ee7\u7eed\u89c4\u5212\u4f1a\u8bdd\uff0c\u8bf7\u91cd\u65b0\u5f00\u59cb\u89c4\u5212\u3002",
+    "Source run user is unavailable for replanning.":
       "\u5f53\u524d\u8fd0\u884c\u7f3a\u5c11\u5173\u8054\u7528\u6237\uff0c\u8bf7\u91cd\u65b0\u5f00\u59cb\u89c4\u5212\u3002",
   };
   return knownMessages[message] ?? statusFallbackMessage(status);

@@ -456,6 +456,11 @@ dd {
   gap: 14px;
 }
 
+.replan-panel {
+  display: grid;
+  gap: 14px;
+}
+
 .clarification-chip-list {
   display: flex;
   flex-wrap: wrap;
@@ -476,6 +481,10 @@ dd {
 }
 
 .clarification-textarea {
+  min-height: 96px;
+}
+
+.replan-textarea {
   min-height: 96px;
 }
 
