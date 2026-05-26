@@ -1,15 +1,20 @@
-import { useState } from "react";
-import { getObservabilityRun } from "./api";
+import { useEffect, useState } from "react";
+import {
+  getLatestReleaseGateBenchmarkSummary,
+  getObservabilityRun,
+} from "./api";
 import { FrontendApiError } from "../shared/http";
 import type {
   InternalActionLedgerSummary,
   InternalBenchmarkArtifactSummary,
   InternalObservabilityRunSummary,
   InternalRecoveryPathSummary,
+  InternalReleaseGateBenchmarkSummary,
   InternalToolEventSummary,
 } from "./types";
 
 const GENERIC_ERROR_MESSAGE = "Internal observability request failed. Please try again.";
+const BENCHMARK_GENERIC_ERROR_MESSAGE = "Internal benchmark summary request failed. Please try again.";
 
 export function ObservabilityPage() {
   const [runId, setRunId] = useState("");
@@ -17,6 +22,51 @@ export function ObservabilityPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [benchmarkSummary, setBenchmarkSummary] = useState<InternalReleaseGateBenchmarkSummary | null>(null);
+  const [benchmarkMissingMessage, setBenchmarkMissingMessage] = useState<string | null>(null);
+  const [benchmarkErrorMessage, setBenchmarkErrorMessage] = useState<string | null>(null);
+  const [isBenchmarkLoading, setIsBenchmarkLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadBenchmarkSummary() {
+      setIsBenchmarkLoading(true);
+      setBenchmarkSummary(null);
+      setBenchmarkMissingMessage(null);
+      setBenchmarkErrorMessage(null);
+
+      try {
+        const next = await getLatestReleaseGateBenchmarkSummary();
+        if (!active) {
+          return;
+        }
+        setBenchmarkSummary(next);
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        if (error instanceof FrontendApiError && error.status === 404) {
+          setBenchmarkMissingMessage(error.message);
+        } else if (error instanceof FrontendApiError) {
+          setBenchmarkErrorMessage(error.message);
+        } else {
+          setBenchmarkErrorMessage(BENCHMARK_GENERIC_ERROR_MESSAGE);
+        }
+      } finally {
+        if (active) {
+          setIsBenchmarkLoading(false);
+        }
+      }
+    }
+
+    void loadBenchmarkSummary();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleLoad() {
     const trimmed = runId.trim();
@@ -56,6 +106,13 @@ export function ObservabilityPage() {
       </section>
 
       <div className="observability-grid">
+        <BenchmarkSummaryPanel
+          summary={benchmarkSummary}
+          missingMessage={benchmarkMissingMessage}
+          errorMessage={benchmarkErrorMessage}
+          isLoading={isBenchmarkLoading}
+        />
+
         <section className="panel observability-panel">
           <div className="section-heading">
             <h2>Load Run</h2>
@@ -101,117 +158,186 @@ export function ObservabilityPage() {
   );
 }
 
+function BenchmarkSummaryPanel({
+  summary,
+  missingMessage,
+  errorMessage,
+  isLoading,
+}: {
+  summary: InternalReleaseGateBenchmarkSummary | null;
+  missingMessage: string | null;
+  errorMessage: string | null;
+  isLoading: boolean;
+}) {
+  return (
+    <section className="panel observability-review-section">
+      <div className="section-heading">
+        <h2>Benchmark Summary</h2>
+      </div>
+      <p className="muted reviewer-note">
+        Reviewer-facing snapshot of the latest release_gate_v1 benchmark evidence.
+      </p>
+
+      {isLoading ? <p className="muted">Loading latest release_gate_v1 benchmark summary...</p> : null}
+
+      {!isLoading && missingMessage ? <p className="muted">{missingMessage}</p> : null}
+
+      {!isLoading && errorMessage ? (
+        <div className="error-banner" role="alert">
+          <span>{errorMessage}</span>
+        </div>
+      ) : null}
+
+      {!isLoading && summary ? (
+        <div className="observability-review-stack">
+          <dl className="metadata-list observability-list">
+            <MetaItem label="Suite ID" value={summary.suite_id} mono />
+            <MetaItem label="Suite Title" value={summary.suite_title} />
+            <MetaItem label="Run Status" value={summary.run_status} />
+            <MetaItem label="Case Count" value={String(summary.case_count)} />
+            <MetaItem label="Passed" value={String(summary.passed_count)} />
+            <MetaItem label="Failed" value={String(summary.failed_count)} />
+            <MetaItem label="Error" value={String(summary.error_count)} />
+            <MetaItem label="Overall Score" value={String(summary.overall_score)} />
+            <MetaItem label="Report Path" value={summary.report_path} mono />
+          </dl>
+
+          <div className="observability-count-grid">
+            <CountMapPanel title="Levels" items={summary.matrix_summary.level_counts} />
+            <CountMapPanel title="Tool Profiles" items={summary.matrix_summary.tool_profile_counts} />
+            <CountMapPanel title="Failure Modes" items={summary.matrix_summary.failure_mode_counts} />
+            <CountMapPanel title="Tags" items={summary.matrix_summary.tag_counts} />
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function ObservabilityResult({ result }: { result: InternalObservabilityRunSummary }) {
   const timing = result.workflow_timing_summary;
 
   return (
     <div className="workspace observability-workspace">
-      <section className="panel">
+      <section className="observability-review-section">
         <div className="section-heading">
-          <h2>Run Overview</h2>
+          <h2>Trace Summary</h2>
         </div>
-        <dl className="metadata-list observability-list">
-          <MetaItem label="Run ID" value={result.run_id} mono />
-          <MetaItem label="Trace ID" value={result.trace_id} mono />
-          <MetaItem label="Status" value={result.status} />
-          <MetaItem label="Case ID" value={result.case_id} />
-          <MetaItem label="Agent Version" value={result.agent_version} />
-          <MetaItem label="Prompt Version" value={result.prompt_version} />
-          <MetaItem label="Tool Profile" value={result.tool_profile} />
-          <MetaItem label="World Profile" value={result.world_profile} />
-          <MetaItem label="Failure Profile" value={result.failure_profile} />
-          <MetaItem label="Tool Events" value={String(result.tool_event_count)} />
-          <MetaItem label="Action Count" value={String(result.action_count)} />
-          <MetaItem label="Execution Status" value={result.execution_status} />
-          <MetaItem label="Feedback Status" value={result.feedback_status} />
-          <MetaItem label="Observability Status" value={result.observability_status} />
-          <MetaItem label="Created At" value={result.created_at} />
-          <MetaItem label="Updated At" value={result.updated_at} />
-        </dl>
+        <p className="muted reviewer-note">
+          Reviewer-facing summary of run identity, trace identity, workflow timing, and observability status.
+        </p>
+
+        <div className="observability-summary-grid">
+          <section className="panel">
+            <div className="section-heading">
+              <h3>Run Identity</h3>
+            </div>
+            <dl className="metadata-list observability-list">
+              <MetaItem label="Run ID" value={result.run_id} mono />
+              <MetaItem label="Trace ID" value={result.trace_id} mono />
+              <MetaItem label="Status" value={result.status} />
+              <MetaItem label="Case ID" value={result.case_id} />
+              <MetaItem label="Agent Version" value={result.agent_version} />
+              <MetaItem label="Prompt Version" value={result.prompt_version} />
+              <MetaItem label="Tool Profile" value={result.tool_profile} />
+              <MetaItem label="World Profile" value={result.world_profile} />
+              <MetaItem label="Failure Profile" value={result.failure_profile} />
+              <MetaItem label="Created At" value={result.created_at} />
+              <MetaItem label="Updated At" value={result.updated_at} />
+            </dl>
+          </section>
+
+          <section className="panel">
+            <div className="section-heading">
+              <h3>Workflow Timing</h3>
+            </div>
+            {timing ? (
+              <>
+                <dl className="metadata-list observability-list">
+                  <MetaItem label="Schema" value={timing.schema_version} />
+                  <MetaItem label="Total Duration" value={`${timing.total_duration_ms} ms`} />
+                  <MetaItem label="Stage Count" value={String(timing.stage_count)} />
+                </dl>
+                <ul className="observability-stage-list">
+                  {timing.stages.map((stage) => (
+                    <li key={stage.node_name}>
+                      <strong>{stage.node_name}</strong>
+                      <span>{stage.total_duration_ms} ms</span>
+                      <span>attempts: {stage.attempt_count}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="muted">No workflow timing summary is available for this run yet.</p>
+            )}
+          </section>
+
+          <section className="panel">
+            <div className="section-heading">
+              <h3>Observability Status</h3>
+            </div>
+            <dl className="metadata-list observability-list">
+              <MetaItem label="Tool Events" value={String(result.tool_event_count)} />
+              <MetaItem label="Action Count" value={String(result.action_count)} />
+              <MetaItem label="Execution Status" value={result.execution_status} />
+              <MetaItem label="Feedback Status" value={result.feedback_status} />
+              <MetaItem label="Observability Status" value={result.observability_status} />
+              <MetaItem label="Trace ID" value={result.observability_summary.trace_id} mono />
+              <MetaItem label="Recorder Status" value={result.observability_summary.status} />
+              <MetaItem
+                label="Local Buffer Written"
+                value={booleanLabel(result.observability_summary.local_buffer_written)}
+              />
+              <MetaItem
+                label="LangSmith Enabled"
+                value={booleanLabel(result.observability_summary.langsmith_enabled)}
+              />
+              <MetaItem
+                label="LangSmith Posted"
+                value={booleanLabel(result.observability_summary.langsmith_posted)}
+              />
+              <MetaItem
+                label="Local Buffer Error"
+                value={stringifyValue(result.observability_summary.local_buffer_error)}
+              />
+              <MetaItem label="LangSmith Error" value={stringifyValue(result.observability_summary.langsmith_error)} />
+            </dl>
+          </section>
+        </div>
       </section>
 
-      <section className="panel">
-        <div className="section-heading">
-          <h2>Workflow Timing</h2>
-        </div>
-        {timing ? (
-          <>
-            <dl className="metadata-list observability-list">
-              <MetaItem label="Schema" value={timing.schema_version} />
-              <MetaItem label="Total Duration" value={`${timing.total_duration_ms} ms`} />
-              <MetaItem label="Stage Count" value={String(timing.stage_count)} />
-            </dl>
-            <ul className="observability-stage-list">
-              {timing.stages.map((stage) => (
-                <li key={stage.node_name}>
-                  <strong>{stage.node_name}</strong>
-                  <span>{stage.total_duration_ms} ms</span>
-                  <span>attempts: {stage.attempt_count}</span>
-                </li>
+      <div className="observability-secondary-grid">
+        <section className="panel">
+          <div className="section-heading">
+            <h2>Node History</h2>
+          </div>
+          {result.node_history.length ? (
+            <ol className="node-list">
+              {result.node_history.map((node, index) => (
+                <li key={`${node}-${index}`}>{node}</li>
+              ))}
+            </ol>
+          ) : (
+            <p className="muted">No node history is available.</p>
+          )}
+        </section>
+
+        <section className="panel">
+          <div className="section-heading">
+            <h2>Agent Roles</h2>
+          </div>
+          {result.agent_roles.length ? (
+            <ul className="observability-chip-list">
+              {result.agent_roles.map((role) => (
+                <li key={role}>{role}</li>
               ))}
             </ul>
-          </>
-        ) : (
-          <p className="muted">No workflow timing summary is available for this run yet.</p>
-        )}
-      </section>
-
-      <section className="panel">
-        <div className="section-heading">
-          <h2>Node History</h2>
-        </div>
-        {result.node_history.length ? (
-          <ol className="node-list">
-            {result.node_history.map((node, index) => (
-              <li key={`${node}-${index}`}>{node}</li>
-            ))}
-          </ol>
-        ) : (
-          <p className="muted">No node history is available.</p>
-        )}
-      </section>
-
-      <section className="panel">
-        <div className="section-heading">
-          <h2>Agent Roles</h2>
-        </div>
-        {result.agent_roles.length ? (
-          <ul className="observability-chip-list">
-            {result.agent_roles.map((role) => (
-              <li key={role}>{role}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="muted">No agent roles were recorded.</p>
-        )}
-      </section>
-
-      <section className="panel">
-        <div className="section-heading">
-          <h2>Observability Summary</h2>
-        </div>
-        <dl className="metadata-list observability-list">
-          <MetaItem label="Trace ID" value={result.observability_summary.trace_id} mono />
-          <MetaItem label="Status" value={result.observability_summary.status} />
-          <MetaItem
-            label="Local Buffer Written"
-            value={booleanLabel(result.observability_summary.local_buffer_written)}
-          />
-          <MetaItem
-            label="LangSmith Enabled"
-            value={booleanLabel(result.observability_summary.langsmith_enabled)}
-          />
-          <MetaItem
-            label="LangSmith Posted"
-            value={booleanLabel(result.observability_summary.langsmith_posted)}
-          />
-          <MetaItem
-            label="Local Buffer Error"
-            value={stringifyValue(result.observability_summary.local_buffer_error)}
-          />
-          <MetaItem label="LangSmith Error" value={stringifyValue(result.observability_summary.langsmith_error)} />
-        </dl>
-      </section>
+          ) : (
+            <p className="muted">No agent roles were recorded.</p>
+          )}
+        </section>
+      </div>
 
       <div className="observability-placeholder-grid">
         <ToolEventsPanel items={result.tool_event_summaries} />
@@ -223,13 +349,26 @@ function ObservabilityResult({ result }: { result: InternalObservabilityRunSumma
   );
 }
 
-function PlaceholderPanel({ title, body }: { title: string; body: string }) {
+function CountMapPanel({ title, items }: { title: string; items: Record<string, number> }) {
+  const entries = Object.entries(items).sort(([left], [right]) => left.localeCompare(right));
+
   return (
     <section className="panel">
       <div className="section-heading">
-        <h2>{title}</h2>
+        <h3>{title}</h3>
       </div>
-      <p className="muted">{body}</p>
+      {entries.length ? (
+        <ul className="observability-chip-list observability-chip-list-compact">
+          {entries.map(([label, count]) => (
+            <li key={`${title}-${label}`}>
+              <span>{label}</span>
+              <strong>{count}</strong>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted">No summary values are available.</p>
+      )}
     </section>
   );
 }
@@ -366,7 +505,7 @@ function RecoveryPathPanel({ summary }: { summary: InternalRecoveryPathSummary |
   return (
     <section className="panel">
       <div className="section-heading">
-        <h2>Recovery Path</h2>
+        <h2>Recovery Visualization</h2>
       </div>
       {summary === null ? (
         <p className="muted">This run did not enter bounded recovery.</p>

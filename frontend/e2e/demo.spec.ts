@@ -213,8 +213,19 @@ const mockedCompletedRun = {
       },
       execution: {
         status: "succeeded",
+        started_at: "2026-05-26T14:00:00+08:00",
+        finished_at: "2026-05-26T14:02:00+08:00",
         succeeded_count: 1,
         failed_count: 0,
+        action_results: [
+          {
+            action_ref: "draft_1_action_1",
+            execution_order: 1,
+            tool_name: "reserve_restaurant",
+            target_id: "green-table",
+            status: "succeeded",
+          },
+        ],
       },
       feedback: {
         status: "written",
@@ -246,6 +257,7 @@ test.describe("desktop web demo", () => {
 
     await expect(page.getByTestId("run-status")).toHaveText("已完成", { timeout: 60_000 });
     await expect(page.getByText("执行与反馈")).toBeVisible();
+    await expect(page.getByText("执行时间线")).toBeVisible();
     await expect(page.getByText("已完成动作")).toBeVisible();
     expect(await visibleActionCount(page)).toBeGreaterThan(0);
     await expect(page.getByTestId("confirm-button")).toHaveCount(0);

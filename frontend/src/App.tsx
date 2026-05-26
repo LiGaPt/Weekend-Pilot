@@ -21,6 +21,7 @@ import type {
   DemoActionManifestSummary,
   DemoCandidateSummary,
   DemoClarificationSummary,
+  DemoExecutionActionResultSummary,
   DemoPlanPreview,
   DemoReadProfile,
   DemoReplanRunRequest,
@@ -715,6 +716,8 @@ function ExecutionResult({ run, plan }: { run: DemoRunSummary; plan: DemoPlanPre
   }
 
   const feedback = plan.feedback;
+  const executionActions = normalizeExecutionActions(plan.execution?.action_results);
+  const hasExecutionWindow = Boolean(plan.execution?.started_at || plan.execution?.finished_at);
 
   return (
     <section className="panel result-panel" aria-labelledby="result-title">
@@ -727,6 +730,37 @@ function ExecutionResult({ run, plan }: { run: DemoRunSummary; plan: DemoPlanPre
         <MetaItem label="反馈状态" value={statusLabel(feedback?.status || run.feedback_status)} />
       </dl>
       {feedback?.message ? <p>{feedback.message}</p> : null}
+      {plan.execution ? (
+        <section
+          className="feedback-block execution-timeline-section"
+          aria-labelledby="execution-timeline-title"
+          data-testid="execution-timeline"
+        >
+          <h3 id="execution-timeline-title">执行时间线</h3>
+          {hasExecutionWindow ? (
+            <dl className="compact-list execution-window-list">
+              <MetaItem label="开始" value={plan.execution?.started_at} />
+              <MetaItem label="结束" value={plan.execution?.finished_at} />
+            </dl>
+          ) : null}
+          {executionActions.length ? (
+            <ol className="execution-timeline-list">
+              {executionActions.map((action) => (
+                <li
+                  key={`${action.execution_order}-${action.action_ref ?? action.label}-${action.target_id ?? "target"}`}
+                >
+                  <span className="requirement">第 {action.execution_order} 步</span>
+                  <span className="action-type">{action.label}</span>
+                  <span>{action.target_id || "暂无目标"}</span>
+                  <span className="muted">{executionActionStatusLabel(action.status)}</span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="muted">已生成执行结果，但当前没有可展示的执行动作。</p>
+          )}
+        </section>
+      ) : null}
       <FeedbackActions title="已完成动作" items={feedback?.completed_actions} />
       <FeedbackActions title="失败动作" items={feedback?.failed_actions} />
       <TextList title="后续建议" items={feedback?.next_steps} />
@@ -939,6 +973,38 @@ function safeText(value: unknown) {
   return typeof value === "string" && value.trim() ? value : null;
 }
 
+function normalizeExecutionActions(
+  actions?: DemoExecutionActionResultSummary[],
+): Array<{
+  action_ref: string | null;
+  execution_order: number;
+  label: string;
+  target_id: string | null;
+  status: string | null;
+}> {
+  if (!Array.isArray(actions)) {
+    return [];
+  }
+
+  return actions
+    .map((action) => {
+      const executionOrder = action.execution_order;
+      if (typeof executionOrder !== "number" || executionOrder <= 0) {
+        return null;
+      }
+
+      return {
+        action_ref: safeText(action.action_ref),
+        execution_order: executionOrder,
+        label: actionLabel(safeText(action.tool_name) || safeText(action.action_type)) || "动作",
+        target_id: safeText(action.target_id),
+        status: safeText(action.status),
+      };
+    })
+    .filter((action): action is NonNullable<typeof action> => action !== null)
+    .sort((left, right) => left.execution_order - right.execution_order);
+}
+
 function actionLabel(value?: string | null) {
   const labels: Record<string, string> = {
     book_ticket: "订票",
@@ -975,6 +1041,17 @@ function feedbackStatusLabel(value?: string | null) {
     written: "已生成",
   };
   return value ? labels[value] ?? value : null;
+}
+
+function executionActionStatusLabel(value?: string | null) {
+  const labels: Record<string, string> = {
+    succeeded: "成功",
+    failed: "失败",
+    blocked: "已阻止",
+    rate_limited: "限流",
+    idempotent_replay: "幂等重放",
+  };
+  return value ? labels[value] ?? value : "未知";
 }
 
 function clarificationFieldLabel(value: string) {

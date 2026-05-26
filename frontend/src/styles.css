@@ -91,6 +91,21 @@ button {
   max-width: 1440px;
 }
 
+.observability-review-section,
+.observability-review-stack,
+.observability-summary-grid,
+.observability-secondary-grid,
+.observability-count-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.observability-summary-grid,
+.observability-count-grid,
+.observability-secondary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
 .side-rail {
   align-content: start;
 }
@@ -372,6 +387,12 @@ dd {
   font-weight: 700;
 }
 
+.observability-chip-list-compact li {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
 .observability-detail-list {
   display: grid;
   gap: 12px;
@@ -552,6 +573,32 @@ dd {
   margin-top: 12px;
 }
 
+.reviewer-note {
+  margin-top: -2px;
+}
+
+.execution-window-list {
+  margin-bottom: 12px;
+}
+
+.execution-timeline-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.execution-timeline-list li {
+  align-items: start;
+  border: 1px solid #e1e8ef;
+  border-radius: 7px;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(100px, auto) minmax(130px, 0.3fr) minmax(160px, 1fr) minmax(100px, auto);
+  padding: 10px 12px;
+}
+
 .text-list-block ul {
   margin: 0;
   padding-left: 18px;
@@ -632,7 +679,10 @@ dd {
   .app-grid,
   .plan-grid,
   .action-panel,
-  .observability-placeholder-grid {
+  .observability-placeholder-grid,
+  .observability-summary-grid,
+  .observability-secondary-grid,
+  .observability-count-grid {
     grid-template-columns: 1fr;
   }
 
@@ -645,7 +695,8 @@ dd {
 
   .timeline-list li,
   .action-list li,
-  .feedback-list li {
+  .feedback-list li,
+  .execution-timeline-list li {
     grid-template-columns: 1fr;
   }
 
