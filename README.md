@@ -484,6 +484,10 @@ npm --prefix frontend run dev:internal
 Open the customer surface at `http://127.0.0.1:5173/`.
 Open the internal review surface at `http://127.0.0.1:5174/`.
 
+## Richer Web UI V1
+
+The V1 richer Web UI acceptance slice is now tracked explicitly in `docs/RICHER_WEB_UI_V1_CHECKLIST.md`. Reviewers should use that checklist to confirm the six V1 capability buckets end to end: planning, confirmation, execution timeline, trace summary, benchmark summary, and recovery visualization.
+
 The frontend defaults to `http://127.0.0.1:8000` for the API. To override it locally, set `VITE_API_BASE_URL` in `frontend/.env`.
 The public demo page only shows customer-safe run details. Internal trace and node history review now lives on the separate internal frontend surface at `http://127.0.0.1:5174/`.
 The visible run inspector includes the current plan version label for the loaded run.

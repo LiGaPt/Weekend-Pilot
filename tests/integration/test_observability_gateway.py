@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.app.benchmark import BenchmarkHarness, load_benchmark_case
+from backend.app.benchmark import internal_summary as internal_benchmark_summary
 from backend.app.confirmation import HumanConfirmationService
 from backend.app.core.config import Settings, get_settings
 from backend.app.db.session import SessionLocal
@@ -93,6 +94,22 @@ def benchmark_paths():
         yield report_dir, trace_path
     finally:
         for path in sorted(directory.rglob("*"), reverse=True) if directory.exists() else []:
+            if path.is_file():
+                path.unlink()
+            elif path.is_dir():
+                path.rmdir()
+        if directory.exists():
+            directory.rmdir()
+
+
+@pytest.fixture()
+def release_gate_summary_dir():
+    directory = Path("var/test-release-gate-summary") / str(uuid4())
+    directory.mkdir(parents=True, exist_ok=False)
+    try:
+        yield directory
+    finally:
+        for path in sorted(directory.rglob("*"), reverse=True):
             if path.is_file():
                 path.unlink()
             elif path.is_dir():
@@ -378,6 +395,66 @@ def test_internal_observability_route_returns_404_for_missing_run(
     assert response.status_code == 404
 
 
+def test_release_gate_benchmark_summary_route_returns_latest_summary(
+    observability_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    release_gate_summary_dir: Path,
+) -> None:
+    report_path = release_gate_summary_dir / "latest-release_gate_v1-run-report.json"
+    report_path.write_text(json.dumps(_build_release_gate_summary_report()), encoding="utf-8")
+    monkeypatch.setattr(internal_benchmark_summary, "DEFAULT_LATEST_RELEASE_GATE_REPORT_PATH", report_path)
+
+    response = observability_client.get("/internal/benchmarks/release-gate-v1/summary")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload == {
+        "schema_version": "weekendpilot_internal_benchmark_summary_v1",
+        "suite_id": "release_gate_v1",
+        "suite_title": "Benchmark release gate v1",
+        "run_status": "passed",
+        "case_count": 15,
+        "passed_count": 15,
+        "failed_count": 0,
+        "error_count": 0,
+        "overall_score": 1.0,
+        "matrix_summary": {
+            "level_counts": {"L1": 3, "L2": 8, "L3": 4},
+            "tool_profile_counts": {"mock_world": 15},
+            "failure_mode_counts": {"none": 14, "route_unavailable": 1},
+            "tag_counts": {
+                "memory_advisory": 1,
+                "memory_expired": 1,
+                "memory_governance": 2,
+                "memory_override": 1,
+            },
+        },
+        "report_path": "var/formal-benchmarks/latest-release_gate_v1-run-report.json",
+    }
+
+
+def test_release_gate_benchmark_summary_route_returns_404_when_latest_report_is_missing(
+    observability_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    release_gate_summary_dir: Path,
+) -> None:
+    monkeypatch.setattr(
+        internal_benchmark_summary,
+        "DEFAULT_LATEST_RELEASE_GATE_REPORT_PATH",
+        release_gate_summary_dir / "missing-release_gate_v1-run-report.json",
+    )
+
+    response = observability_client.get("/internal/benchmarks/release-gate-v1/summary")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": (
+            "Latest release_gate_v1 benchmark summary was not found. "
+            "Run python scripts/run_benchmark_release_gate.py first."
+        )
+    }
+
+
 def test_internal_observability_route_returns_benchmark_artifact_summary_for_benchmark_run(
     db_session: Session,
     redis_runtime,
@@ -478,6 +555,43 @@ def test_internal_observability_route_returns_amap_preview_diagnostics(
     assert "action_id" not in serialized
     assert "tool_event_id" not in serialized
     assert "idempotency_key" not in serialized
+
+
+def _build_release_gate_summary_report() -> dict:
+    return {
+        "schema_version": "weekendpilot_benchmark_run_v1",
+        "run_status": "passed",
+        "case_results": [],
+        "passed_count": 15,
+        "failed_count": 0,
+        "error_count": 0,
+        "overall_score": 1.0,
+        "benchmark_summary": {
+            "schema_version": "weekendpilot_benchmark_summary_v1",
+            "suite_id": "release_gate_v1",
+            "suite_title": "Benchmark release gate v1",
+            "run_status": "passed",
+            "case_count": 15,
+            "passed_count": 15,
+            "failed_count": 0,
+            "error_count": 0,
+            "overall_score": 1.0,
+            "matrix_summary": {
+                "schema_version": "weekendpilot_benchmark_case_matrix_v1",
+                "case_count": 15,
+                "level_counts": {"L1": 3, "L2": 8, "L3": 4},
+                "tool_profile_counts": {"mock_world": 15},
+                "failure_mode_counts": {"none": 14, "route_unavailable": 1},
+                "tag_counts": {
+                    "memory_advisory": 1,
+                    "memory_expired": 1,
+                    "memory_governance": 2,
+                    "memory_override": 1,
+                },
+            },
+        },
+        "report_path": "E:/tmp/suite-release_gate_v1-run-report.json",
+    }
 
 
 def test_internal_observability_route_returns_recovery_path_summary_for_recovery_run(

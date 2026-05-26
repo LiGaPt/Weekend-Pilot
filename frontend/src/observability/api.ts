@@ -1,10 +1,17 @@
 import { API_BASE_URL, FrontendApiError } from "../shared/http";
-import type { InternalObservabilityRunSummary } from "./types";
+import type {
+  InternalObservabilityRunSummary,
+  InternalReleaseGateBenchmarkSummary,
+} from "./types";
 
 export async function getObservabilityRun(runId: string): Promise<InternalObservabilityRunSummary> {
   return request<InternalObservabilityRunSummary>(
     `/internal/runs/${encodeURIComponent(runId)}/observability`,
   );
+}
+
+export async function getLatestReleaseGateBenchmarkSummary(): Promise<InternalReleaseGateBenchmarkSummary> {
+  return request<InternalReleaseGateBenchmarkSummary>("/internal/benchmarks/release-gate-v1/summary");
 }
 
 async function request<T>(path: string): Promise<T> {
@@ -51,6 +58,9 @@ function connectionMessage(error: unknown): string {
 function localizedResponseMessage(message: string, status: number): string {
   const knownMessages: Record<string, string> = {
     "Observability run was not found.": "未找到对应的内部观测运行。",
+    "Latest release_gate_v1 benchmark summary was not found. Run python scripts/run_benchmark_release_gate.py first.":
+      "Latest release_gate_v1 benchmark summary was not found. Run python scripts/run_benchmark_release_gate.py first.",
+    "Latest release_gate_v1 benchmark summary is invalid.": "Latest release_gate_v1 benchmark summary is invalid.",
   };
   return knownMessages[message] ?? statusFallbackMessage(status);
 }

@@ -102,6 +102,27 @@ export type InternalBenchmarkArtifactSummary = {
   report_path: string | null;
 };
 
+export type InternalReleaseGateBenchmarkSummaryMatrix = {
+  level_counts: Record<string, number>;
+  tool_profile_counts: Record<string, number>;
+  failure_mode_counts: Record<string, number>;
+  tag_counts: Record<string, number>;
+};
+
+export type InternalReleaseGateBenchmarkSummary = {
+  schema_version: string;
+  suite_id: string;
+  suite_title: string;
+  run_status: string;
+  case_count: number;
+  passed_count: number;
+  failed_count: number;
+  error_count: number;
+  overall_score: number;
+  matrix_summary: InternalReleaseGateBenchmarkSummaryMatrix;
+  report_path: string;
+};
+
 export type InternalObservabilityRunSummary = {
   schema_version: string;
   run_id: string;

@@ -91,7 +91,16 @@ export type DemoExecutionSummary = {
   finished_at?: string | null;
   succeeded_count?: number | null;
   failed_count?: number | null;
-  action_results?: Record<string, unknown>[];
+  action_results?: DemoExecutionActionResultSummary[];
+};
+
+export type DemoExecutionActionResultSummary = {
+  action_ref?: string | null;
+  execution_order?: number | null;
+  tool_name?: string | null;
+  action_type?: string | null;
+  target_id?: string | null;
+  status?: string | null;
 };
 
 export type DemoFeedbackSummary = {

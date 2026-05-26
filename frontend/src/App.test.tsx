@@ -235,8 +235,26 @@ const completedRun: DemoRunSummary = {
       confirmation: { status: "confirmed", confirmed_by: "web-demo-user", action_count: 1 },
       execution: {
         status: "succeeded",
+        started_at: "2026-05-26T14:00:00+08:00",
+        finished_at: "2026-05-26T14:02:00+08:00",
         succeeded_count: 2,
         failed_count: 0,
+        action_results: [
+          {
+            action_ref: "draft_1_action_2",
+            execution_order: 2,
+            tool_name: "send_message",
+            target_id: "family-chat",
+            status: "succeeded",
+          },
+          {
+            action_ref: "draft_1_action_1",
+            execution_order: 1,
+            tool_name: "reserve_restaurant",
+            target_id: "green-table",
+            status: "succeeded",
+          },
+        ],
       },
       feedback: {
         status: "written",
@@ -346,6 +364,17 @@ describe("App", () => {
     expect(confirmRun).toHaveBeenCalledWith("run-1", "plan-1");
     expect(await screen.findByText("安排已完成")).toBeInTheDocument();
     expect(screen.getByText("订座和通知都已处理完成。")).toBeInTheDocument();
+    expect(screen.getByTestId("execution-timeline")).toBeInTheDocument();
+    expect(screen.getByText("2026-05-26T14:00:00+08:00")).toBeInTheDocument();
+    expect(screen.getByText("2026-05-26T14:02:00+08:00")).toBeInTheDocument();
+    const timelineEntries = within(screen.getByTestId("execution-timeline")).getAllByRole("listitem");
+    expect(timelineEntries[0]).toHaveTextContent("第 1 步");
+    expect(timelineEntries[0]).toHaveTextContent("订座");
+    expect(timelineEntries[0]).toHaveTextContent("green-table");
+    expect(timelineEntries[0]).toHaveTextContent("成功");
+    expect(timelineEntries[1]).toHaveTextContent("第 2 步");
+    expect(timelineEntries[1]).toHaveTextContent("发送消息");
+    expect(timelineEntries[1]).toHaveTextContent("family-chat");
   });
 
   it("declines a selected plan and hides confirm action", async () => {
@@ -596,5 +625,29 @@ describe("App", () => {
     expect(screen.queryByTestId("confirm-button")).not.toBeInTheDocument();
     expect(screen.getByTestId("decline-button")).toBeEnabled();
     expect(screen.getByTestId("refresh-button")).toBeEnabled();
+  });
+
+  it("shows a neutral execution timeline state when execution exists without visible actions", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startRun).mockResolvedValue(awaitingRun);
+    vi.mocked(confirmRun).mockResolvedValue({
+      ...completedRun,
+      plans: [
+        {
+          ...completedRun.plans[0],
+          execution: {
+            ...completedRun.plans[0].execution!,
+            action_results: [],
+          },
+        },
+      ],
+    });
+    render(<App />);
+
+    await user.click(screen.getByTestId("start-button"));
+    await user.click(await screen.findByTestId("confirm-button"));
+
+    expect(await screen.findByTestId("execution-timeline")).toBeInTheDocument();
+    expect(screen.getByText("已生成执行结果，但当前没有可展示的执行动作。")).toBeInTheDocument();
   });
 });

@@ -1,13 +1,20 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getObservabilityRun } from "./api";
+import {
+  getLatestReleaseGateBenchmarkSummary,
+  getObservabilityRun,
+} from "./api";
 import { FrontendApiError } from "../shared/http";
 import { ObservabilityPage } from "./ObservabilityPage";
-import type { InternalObservabilityRunSummary } from "./types";
+import type {
+  InternalObservabilityRunSummary,
+  InternalReleaseGateBenchmarkSummary,
+} from "./types";
 
 vi.mock("./api", () => ({
   getObservabilityRun: vi.fn(),
+  getLatestReleaseGateBenchmarkSummary: vi.fn(),
 }));
 
 const summary: InternalObservabilityRunSummary = {
@@ -128,17 +135,45 @@ const summary: InternalObservabilityRunSummary = {
 };
 
 const benchmarkArtifactSummary = summary.benchmark_artifact_summary!;
+const releaseGateSummary: InternalReleaseGateBenchmarkSummary = {
+  schema_version: "weekendpilot_internal_benchmark_summary_v1",
+  suite_id: "release_gate_v1",
+  suite_title: "Benchmark release gate v1",
+  run_status: "passed",
+  case_count: 15,
+  passed_count: 15,
+  failed_count: 0,
+  error_count: 0,
+  overall_score: 1,
+  matrix_summary: {
+    level_counts: { L1: 3, L2: 8, L3: 4 },
+    tool_profile_counts: { mock_world: 15 },
+    failure_mode_counts: { none: 14, route_unavailable: 1 },
+    tag_counts: {
+      memory_advisory: 1,
+      memory_expired: 1,
+      memory_governance: 2,
+      memory_override: 1,
+    },
+  },
+  report_path: "var/formal-benchmarks/latest-release_gate_v1-run-report.json",
+};
 
 describe("ObservabilityPage", () => {
   beforeEach(() => {
     vi.mocked(getObservabilityRun).mockReset();
+    vi.mocked(getLatestReleaseGateBenchmarkSummary).mockReset();
+    vi.mocked(getLatestReleaseGateBenchmarkSummary).mockResolvedValue(releaseGateSummary);
   });
 
-  it("renders the initial empty state", () => {
+  it("renders the initial empty state and benchmark summary panel", async () => {
     render(<ObservabilityPage />);
 
     expect(screen.getByRole("heading", { name: "Internal Observability Review" })).toBeInTheDocument();
     expect(screen.getByText("Paste a run ID to inspect the internal workflow summary.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Benchmark Summary" })).toBeInTheDocument();
+    expect(screen.getByText("Benchmark release gate v1")).toBeInTheDocument();
+    expect(screen.getByText("var/formal-benchmarks/latest-release_gate_v1-run-report.json")).toBeInTheDocument();
   });
 
   it("validates empty run IDs before loading", async () => {
@@ -159,6 +194,7 @@ describe("ObservabilityPage", () => {
     await user.type(screen.getByRole("textbox", { name: "Run ID" }), "run-1");
     await user.click(screen.getByRole("button", { name: "Load Run" }));
 
+    expect(await screen.findByRole("heading", { name: "Trace Summary" })).toBeInTheDocument();
     expect(await screen.findAllByText("trace-1")).toHaveLength(2);
     expect(screen.getByText("execute_searches")).toBeInTheDocument();
     expect(screen.getByText("supervisor")).toBeInTheDocument();
@@ -174,11 +210,27 @@ describe("ObservabilityPage", () => {
     expect(screen.getByText("locallife_bench_v1")).toBeInTheDocument();
     expect(screen.getByText("light_activity")).toBeInTheDocument();
     expect(screen.getByText("Workflow reached the expected path.")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Recovery Path" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Recovery Visualization" })).toBeInTheDocument();
     expect(screen.getByText("stop_safely")).toBeInTheDocument();
     expect(screen.getByText("Recovery stopped after route failure.")).toBeInTheDocument();
     expect(screen.getByText("family_route_failure_v1")).toBeInTheDocument();
     expect(screen.getByText("var/benchmarks/family_route_failure_v1.json")).toBeInTheDocument();
+  });
+
+  it("shows a reviewer-readable missing state when the latest benchmark report is unavailable", async () => {
+    vi.mocked(getLatestReleaseGateBenchmarkSummary).mockRejectedValue(
+      new FrontendApiError(
+        "Latest release_gate_v1 benchmark summary was not found. Run python scripts/run_benchmark_release_gate.py first.",
+        404,
+      ),
+    );
+    render(<ObservabilityPage />);
+
+    expect(
+      await screen.findByText(
+        "Latest release_gate_v1 benchmark summary was not found. Run python scripts/run_benchmark_release_gate.py first.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("shows a neutral state when workflow timing is missing", async () => {

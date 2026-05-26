@@ -120,6 +120,19 @@ The internal review page now also shows sanitized tool-event and action-ledger d
 
 For the canonical reviewer closure flow, run `python scripts/run_recovery_replay_review.py` from the repo root. It emits the source benchmark `run_id` and the written source benchmark report path for `family_route_failure_v1`, and those two values can be cross-checked directly against this internal observability surface to confirm that `benchmark_artifact_summary.report_path` and `recovery_path_summary.replay_source.benchmark_report_path` both point to the same source report.
 
+The internal review surface now also loads `GET /internal/benchmarks/release-gate-v1/summary` on page load and renders a dedicated `Benchmark Summary` panel even before a run ID is entered. That panel is intentionally scoped to the canonical latest alias `var/formal-benchmarks/latest-release_gate_v1-run-report.json`.
+
+## Richer Web UI V1 Reviewer Flow
+
+For the V1 richer UI closure, use `docs/RICHER_WEB_UI_V1_CHECKLIST.md` as the canonical acceptance checklist. The shortest reviewer sequence is:
+
+1. On `5173`, verify planning and confirmation with a Mock World run.
+2. Confirm the selected plan and verify the customer-facing `执行时间线`.
+3. Copy the resulting `run_id`.
+4. On `5174`, verify `Benchmark Summary` before loading any run.
+5. Load the copied `run_id` and verify `Trace Summary`.
+6. Run `python scripts/run_recovery_replay_review.py`, then load the emitted recovery `run_id` and verify `Recovery Visualization`.
+
 ## Manual Demo Flow
 
 ### Happy Path
@@ -135,8 +148,10 @@ For the canonical reviewer closure flow, run `python scripts/run_recovery_replay
 9. Click `确认当前方案`.
 10. Confirm the run reaches `completed`.
 11. Confirm execution and feedback are visible.
-12. Confirm the action count is greater than `0`.
-13. Confirm the selected plan now shows `action_manifest.source = confirmed_actions`.
+12. Confirm the page now renders `执行时间线`.
+13. Confirm the timeline entries are ordered and show step number, action/tool label, target, and status.
+14. Confirm the action count is greater than `0`.
+15. Confirm the selected plan now shows `action_manifest.source = confirmed_actions`.
 
 The automated desktop browser suite now keeps two happy-path starts in scope:
 
@@ -256,6 +271,19 @@ curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/replan \
 ### Mobile Smoke
 
 Use a mobile viewport around 390px wide. Start a run and confirm the main controls and selected plan remain visible without document-level horizontal scrolling.
+
+### Internal Richer UI Review
+
+1. Open `http://127.0.0.1:5174/`.
+2. Confirm `Benchmark Summary` loads before any run ID is entered.
+3. Run `python scripts/run_benchmark_release_gate.py` if the benchmark panel reports that the latest release-gate summary is missing.
+4. Confirm the benchmark panel shows suite counts, overall score, and matrix counts from the latest release-gate alias.
+5. Paste a customer-demo `run_id` and click `Load Run`.
+6. Confirm the page shows `Trace Summary`.
+7. Confirm `Trace Summary` includes run identity, trace identity, workflow timing, and observability status.
+8. Run `python scripts/run_recovery_replay_review.py`.
+9. Paste the emitted recovery review `run_id`.
+10. Confirm the page shows `Recovery Visualization` with attempt count, max attempts, per-attempt details, and replay source.
 
 ## Automated Checks
 
