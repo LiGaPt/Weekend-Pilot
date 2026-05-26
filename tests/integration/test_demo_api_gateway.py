@@ -17,7 +17,7 @@ from backend.app.providers.amap.errors import AMapConfigurationError
 from backend.app.review.schemas import FinalReviewResult, ReviewCheck
 from backend.app.runtime import get_redis_client
 from backend.app.main import create_app
-from backend.app.tool_gateway import build_default_registry
+from backend.app.tool_gateway import ToolRateLimit, build_default_registry
 
 
 TEST_PREFIX = "demo-api-gateway"
@@ -349,6 +349,42 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
         }
         assert "draft" not in turns[1].payload_json
         assert "plan_json" not in turns[1].payload_json
+    finally:
+        db.close()
+
+
+def test_demo_rate_limits_are_scoped_by_external_user(
+    client,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    test_client, case_ids, external_user_ids = client
+
+    def _low_search_poi_limit(tool_name: str) -> ToolRateLimit | None:
+        if tool_name == "search_poi":
+            return ToolRateLimit(limit=2, window_seconds=60)
+        return None
+
+    monkeypatch.setattr("backend.app.tool_gateway.registry._read_rate_limit", _low_search_poi_limit)
+
+    first_response = test_client.post("/demo/runs", json=_start_payload(case_ids, external_user_ids))
+    second_response = test_client.post("/demo/runs", json=_start_payload(case_ids, external_user_ids))
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    first_body = first_response.json()
+    second_body = second_response.json()
+    assert first_body["status"] == "awaiting_confirmation"
+    assert second_body["status"] == "awaiting_confirmation"
+
+    run_ids = [UUID(first_body["run_id"]), UUID(second_body["run_id"])]
+    db = SessionLocal()
+    try:
+        events = list(
+            db.scalars(select(ToolEvent).where(ToolEvent.run_id.in_(run_ids))).all()
+        )
+        search_poi_events = [event for event in events if event.tool_name == "search_poi"]
+        assert search_poi_events
+        assert all(event.status != "rate_limited" for event in search_poi_events)
     finally:
         db.close()
 

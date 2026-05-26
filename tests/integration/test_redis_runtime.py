@@ -11,6 +11,7 @@ from backend.app.runtime import (
     RedisKeyBuilder,
     RedisLockManager,
     RedisProgressStream,
+    ScopedRateLimiter,
     get_redis_client,
 )
 
@@ -105,6 +106,36 @@ def test_fixed_window_rate_limiter_allows_until_limit_then_denies(redis_runtime)
     assert third.allowed is False
     assert third.remaining == 0
     assert 0 < third.reset_after_seconds <= 30
+
+
+def test_scoped_rate_limiter_isolates_same_name_by_namespace(redis_runtime) -> None:
+    client, builder = redis_runtime
+    base = FixedWindowRateLimiter(client, builder)
+    raw_scope_a = "demo-user:raw-user-a@example.com"
+    raw_scope_b = "demo-user:raw-user-b@example.com"
+    scope_a = ScopedRateLimiter(base, raw_scope_a)
+    scope_b = ScopedRateLimiter(base, raw_scope_b)
+
+    first = scope_a.allow("tool:mock_world:search_poi", limit=1, window_seconds=60)
+    second = scope_a.allow("tool:mock_world:search_poi", limit=1, window_seconds=60)
+    isolated = scope_b.allow("tool:mock_world:search_poi", limit=1, window_seconds=60)
+
+    assert first.allowed is True
+    assert first.remaining == 0
+    assert second.allowed is False
+    assert second.remaining == 0
+    assert isolated.allowed is True
+    assert isolated.remaining == 0
+
+    key_names = [
+        key.decode("utf-8") if isinstance(key, bytes) else str(key)
+        for key in client.scan_iter(f"{TEST_PREFIX}:*")
+    ]
+    assert len(key_names) == 2
+    assert all(":rate-limit:" in key for key in key_names)
+    assert all("tool:mock_world:search_poi" in key for key in key_names)
+    assert all("raw-user-a@example.com" not in key for key in key_names)
+    assert all("raw-user-b@example.com" not in key for key in key_names)
 
 
 def test_progress_stream_appends_and_reads_events_in_order(redis_runtime) -> None:
