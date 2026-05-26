@@ -2,7 +2,7 @@ from backend.app.runtime.cache import JsonRedisCache
 from backend.app.runtime.keys import RedisKeyBuilder
 from backend.app.runtime.locks import RedisLockManager
 from backend.app.runtime.progress import ProgressEvent, RedisProgressStream
-from backend.app.runtime.rate_limit import FixedWindowRateLimiter, RateLimitDecision
+from backend.app.runtime.rate_limit import FixedWindowRateLimiter, RateLimitDecision, ScopedRateLimiter
 from backend.app.runtime.redis_client import get_redis_client
 
 __all__ = [
@@ -13,5 +13,6 @@ __all__ = [
     "RedisKeyBuilder",
     "RedisLockManager",
     "RedisProgressStream",
+    "ScopedRateLimiter",
     "get_redis_client",
 ]

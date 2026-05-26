@@ -34,7 +34,7 @@ from backend.app.repositories import (
     ToolEventRepository,
     UserRepository,
 )
-from backend.app.runtime import FixedWindowRateLimiter, JsonRedisCache
+from backend.app.runtime import FixedWindowRateLimiter, JsonRedisCache, ScopedRateLimiter
 from backend.app.tool_gateway import ToolGateway
 from backend.app.workflow import (
     WeekendPilotWorkflowDependencies,
@@ -139,7 +139,7 @@ class DemoWorkflowService:
             WeekendPilotWorkflowDependencies(
                 session=self.session,
                 cache=self.cache,
-                rate_limiter=self.rate_limiter,
+                rate_limiter=self._rate_limiter_for_external_user(request.external_user_id),
                 trace_buffer_path=self.trace_buffer_path,
             )
         )
@@ -202,7 +202,7 @@ class DemoWorkflowService:
             WeekendPilotWorkflowDependencies(
                 session=self.session,
                 cache=self.cache,
-                rate_limiter=self.rate_limiter,
+                rate_limiter=self._rate_limiter_for_external_user(user.external_id),
                 trace_buffer_path=self.trace_buffer_path,
             )
         )
@@ -289,7 +289,7 @@ class DemoWorkflowService:
             WeekendPilotWorkflowDependencies(
                 session=self.session,
                 cache=self.cache,
-                rate_limiter=self.rate_limiter,
+                rate_limiter=self._rate_limiter_for_external_user(user.external_id),
                 trace_buffer_path=self.trace_buffer_path,
             )
         )
@@ -381,6 +381,7 @@ class DemoWorkflowService:
             gateway = self._gateway(
                 tool_profile=run.tool_profile,
                 world_profile=run.world_profile,
+                rate_limiter=self._rate_limiter_for_run_user(run),
             )
             execution = DeterministicExecutionWorkflow(plans, gateway).execute_confirmed_plan(
                 run_id,
@@ -458,6 +459,7 @@ class DemoWorkflowService:
         *,
         tool_profile: str = "mock_world",
         world_profile: str = "family_afternoon",
+        rate_limiter: FixedWindowRateLimiter | None = None,
     ) -> ToolGateway:
         registry = build_mock_world_registry(world_profile)
         if tool_profile != "mock_world":
@@ -467,8 +469,20 @@ class DemoWorkflowService:
             tool_events=ToolEventRepository(self.session),
             action_ledger=ActionLedgerRepository(self.session),
             cache=self.cache,
-            rate_limiter=self.rate_limiter,
+            rate_limiter=rate_limiter or self.rate_limiter,
         )
+
+    def _rate_limiter_for_external_user(self, external_user_id: str | None) -> FixedWindowRateLimiter:
+        if not external_user_id:
+            return self.rate_limiter
+        return ScopedRateLimiter(self.rate_limiter, f"demo-user:{external_user_id}")
+
+    def _rate_limiter_for_run_user(self, run: AgentRun) -> FixedWindowRateLimiter:
+        if run.user_id is None:
+            return self.rate_limiter
+        user = UserRepository(self.session).get_by_id(run.user_id)
+        external_user_id = user.external_id if user is not None else None
+        return self._rate_limiter_for_external_user(external_user_id)
 
     def _workflow_profiles_for_start_request(self, request: DemoStartRunRequest) -> tuple[str, str]:
         if request.read_profile == "amap":
