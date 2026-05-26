@@ -118,6 +118,8 @@ Paste a `run_id` from the public demo flow into the internal surface to inspect 
 
 The internal review page now also shows sanitized tool-event and action-ledger detail panels, a real benchmark-artifact panel populated from persisted run metadata, and a real recovery-path panel populated from persisted bounded recovery metadata. For benchmark-backed recovery runs, the page also shows the persisted benchmark case report path as replay input context. Replay execution and replay report browsing remain separate tooling.
 
+For the canonical reviewer closure flow, run `python scripts/run_recovery_replay_review.py` from the repo root. It emits the source benchmark `run_id` and the written source benchmark report path for `family_route_failure_v1`, and those two values can be cross-checked directly against this internal observability surface to confirm that `benchmark_artifact_summary.report_path` and `recovery_path_summary.replay_source.benchmark_report_path` both point to the same source report.
+
 ## Manual Demo Flow
 
 ### Happy Path

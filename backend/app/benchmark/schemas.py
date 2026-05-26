@@ -15,6 +15,7 @@ from backend.app.workflow.timing import WorkflowTimingSummary
 
 BenchmarkCaseStatus = Literal["passed", "failed", "error"]
 BenchmarkReplayStatus = Literal["passed", "failed", "error"]
+RecoveryReplayReviewStatus = Literal["passed", "failed", "error"]
 BenchmarkSuiteId = Literal[
     "baseline",
     "expanded",
@@ -279,3 +280,43 @@ class BenchmarkReplayRunReport(BaseModel):
     passed_count: int
     failed_count: int
     error_count: int
+
+
+class RecoveryReplayReviewCheck(BaseModel):
+    name: str
+    passed: bool
+    detail: str
+
+
+class RecoveryReplaySummary(BaseModel):
+    status: BenchmarkReplayStatus | None = None
+    mismatch_count: int = 0
+    failure_chain_signature: list[str] = Field(default_factory=list)
+
+
+class RecoveryReplayReviewReplaySource(BaseModel):
+    case_id: str
+    benchmark_report_path: str
+
+
+class RecoveryReplayReviewSummary(BaseModel):
+    benchmark_report_path: str | None = None
+    attempt_count: int = 0
+    max_attempts: int = 0
+    recovery_actions: list[str] = Field(default_factory=list)
+    replay_source: RecoveryReplayReviewReplaySource | None = None
+
+
+class RecoveryReplayReviewResult(BaseModel):
+    schema_version: str = "weekendpilot_recovery_replay_review_v1"
+    status: RecoveryReplayReviewStatus
+    case_id: str
+    run_id: UUID | None = None
+    run_directory: str
+    source_report_path: str | None = None
+    replay_report_path: str | None = None
+    latest_review_path: str
+    checks: list[RecoveryReplayReviewCheck] = Field(default_factory=list)
+    failure_chain_summary: BenchmarkFailureChainSummary | None = None
+    replay_summary: RecoveryReplaySummary = Field(default_factory=RecoveryReplaySummary)
+    recovery_review: RecoveryReplayReviewSummary | None = None

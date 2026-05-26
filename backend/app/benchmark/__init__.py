@@ -5,6 +5,10 @@ from backend.app.benchmark.fixtures import (
 )
 from backend.app.benchmark.harness import BenchmarkHarness
 from backend.app.benchmark.replay import BenchmarkReplayHarness
+from backend.app.benchmark.recovery_review import (
+    RecoveryReplayReviewError,
+    run_recovery_replay_review,
+)
 from backend.app.benchmark.schemas import (
     BenchmarkCase,
     BenchmarkCaseResult,
@@ -15,6 +19,11 @@ from backend.app.benchmark.schemas import (
     BenchmarkReplaySummary,
     BenchmarkRunReport,
     BenchmarkScore,
+    RecoveryReplayReviewCheck,
+    RecoveryReplayReviewReplaySource,
+    RecoveryReplayReviewResult,
+    RecoveryReplayReviewSummary,
+    RecoveryReplaySummary,
 )
 from backend.app.benchmark.suites import (
     list_benchmark_suites,
@@ -33,6 +42,12 @@ __all__ = [
     "BenchmarkReplayMismatch",
     "BenchmarkReplayRunReport",
     "BenchmarkReplaySummary",
+    "RecoveryReplayReviewCheck",
+    "RecoveryReplayReviewError",
+    "RecoveryReplayReviewReplaySource",
+    "RecoveryReplayReviewResult",
+    "RecoveryReplayReviewSummary",
+    "RecoveryReplaySummary",
     "BenchmarkRunReport",
     "BenchmarkScore",
     "BenchmarkSuiteDescription",
@@ -42,4 +57,5 @@ __all__ = [
     "load_failure_benchmark_cases",
     "load_registered_benchmark_cases",
     "list_benchmark_suites",
+    "run_recovery_replay_review",
 ]

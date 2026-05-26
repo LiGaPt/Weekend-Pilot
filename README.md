@@ -235,6 +235,39 @@ Each successful run writes a dedicated output directory under `var/formal-benchm
 
 The latest alias is a direct file copy of the passing suite report, so nested `report_path` values continue to point at the unique run directory that produced the result. This task does not publish benchmark outputs into `docs/artifacts/`; formal verification artifacts stay under `var/` only.
 
+## Recovery Replay Review
+
+The repository now also includes one canonical reviewer-closure flow for the existing failure injection, replay harness, and internal recovery review stack. It is intentionally pinned to the standard `family_route_failure_v1` case and does not add a replay UI, case picker, or batch review mode.
+
+Run it from the repo root:
+
+```bash
+python scripts/run_recovery_replay_review.py
+```
+
+The runner starts `postgres` and `redis` with `docker compose up -d postgres redis`, waits for both services to become reachable, runs `python -m alembic upgrade head`, and then executes:
+
+- `BenchmarkHarness.run_case(load_benchmark_case("family_route_failure_v1"))`
+- `BenchmarkReplayHarness.replay_report(source_report_path)`
+- `InternalObservabilityService.get_run_summary(source_run_id)`
+
+Each run writes a dedicated output directory under `var/recovery-reviews/recovery-review-<unique-id>/`, including:
+
+- the source benchmark case report
+- the replay case report under `replays/`
+- one aggregate `recovery-review.json` artifact
+- a run-local trace buffer at `review-traces.jsonl`
+
+Successful runs also refresh `var/recovery-reviews/latest-family_route_failure_v1-review.json`. Failed or errored runs keep their unique directory for inspection and must not overwrite that latest alias.
+
+The aggregate review passes only when all three closure checks stay true:
+
+- `benchmark_failure_path`
+- `replay_matches_source_report`
+- `observability_links_source_report`
+
+That aggregate artifact gives reviewers one compact evidence chain tying the source failure path, the replayed report, and the internal observability metadata back to the same source benchmark report path.
+
 ## Memory Governance V1
 
 WeekendPilot already includes a narrow, releaseable memory-governance slice for V1. The current scope is read-only query shaping only: explicit user input still wins, advisory memory can help when the user is vague, and expired high-confidence memory is downgraded instead of disappearing before evaluation. The full release contract, exact rule matrix, and benchmark evidence mapping live in `docs/MEMORY_GOVERNANCE_RUNBOOK.md`.
