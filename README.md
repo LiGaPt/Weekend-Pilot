@@ -235,6 +235,12 @@ Each successful run writes a dedicated output directory under `var/formal-benchm
 
 The latest alias is a direct file copy of the passing suite report, so nested `report_path` values continue to point at the unique run directory that produced the result. This task does not publish benchmark outputs into `docs/artifacts/`; formal verification artifacts stay under `var/` only.
 
+## Memory Governance V1
+
+WeekendPilot already includes a narrow, releaseable memory-governance slice for V1. The current scope is read-only query shaping only: explicit user input still wins, advisory memory can help when the user is vague, and expired high-confidence memory is downgraded instead of disappearing before evaluation. The full release contract, exact rule matrix, and benchmark evidence mapping live in `docs/MEMORY_GOVERNANCE_RUNBOOK.md`.
+
+This V1 slice is benchmark-backed through the existing `memory_governance` cases, the blocking `release_gate_v1` suite, and the broader `all_registered` formal-verification suite. It does not include memory CRUD, user-facing controls, or broader memory lifecycle management.
+
 ## LangGraph Workflow Skeleton
 
 The workflow package provides the shared product route for the deterministic Mock World flow. It pauses before write-tool execution unless `auto_confirm=True` is supplied by a test or demo caller.
