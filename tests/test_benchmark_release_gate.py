@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 
 import backend.app.benchmark.release_gate as release_gate
+from backend.app.core.config import Settings
 
 
 class _FakeSession:
@@ -49,7 +50,17 @@ def test_run_benchmark_release_gate_creates_unique_run_dir_and_latest_alias(
         captured["poll_interval_seconds"] = poll_interval_seconds
 
     class FakeHarness:
-        def __init__(self, db_session, cache, rate_limiter, *, report_dir, trace_buffer_path) -> None:
+        def __init__(
+            self,
+            db_session,
+            cache,
+            rate_limiter,
+            *,
+            report_dir,
+            trace_buffer_path,
+            workflow_settings=None,
+            workflow_llm_client=None,
+        ) -> None:
             captured["db_session"] = db_session
             captured["cache"] = cache
             captured["rate_limiter"] = rate_limiter
@@ -142,6 +153,115 @@ def test_run_benchmark_release_gate_creates_unique_run_dir_and_latest_alias(
         _cleanup_test_dir(output_root)
 
 
+def test_run_benchmark_release_gate_injects_deterministic_workflow_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_root = _make_test_dir()
+    fixed_uuid = UUID("99999999-1234-5678-1234-567899999999")
+    source_settings = Settings(
+        _env_file=None,
+        app_name="WeekendPilot",
+        app_env="preview",
+        database_url="postgresql+psycopg://postgres:postgres@localhost:5432/weekend_pilot",
+        redis_url="redis://localhost:6379/0",
+        local_trace_buffer_path="var/traces/gate-preview.jsonl",
+        langsmith_tracing=True,
+        langchain_tracing_v2=True,
+        langsmith_api_key="langsmith-preview-key",
+        langsmith_endpoint="https://langsmith.example.test",
+        llm_enabled=True,
+        llm_api_key="llm-preview-key",
+        llm_base_url="https://llm.example.test/v1",
+        llm_model_id="preview-model",
+    )
+    captured: dict[str, object] = {}
+
+    class FakeHarness:
+        def __init__(
+            self,
+            db_session,
+            cache,
+            rate_limiter,
+            *,
+            report_dir,
+            trace_buffer_path,
+            workflow_settings=None,
+            workflow_llm_client=None,
+        ) -> None:
+            captured["db_session"] = db_session
+            captured["cache"] = cache
+            captured["rate_limiter"] = rate_limiter
+            captured["report_dir"] = Path(report_dir)
+            captured["trace_buffer_path"] = Path(trace_buffer_path)
+            captured["workflow_settings"] = workflow_settings
+            captured["workflow_llm_client"] = workflow_llm_client
+
+        def run_suite(self, suite_id: str):
+            report_path = Path(captured["report_dir"]) / "suite-release_gate_v1-run-report.json"
+            report_path.write_text(
+                json.dumps({"suite_id": suite_id, "report_path": str(report_path)}),
+                encoding="utf-8",
+            )
+            return SimpleNamespace(
+                run_status="passed",
+                failed_count=0,
+                error_count=0,
+                overall_score=1.0,
+                report_path=str(report_path),
+                benchmark_summary=SimpleNamespace(
+                    suite_id="release_gate_v1",
+                    case_count=15,
+                    passed_count=15,
+                    failed_count=0,
+                    error_count=0,
+                    overall_score=1.0,
+                    matrix_summary=SimpleNamespace(
+                        level_counts={"L1": 3, "L2": 8, "L3": 4},
+                        tool_profile_counts={"mock_world": 15},
+                        failure_mode_counts={"none": 14, "route_unavailable": 1},
+                    ),
+                ),
+                benchmark_timing_summary=SimpleNamespace(
+                    overall_total_duration_ms=SimpleNamespace(
+                        p50_ms=446,
+                        p95_ms=1564,
+                        p99_ms=2011,
+                    )
+                ),
+            )
+
+    monkeypatch.setattr(release_gate, "_bootstrap_runtime", lambda **_: None)
+    monkeypatch.setattr(release_gate, "uuid4", lambda: fixed_uuid)
+    monkeypatch.setattr(release_gate, "SessionLocal", _FakeSession)
+    monkeypatch.setattr(release_gate, "get_redis_client", _FakeRedis)
+    monkeypatch.setattr(release_gate, "RedisKeyBuilder", _FakeRedisKeyBuilder)
+    monkeypatch.setattr(release_gate, "get_settings", lambda: source_settings, raising=False)
+    monkeypatch.setattr(release_gate, "BenchmarkHarness", FakeHarness)
+
+    try:
+        release_gate.run_benchmark_release_gate(output_root=output_root, start_services=False)
+
+        injected = captured["workflow_settings"]
+        assert isinstance(injected, Settings)
+        assert injected is not source_settings
+        assert injected.app_name == source_settings.app_name
+        assert injected.app_env == source_settings.app_env
+        assert injected.database_url == source_settings.database_url
+        assert injected.redis_url == source_settings.redis_url
+        assert injected.local_trace_buffer_path == source_settings.local_trace_buffer_path
+        assert injected.llm_enabled is False
+        assert injected.llm_api_key is None
+        assert injected.llm_base_url is None
+        assert injected.llm_model_id is None
+        assert injected.langsmith_tracing is False
+        assert injected.langchain_tracing_v2 is False
+        assert injected.langsmith_api_key is None
+        assert injected.langsmith_endpoint is None
+        assert captured["workflow_llm_client"] is None
+    finally:
+        _cleanup_test_dir(output_root)
+
+
 def test_run_benchmark_release_gate_preserves_latest_alias_when_release_is_blocked(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -157,7 +277,17 @@ def test_run_benchmark_release_gate_preserves_latest_alias_when_release_is_block
     monkeypatch.setattr(release_gate, "RedisKeyBuilder", _FakeRedisKeyBuilder)
 
     class FakeHarness:
-        def __init__(self, _db_session, _cache, _rate_limiter, *, report_dir, trace_buffer_path) -> None:
+        def __init__(
+            self,
+            _db_session,
+            _cache,
+            _rate_limiter,
+            *,
+            report_dir,
+            trace_buffer_path,
+            workflow_settings=None,
+            workflow_llm_client=None,
+        ) -> None:
             self.report_dir = Path(report_dir)
             self.trace_buffer_path = Path(trace_buffer_path)
 

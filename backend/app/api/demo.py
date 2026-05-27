@@ -38,6 +38,7 @@ def _build_service(
         cache=JsonRedisCache(redis_client, keys),
         rate_limiter=FixedWindowRateLimiter(redis_client, keys),
         trace_buffer_path=settings.local_trace_buffer_path,
+        workflow_settings=settings,
     )
 
 

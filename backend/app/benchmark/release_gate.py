@@ -12,6 +12,7 @@ from uuid import uuid4
 from sqlalchemy import text
 
 from backend.app.benchmark import BenchmarkHarness
+from backend.app.core.config import Settings, get_settings
 from backend.app.db.session import SessionLocal, engine
 from backend.app.runtime import FixedWindowRateLimiter, JsonRedisCache, RedisKeyBuilder, get_redis_client
 
@@ -76,6 +77,7 @@ def run_benchmark_release_gate(
     run_directory.mkdir(parents=True, exist_ok=False)
     trace_buffer_path = run_directory / RELEASE_GATE_TRACE_FILENAME
     latest_report_path = root / LATEST_REPORT_FILENAME
+    workflow_settings = _build_release_gate_workflow_settings()
 
     session = None
     redis_client = None
@@ -91,6 +93,7 @@ def run_benchmark_release_gate(
             rate_limiter,
             report_dir=run_directory,
             trace_buffer_path=trace_buffer_path,
+            workflow_settings=workflow_settings,
         )
         report = harness.run_suite(RELEASE_GATE_SUITE_ID)
         return _finalize_release_gate_result(
@@ -138,6 +141,22 @@ def _bootstrap_runtime(
     _run_subprocess(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
         error_context="Alembic upgrade failed.",
+    )
+
+
+def _build_release_gate_workflow_settings(source: Settings | None = None) -> Settings:
+    settings = source if source is not None else get_settings()
+    return settings.model_copy(
+        update={
+            "llm_enabled": False,
+            "llm_api_key": None,
+            "llm_base_url": None,
+            "llm_model_id": None,
+            "langsmith_tracing": False,
+            "langchain_tracing_v2": False,
+            "langsmith_api_key": None,
+            "langsmith_endpoint": None,
+        }
     )
 
 

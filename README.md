@@ -183,6 +183,8 @@ python -m pytest tests/test_benchmark_harness.py tests/integration/test_benchmar
 
 The repository now includes a blocking benchmark release gate for V1 sign-off. `release_gate_v1` is the formal LocalLife-Bench `L1-L3` release suite: it covers the current 15 Mock World `L1-L3` cases and intentionally excludes the two current `L5` composite chaos cases. Those broader chaos cases remain part of `all_registered`, not the blocking V1 gate.
 
+`python scripts/run_benchmark_release_gate.py` now always injects deterministic workflow settings for the blocking gate. Local `LLM_*` preview settings and local LangSmith preview settings are ignored for `release_gate_v1`, so the blocking gate always evaluates the deterministic bounded-agent path. LLM-backed bounded agents remain available only as an explicit local preview path outside the V1.5 blocking release contract.
+
 Run the blocking gate from the repo root:
 
 ```bash
