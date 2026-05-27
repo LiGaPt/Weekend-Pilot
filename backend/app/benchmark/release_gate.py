@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -32,6 +33,10 @@ EXPECTED_PASSED_COUNT = 15
 EXPECTED_FAILED_COUNT = 0
 EXPECTED_ERROR_COUNT = 0
 EXPECTED_OVERALL_SCORE = 1.0
+EXPECTED_P50_DURATION_MS = 2000
+EXPECTED_P95_DURATION_MS = 5000
+EXPECTED_MAX_DURATION_MS = 8000
+FOCUS_STAGE_NODE_NAMES = ("pre_flight_check_availability", "logical_planner_agent")
 
 
 class BenchmarkReleaseGateError(RuntimeError):
@@ -57,6 +62,11 @@ class BenchmarkReleaseGateResult:
     p50_duration_ms: int | None = None
     p95_duration_ms: int | None = None
     p99_duration_ms: int | None = None
+    max_duration_ms: int | None = None
+    latency_slo: dict[str, Any] = field(default_factory=dict)
+    slow_cases: list[dict[str, Any]] = field(default_factory=list)
+    slow_stages: list[dict[str, Any]] = field(default_factory=list)
+    focus_stages: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 def run_benchmark_release_gate(
@@ -275,13 +285,59 @@ def _finalize_release_gate_result(
             f"Expected failure_mode_counts={EXPECTED_FAILURE_MODE_COUNTS}, got {failure_mode_counts}."
         )
 
+    timing_summary = getattr(report, "benchmark_timing_summary", None)
+    (
+        p50_duration_ms,
+        p95_duration_ms,
+        p99_duration_ms,
+        max_duration_ms,
+        latency_slo,
+        latency_failures,
+    ) = _evaluate_latency_slo(timing_summary)
+    blocking_failures.extend(latency_failures)
+
+    slow_cases, slow_case_failures = _build_slow_case_ranking(getattr(report, "case_results", None))
+    blocking_failures.extend(slow_case_failures)
+
+    slow_stages = _build_slow_stage_ranking(getattr(timing_summary, "stages", None))
+    focus_stages, focus_stage_failures = _extract_focus_stages(slow_stages)
+    blocking_failures.extend(focus_stage_failures)
+
+    evaluation_payload = _build_release_gate_evaluation(
+        suite_id=suite_id,
+        release_blocked=bool(blocking_failures),
+        blocking_failures=blocking_failures,
+        latency_slo=latency_slo,
+        slow_cases=slow_cases,
+        slow_stages=slow_stages,
+        focus_stages=focus_stages,
+    )
+    report_enriched = False
+    if suite_report_path.exists():
+        enrichment_error = _write_release_gate_evaluation(suite_report_path, evaluation_payload)
+        if enrichment_error is not None:
+            blocking_failures.append(enrichment_error)
+        else:
+            report_enriched = True
+
     if not blocking_failures:
         copy_error = _refresh_latest_alias(suite_report_path, latest_report_path)
         if copy_error is not None:
             blocking_failures.append(copy_error)
 
-    timing_summary = getattr(report, "benchmark_timing_summary", None)
-    total_duration = getattr(timing_summary, "overall_total_duration_ms", None)
+    if report_enriched and blocking_failures != evaluation_payload["blocking_failures"]:
+        final_payload = _build_release_gate_evaluation(
+            suite_id=suite_id,
+            release_blocked=bool(blocking_failures),
+            blocking_failures=blocking_failures,
+            latency_slo=latency_slo,
+            slow_cases=slow_cases,
+            slow_stages=slow_stages,
+            focus_stages=focus_stages,
+        )
+        follow_up_error = _write_release_gate_evaluation(suite_report_path, final_payload)
+        if follow_up_error is not None:
+            blocking_failures.append(follow_up_error)
 
     return BenchmarkReleaseGateResult(
         gate_id=RELEASE_GATE_SUITE_ID,
@@ -298,9 +354,14 @@ def _finalize_release_gate_result(
         suite_report_path=suite_report_path,
         latest_report_path=latest_report_path,
         trace_buffer_path=trace_buffer_path,
-        p50_duration_ms=_coerce_optional_int(getattr(total_duration, "p50_ms", None)),
-        p95_duration_ms=_coerce_optional_int(getattr(total_duration, "p95_ms", None)),
-        p99_duration_ms=_coerce_optional_int(getattr(total_duration, "p99_ms", None)),
+        p50_duration_ms=p50_duration_ms,
+        p95_duration_ms=p95_duration_ms,
+        p99_duration_ms=p99_duration_ms,
+        max_duration_ms=max_duration_ms,
+        latency_slo=latency_slo,
+        slow_cases=slow_cases,
+        slow_stages=slow_stages,
+        focus_stages=focus_stages,
     )
 
 
@@ -321,33 +382,249 @@ def _refresh_latest_alias(suite_report_path: Path, latest_report_path: Path) -> 
                 pass
 
 
-def _format_success_summary(result: BenchmarkReleaseGateResult) -> str:
-    return "\n".join(
-        [
-            "Benchmark release gate passed.",
-            f"Gate: {result.gate_id}",
-            f"Suite: {result.suite_id}",
-            (
-                f"Cases: {result.case_count} "
-                f"({result.passed_count} passed, {result.failed_count} failed, {result.error_count} error)"
-            ),
-            f"Overall score: {result.overall_score}",
-            (
-                "Timing: "
-                f"p50={_format_duration(result.p50_duration_ms)}, "
-                f"p95={_format_duration(result.p95_duration_ms)}, "
-                f"p99={_format_duration(result.p99_duration_ms)}"
-            ),
-            f"Run directory: {result.run_directory}",
-            f"Suite report: {result.suite_report_path}",
-            f"Latest report: {result.latest_report_path}",
-        ]
+def _evaluate_latency_slo(
+    timing_summary: Any,
+) -> tuple[int | None, int | None, int | None, int | None, dict[str, Any], list[str]]:
+    failures: list[str] = []
+    if timing_summary is None:
+        failures.append("Missing benchmark_timing_summary.")
+        return (
+            None,
+            None,
+            None,
+            None,
+            _build_latency_slo_payload(None, None, None, None),
+            failures,
+        )
+
+    total_duration = getattr(timing_summary, "overall_total_duration_ms", None)
+    if total_duration is None:
+        failures.append("Missing benchmark_timing_summary.overall_total_duration_ms.")
+        return (
+            None,
+            None,
+            None,
+            None,
+            _build_latency_slo_payload(None, None, None, None),
+            failures,
+        )
+
+    p50_duration_ms = _coerce_optional_int(_value_for(total_duration, "p50_ms"))
+    p95_duration_ms = _coerce_optional_int(_value_for(total_duration, "p95_ms"))
+    p99_duration_ms = _coerce_optional_int(_value_for(total_duration, "p99_ms"))
+    max_duration_ms = _coerce_optional_int(_value_for(total_duration, "max_ms"))
+
+    if p50_duration_ms is None:
+        failures.append("Missing benchmark_timing_summary.overall_total_duration_ms.p50_ms.")
+    if p95_duration_ms is None:
+        failures.append("Missing benchmark_timing_summary.overall_total_duration_ms.p95_ms.")
+    if max_duration_ms is None:
+        failures.append("Missing benchmark_timing_summary.overall_total_duration_ms.max_ms.")
+    if p99_duration_ms is None:
+        failures.append("Missing benchmark_timing_summary.overall_total_duration_ms.p99_ms.")
+
+    if p50_duration_ms is not None and p50_duration_ms > EXPECTED_P50_DURATION_MS:
+        failures.append(
+            f"Expected p50_ms<={EXPECTED_P50_DURATION_MS}, got {p50_duration_ms}."
+        )
+    if p95_duration_ms is not None and p95_duration_ms > EXPECTED_P95_DURATION_MS:
+        failures.append(
+            f"Expected p95_ms<={EXPECTED_P95_DURATION_MS}, got {p95_duration_ms}."
+        )
+    if max_duration_ms is not None and max_duration_ms > EXPECTED_MAX_DURATION_MS:
+        failures.append(
+            f"Expected max_ms<={EXPECTED_MAX_DURATION_MS}, got {max_duration_ms}."
+        )
+
+    return (
+        p50_duration_ms,
+        p95_duration_ms,
+        p99_duration_ms,
+        max_duration_ms,
+        _build_latency_slo_payload(
+            p50_duration_ms,
+            p95_duration_ms,
+            p99_duration_ms,
+            max_duration_ms,
+        ),
+        failures,
     )
 
 
+def _build_latency_slo_payload(
+    p50_duration_ms: int | None,
+    p95_duration_ms: int | None,
+    p99_duration_ms: int | None,
+    max_duration_ms: int | None,
+) -> dict[str, Any]:
+    passed = (
+        p50_duration_ms is not None
+        and p95_duration_ms is not None
+        and max_duration_ms is not None
+        and p50_duration_ms <= EXPECTED_P50_DURATION_MS
+        and p95_duration_ms <= EXPECTED_P95_DURATION_MS
+        and max_duration_ms <= EXPECTED_MAX_DURATION_MS
+    )
+    return {
+        "schema_version": "weekendpilot_release_gate_latency_slo_v1",
+        "p50_threshold_ms": EXPECTED_P50_DURATION_MS,
+        "p95_threshold_ms": EXPECTED_P95_DURATION_MS,
+        "max_threshold_ms": EXPECTED_MAX_DURATION_MS,
+        "observed_p50_ms": p50_duration_ms,
+        "observed_p95_ms": p95_duration_ms,
+        "observed_p99_ms": p99_duration_ms,
+        "observed_max_ms": max_duration_ms,
+        "status": "passed" if passed else "failed",
+    }
+
+
+def _build_slow_case_ranking(case_results: Any) -> tuple[list[dict[str, Any]], list[str]]:
+    failures: list[str] = []
+    ranked: list[dict[str, Any]] = []
+
+    for case_result in list(case_results or []):
+        case_id = str(_value_for(case_result, "case_id") or "")
+        workflow_status = _value_for(case_result, "workflow_status")
+        workflow_timing_summary = _value_for(case_result, "workflow_timing_summary")
+        total_duration_ms = _coerce_optional_int(_value_for(workflow_timing_summary, "total_duration_ms"))
+        if total_duration_ms is None:
+            failures.append(
+                f"Missing workflow_timing_summary.total_duration_ms for case_id={case_id!r}."
+            )
+            continue
+        ranked.append(
+            {
+                "case_id": case_id,
+                "workflow_status": workflow_status,
+                "total_duration_ms": total_duration_ms,
+                "report_path": _value_for(case_result, "report_path"),
+            }
+        )
+
+    ordered = sorted(
+        ranked,
+        key=lambda entry: (-int(entry["total_duration_ms"]), str(entry["case_id"])),
+    )
+    return (
+        [
+            {
+                "rank": index,
+                **entry,
+            }
+            for index, entry in enumerate(ordered, start=1)
+        ],
+        failures,
+    )
+
+
+def _build_slow_stage_ranking(stages: Any) -> list[dict[str, Any]]:
+    serialized = [_stage_to_dict(stage) for stage in list(stages or [])]
+    ordered = sorted(
+        serialized,
+        key=lambda entry: (
+            -_sort_number(entry.get("p95_ms")),
+            -_sort_number(entry.get("max_ms")),
+            -_sort_float(entry.get("mean_ms")),
+            str(entry.get("node_name") or ""),
+        ),
+    )
+    return [
+        {
+            "rank": index,
+            **entry,
+        }
+        for index, entry in enumerate(ordered, start=1)
+    ]
+
+
+def _extract_focus_stages(
+    slow_stages: list[dict[str, Any]],
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    failures: list[str] = []
+    stage_map = {str(stage["node_name"]): stage for stage in slow_stages}
+    focus_stages: dict[str, dict[str, Any]] = {}
+    for node_name in FOCUS_STAGE_NODE_NAMES:
+        stage = stage_map.get(node_name)
+        if stage is None:
+            failures.append(f"Missing focus stage {node_name!r} in benchmark_timing_summary.stages.")
+            continue
+        focus_stages[node_name] = {key: value for key, value in stage.items() if key != "rank"}
+    return focus_stages, failures
+
+
+def _stage_to_dict(stage: Any) -> dict[str, Any]:
+    return {
+        "node_name": _value_for(stage, "node_name"),
+        "sample_count": _coerce_optional_int(_value_for(stage, "sample_count")),
+        "retry_case_count": _coerce_optional_int(_value_for(stage, "retry_case_count")),
+        "min_ms": _coerce_optional_int(_value_for(stage, "min_ms")),
+        "p50_ms": _coerce_optional_int(_value_for(stage, "p50_ms")),
+        "p95_ms": _coerce_optional_int(_value_for(stage, "p95_ms")),
+        "p99_ms": _coerce_optional_int(_value_for(stage, "p99_ms")),
+        "max_ms": _coerce_optional_int(_value_for(stage, "max_ms")),
+        "mean_ms": _coerce_optional_float(_value_for(stage, "mean_ms")),
+    }
+
+
+def _build_release_gate_evaluation(
+    *,
+    suite_id: str | None,
+    release_blocked: bool,
+    blocking_failures: list[str],
+    latency_slo: dict[str, Any],
+    slow_cases: list[dict[str, Any]],
+    slow_stages: list[dict[str, Any]],
+    focus_stages: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "schema_version": "weekendpilot_release_gate_evaluation_v1",
+        "gate_id": RELEASE_GATE_SUITE_ID,
+        "suite_id": suite_id,
+        "release_blocked": release_blocked,
+        "blocking_failures": list(blocking_failures),
+        "latency_slo": latency_slo,
+        "slow_cases": slow_cases,
+        "slow_stages": slow_stages,
+        "focus_stages": focus_stages,
+    }
+
+
+def _write_release_gate_evaluation(suite_report_path: Path, evaluation: dict[str, Any]) -> str | None:
+    temp_path = suite_report_path.with_name(f"{suite_report_path.name}.tmp")
+    try:
+        payload = json.loads(suite_report_path.read_text(encoding="utf-8"))
+        payload["release_gate_evaluation"] = evaluation
+        suite_report_path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        temp_path.replace(suite_report_path)
+        return None
+    except (OSError, json.JSONDecodeError):
+        return f"Could not enrich release gate report: {suite_report_path}"
+    finally:
+        if temp_path.exists():
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass
+
+
+def _format_success_summary(result: BenchmarkReleaseGateResult) -> str:
+    return "\n".join(_build_summary_lines(result, heading="Benchmark release gate passed."))
+
+
 def _format_failure_summary(result: BenchmarkReleaseGateResult) -> str:
+    lines = _build_summary_lines(result, heading="Benchmark release gate failed.")
+    lines.append("Blocking failures:")
+    lines.extend(f"- {failure}" for failure in result.blocking_failures)
+    return "\n".join(lines)
+
+
+def _build_summary_lines(result: BenchmarkReleaseGateResult, *, heading: str) -> list[str]:
     lines = [
-        "Benchmark release gate failed.",
+        heading,
         f"Gate: {result.gate_id}",
         f"Suite: {result.suite_id}",
         (
@@ -359,21 +636,88 @@ def _format_failure_summary(result: BenchmarkReleaseGateResult) -> str:
             "Timing: "
             f"p50={_format_duration(result.p50_duration_ms)}, "
             f"p95={_format_duration(result.p95_duration_ms)}, "
-            f"p99={_format_duration(result.p99_duration_ms)}"
+            f"p99={_format_duration(result.p99_duration_ms)}, "
+            f"max={_format_duration(result.max_duration_ms)}"
         ),
-        f"Run directory: {result.run_directory}",
-        f"Suite report: {result.suite_report_path}",
-        f"Latest report: {result.latest_report_path}",
-        "Blocking failures:",
+        _format_latency_slo_line(result.latency_slo),
     ]
-    lines.extend(f"- {failure}" for failure in result.blocking_failures)
-    return "\n".join(lines)
+    lines.extend(_format_focus_stage_lines(result.focus_stages))
+    lines.extend(_format_slow_case_lines(result.slow_cases))
+    lines.extend(_format_slow_stage_lines(result.slow_stages))
+    lines.extend(
+        [
+            f"Run directory: {result.run_directory}",
+            f"Suite report: {result.suite_report_path}",
+            f"Latest report: {result.latest_report_path}",
+        ]
+    )
+    return lines
+
+
+def _format_latency_slo_line(latency_slo: dict[str, Any]) -> str:
+    return (
+        "Latency SLO: "
+        f"p50<={latency_slo.get('p50_threshold_ms', EXPECTED_P50_DURATION_MS)}ms, "
+        f"p95<={latency_slo.get('p95_threshold_ms', EXPECTED_P95_DURATION_MS)}ms, "
+        f"max<={latency_slo.get('max_threshold_ms', EXPECTED_MAX_DURATION_MS)}ms "
+        f"({latency_slo.get('status', 'failed')})"
+    )
+
+
+def _format_focus_stage_lines(focus_stages: dict[str, dict[str, Any]]) -> list[str]:
+    lines = ["Focus stages:"]
+    for node_name in FOCUS_STAGE_NODE_NAMES:
+        stage = focus_stages.get(node_name)
+        if stage is None:
+            lines.append(f"- {node_name}: missing")
+            continue
+        lines.append(
+            f"- {node_name}: mean={_format_duration_float(stage.get('mean_ms'))}, "
+            f"p95={_format_duration(stage.get('p95_ms'))}, "
+            f"max={_format_duration(stage.get('max_ms'))}"
+        )
+    return lines
+
+
+def _format_slow_case_lines(slow_cases: list[dict[str, Any]]) -> list[str]:
+    lines = ["Slow cases:"]
+    if not slow_cases:
+        lines.append("- n/a")
+        return lines
+    for entry in slow_cases[:3]:
+        lines.append(
+            f"- #{entry['rank']} {entry['case_id']} "
+            f"({entry.get('workflow_status') or 'unknown'}): "
+            f"{_format_duration(entry.get('total_duration_ms'))}"
+        )
+    return lines
+
+
+def _format_slow_stage_lines(slow_stages: list[dict[str, Any]]) -> list[str]:
+    lines = ["Slow stages:"]
+    if not slow_stages:
+        lines.append("- n/a")
+        return lines
+    for entry in slow_stages[:5]:
+        lines.append(
+            f"- #{entry['rank']} {entry.get('node_name')}: "
+            f"p95={_format_duration(entry.get('p95_ms'))}, "
+            f"max={_format_duration(entry.get('max_ms'))}, "
+            f"mean={_format_duration_float(entry.get('mean_ms'))}"
+        )
+    return lines
 
 
 def _format_duration(value: int | None) -> str:
     if value is None:
         return "n/a"
     return f"{value}ms"
+
+
+def _format_duration_float(value: Any) -> str:
+    if value is None:
+        return "n/a"
+    return f"{float(value):.2f}ms"
 
 
 def _coerce_count_map(value: Any) -> dict[str, int]:
@@ -401,6 +745,32 @@ def _coerce_optional_int(value: Any) -> int | None:
     if value is None:
         return None
     return int(value)
+
+
+def _coerce_optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    return float(value)
+
+
+def _sort_number(value: Any) -> int:
+    if value is None:
+        return -1
+    return int(value)
+
+
+def _sort_float(value: Any) -> float:
+    if value is None:
+        return -1.0
+    return float(value)
+
+
+def _value_for(value: Any, key: str) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        return value.get(key)
+    return getattr(value, key, None)
 
 
 def _close_quietly(resource: Any) -> None:
