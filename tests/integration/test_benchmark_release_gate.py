@@ -49,6 +49,12 @@ def test_benchmark_release_gate_runs_release_gate_v1_and_refreshes_latest_alias(
         assert result.p50_duration_ms is not None
         assert result.p95_duration_ms is not None
         assert result.p99_duration_ms is not None
+        assert result.max_duration_ms is not None
+        assert result.latency_slo["status"] == "passed"
+        assert len(result.slow_cases) == 15
+        assert result.slow_stages
+        assert "pre_flight_check_availability" in result.focus_stages
+        assert "logical_planner_agent" in result.focus_stages
 
         case_report_paths = [path for path in result.run_directory.glob("*.json") if path.is_file()]
         assert len(case_report_paths) >= 16
@@ -74,6 +80,23 @@ def test_benchmark_release_gate_runs_release_gate_v1_and_refreshes_latest_alias(
         assert latest_payload["report_path"] == str(result.suite_report_path)
         assert latest_payload["benchmark_summary"]["suite_id"] == "release_gate_v1"
         assert latest_payload["benchmark_summary"]["case_count"] == 15
+        assert suite_payload["release_gate_evaluation"]["latency_slo"]["p50_threshold_ms"] == 2000
+        assert suite_payload["release_gate_evaluation"]["latency_slo"]["p95_threshold_ms"] == 5000
+        assert suite_payload["release_gate_evaluation"]["latency_slo"]["max_threshold_ms"] == 8000
+        assert suite_payload["release_gate_evaluation"]["latency_slo"]["observed_max_ms"] == result.max_duration_ms
+        assert latest_payload["release_gate_evaluation"] == suite_payload["release_gate_evaluation"]
+        assert len(suite_payload["release_gate_evaluation"]["slow_cases"]) == 15
+        assert suite_payload["release_gate_evaluation"]["focus_stages"]["pre_flight_check_availability"]["node_name"] == (
+            "pre_flight_check_availability"
+        )
+        assert suite_payload["release_gate_evaluation"]["focus_stages"]["logical_planner_agent"]["node_name"] == (
+            "logical_planner_agent"
+        )
+        slow_cases = suite_payload["release_gate_evaluation"]["slow_cases"]
+        assert slow_cases == sorted(
+            slow_cases,
+            key=lambda entry: (-entry["total_duration_ms"], entry["case_id"]),
+        )
         assert all(
             str(result.run_directory) in case_result["report_path"]
             for case_result in latest_payload["case_results"]

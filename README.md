@@ -207,8 +207,22 @@ The gate passes only when all of the following stay true:
 - `matrix_summary.level_counts == {"L1": 3, "L2": 8, "L3": 4}`
 - `matrix_summary.tool_profile_counts == {"mock_world": 15}`
 - `matrix_summary.failure_mode_counts == {"none": 14, "route_unavailable": 1}`
+- `benchmark_timing_summary.overall_total_duration_ms.p50_ms <= 2000`
+- `benchmark_timing_summary.overall_total_duration_ms.p95_ms <= 5000`
+- `benchmark_timing_summary.overall_total_duration_ms.max_ms <= 8000`
+- every `release_gate_v1` case report includes `workflow_timing_summary.total_duration_ms`
+- `benchmark_timing_summary.stages` includes both `pre_flight_check_availability` and `logical_planner_agent`
 
 Any drift from those rules blocks release. Failed runs keep their unique `var/formal-benchmarks/release-gate-v1-<unique-id>/` directory for debugging, and a blocked run must not overwrite `latest-release_gate_v1-run-report.json`.
+
+Each unique `suite-release_gate_v1-run-report.json` is now enriched with an additive top-level `release_gate_evaluation` block. That block preserves:
+
+- the blocking latency SLO evaluation (`p50`, `p95`, `p99`, `max`)
+- a full `slow_cases` ranking across all 15 release-gate cases
+- a full `slow_stages` ranking across the suite timing summary
+- exact `focus_stages` diagnostics for `pre_flight_check_availability` and `logical_planner_agent`
+
+The latest alias is refreshed only after a fully passing gate, so `var/formal-benchmarks/latest-release_gate_v1-run-report.json` always matches the latest passing release evidence, including the same `release_gate_evaluation` payload.
 
 Release checklist:
 
