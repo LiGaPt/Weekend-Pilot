@@ -48,6 +48,7 @@ from backend.app.benchmark.schemas import (
 )
 from backend.app.benchmark.matrix import build_case_matrix_summary
 from backend.app.benchmark.timing import summarize_benchmark_timing
+from backend.app.core.config import Settings
 from backend.app.workflow.timing import WorkflowStageTimingEntry, WorkflowTimingSummary
 from backend.app.workflow.state import V1_WORKFLOW_NODE_NAMES
 
@@ -2039,6 +2040,143 @@ def test_harness_uses_continuation_path_when_case_has_continuations(
 
     assert result.status == "passed"
     assert calls == []
+
+
+def test_legacy_case_passes_explicit_workflow_settings_into_workflow_dependencies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_dir = _unit_report_dir()
+    workflow_settings = Settings(_env_file=None, app_name="benchmark-explicit-settings", llm_enabled=True)
+    workflow_llm_client = object()
+    harness = BenchmarkHarness(
+        session=None,
+        cache=None,
+        rate_limiter=None,
+        report_dir=report_dir,
+        workflow_settings=workflow_settings,
+        workflow_llm_client=workflow_llm_client,
+    )
+    captured: dict[str, object] = {}
+
+    class FakeWorkflowDependencies:
+        def __init__(self, **kwargs) -> None:
+            captured["settings"] = kwargs.get("settings")
+            captured["llm_client"] = kwargs.get("llm_client")
+
+    class FakeWorkflowRunner:
+        def __init__(self, dependencies) -> None:
+            captured["dependencies"] = dependencies
+
+        def run(self, request):
+            captured["request"] = request
+            return SimpleNamespace(
+                run_id=None,
+                trace_id=None,
+                status="error",
+                error_json={"message": "expected"},
+                tool_event_count=0,
+                action_count=0,
+                feedback_status=None,
+                observability_status=None,
+                workflow_timing_summary=None,
+                node_history=[],
+                agent_results=[],
+            )
+
+    monkeypatch.setattr(benchmark_harness, "_Repositories", lambda session: SimpleNamespace())
+    monkeypatch.setattr(
+        harness,
+        "_prepare_case_user",
+        lambda benchmark_case, repositories: ("benchmark-user", SimpleNamespace(display_name="Benchmark User")),
+    )
+    monkeypatch.setattr(harness, "_finalize_case_result", lambda result, repositories=None: result)
+    monkeypatch.setattr(benchmark_harness, "WeekendPilotWorkflowDependencies", FakeWorkflowDependencies)
+    monkeypatch.setattr(benchmark_harness, "WeekendPilotWorkflowRunner", FakeWorkflowRunner)
+
+    try:
+        result = harness._run_legacy_case(_benchmark_case())
+
+        assert captured["settings"] is workflow_settings
+        assert captured["llm_client"] is workflow_llm_client
+        assert result.status == "error"
+    finally:
+        _cleanup_report_dir(report_dir)
+
+
+def test_continuation_case_passes_explicit_workflow_settings_into_demo_workflow_service(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_dir = _unit_report_dir()
+    workflow_settings = Settings(_env_file=None, app_name="benchmark-explicit-settings", llm_enabled=True)
+    workflow_llm_client = object()
+    harness = BenchmarkHarness(
+        session=None,
+        cache=None,
+        rate_limiter=None,
+        report_dir=report_dir,
+        workflow_settings=workflow_settings,
+        workflow_llm_client=workflow_llm_client,
+    )
+    case = BenchmarkCase(
+        case_id="continuation_case",
+        title="Continuation case",
+        user_input="Plan something nearby.",
+        continuations=[
+            BenchmarkContinuationRequest(
+                mode="clarify",
+                user_input="This afternoon I want a nearby solo outing for a few hours.",
+            )
+        ],
+        taxonomy=_taxonomy_payload(
+            scenario_bucket="solo",
+            level="L3",
+            tags=["clarification_turn", "conversation_continuation"],
+        ),
+        expected=BenchmarkExpectedOutcome(
+            required_tool_names=["search_poi"],
+            min_tool_event_count=1,
+            min_action_count=1,
+        ),
+    )
+    captured: dict[str, object] = {}
+
+    class FakeDemoWorkflowService:
+        def __init__(
+            self,
+            session,
+            cache,
+            rate_limiter,
+            trace_buffer_path,
+            workflow_settings=None,
+            workflow_llm_client=None,
+        ) -> None:
+            captured["workflow_settings"] = workflow_settings
+            captured["workflow_llm_client"] = workflow_llm_client
+            captured["trace_buffer_path"] = trace_buffer_path
+
+        def start_run(self, request, *, override=None):
+            captured["request"] = request
+            captured["override"] = override
+            raise benchmark_harness.DemoServiceError(409, "stop after capture")
+
+    monkeypatch.setattr(benchmark_harness, "_Repositories", lambda session: SimpleNamespace())
+    monkeypatch.setattr(
+        harness,
+        "_prepare_case_user",
+        lambda benchmark_case, repositories: ("benchmark-user", SimpleNamespace(display_name="Benchmark User")),
+    )
+    monkeypatch.setattr(harness, "_finalize_case_result", lambda result, repositories=None: result)
+    monkeypatch.setattr(benchmark_harness, "DemoWorkflowService", FakeDemoWorkflowService)
+
+    try:
+        result = harness._run_continuation_case(case)
+
+        assert captured["workflow_settings"] is workflow_settings
+        assert captured["workflow_llm_client"] is workflow_llm_client
+        assert result.status == "error"
+        assert result.failure_reasons == ["stop after capture"]
+    finally:
+        _cleanup_report_dir(report_dir)
 
 
 def test_harness_uses_legacy_path_when_case_has_no_continuations(

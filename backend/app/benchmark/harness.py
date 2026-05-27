@@ -46,6 +46,7 @@ from backend.app.demo.schemas import (
     DemoReplanRunRequest,
     DemoStartRunRequest,
 )
+from backend.app.core.config import Settings
 from backend.app.demo.service import DemoServiceError, DemoStartRunOverride, DemoWorkflowService
 from backend.app.benchmark.suites import (
     canonical_benchmark_suite_id,
@@ -84,12 +85,16 @@ class BenchmarkHarness:
         rate_limiter: FixedWindowRateLimiter,
         report_dir: Path | str = "var/benchmarks",
         trace_buffer_path: Path | str | None = None,
+        workflow_settings: Settings | None = None,
+        workflow_llm_client: Any | None = None,
     ) -> None:
         self.session = session
         self.cache = cache
         self.rate_limiter = rate_limiter
         self.report_dir = Path(report_dir)
         self.trace_buffer_path = Path(trace_buffer_path) if trace_buffer_path is not None else None
+        self.workflow_settings = workflow_settings
+        self.workflow_llm_client = workflow_llm_client
 
     def run_case(self, case: BenchmarkCase) -> BenchmarkCaseResult:
         try:
@@ -213,6 +218,8 @@ class BenchmarkHarness:
                 rate_limiter=_BenchmarkCaseRateLimiter(self.rate_limiter, external_user_id),
                 failure_injector=failure_injector,
                 trace_buffer_path=self._trace_path(case.case_id),
+                settings=self.workflow_settings,
+                llm_client=self.workflow_llm_client,
             )
         ).run(
             WeekendPilotWorkflowRequest(
@@ -382,6 +389,8 @@ class BenchmarkHarness:
             cache=self.cache,
             rate_limiter=_BenchmarkCaseRateLimiter(self.rate_limiter, external_user_id),
             trace_buffer_path=self._trace_path(case.case_id),
+            workflow_settings=self.workflow_settings,
+            workflow_llm_client=self.workflow_llm_client,
         )
         conversation_trace: list[BenchmarkConversationTraceStep] = []
         conversation_run_ids: list[UUID] = []

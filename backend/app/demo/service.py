@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.app.confirmation import HumanConfirmationService, PlanConfirmationError
+from backend.app.core.config import Settings
 from backend.app.demo.replan import build_follow_up_intent
 from backend.app.demo.world_profile import resolve_mock_world_demo_profile
 from backend.app.execution import DeterministicExecutionWorkflow, ExecutionWorkflowError
@@ -114,11 +115,15 @@ class DemoWorkflowService:
         cache: JsonRedisCache,
         rate_limiter: FixedWindowRateLimiter,
         trace_buffer_path: str | Path | None,
+        workflow_settings: Settings | None = None,
+        workflow_llm_client: Any | None = None,
     ) -> None:
         self.session = session
         self.cache = cache
         self.rate_limiter = rate_limiter
         self.trace_buffer_path = trace_buffer_path
+        self.workflow_settings = workflow_settings
+        self.workflow_llm_client = workflow_llm_client
 
     def start_run(
         self,
@@ -141,6 +146,8 @@ class DemoWorkflowService:
                 cache=self.cache,
                 rate_limiter=self._rate_limiter_for_external_user(request.external_user_id),
                 trace_buffer_path=self.trace_buffer_path,
+                settings=self.workflow_settings,
+                llm_client=self.workflow_llm_client,
             )
         )
         result = runner.run(
@@ -204,6 +211,8 @@ class DemoWorkflowService:
                 cache=self.cache,
                 rate_limiter=self._rate_limiter_for_external_user(user.external_id),
                 trace_buffer_path=self.trace_buffer_path,
+                settings=self.workflow_settings,
+                llm_client=self.workflow_llm_client,
             )
         )
         result = runner.run(
@@ -291,6 +300,8 @@ class DemoWorkflowService:
                 cache=self.cache,
                 rate_limiter=self._rate_limiter_for_external_user(user.external_id),
                 trace_buffer_path=self.trace_buffer_path,
+                settings=self.workflow_settings,
+                llm_client=self.workflow_llm_client,
             )
         )
         result = runner.run(
