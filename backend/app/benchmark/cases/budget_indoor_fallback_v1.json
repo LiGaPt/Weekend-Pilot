@@ -1,0 +1,64 @@
+{
+  "case_id": "budget_indoor_fallback_v1",
+  "title": "Budget indoor fallback after unavailable top activity",
+  "user_input": "This afternoon I want a nearby indoor solo activity for a few hours and a quick low-cost meal after that.",
+  "agent_version": "agent-v1",
+  "prompt_version": "prompt-v1",
+  "tool_profile": "mock_world",
+  "world_profile": "budget_lite",
+  "failure_profile": null,
+  "memory_items": [],
+  "expected": {
+    "required_tool_names": [
+      "search_poi",
+      "check_weather",
+      "get_poi_detail",
+      "check_opening_hours",
+      "check_queue",
+      "check_table_availability",
+      "check_ticket_availability",
+      "check_route"
+    ],
+    "min_tool_event_count": 8,
+    "min_action_count": 1,
+    "expected_workflow_status": "completed",
+    "expected_execution_status": "succeeded",
+    "expected_feedback_status": "completed",
+    "robustness": {
+      "expected_selected_activity_id": "activity_gallery_501",
+      "expected_selected_dining_id": "restaurant_bento_501",
+      "minimum_activity_search_results": 3,
+      "minimum_dining_search_results": 4,
+      "expected_activity_search_prefix": [
+        "activity_workshop_501",
+        "activity_designmall_501",
+        "activity_gallery_501"
+      ],
+      "expected_dining_search_prefix": [
+        "restaurant_bento_501",
+        "restaurant_cafe_501",
+        "restaurant_bistro_501"
+      ],
+      "required_unavailable_candidate_ids": [
+        "activity_workshop_501",
+        "restaurant_cafe_501"
+      ],
+      "minimum_failed_route_pairs": 1
+    }
+  },
+  "taxonomy": {
+    "suite": "locallife_bench_v1",
+    "scenario_bucket": "unknown",
+    "level": "L2",
+    "tags": [
+      "budget_limited",
+      "indoor_activity",
+      "robustness_case",
+      "fallback_selection"
+    ],
+    "failure_mode": null
+  },
+  "metadata": {
+    "focus": "budget_robustness_fallback_selection"
+  }
+}

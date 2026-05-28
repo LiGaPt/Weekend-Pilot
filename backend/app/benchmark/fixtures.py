@@ -28,6 +28,10 @@ _REGISTERED_CASE_IDS = (
     "family_memory_expired_advisory_v1",
     "solo_clarification_continuation_v1",
     "family_replan_version_continuation_v1",
+    "family_distractor_selection_v1",
+    "friends_distractor_selection_v1",
+    "rainy_day_stable_sorting_v1",
+    "budget_indoor_fallback_v1",
 )
 
 

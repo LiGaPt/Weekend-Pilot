@@ -35,6 +35,12 @@ _CONVERSATION_CONTINUATION_CASE_IDS = [
     "solo_clarification_continuation_v1",
     "family_replan_version_continuation_v1",
 ]
+_ROBUSTNESS_FOCUSED_CASE_IDS = [
+    "family_distractor_selection_v1",
+    "friends_distractor_selection_v1",
+    "rainy_day_stable_sorting_v1",
+    "budget_indoor_fallback_v1",
+]
 _DEFAULT_CASE_IDS = [*_BASELINE_CASE_IDS, *_EXPANDED_CASE_IDS]
 _RELEASE_GATE_V1_CASE_IDS = [
     *_DEFAULT_CASE_IDS,
@@ -48,6 +54,7 @@ _ALL_REGISTERED_CASE_IDS = [
     *_RECOVERY_FOCUSED_CASE_IDS,
     *_MEMORY_GOVERNANCE_CASE_IDS[1:],
     *_CONVERSATION_CONTINUATION_CASE_IDS,
+    *_ROBUSTNESS_FOCUSED_CASE_IDS,
 ]
 _ORDERED_SUITE_IDS: tuple[BenchmarkSuiteId, ...] = (
     "baseline",
@@ -55,6 +62,7 @@ _ORDERED_SUITE_IDS: tuple[BenchmarkSuiteId, ...] = (
     "recovery_focused",
     "memory_governance",
     "conversation_continuations",
+    "robustness_focused",
     "default",
     "release_gate_v1",
     "all_registered",
@@ -87,6 +95,11 @@ _SUITE_DEFINITIONS: dict[BenchmarkSuiteId, dict[str, Any]] = {
         "title": "Conversation continuations benchmark suite",
         "description": "Mock World continuation cases that validate clarification and follow-up replan chains.",
         "case_ids": _CONVERSATION_CONTINUATION_CASE_IDS,
+    },
+    "robustness_focused": {
+        "title": "Robustness focused benchmark suite",
+        "description": "Focused Mock World cases that prove noisy candidate selection, fallback behavior, and stable search ordering.",
+        "case_ids": _ROBUSTNESS_FOCUSED_CASE_IDS,
     },
     "default": {
         "title": "Default benchmark suite",

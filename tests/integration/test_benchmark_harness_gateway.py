@@ -57,6 +57,86 @@ CONVERSATION_CONTINUATION_CASE_IDS = {
     "family_replan_version_continuation_v1",
 }
 CONVERSATION_CONTINUATION_TOOL_PROFILE_COUNTS = {"mock_world": 2}
+ROBUSTNESS_CASE_IDS = {
+    "family_distractor_selection_v1",
+    "friends_distractor_selection_v1",
+    "rainy_day_stable_sorting_v1",
+    "budget_indoor_fallback_v1",
+}
+ROBUSTNESS_EXPECTATIONS_BY_CASE = {
+    "family_distractor_selection_v1": {
+        "selected_activity_id": "activity_museum_001",
+        "selected_dining_id": "restaurant_light_001",
+        "activity_prefix": [
+            "activity_museum_001",
+            "activity_story_atelier_001",
+            "activity_riverside_reading_001",
+        ],
+        "dining_prefix": [
+            "restaurant_light_001",
+            "restaurant_picnic_001",
+            "restaurant_garden_001",
+        ],
+        "unavailable_candidate_ids": [
+            "activity_story_atelier_001",
+            "restaurant_picnic_001",
+        ],
+    },
+    "friends_distractor_selection_v1": {
+        "selected_activity_id": "activity_lawn_301",
+        "selected_dining_id": "restaurant_yard_301",
+        "activity_prefix": [
+            "activity_lawn_301",
+            "activity_arcade_301",
+            "activity_promenade_301",
+        ],
+        "dining_prefix": [
+            "restaurant_yard_301",
+            "restaurant_patio_301",
+            "restaurant_bistro_301",
+        ],
+        "unavailable_candidate_ids": [
+            "activity_arcade_301",
+            "restaurant_patio_301",
+        ],
+    },
+    "rainy_day_stable_sorting_v1": {
+        "selected_activity_id": "activity_market_401",
+        "selected_dining_id": "restaurant_soup_401",
+        "activity_prefix": [
+            "activity_market_401",
+            "activity_arcade_401",
+            "activity_gardenhall_401",
+        ],
+        "dining_prefix": [
+            "restaurant_soup_401",
+            "restaurant_hotpot_401",
+            "restaurant_cafe_401",
+        ],
+        "unavailable_candidate_ids": [
+            "activity_arcade_401",
+            "restaurant_hotpot_401",
+        ],
+    },
+    "budget_indoor_fallback_v1": {
+        "selected_activity_id": "activity_gallery_501",
+        "selected_dining_id": "restaurant_bento_501",
+        "activity_prefix": [
+            "activity_workshop_501",
+            "activity_designmall_501",
+            "activity_gallery_501",
+        ],
+        "dining_prefix": [
+            "restaurant_bento_501",
+            "restaurant_cafe_501",
+            "restaurant_bistro_501",
+        ],
+        "unavailable_candidate_ids": [
+            "activity_workshop_501",
+            "restaurant_cafe_501",
+        ],
+    },
+}
 DEFAULT_CASE_IDS = {
     "family_afternoon_v1",
     "family_indoor_light_meal_v1",
@@ -136,6 +216,23 @@ CONVERSATION_CONTINUATION_CONSTRAINT_TAG_COUNTS = {
     "light_meal": 2,
     "plan_versioning": 1,
     "replan_turn": 1,
+}
+ROBUSTNESS_SCENARIO_BUCKET_COUNTS = {"family": 1, "friends": 1, "mixed": 1, "unknown": 1}
+ROBUSTNESS_FAILURE_MODE_COUNTS = {"none": 4}
+ROBUSTNESS_TOOL_PROFILE_COUNTS = {"mock_world": 4}
+ROBUSTNESS_CONSTRAINT_TAG_COUNTS = {
+    "budget_limited": 1,
+    "casual_dining": 1,
+    "child_friendly": 1,
+    "distractor_selection": 2,
+    "fallback_selection": 1,
+    "friends_group": 1,
+    "indoor_activity": 2,
+    "light_meal": 1,
+    "outdoor_activity": 1,
+    "rainy_day": 1,
+    "robustness_case": 4,
+    "stable_sorting": 1,
 }
 BASELINE_SCENARIO_BUCKET_COUNTS = {"family": 5, "solo": 1}
 BASELINE_FAILURE_MODE_COUNTS = {"none": 6}
@@ -284,24 +381,24 @@ DEFAULT_CONSTRAINT_TAG_COUNTS = {
 }
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
-    "family": 10,
-    "friends": 1,
-    "mixed": 2,
+    "family": 11,
+    "friends": 2,
+    "mixed": 3,
     "solo": 2,
-    "unknown": 1,
+    "unknown": 2,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L3": 4, "L5": 2}
-ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 17}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 12, "L3": 4, "L5": 2}
+ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 21}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
-    "budget_lite": 1,
+    "budget_lite": 2,
     "couple_afternoon": 1,
-    "family_afternoon": 10,
-    "friends_gathering": 1,
-    "rainy_day_fallback": 2,
+    "family_afternoon": 11,
+    "friends_gathering": 2,
+    "rainy_day_fallback": 3,
     "solo_afternoon": 2,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
-    "none": 14,
+    "none": 18,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
@@ -310,63 +407,71 @@ ALL_REGISTERED_TAG_COUNTS = {
     "addon_optional": 1,
     "bad_weather": 1,
     "baseline": 2,
-    "budget_limited": 1,
-    "casual_dining": 1,
-    "child_friendly": 10,
+    "budget_limited": 2,
+    "casual_dining": 2,
+    "child_friendly": 11,
     "citywalk": 2,
     "clarification_turn": 1,
     "composite_failure": 2,
     "conversation_continuation": 2,
     "date_friendly": 1,
+    "distractor_selection": 2,
     "dining_unavailable": 1,
     "failure_injected": 3,
     "fallback": 1,
+    "fallback_selection": 1,
     "free_activity": 1,
-    "friends_group": 1,
-    "indoor_activity": 4,
+    "friends_group": 2,
+    "indoor_activity": 6,
     "light_activity": 2,
-    "light_meal": 9,
+    "light_meal": 10,
     "memory_advisory": 1,
     "memory_expired": 1,
     "memory_governance": 2,
     "memory_override": 1,
-    "outdoor_activity": 2,
+    "outdoor_activity": 3,
     "plan_versioning": 1,
     "quick_dinner": 1,
     "quick_meal": 1,
-    "rainy_day": 2,
+    "rainy_day": 3,
     "replan_turn": 1,
+    "robustness_case": 4,
     "route_failure": 2,
+    "stable_sorting": 1,
     "ticket_sold_out": 1,
 }
 ALL_REGISTERED_CONSTRAINT_TAG_COUNTS = {
     "addon_optional": 1,
     "bad_weather": 1,
-    "budget_limited": 1,
-    "casual_dining": 1,
-    "child_friendly": 10,
+    "budget_limited": 2,
+    "casual_dining": 2,
+    "child_friendly": 11,
     "citywalk": 2,
     "clarification_turn": 1,
     "composite_failure": 2,
     "conversation_continuation": 2,
     "date_friendly": 1,
+    "distractor_selection": 2,
     "dining_unavailable": 1,
     "fallback": 1,
+    "fallback_selection": 1,
     "free_activity": 1,
-    "friends_group": 1,
-    "indoor_activity": 4,
+    "friends_group": 2,
+    "indoor_activity": 6,
     "light_activity": 2,
-    "light_meal": 9,
+    "light_meal": 10,
     "memory_advisory": 1,
     "memory_expired": 1,
     "memory_governance": 2,
     "memory_override": 1,
-    "outdoor_activity": 2,
+    "outdoor_activity": 3,
     "plan_versioning": 1,
     "quick_dinner": 1,
     "quick_meal": 1,
-    "rainy_day": 2,
+    "rainy_day": 3,
     "replan_turn": 1,
+    "robustness_case": 4,
+    "stable_sorting": 1,
     "ticket_sold_out": 1,
 }
 FORBIDDEN_REPORT_TEXT = ("action_id", "tool_event_id", "api_key", "token", "secret", "debug_trace")
@@ -902,6 +1007,15 @@ def test_benchmark_harness_runs_family_replan_version_continuation_case(
             CONVERSATION_CONTINUATION_CONSTRAINT_TAG_COUNTS,
         ),
         (
+            "robustness_focused",
+            ROBUSTNESS_CASE_IDS,
+            4,
+            ROBUSTNESS_TOOL_PROFILE_COUNTS,
+            ROBUSTNESS_SCENARIO_BUCKET_COUNTS,
+            ROBUSTNESS_FAILURE_MODE_COUNTS,
+            ROBUSTNESS_CONSTRAINT_TAG_COUNTS,
+        ),
+        (
             "release_gate_v1",
             RELEASE_GATE_V1_CASE_IDS,
             15,
@@ -985,6 +1099,54 @@ def test_benchmark_harness_runs_named_mock_world_suite(
     serialized_suite = json.dumps(suite_payload, sort_keys=True)
     for forbidden in FORBIDDEN_REPORT_TEXT:
         assert forbidden not in serialized_suite
+
+
+@pytest.mark.parametrize(
+    ("case_id", "expected"),
+    list(ROBUSTNESS_EXPECTATIONS_BY_CASE.items()),
+)
+def test_benchmark_harness_runs_robustness_case_with_expected_score_details(
+    case_id: str,
+    expected: dict[str, object],
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    case = load_benchmark_case(case_id)
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    result = harness.run_case(case)
+
+    assert result.status == "passed"
+    assert result.workflow_status == "completed"
+    assert result.report_path is not None
+    robustness_scores = [score for score in result.scores if score.name == "robustness"]
+    assert len(robustness_scores) == 1
+
+    robustness_score = robustness_scores[0]
+    assert robustness_score.passed is True
+    assert robustness_score.details["selected_activity_id"] == expected["selected_activity_id"]
+    assert robustness_score.details["selected_dining_id"] == expected["selected_dining_id"]
+    assert robustness_score.details["observed_activity_search_results"][:3] == expected["activity_prefix"]
+    assert robustness_score.details["observed_dining_search_results"][:3] == expected["dining_prefix"]
+    assert set(expected["unavailable_candidate_ids"]).issubset(
+        set(robustness_score.details["observed_unavailable_candidate_ids"])
+    )
+    assert robustness_score.details["failed_route_pair_count"] >= 1
+
+    report_payload = json.loads(Path(result.report_path).read_text(encoding="utf-8"))
+    serialized_report = json.dumps(report_payload, sort_keys=True)
+    assert any(score["name"] == "robustness" for score in report_payload["scores"])
+    for forbidden in FORBIDDEN_REPORT_TEXT:
+        assert forbidden not in serialized_report
 
 
 def test_benchmark_harness_runs_release_gate_v1_suite(
@@ -1199,9 +1361,9 @@ def test_benchmark_harness_runs_all_registered_suite(
 
     report = harness.run_suite("all_registered")
 
-    assert len(report.case_results) == 17
+    assert len(report.case_results) == 21
     assert report.run_status == "passed"
-    assert report.passed_count == 17
+    assert report.passed_count == 21
     assert report.failed_count == 0
     assert report.error_count == 0
     assert report.report_path is not None
