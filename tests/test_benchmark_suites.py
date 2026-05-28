@@ -38,6 +38,10 @@ REGISTERED_CASE_IDS = [
     "family_memory_expired_advisory_v1",
     "solo_clarification_continuation_v1",
     "family_replan_version_continuation_v1",
+    "family_distractor_selection_v1",
+    "friends_distractor_selection_v1",
+    "rainy_day_stable_sorting_v1",
+    "budget_indoor_fallback_v1",
 ]
 BASELINE_CASE_IDS = REGISTERED_CASE_IDS[:6]
 EXPANDED_CASE_IDS = REGISTERED_CASE_IDS[6:10]
@@ -55,6 +59,12 @@ CONVERSATION_CONTINUATION_CASE_IDS = [
     "solo_clarification_continuation_v1",
     "family_replan_version_continuation_v1",
 ]
+ROBUSTNESS_FOCUSED_CASE_IDS = [
+    "family_distractor_selection_v1",
+    "friends_distractor_selection_v1",
+    "rainy_day_stable_sorting_v1",
+    "budget_indoor_fallback_v1",
+]
 DEFAULT_CASE_IDS = BASELINE_CASE_IDS + EXPANDED_CASE_IDS
 RELEASE_GATE_V1_CASE_IDS = [
     *DEFAULT_CASE_IDS,
@@ -69,6 +79,7 @@ CANONICAL_SUITE_IDS = [
     "recovery_focused",
     "memory_governance",
     "conversation_continuations",
+    "robustness_focused",
     "default",
     "release_gate_v1",
     "all_registered",
@@ -209,6 +220,35 @@ CONVERSATION_CONTINUATION_TAG_COUNTS = {
     "plan_versioning": 1,
     "replan_turn": 1,
 }
+ROBUSTNESS_FOCUSED_SCENARIO_BUCKET_COUNTS = {
+    "family": 1,
+    "friends": 1,
+    "mixed": 1,
+    "unknown": 1,
+}
+ROBUSTNESS_FOCUSED_LEVEL_COUNTS = {"L2": 4}
+ROBUSTNESS_FOCUSED_TOOL_PROFILE_COUNTS = {"mock_world": 4}
+ROBUSTNESS_FOCUSED_WORLD_PROFILE_COUNTS = {
+    "budget_lite": 1,
+    "family_afternoon": 1,
+    "friends_gathering": 1,
+    "rainy_day_fallback": 1,
+}
+ROBUSTNESS_FOCUSED_FAILURE_MODE_COUNTS = {"none": 4}
+ROBUSTNESS_FOCUSED_TAG_COUNTS = {
+    "budget_limited": 1,
+    "casual_dining": 1,
+    "child_friendly": 1,
+    "distractor_selection": 2,
+    "fallback_selection": 1,
+    "friends_group": 1,
+    "indoor_activity": 2,
+    "light_meal": 1,
+    "outdoor_activity": 1,
+    "rainy_day": 1,
+    "robustness_case": 4,
+    "stable_sorting": 1,
+}
 RELEASE_GATE_V1_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
     "family": 9,
@@ -262,24 +302,24 @@ RELEASE_GATE_V1_TAG_COUNTS = {
 }
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
-    "family": 10,
-    "friends": 1,
-    "mixed": 2,
+    "family": 11,
+    "friends": 2,
+    "mixed": 3,
     "solo": 2,
-    "unknown": 1,
+    "unknown": 2,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L3": 4, "L5": 2}
-ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 17}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 12, "L3": 4, "L5": 2}
+ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 21}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
-    "budget_lite": 1,
+    "budget_lite": 2,
     "couple_afternoon": 1,
-    "family_afternoon": 10,
-    "friends_gathering": 1,
-    "rainy_day_fallback": 2,
+    "family_afternoon": 11,
+    "friends_gathering": 2,
+    "rainy_day_fallback": 3,
     "solo_afternoon": 2,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
-    "none": 14,
+    "none": 18,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
@@ -288,33 +328,37 @@ ALL_REGISTERED_TAG_COUNTS = {
     "addon_optional": 1,
     "bad_weather": 1,
     "baseline": 2,
-    "budget_limited": 1,
-    "casual_dining": 1,
-    "child_friendly": 10,
+    "budget_limited": 2,
+    "casual_dining": 2,
+    "child_friendly": 11,
     "citywalk": 2,
     "clarification_turn": 1,
     "composite_failure": 2,
     "conversation_continuation": 2,
     "date_friendly": 1,
+    "distractor_selection": 2,
     "dining_unavailable": 1,
     "failure_injected": 3,
     "fallback": 1,
+    "fallback_selection": 1,
     "free_activity": 1,
-    "friends_group": 1,
-    "indoor_activity": 4,
+    "friends_group": 2,
+    "indoor_activity": 6,
     "light_activity": 2,
-    "light_meal": 9,
+    "light_meal": 10,
     "memory_advisory": 1,
     "memory_expired": 1,
     "memory_governance": 2,
     "memory_override": 1,
-    "outdoor_activity": 2,
+    "outdoor_activity": 3,
     "plan_versioning": 1,
     "quick_dinner": 1,
     "quick_meal": 1,
-    "rainy_day": 2,
+    "rainy_day": 3,
     "replan_turn": 1,
+    "robustness_case": 4,
     "route_failure": 2,
+    "stable_sorting": 1,
     "ticket_sold_out": 1,
 }
 
@@ -333,6 +377,7 @@ def test_load_benchmark_suite_returns_expected_named_membership() -> None:
     assert [case.case_id for case in load_benchmark_suite("conversation_continuations")] == (
         CONVERSATION_CONTINUATION_CASE_IDS
     )
+    assert [case.case_id for case in load_benchmark_suite("robustness_focused")] == ROBUSTNESS_FOCUSED_CASE_IDS
     assert [case.case_id for case in load_benchmark_suite("default")] == DEFAULT_CASE_IDS
     assert [case.case_id for case in load_benchmark_suite("release_gate_v1")] == RELEASE_GATE_V1_CASE_IDS
     assert [case.case_id for case in load_benchmark_suite("failures")] == RECOVERY_FOCUSED_CASE_IDS
@@ -377,6 +422,22 @@ def test_list_benchmark_suite_ids_for_case_returns_expected_membership() -> None
     assert benchmark_suites.list_benchmark_suite_ids_for_case("family_replan_version_continuation_v1") == [
         "conversation_continuations",
         "release_gate_v1",
+        "all_registered",
+    ]
+    assert benchmark_suites.list_benchmark_suite_ids_for_case("family_distractor_selection_v1") == [
+        "robustness_focused",
+        "all_registered",
+    ]
+    assert benchmark_suites.list_benchmark_suite_ids_for_case("friends_distractor_selection_v1") == [
+        "robustness_focused",
+        "all_registered",
+    ]
+    assert benchmark_suites.list_benchmark_suite_ids_for_case("rainy_day_stable_sorting_v1") == [
+        "robustness_focused",
+        "all_registered",
+    ]
+    assert benchmark_suites.list_benchmark_suite_ids_for_case("budget_indoor_fallback_v1") == [
+        "robustness_focused",
         "all_registered",
     ]
     assert benchmark_suites.list_benchmark_suite_ids_for_case("family_route_and_dining_unavailable_v1") == [
@@ -463,6 +524,17 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
         tag_counts=CONVERSATION_CONTINUATION_TAG_COUNTS,
     )
     _assert_suite_description(
+        suite_map["robustness_focused"],
+        case_ids=ROBUSTNESS_FOCUSED_CASE_IDS,
+        case_count=4,
+        scenario_bucket_counts=ROBUSTNESS_FOCUSED_SCENARIO_BUCKET_COUNTS,
+        level_counts=ROBUSTNESS_FOCUSED_LEVEL_COUNTS,
+        tool_profile_counts=ROBUSTNESS_FOCUSED_TOOL_PROFILE_COUNTS,
+        world_profile_counts=ROBUSTNESS_FOCUSED_WORLD_PROFILE_COUNTS,
+        failure_mode_counts=ROBUSTNESS_FOCUSED_FAILURE_MODE_COUNTS,
+        tag_counts=ROBUSTNESS_FOCUSED_TAG_COUNTS,
+    )
+    _assert_suite_description(
         suite_map["default"],
         case_ids=DEFAULT_CASE_IDS,
         case_count=10,
@@ -487,7 +559,7 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
     _assert_suite_description(
         suite_map["all_registered"],
         case_ids=REGISTERED_CASE_IDS,
-        case_count=17,
+        case_count=21,
         scenario_bucket_counts=ALL_REGISTERED_SCENARIO_BUCKET_COUNTS,
         level_counts=ALL_REGISTERED_LEVEL_COUNTS,
         tool_profile_counts=ALL_REGISTERED_TOOL_PROFILE_COUNTS,
@@ -590,6 +662,11 @@ def test_list_benchmark_suites_rejects_duplicate_case_ids(monkeypatch: pytest.Mo
                 "description": "Continuation cases",
                 "case_ids": CONVERSATION_CONTINUATION_CASE_IDS,
             },
+            "robustness_focused": {
+                "title": "Robustness focused suite",
+                "description": "Robustness cases",
+                "case_ids": ROBUSTNESS_FOCUSED_CASE_IDS,
+            },
             "default": {
                 "title": "Default suite",
                 "description": "Default cases",
@@ -643,6 +720,11 @@ def test_list_benchmark_suites_rejects_unknown_registered_case_id(
                 "title": "Conversation continuations suite",
                 "description": "Continuation cases",
                 "case_ids": CONVERSATION_CONTINUATION_CASE_IDS,
+            },
+            "robustness_focused": {
+                "title": "Robustness focused suite",
+                "description": "Robustness cases",
+                "case_ids": ROBUSTNESS_FOCUSED_CASE_IDS,
             },
             "default": {
                 "title": "Default suite",

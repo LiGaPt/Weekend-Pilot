@@ -21,6 +21,7 @@ from backend.app.benchmark.graders import (
     grade_feedback,
     grade_memory_governance,
     grade_plan_quality,
+    grade_robustness_expectation,
     grade_recovery_expectation,
     grade_trajectory,
     grade_workflow_path,
@@ -313,6 +314,10 @@ class BenchmarkHarness:
         ]
         if case.expected.expected_workflow_status == "completed":
             scores.insert(3, grade_plan_quality(selected_plan))
+            if case.expected.robustness is not None:
+                scores.insert(4, grade_robustness_expectation(case, selected_plan, tool_events))
+        elif case.expected.robustness is not None:
+            scores.append(grade_robustness_expectation(case, selected_plan, tool_events))
         if case.expected.expected_recovery_action is not None:
             scores.append(grade_recovery_expectation(case, run_metadata))
         if case.expected.memory_governance is not None:
@@ -549,6 +554,10 @@ class BenchmarkHarness:
         ]
         if case.expected.expected_workflow_status == "completed":
             scores.insert(3, grade_plan_quality(selected_plan))
+            if case.expected.robustness is not None:
+                scores.insert(4, grade_robustness_expectation(case, selected_plan, aggregated_tool_events))
+        elif case.expected.robustness is not None:
+            scores.append(grade_robustness_expectation(case, selected_plan, aggregated_tool_events))
         if case.expected.expected_recovery_action is not None:
             scores.append(grade_recovery_expectation(case, run_metadata))
         if case.expected.memory_governance is not None:

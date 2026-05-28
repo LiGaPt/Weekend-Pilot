@@ -26,6 +26,7 @@ from backend.app.benchmark.graders import (
     grade_failure_injection,
     grade_feedback,
     grade_memory_governance,
+    grade_robustness_expectation,
     grade_recovery_expectation,
     grade_trajectory,
     grade_workflow_path,
@@ -41,6 +42,7 @@ from backend.app.benchmark.schemas import (
     BenchmarkMemoryDecisionExpectation,
     BenchmarkMemoryGovernanceExpectation,
     BenchmarkExpectedOutcome,
+    BenchmarkRobustnessExpectation,
     BenchmarkRunReport,
     BenchmarkScore,
     BenchmarkSuiteDescription,
@@ -103,6 +105,102 @@ CONTINUATION_CASE_IDS = (
     "solo_clarification_continuation_v1",
     "family_replan_version_continuation_v1",
 )
+ROBUSTNESS_CASE_IDS = (
+    "family_distractor_selection_v1",
+    "friends_distractor_selection_v1",
+    "rainy_day_stable_sorting_v1",
+    "budget_indoor_fallback_v1",
+)
+ROBUSTNESS_EXPECTATIONS_BY_CASE = {
+    "family_distractor_selection_v1": {
+        "world_profile": "family_afternoon",
+        "selected_activity_id": "activity_museum_001",
+        "selected_dining_id": "restaurant_light_001",
+        "minimum_activity_search_results": 5,
+        "minimum_dining_search_results": 5,
+        "expected_activity_search_prefix": [
+            "activity_museum_001",
+            "activity_story_atelier_001",
+            "activity_riverside_reading_001",
+        ],
+        "expected_dining_search_prefix": [
+            "restaurant_light_001",
+            "restaurant_picnic_001",
+            "restaurant_garden_001",
+        ],
+        "required_unavailable_candidate_ids": [
+            "activity_story_atelier_001",
+            "restaurant_picnic_001",
+        ],
+        "minimum_failed_route_pairs": 1,
+    },
+    "friends_distractor_selection_v1": {
+        "world_profile": "friends_gathering",
+        "selected_activity_id": "activity_lawn_301",
+        "selected_dining_id": "restaurant_yard_301",
+        "minimum_activity_search_results": 4,
+        "minimum_dining_search_results": 4,
+        "expected_activity_search_prefix": [
+            "activity_lawn_301",
+            "activity_arcade_301",
+            "activity_promenade_301",
+        ],
+        "expected_dining_search_prefix": [
+            "restaurant_yard_301",
+            "restaurant_patio_301",
+            "restaurant_bistro_301",
+        ],
+        "required_unavailable_candidate_ids": [
+            "activity_arcade_301",
+            "restaurant_patio_301",
+        ],
+        "minimum_failed_route_pairs": 1,
+    },
+    "rainy_day_stable_sorting_v1": {
+        "world_profile": "rainy_day_fallback",
+        "selected_activity_id": "activity_market_401",
+        "selected_dining_id": "restaurant_soup_401",
+        "minimum_activity_search_results": 4,
+        "minimum_dining_search_results": 4,
+        "expected_activity_search_prefix": [
+            "activity_market_401",
+            "activity_arcade_401",
+            "activity_gardenhall_401",
+        ],
+        "expected_dining_search_prefix": [
+            "restaurant_soup_401",
+            "restaurant_hotpot_401",
+            "restaurant_cafe_401",
+        ],
+        "required_unavailable_candidate_ids": [
+            "activity_arcade_401",
+            "restaurant_hotpot_401",
+        ],
+        "minimum_failed_route_pairs": 1,
+    },
+    "budget_indoor_fallback_v1": {
+        "world_profile": "budget_lite",
+        "selected_activity_id": "activity_gallery_501",
+        "selected_dining_id": "restaurant_bento_501",
+        "minimum_activity_search_results": 3,
+        "minimum_dining_search_results": 4,
+        "expected_activity_search_prefix": [
+            "activity_workshop_501",
+            "activity_designmall_501",
+            "activity_gallery_501",
+        ],
+        "expected_dining_search_prefix": [
+            "restaurant_bento_501",
+            "restaurant_cafe_501",
+            "restaurant_bistro_501",
+        ],
+        "required_unavailable_candidate_ids": [
+            "activity_workshop_501",
+            "restaurant_cafe_501",
+        ],
+        "minimum_failed_route_pairs": 1,
+    },
+}
 REQUIRED_CASE_TOOL_NAMES = {
     "search_poi",
     "check_weather",
@@ -166,26 +264,50 @@ MEMORY_GOVERNANCE_TAG_COUNTS = {
     "memory_governance": 2,
     "memory_override": 1,
 }
+ROBUSTNESS_SCENARIO_BUCKET_COUNTS = {"family": 1, "friends": 1, "mixed": 1, "unknown": 1}
+ROBUSTNESS_LEVEL_COUNTS = {"L2": 4}
+ROBUSTNESS_TOOL_PROFILE_COUNTS = {"mock_world": 4}
+ROBUSTNESS_WORLD_PROFILE_COUNTS = {
+    "budget_lite": 1,
+    "family_afternoon": 1,
+    "friends_gathering": 1,
+    "rainy_day_fallback": 1,
+}
+ROBUSTNESS_FAILURE_MODE_COUNTS = {"none": 4}
+ROBUSTNESS_TAG_COUNTS = {
+    "budget_limited": 1,
+    "casual_dining": 1,
+    "child_friendly": 1,
+    "distractor_selection": 2,
+    "fallback_selection": 1,
+    "friends_group": 1,
+    "indoor_activity": 2,
+    "light_meal": 1,
+    "outdoor_activity": 1,
+    "rainy_day": 1,
+    "robustness_case": 4,
+    "stable_sorting": 1,
+}
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
-    "family": 10,
-    "friends": 1,
-    "mixed": 2,
+    "family": 11,
+    "friends": 2,
+    "mixed": 3,
     "solo": 2,
-    "unknown": 1,
+    "unknown": 2,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 8, "L3": 4, "L5": 2}
-ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 17}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 12, "L3": 4, "L5": 2}
+ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 21}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
-    "budget_lite": 1,
+    "budget_lite": 2,
     "couple_afternoon": 1,
-    "family_afternoon": 10,
-    "friends_gathering": 1,
-    "rainy_day_fallback": 2,
+    "family_afternoon": 11,
+    "friends_gathering": 2,
+    "rainy_day_fallback": 3,
     "solo_afternoon": 2,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
-    "none": 14,
+    "none": 18,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
@@ -194,33 +316,37 @@ ALL_REGISTERED_TAG_COUNTS = {
     "addon_optional": 1,
     "bad_weather": 1,
     "baseline": 2,
-    "budget_limited": 1,
-    "casual_dining": 1,
-    "child_friendly": 10,
+    "budget_limited": 2,
+    "casual_dining": 2,
+    "child_friendly": 11,
     "citywalk": 2,
     "clarification_turn": 1,
     "composite_failure": 2,
     "conversation_continuation": 2,
     "date_friendly": 1,
+    "distractor_selection": 2,
     "dining_unavailable": 1,
     "failure_injected": 3,
     "fallback": 1,
+    "fallback_selection": 1,
     "free_activity": 1,
-    "friends_group": 1,
-    "indoor_activity": 4,
+    "friends_group": 2,
+    "indoor_activity": 6,
     "light_activity": 2,
-    "light_meal": 9,
+    "light_meal": 10,
     "memory_advisory": 1,
     "memory_expired": 1,
     "memory_governance": 2,
     "memory_override": 1,
-    "outdoor_activity": 2,
+    "outdoor_activity": 3,
     "plan_versioning": 1,
     "quick_dinner": 1,
     "quick_meal": 1,
-    "rainy_day": 2,
+    "rainy_day": 3,
     "replan_turn": 1,
+    "robustness_case": 4,
     "route_failure": 2,
+    "stable_sorting": 1,
     "ticket_sold_out": 1,
 }
 EXPECTED_TAXONOMY_BY_CASE = {
@@ -323,6 +449,26 @@ EXPECTED_TAXONOMY_BY_CASE = {
         scenario_bucket="family",
         level="L3",
         tags=["child_friendly", "conversation_continuation", "light_meal", "plan_versioning", "replan_turn"],
+    ),
+    "family_distractor_selection_v1": _taxonomy_payload(
+        scenario_bucket="family",
+        level="L2",
+        tags=["child_friendly", "light_meal", "robustness_case", "distractor_selection"],
+    ),
+    "friends_distractor_selection_v1": _taxonomy_payload(
+        scenario_bucket="friends",
+        level="L2",
+        tags=["casual_dining", "friends_group", "outdoor_activity", "robustness_case", "distractor_selection"],
+    ),
+    "rainy_day_stable_sorting_v1": _taxonomy_payload(
+        scenario_bucket="mixed",
+        level="L2",
+        tags=["rainy_day", "indoor_activity", "robustness_case", "stable_sorting"],
+    ),
+    "budget_indoor_fallback_v1": _taxonomy_payload(
+        scenario_bucket="unknown",
+        level="L2",
+        tags=["budget_limited", "indoor_activity", "robustness_case", "fallback_selection"],
     ),
 }
 
@@ -441,6 +587,29 @@ def test_continuation_fixtures_are_loadable_but_not_default() -> None:
     ]
 
 
+def test_robustness_fixtures_are_loadable_but_not_default_or_release_gate() -> None:
+    default_case_ids = {case.case_id for case in load_default_benchmark_cases()}
+    release_gate_case_ids = {case.case_id for case in load_benchmark_suite("release_gate_v1")}
+
+    for case_id, expected in ROBUSTNESS_EXPECTATIONS_BY_CASE.items():
+        case = load_benchmark_case(case_id)
+
+        assert case.case_id not in default_case_ids
+        assert case.case_id not in release_gate_case_ids
+        assert case.world_profile == expected["world_profile"]
+        assert case.expected.robustness is not None
+        assert case.expected.robustness.expected_selected_activity_id == expected["selected_activity_id"]
+        assert case.expected.robustness.expected_selected_dining_id == expected["selected_dining_id"]
+        assert case.expected.robustness.minimum_activity_search_results == expected["minimum_activity_search_results"]
+        assert case.expected.robustness.minimum_dining_search_results == expected["minimum_dining_search_results"]
+        assert case.expected.robustness.expected_activity_search_prefix == expected["expected_activity_search_prefix"]
+        assert case.expected.robustness.expected_dining_search_prefix == expected["expected_dining_search_prefix"]
+        assert case.expected.robustness.required_unavailable_candidate_ids == (
+            expected["required_unavailable_candidate_ids"]
+        )
+        assert case.expected.robustness.minimum_failed_route_pairs == expected["minimum_failed_route_pairs"]
+
+
 def test_default_fixtures_can_be_loaded_individually() -> None:
     for case_id in DEFAULT_CASE_IDS:
         case = load_benchmark_case(case_id)
@@ -450,7 +619,13 @@ def test_default_fixtures_can_be_loaded_individually() -> None:
 
 
 def test_default_and_failure_fixtures_expose_expected_taxonomy() -> None:
-    case_ids = [*DEFAULT_CASE_IDS, *FAILURE_CASE_IDS, *MEMORY_GOVERNANCE_CASE_IDS[1:], *CONTINUATION_CASE_IDS]
+    case_ids = [
+        *DEFAULT_CASE_IDS,
+        *FAILURE_CASE_IDS,
+        *MEMORY_GOVERNANCE_CASE_IDS[1:],
+        *CONTINUATION_CASE_IDS,
+        *ROBUSTNESS_CASE_IDS,
+    ]
 
     for case_id in case_ids:
         case = load_benchmark_case(case_id)
@@ -496,10 +671,22 @@ def test_memory_governance_suite_matrix_summary_counts_are_expected() -> None:
     assert summary.tag_counts == MEMORY_GOVERNANCE_TAG_COUNTS
 
 
+def test_robustness_focused_suite_matrix_summary_counts_are_expected() -> None:
+    summary = build_case_matrix_summary(load_benchmark_suite("robustness_focused"))
+
+    assert summary.case_count == 4
+    assert summary.scenario_bucket_counts == ROBUSTNESS_SCENARIO_BUCKET_COUNTS
+    assert summary.level_counts == ROBUSTNESS_LEVEL_COUNTS
+    assert summary.tool_profile_counts == ROBUSTNESS_TOOL_PROFILE_COUNTS
+    assert summary.world_profile_counts == ROBUSTNESS_WORLD_PROFILE_COUNTS
+    assert summary.failure_mode_counts == ROBUSTNESS_FAILURE_MODE_COUNTS
+    assert summary.tag_counts == ROBUSTNESS_TAG_COUNTS
+
+
 def test_all_registered_case_matrix_summary_counts_are_expected() -> None:
     summary = build_case_matrix_summary(load_benchmark_suite("all_registered"))
 
-    assert summary.case_count == 17
+    assert summary.case_count == 21
     assert summary.scenario_bucket_counts == ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
     assert summary.level_counts == ALL_REGISTERED_LEVEL_COUNTS
     assert summary.tool_profile_counts == ALL_REGISTERED_TOOL_PROFILE_COUNTS
@@ -933,6 +1120,221 @@ def test_trajectory_grader_fails_when_required_tool_is_missing() -> None:
     assert score.passed is False
     assert score.score == 0.0
     assert "check_route" in score.reason
+
+
+def test_robustness_grader_passes_when_selected_pair_and_evidence_match() -> None:
+    case = BenchmarkCase(
+        case_id="budget_indoor_fallback_v1",
+        title="Budget fallback",
+        user_input="Plan an afternoon.",
+        taxonomy=_taxonomy_payload(
+            scenario_bucket="unknown",
+            level="L2",
+            tags=["budget_limited", "indoor_activity", "robustness_case", "fallback_selection"],
+        ),
+        expected=BenchmarkExpectedOutcome(
+            required_tool_names=["search_poi"],
+            min_tool_event_count=1,
+            min_action_count=1,
+            robustness=BenchmarkRobustnessExpectation(
+                expected_selected_activity_id="activity_gallery_501",
+                expected_selected_dining_id="restaurant_bento_501",
+                minimum_activity_search_results=3,
+                minimum_dining_search_results=4,
+                expected_activity_search_prefix=[
+                    "activity_workshop_501",
+                    "activity_designmall_501",
+                    "activity_gallery_501",
+                ],
+                expected_dining_search_prefix=[
+                    "restaurant_bento_501",
+                    "restaurant_cafe_501",
+                    "restaurant_bistro_501",
+                ],
+                required_unavailable_candidate_ids=[
+                    "activity_workshop_501",
+                    "restaurant_cafe_501",
+                ],
+                minimum_failed_route_pairs=1,
+            ),
+        ),
+    )
+    selected_plan = SimpleNamespace(
+        plan_json={
+            "draft": {
+                "activity": {"candidate_id": "activity_gallery_501"},
+                "dining": {"candidate_id": "restaurant_bento_501"},
+            }
+        }
+    )
+    tool_events = [
+        SimpleNamespace(
+            tool_name="search_poi",
+            request_json={"payload": {"category": "activity"}},
+            response_json={
+                "results": [
+                    {"poi_id": "activity_workshop_501"},
+                    {"poi_id": "activity_designmall_501"},
+                    {"poi_id": "activity_gallery_501"},
+                ]
+            },
+            status="succeeded",
+        ),
+        SimpleNamespace(
+            tool_name="search_poi",
+            request_json={"payload": {"category": "dining"}},
+            response_json={
+                "results": [
+                    {"poi_id": "restaurant_bento_501"},
+                    {"poi_id": "restaurant_cafe_501"},
+                    {"poi_id": "restaurant_bistro_501"},
+                    {"poi_id": "restaurant_noodle_501"},
+                ]
+            },
+            status="succeeded",
+        ),
+        SimpleNamespace(
+            tool_name="check_ticket_availability",
+            request_json={"payload": {"poi_id": "activity_workshop_501"}},
+            response_json={"ticket_availability": {"available": False}},
+            status="succeeded",
+        ),
+        SimpleNamespace(
+            tool_name="check_table_availability",
+            request_json={"payload": {"restaurant_id": "restaurant_cafe_501"}},
+            response_json={"table_availability": {"available": False}},
+            status="succeeded",
+        ),
+        SimpleNamespace(
+            tool_name="check_route",
+            request_json={"payload": {"origin_id": "activity_workshop_501", "destination_id": "restaurant_bento_501"}},
+            response_json=None,
+            status="failed",
+        ),
+        SimpleNamespace(
+            tool_name="check_route",
+            request_json={"payload": {"origin_id": "activity_gallery_501", "destination_id": "restaurant_bento_501"}},
+            response_json={"route": {"duration_minutes": 12}},
+            status="succeeded",
+        ),
+    ]
+
+    score = grade_robustness_expectation(case, selected_plan, tool_events)
+
+    assert score.name == "robustness"
+    assert score.passed is True
+    assert score.details["selected_activity_id"] == "activity_gallery_501"
+    assert score.details["selected_dining_id"] == "restaurant_bento_501"
+    assert score.details["observed_activity_search_results"] == [
+        "activity_workshop_501",
+        "activity_designmall_501",
+        "activity_gallery_501",
+    ]
+    assert score.details["observed_dining_search_results"] == [
+        "restaurant_bento_501",
+        "restaurant_cafe_501",
+        "restaurant_bistro_501",
+        "restaurant_noodle_501",
+    ]
+    assert score.details["observed_unavailable_candidate_ids"] == [
+        "activity_workshop_501",
+        "restaurant_cafe_501",
+    ]
+    assert score.details["failed_route_pair_count"] == 1
+
+
+def test_robustness_grader_fails_when_selected_pair_does_not_match() -> None:
+    case = BenchmarkCase(
+        case_id="budget_indoor_fallback_v1",
+        title="Budget fallback",
+        user_input="Plan an afternoon.",
+        taxonomy=_taxonomy_payload(
+            scenario_bucket="unknown",
+            level="L2",
+            tags=["budget_limited", "indoor_activity", "robustness_case", "fallback_selection"],
+        ),
+        expected=BenchmarkExpectedOutcome(
+            required_tool_names=["search_poi"],
+            min_tool_event_count=1,
+            min_action_count=1,
+            robustness=BenchmarkRobustnessExpectation(
+                expected_selected_activity_id="activity_gallery_501",
+                expected_selected_dining_id="restaurant_bento_501",
+                minimum_activity_search_results=3,
+                minimum_dining_search_results=4,
+                expected_activity_search_prefix=[
+                    "activity_workshop_501",
+                    "activity_designmall_501",
+                    "activity_gallery_501",
+                ],
+                expected_dining_search_prefix=[
+                    "restaurant_bento_501",
+                    "restaurant_cafe_501",
+                    "restaurant_bistro_501",
+                ],
+                required_unavailable_candidate_ids=[
+                    "activity_workshop_501",
+                    "restaurant_cafe_501",
+                ],
+                minimum_failed_route_pairs=1,
+            ),
+        ),
+    )
+    selected_plan = SimpleNamespace(
+        plan_json={
+            "draft": {
+                "activity": {"candidate_id": "activity_gallery_501"},
+                "dining": {"candidate_id": "restaurant_cafe_501"},
+            }
+        }
+    )
+    tool_events = [
+        SimpleNamespace(
+            tool_name="search_poi",
+            request_json={"payload": {"category": "activity"}},
+            response_json={"results": [{"poi_id": "activity_workshop_501"}, {"poi_id": "activity_gallery_501"}]},
+            status="succeeded",
+        ),
+        SimpleNamespace(
+            tool_name="search_poi",
+            request_json={"payload": {"category": "dining"}},
+            response_json={
+                "results": [
+                    {"poi_id": "restaurant_bento_501"},
+                    {"poi_id": "restaurant_cafe_501"},
+                    {"poi_id": "restaurant_bistro_501"},
+                    {"poi_id": "restaurant_noodle_501"},
+                ]
+            },
+            status="succeeded",
+        ),
+        SimpleNamespace(
+            tool_name="check_ticket_availability",
+            request_json={"payload": {"poi_id": "activity_workshop_501"}},
+            response_json={"ticket_availability": {"available": False}},
+            status="succeeded",
+        ),
+        SimpleNamespace(
+            tool_name="check_table_availability",
+            request_json={"payload": {"restaurant_id": "restaurant_cafe_501"}},
+            response_json={"table_availability": {"available": False}},
+            status="succeeded",
+        ),
+        SimpleNamespace(
+            tool_name="check_route",
+            request_json={"payload": {"origin_id": "activity_workshop_501", "destination_id": "restaurant_bento_501"}},
+            response_json=None,
+            status="failed",
+        ),
+    ]
+
+    score = grade_robustness_expectation(case, selected_plan, tool_events)
+
+    assert score.name == "robustness"
+    assert score.passed is False
+    assert score.score == 0.0
+    assert score.details["selected_dining_id"] == "restaurant_cafe_501"
+    assert "selected dining" in score.reason
 
 
 def test_combine_scores_returns_failed_status_when_one_score_fails() -> None:

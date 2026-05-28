@@ -63,6 +63,90 @@ def grade_plan_quality(selected_plan: Any) -> BenchmarkScore:
     )
 
 
+def grade_robustness_expectation(
+    case: BenchmarkCase,
+    selected_plan: Any,
+    tool_events: Sequence[Any],
+) -> BenchmarkScore:
+    expectation = case.expected.robustness
+    if expectation is None:
+        raise ValueError("Robustness grading requires case.expected.robustness.")
+
+    plan_json = getattr(selected_plan, "plan_json", None)
+    selected_activity_id = _selected_candidate_id(plan_json, "activity")
+    selected_dining_id = _selected_candidate_id(plan_json, "dining")
+    activity_results = _search_results_for_category(tool_events, "activity")
+    dining_results = _search_results_for_category(tool_events, "dining")
+    unavailable_candidate_ids = _unavailable_candidate_ids(tool_events)
+    failed_route_pair_count = sum(
+        1
+        for event in tool_events
+        if _value(event, "tool_name") == "check_route"
+        and _value(event, "status") not in {"succeeded", "cached"}
+    )
+
+    failures: list[str] = []
+    if selected_activity_id != expectation.expected_selected_activity_id:
+        failures.append(
+            "Observed selected activity "
+            f"{selected_activity_id!r} did not match expected {expectation.expected_selected_activity_id!r}."
+        )
+    if selected_dining_id != expectation.expected_selected_dining_id:
+        failures.append(
+            "Observed selected dining "
+            f"{selected_dining_id!r} did not match expected {expectation.expected_selected_dining_id!r}."
+        )
+    if len(activity_results) < expectation.minimum_activity_search_results:
+        failures.append(
+            "Observed activity search results "
+            f"{len(activity_results)} below required minimum {expectation.minimum_activity_search_results}."
+        )
+    if len(dining_results) < expectation.minimum_dining_search_results:
+        failures.append(
+            "Observed dining search results "
+            f"{len(dining_results)} below required minimum {expectation.minimum_dining_search_results}."
+        )
+    if activity_results[: len(expectation.expected_activity_search_prefix)] != expectation.expected_activity_search_prefix:
+        failures.append("Observed activity search prefix did not match expected deterministic prefix.")
+    if dining_results[: len(expectation.expected_dining_search_prefix)] != expectation.expected_dining_search_prefix:
+        failures.append("Observed dining search prefix did not match expected deterministic prefix.")
+    missing_unavailable_ids = [
+        candidate_id
+        for candidate_id in expectation.required_unavailable_candidate_ids
+        if candidate_id not in unavailable_candidate_ids
+    ]
+    if missing_unavailable_ids:
+        failures.append(
+            f"Missing required unavailable candidate IDs: {', '.join(missing_unavailable_ids)}"
+        )
+    if failed_route_pair_count < expectation.minimum_failed_route_pairs:
+        failures.append(
+            "Observed failed route pair count "
+            f"{failed_route_pair_count} below required minimum {expectation.minimum_failed_route_pairs}."
+        )
+
+    passed = not failures
+    reason = (
+        "Selected pair, noisy search ordering, unavailable candidates, and route fallback evidence matched expectation."
+    )
+    if failures:
+        reason = failures[0]
+    return BenchmarkScore(
+        name="robustness",
+        score=1.0 if passed else 0.0,
+        passed=passed,
+        reason=reason,
+        details={
+            "selected_activity_id": selected_activity_id,
+            "selected_dining_id": selected_dining_id,
+            "observed_activity_search_results": activity_results,
+            "observed_dining_search_results": dining_results,
+            "observed_unavailable_candidate_ids": unavailable_candidate_ids,
+            "failed_route_pair_count": failed_route_pair_count,
+        },
+    )
+
+
 def grade_workflow_path(workflow_result: Any, case: BenchmarkCase | None = None) -> BenchmarkScore:
     expected_status = case.expected.expected_workflow_status if case is not None else "completed"
     expected_error_type = case.expected.expected_error_type if case is not None else None
@@ -471,6 +555,76 @@ def _value(source: Any, key: str, default: Any = None) -> Any:
     if isinstance(source, dict):
         return source.get(key, default)
     return getattr(source, key, default)
+
+
+def _selected_candidate_id(plan_json: Any, section: str) -> str | None:
+    draft = _value(plan_json, "draft")
+    candidate = _value(draft, section)
+    candidate_id = _value(candidate, "candidate_id")
+    return candidate_id if isinstance(candidate_id, str) and candidate_id else None
+
+
+def _search_results_for_category(tool_events: Sequence[Any], category: str) -> list[str]:
+    for event in tool_events:
+        if _value(event, "tool_name") != "search_poi":
+            continue
+        payload = _value(_value(event, "request_json", {}), "payload", {})
+        if _value(payload, "category") != category:
+            continue
+        results = _value(_value(event, "response_json", {}), "results", [])
+        if not isinstance(results, list):
+            return []
+        return [
+            poi_id
+            for poi_id in (_value(item, "poi_id") for item in results)
+            if isinstance(poi_id, str) and poi_id
+        ]
+    return []
+
+
+def _unavailable_candidate_ids(tool_events: Sequence[Any]) -> list[str]:
+    observed: list[str] = []
+    for event in tool_events:
+        tool_name = _value(event, "tool_name")
+        request_payload = _value(_value(event, "request_json", {}), "payload", {})
+        response_json = _value(event, "response_json", {})
+        candidate_id: str | None = None
+        unavailable = False
+
+        if tool_name == "check_ticket_availability":
+            candidate_id = _first_text(
+                _value(request_payload, "poi_id"),
+                _value(request_payload, "candidate_id"),
+            )
+            ticket = _value(response_json, "ticket_availability", {})
+            unavailable = _value(ticket, "available") is False
+        elif tool_name == "check_table_availability":
+            candidate_id = _first_text(
+                _value(request_payload, "restaurant_id"),
+                _value(request_payload, "candidate_id"),
+            )
+            table = _value(response_json, "table_availability", {})
+            unavailable = _value(table, "available") is False
+        elif tool_name == "check_queue":
+            queue = _value(response_json, "queue", {})
+            candidate_id = _first_text(
+                _value(request_payload, "poi_id"),
+                _value(queue, "poi_id"),
+                _value(request_payload, "candidate_id"),
+            )
+            queue_status = _value(queue, "status")
+            unavailable = isinstance(queue_status, str) and queue_status != "open"
+
+        if unavailable and candidate_id and candidate_id not in observed:
+            observed.append(candidate_id)
+    return observed
+
+
+def _first_text(*values: Any) -> str | None:
+    for value in values:
+        if isinstance(value, str) and value:
+            return value
+    return None
 
 
 def combine_scores(scores: Sequence[BenchmarkScore]) -> tuple[str, float, list[str]]:

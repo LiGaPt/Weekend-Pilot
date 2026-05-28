@@ -22,6 +22,7 @@ BenchmarkSuiteId = Literal[
     "recovery_focused",
     "memory_governance",
     "conversation_continuations",
+    "robustness_focused",
     "default",
     "release_gate_v1",
     "all_registered",
@@ -76,6 +77,17 @@ class BenchmarkConversationTraceStep(BaseModel):
     version_label: str | None = None
 
 
+class BenchmarkRobustnessExpectation(BaseModel):
+    expected_selected_activity_id: str
+    expected_selected_dining_id: str
+    minimum_activity_search_results: int
+    minimum_dining_search_results: int
+    expected_activity_search_prefix: list[str] = Field(default_factory=list)
+    expected_dining_search_prefix: list[str] = Field(default_factory=list)
+    required_unavailable_candidate_ids: list[str] = Field(default_factory=list)
+    minimum_failed_route_pairs: int
+
+
 class BenchmarkExpectedOutcome(BaseModel):
     required_tool_names: list[str]
     min_tool_event_count: int
@@ -88,6 +100,7 @@ class BenchmarkExpectedOutcome(BaseModel):
     min_injected_failure_count: int = 0
     memory_governance: BenchmarkMemoryGovernanceExpectation | None = None
     conversation: BenchmarkConversationExpectation | None = None
+    robustness: BenchmarkRobustnessExpectation | None = None
 
 
 class BenchmarkCaseTaxonomy(BaseModel):

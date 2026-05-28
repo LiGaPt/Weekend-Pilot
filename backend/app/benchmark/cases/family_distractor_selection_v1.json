@@ -1,0 +1,64 @@
+{
+  "case_id": "family_distractor_selection_v1",
+  "title": "Family distractor selection with unavailable top alternatives",
+  "user_input": "This afternoon I want to go out with my wife and child for a few hours. Not too far. My child is 5, and my wife is trying to eat lighter.",
+  "agent_version": "agent-v1",
+  "prompt_version": "prompt-v1",
+  "tool_profile": "mock_world",
+  "world_profile": "family_afternoon",
+  "failure_profile": null,
+  "memory_items": [],
+  "expected": {
+    "required_tool_names": [
+      "search_poi",
+      "check_weather",
+      "get_poi_detail",
+      "check_opening_hours",
+      "check_queue",
+      "check_table_availability",
+      "check_ticket_availability",
+      "check_route"
+    ],
+    "min_tool_event_count": 8,
+    "min_action_count": 1,
+    "expected_workflow_status": "completed",
+    "expected_execution_status": "succeeded",
+    "expected_feedback_status": "completed",
+    "robustness": {
+      "expected_selected_activity_id": "activity_museum_001",
+      "expected_selected_dining_id": "restaurant_light_001",
+      "minimum_activity_search_results": 5,
+      "minimum_dining_search_results": 5,
+      "expected_activity_search_prefix": [
+        "activity_museum_001",
+        "activity_story_atelier_001",
+        "activity_riverside_reading_001"
+      ],
+      "expected_dining_search_prefix": [
+        "restaurant_light_001",
+        "restaurant_picnic_001",
+        "restaurant_garden_001"
+      ],
+      "required_unavailable_candidate_ids": [
+        "activity_story_atelier_001",
+        "restaurant_picnic_001"
+      ],
+      "minimum_failed_route_pairs": 1
+    }
+  },
+  "taxonomy": {
+    "suite": "locallife_bench_v1",
+    "scenario_bucket": "family",
+    "level": "L2",
+    "tags": [
+      "child_friendly",
+      "light_meal",
+      "robustness_case",
+      "distractor_selection"
+    ],
+    "failure_mode": null
+  },
+  "metadata": {
+    "focus": "family_robustness_distractor_selection"
+  }
+}
