@@ -236,6 +236,61 @@ Release checklist:
 - retain or reference the latest release-gate report path for review
 - optionally run `python scripts/run_formal_verification.py` for broader full-inventory validation
 
+## Benchmark Coverage Gate
+
+The repository now includes a separate V1.5 benchmark coverage gate for the broader `all_registered` inventory. The three benchmark entrypoints now serve different governance roles:
+
+- `release_gate_v1` is still the blocking 15-case V1 release gate for the fixed `L1-L3` release suite.
+- `python scripts/run_formal_verification.py` is still the broader fresh full-inventory engineering run for `all_registered`.
+- `coverage_gate_v1_5` is the new blocking diversity gate for the fresh `all_registered` run evidence.
+
+Run the coverage gate from the repo root:
+
+```bash
+python scripts/run_benchmark_coverage_gate.py
+```
+
+The coverage gate reuses a fresh `run_formal_verification(...)` execution and then blocks unless all of the following stay true:
+
+- `suite_id == "all_registered"`
+- `run_status == "passed"`
+- `failed_count == 0`
+- `error_count == 0`
+- `case_count >= 21`
+- `matrix_summary.tool_profile_counts == {"mock_world": case_count}`
+- `scenario_bucket_counts` minimums:
+  - `couple >= 1`
+  - `family >= 5`
+  - `friends >= 2`
+  - `mixed >= 3`
+  - `solo >= 2`
+  - `unknown >= 2`
+- `family / case_count <= 0.60`
+- `world_profile_counts` minimums:
+  - `budget_lite >= 2`
+  - `couple_afternoon >= 1`
+  - `family_afternoon >= 5`
+  - `friends_gathering >= 2`
+  - `rainy_day_fallback >= 3`
+  - `solo_afternoon >= 2`
+- `family_afternoon / case_count <= 0.60`
+- `failure_mode_counts` minimums:
+  - `route_unavailable >= 1`
+  - `route_and_dining_unavailable >= 1`
+  - `ticket_sold_out_and_bad_weather >= 1`
+- `none / case_count <= 0.90`
+- `constraint_tag_outcomes[*].case_count` minimums:
+  - `budget_limited >= 2`
+  - `casual_dining >= 2`
+  - `conversation_continuation >= 2`
+  - `date_friendly >= 1`
+  - `friends_group >= 2`
+  - `memory_governance >= 2`
+  - `rainy_day >= 3`
+  - `robustness_case >= 4`
+
+Each unique `suite-all_registered-run-report.json` is enriched with an additive top-level `coverage_gate_evaluation` block, and a fully passing run refreshes `var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json`. Blocked runs keep the unique run directory for debugging and must not overwrite that latest coverage alias.
+
 ## Formal Verification
 
 The repository now includes a broader one-click formal verification runner for the canonical `all_registered` benchmark suite. `all_registered` remains the full registered fixture inventory, including the two current `L5` composite chaos cases that are intentionally outside the blocking `release_gate_v1` boundary. Run it from the repo root:
