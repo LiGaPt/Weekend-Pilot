@@ -1,21 +1,26 @@
 {
   "profile": "solo_afternoon",
   "location": {
-    "city": "上海",
-    "area": "静安"
+    "city": "\u4e0a\u6d77",
+    "area": "\u9759\u5b89"
   },
   "pois": [
     {
       "poi_id": "activity_gallery_001",
-      "name": "静安轻展馆",
+      "name": "\u9759\u5b89\u8f7b\u5c55\u9986",
       "category": "activity",
-      "address": "上海市静安区展览路18号",
+      "address": "\u4e0a\u6d77\u5e02\u9759\u5b89\u533a\u5c55\u89c8\u8def18\u53f7",
       "location": {
         "lat": 31.2321,
         "lng": 121.4552
       },
-      "tags": ["indoor", "museum", "quiet", "light_activity"],
-      "description": "适合一个人慢慢逛的轻量展馆，节奏舒适。",
+      "tags": [
+        "indoor",
+        "museum",
+        "quiet",
+        "light_activity"
+      ],
+      "description": "\u9002\u5408\u4e00\u4e2a\u4eba\u6162\u6162\u901b\u7684\u8f7b\u91cf\u5c55\u9986\uff0c\u8282\u594f\u8212\u9002\u3002",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -30,15 +35,19 @@
     },
     {
       "poi_id": "activity_walk_001",
-      "name": "静安街区短途漫步",
+      "name": "\u9759\u5b89\u8857\u533a\u77ed\u9014\u6f2b\u6b65",
       "category": "activity",
-      "address": "上海市静安区街心路",
+      "address": "\u4e0a\u6d77\u5e02\u9759\u5b89\u533a\u8857\u5fc3\u8def",
       "location": {
         "lat": 31.2298,
         "lng": 121.4481
       },
-      "tags": ["outdoor", "citywalk", "light_activity"],
-      "description": "树荫较多的短距离步行路线，适合一个人放松散步。",
+      "tags": [
+        "outdoor",
+        "citywalk",
+        "light_activity"
+      ],
+      "description": "\u6811\u836b\u8f83\u591a\u7684\u77ed\u8ddd\u79bb\u6b65\u884c\u8def\u7ebf\uff0c\u9002\u5408\u4e00\u4e2a\u4eba\u653e\u677e\u6563\u6b65\u3002",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -52,16 +61,76 @@
       "sort_order": 20
     },
     {
+      "poi_id": "activity_studio_001",
+      "name": "Solo Sketch Studio",
+      "category": "activity",
+      "address": "Jing'an District Studio Lane 18",
+      "location": {
+        "lat": 31.2312,
+        "lng": 121.4529
+      },
+      "tags": [
+        "indoor",
+        "light_activity",
+        "quiet",
+        "creative"
+      ],
+      "description": "A calm sketch workshop that looks appealing for a solo afternoon, but today's drop-in tickets are sold out.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "13:00",
+            "end": "18:00"
+          }
+        ],
+        "last_entry": "17:15"
+      },
+      "sort_order": 15
+    },
+    {
+      "poi_id": "activity_boardgame_001",
+      "name": "Shared Table Game Loft",
+      "category": "activity",
+      "address": "Jing'an District Loft Street 22",
+      "location": {
+        "lat": 31.233,
+        "lng": 121.4508
+      },
+      "tags": [
+        "indoor",
+        "light_activity",
+        "group_friendly",
+        "social"
+      ],
+      "description": "A usable but group-leaning board-game loft that feels louder and less focused than the canonical solo gallery stop.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "13:00",
+            "end": "21:00"
+          }
+        ],
+        "last_entry": "20:00"
+      },
+      "sort_order": 18
+    },
+    {
       "poi_id": "restaurant_light_001",
-      "name": "静安清淡食堂",
+      "name": "\u9759\u5b89\u6e05\u6de1\u98df\u5802",
       "category": "dining",
-      "address": "上海市静安区清食路66号",
+      "address": "\u4e0a\u6d77\u5e02\u9759\u5b89\u533a\u6e05\u98df\u8def66\u53f7",
       "location": {
         "lat": 31.2307,
         "lng": 121.4516
       },
-      "tags": ["lighter_options", "quiet", "vegetable_forward"],
-      "description": "提供清淡套餐、蒸菜和轻食碗，适合一个人安静吃晚餐。",
+      "tags": [
+        "lighter_options",
+        "quiet",
+        "vegetable_forward"
+      ],
+      "description": "\u63d0\u4f9b\u6e05\u6de1\u5957\u9910\u3001\u84b8\u83dc\u548c\u8f7b\u98df\u7897\uff0c\u9002\u5408\u4e00\u4e2a\u4eba\u5b89\u9759\u5403\u665a\u9910\u3002",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -76,15 +145,19 @@
     },
     {
       "poi_id": "restaurant_noodle_001",
-      "name": "静安简单面馆",
+      "name": "\u9759\u5b89\u7b80\u5355\u9762\u9986",
       "category": "dining",
-      "address": "上海市静安区面香街8号",
+      "address": "\u4e0a\u6d77\u5e02\u9759\u5b89\u533a\u9762\u9999\u88578\u53f7",
       "location": {
         "lat": 31.2341,
         "lng": 121.4478
       },
-      "tags": ["quick_meal", "simple"],
-      "description": "小碗面和热汤，适合晚些时候快速吃一顿。",
+      "tags": [
+        "quick_meal",
+        "simple",
+        "lighter_options"
+      ],
+      "description": "\u5c0f\u7897\u9762\u548c\u70ed\u6c64\uff0c\u9002\u5408\u665a\u4e9b\u65f6\u5019\u5feb\u901f\u5403\u4e00\u987f\u3002 Light sides are available, but it is still more utilitarian than the canonical light dining stop.",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -96,6 +169,60 @@
         "last_entry": "21:00"
       },
       "sort_order": 40
+    },
+    {
+      "poi_id": "restaurant_counter_001",
+      "name": "Counter Salad Bar",
+      "category": "dining",
+      "address": "Jing'an District Counter Road 10",
+      "location": {
+        "lat": 31.2319,
+        "lng": 121.4538
+      },
+      "tags": [
+        "lighter_options",
+        "casual",
+        "group_friendly"
+      ],
+      "description": "The menu fits the lighter-dinner request, but today's counter service is unavailable and the queue is paused.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:30",
+            "end": "20:00"
+          }
+        ],
+        "last_entry": "19:30"
+      },
+      "sort_order": 35
+    },
+    {
+      "poi_id": "restaurant_sharedplates_001",
+      "name": "Shared Plates Kitchen",
+      "category": "dining",
+      "address": "Jing'an District Social Street 14",
+      "location": {
+        "lat": 31.2328,
+        "lng": 121.4494
+      },
+      "tags": [
+        "lighter_options",
+        "casual",
+        "group_friendly"
+      ],
+      "description": "A usable lighter menu, but the room is more group-oriented and noisier than the canonical solo dinner choice.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:00",
+            "end": "21:00"
+          }
+        ],
+        "last_entry": "20:15"
+      },
+      "sort_order": 38
     }
   ],
   "routes": [
@@ -105,7 +232,7 @@
       "mode": "walking",
       "distance_meters": 650,
       "duration_minutes": 9,
-      "summary": "步行距离很短，适合慢慢散步后直接用餐。"
+      "summary": "\u6b65\u884c\u8ddd\u79bb\u5f88\u77ed\uff0c\u9002\u5408\u6162\u6162\u6563\u6b65\u540e\u76f4\u63a5\u7528\u9910\u3002"
     },
     {
       "origin_id": "activity_walk_001",
@@ -113,7 +240,7 @@
       "mode": "walking",
       "distance_meters": 780,
       "duration_minutes": 11,
-      "summary": "沿街区慢走即可到达，路径平缓。"
+      "summary": "\u6cbf\u8857\u533a\u6162\u8d70\u5373\u53ef\u5230\u8fbe\uff0c\u8def\u5f84\u5e73\u7f13\u3002"
     },
     {
       "origin_id": "activity_gallery_001",
@@ -121,16 +248,32 @@
       "mode": "walking",
       "distance_meters": 920,
       "duration_minutes": 13,
-      "summary": "从展馆到面馆的短途步行路线。"
+      "summary": "\u4ece\u5c55\u9986\u5230\u9762\u9986\u7684\u77ed\u9014\u6b65\u884c\u8def\u7ebf\u3002"
+    },
+    {
+      "origin_id": "activity_gallery_001",
+      "destination_id": "restaurant_sharedplates_001",
+      "mode": "walking",
+      "distance_meters": 980,
+      "duration_minutes": 14,
+      "summary": "A straightforward walk from the gallery to a louder dining room farther down the block."
+    },
+    {
+      "origin_id": "activity_boardgame_001",
+      "destination_id": "restaurant_light_001",
+      "mode": "walking",
+      "distance_meters": 840,
+      "duration_minutes": 12,
+      "summary": "A usable walking link, but it is slightly longer than the canonical gallery-to-dinner route."
     }
   ],
   "weather": {
-    "location": "徐汇",
+    "location": "\u5f90\u6c47",
     "date": "2026-05-16",
-    "condition": "多云",
+    "condition": "\u591a\u4e91",
     "temperature_c": 24,
     "precipitation_chance": 0.1,
-    "advisory": "天气适合轻量步行，外出无需复杂准备。"
+    "advisory": "\u5929\u6c14\u9002\u5408\u8f7b\u91cf\u6b65\u884c\uff0c\u5916\u51fa\u65e0\u9700\u590d\u6742\u51c6\u5907\u3002"
   },
   "queues": {
     "queue_restaurant_light_001": {
@@ -146,38 +289,105 @@
       "status": "open",
       "wait_minutes": 5,
       "parties_ahead": 1
+    },
+    "queue_restaurant_counter_001": {
+      "queue_id": "queue_restaurant_counter_001",
+      "poi_id": "restaurant_counter_001",
+      "status": "paused",
+      "wait_minutes": 35,
+      "parties_ahead": 9
+    },
+    "queue_restaurant_sharedplates_001": {
+      "queue_id": "queue_restaurant_sharedplates_001",
+      "poi_id": "restaurant_sharedplates_001",
+      "status": "open",
+      "wait_minutes": 18,
+      "parties_ahead": 4
     }
   },
   "table_availability": {
     "restaurant_light_001": {
       "restaurant_id": "restaurant_light_001",
       "available": true,
-      "time_slots": ["17:30", "18:00", "18:30"],
+      "time_slots": [
+        "17:30",
+        "18:00",
+        "18:30"
+      ],
       "max_party_size": 2,
-      "notes": "靠窗安静位可订。"
+      "notes": "\u9760\u7a97\u5b89\u9759\u4f4d\u53ef\u8ba2\u3002"
     },
     "restaurant_noodle_001": {
       "restaurant_id": "restaurant_noodle_001",
       "available": true,
-      "time_slots": ["17:00", "17:30", "18:00", "18:30"],
+      "time_slots": [
+        "17:00",
+        "17:30",
+        "18:00",
+        "18:30"
+      ],
       "max_party_size": 4,
-      "notes": "翻台快，适合临时到店。"
+      "notes": "\u7ffb\u53f0\u5feb\uff0c\u9002\u5408\u4e34\u65f6\u5230\u5e97\u3002"
+    },
+    "restaurant_counter_001": {
+      "restaurant_id": "restaurant_counter_001",
+      "available": false,
+      "time_slots": [],
+      "max_party_size": 2,
+      "notes": "Counter service is offline for a private event."
+    },
+    "restaurant_sharedplates_001": {
+      "restaurant_id": "restaurant_sharedplates_001",
+      "available": true,
+      "time_slots": [
+        "18:00",
+        "18:30",
+        "19:00"
+      ],
+      "max_party_size": 4,
+      "notes": "Walk-in tables exist, but the room is busier and less quiet."
     }
   },
   "ticket_availability": {
     "activity_gallery_001": {
       "poi_id": "activity_gallery_001",
       "available": true,
-      "time_slots": ["13:30", "14:00", "14:30"],
+      "time_slots": [
+        "13:30",
+        "14:00",
+        "14:30"
+      ],
       "remaining": 20,
       "price_cents": 4000
     },
     "activity_walk_001": {
       "poi_id": "activity_walk_001",
       "available": true,
-      "time_slots": ["14:00", "15:00", "16:00"],
+      "time_slots": [
+        "14:00",
+        "15:00",
+        "16:00"
+      ],
       "remaining": 99,
       "price_cents": 0
+    },
+    "activity_studio_001": {
+      "poi_id": "activity_studio_001",
+      "available": false,
+      "time_slots": [],
+      "remaining": 0,
+      "price_cents": 3200
+    },
+    "activity_boardgame_001": {
+      "poi_id": "activity_boardgame_001",
+      "available": true,
+      "time_slots": [
+        "14:00",
+        "15:00",
+        "16:00"
+      ],
+      "remaining": 16,
+      "price_cents": 2800
     }
   },
   "addons": []

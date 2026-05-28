@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from backend.app.benchmark import load_benchmark_case
 from backend.app.db.session import SessionLocal
 from backend.app.models.runtime import ActionLedger, ToolEvent
 from backend.app.planning import (
@@ -28,6 +29,50 @@ from backend.app.tool_gateway import ToolGateway
 
 
 TEST_PREFIX = "weekendpilot:test:final-review-gate"
+CANONICAL_CASES = [
+    pytest.param(
+        "family_afternoon_v1",
+        "family_afternoon",
+        "activity_museum_001",
+        "restaurant_light_001",
+        id="family_afternoon",
+    ),
+    pytest.param(
+        "solo_afternoon_v1",
+        "solo_afternoon",
+        "activity_gallery_001",
+        "restaurant_light_001",
+        id="solo_afternoon",
+    ),
+    pytest.param(
+        "couple_afternoon_v1",
+        "couple_afternoon",
+        "activity_citywalk_201",
+        "restaurant_light_201",
+        id="couple_afternoon",
+    ),
+    pytest.param(
+        "friends_gathering_v1",
+        "friends_gathering",
+        "activity_lawn_301",
+        "restaurant_yard_301",
+        id="friends_gathering",
+    ),
+    pytest.param(
+        "rainy_day_fallback_v1",
+        "rainy_day_fallback",
+        "activity_market_401",
+        "restaurant_soup_401",
+        id="rainy_day_fallback",
+    ),
+    pytest.param(
+        "budget_lite_v1",
+        "budget_lite",
+        "activity_park_501",
+        "restaurant_bento_501",
+        id="budget_lite",
+    ),
+]
 
 
 @pytest.fixture()
@@ -58,18 +103,18 @@ def redis_runtime():
         cleanup()
 
 
-def create_run(session: Session):
+def create_run(session: Session, *, case_id: str, world_profile: str):
     user = UserRepository(session).create(
         external_id=f"final-review-gate-user-{uuid4()}",
         display_name="Final Review Gate Tester",
     )
     return AgentRunRepository(session).create(
         user_id=user.user_id,
-        case_id="case-final-review-gate",
+        case_id=case_id,
         agent_version="agent-v1",
         prompt_version="prompt-v1",
         tool_profile="mock_world",
-        world_profile="family_afternoon",
+        world_profile=world_profile,
         failure_profile=None,
         status="running",
         metadata_json={"source": "final-review-gate-test"},
@@ -80,9 +125,11 @@ def build_gateway(
     session: Session,
     cache: JsonRedisCache,
     rate_limiter: FixedWindowRateLimiter,
+    *,
+    world_profile: str = "family_afternoon",
 ) -> ToolGateway:
     return ToolGateway(
-        registry=build_mock_world_registry(),
+        registry=build_mock_world_registry(world_profile),
         tool_events=ToolEventRepository(session),
         action_ledger=ActionLedgerRepository(session),
         cache=cache,
@@ -90,21 +137,37 @@ def build_gateway(
     )
 
 
+@pytest.mark.parametrize(
+    ("case_id", "expected_world_profile", "expected_activity_id", "expected_dining_id"),
+    CANONICAL_CASES,
+)
 def test_final_review_gate_approves_mock_world_drafts_without_side_effects(
+    case_id: str,
+    expected_world_profile: str,
+    expected_activity_id: str,
+    expected_dining_id: str,
     db_session: Session,
     redis_runtime,
 ) -> None:
     cache, rate_limiter = redis_runtime
-    run = create_run(db_session)
-    gateway = build_gateway(db_session, cache, rate_limiter)
-    intent = DeterministicIntentParser().parse(
-        "This afternoon I want to go out with my wife and child for a few hours. "
-        "Not too far. My child is 5, and my wife is trying to eat lighter."
+    case = load_benchmark_case(case_id)
+    run = create_run(
+        db_session,
+        case_id=case.case_id,
+        world_profile=case.world_profile,
     )
-    plan = DeterministicQueryPlanner().build(intent, provider_profile="mock_world")
+    gateway = build_gateway(
+        db_session,
+        cache,
+        rate_limiter,
+        world_profile=case.world_profile,
+    )
+    intent = DeterministicIntentParser().parse(case.user_input)
+    plan = DeterministicQueryPlanner().build(intent, provider_profile=case.tool_profile)
     collection = QueryPlanExecutor(gateway).execute_initial_calls(plan, run.run_id)
     enrichment = CandidateEnricher(gateway).enrich(plan, collection)
     drafts = DeterministicItineraryGenerator().generate(plan, enrichment)
+    first_draft = drafts.drafts[0]
 
     action_ledger_count_before = db_session.scalar(
         select(func.count()).select_from(ActionLedger).where(ActionLedger.run_id == run.run_id)
@@ -120,6 +183,9 @@ def test_final_review_gate_approves_mock_world_drafts_without_side_effects(
         pre_confirmation_action_count=action_ledger_count_before,
     )
 
+    assert run.world_profile == expected_world_profile
+    assert first_draft.activity.candidate_id == expected_activity_id
+    assert first_draft.dining.candidate_id == expected_dining_id
     assert result.decision in {"approved", "approved_with_warnings"}
     assert result.safe_to_present is True
     assert any(reviewed.safe_to_present for reviewed in result.reviewed_drafts)

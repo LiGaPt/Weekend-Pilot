@@ -43,6 +43,8 @@ python -m pytest tests/integration/test_amap_live.py -v
 
 Mock World is the deterministic default provider for benchmark-style local-life tests. It covers canonical read tools, availability checks, and simulated write tools without external APIs or secrets.
 
+The six canonical Mock World profiles now intentionally include extra distractors, unavailable candidates, and partial route coverage inside the existing fixtures. Benchmark and release-gate runs still stay on Mock World, but candidate screening, ranking, and final review now have to reject noisy top-3 options instead of only hitting hand-prepared winners. This hardening does not change the public demo contract or the registered world-profile set.
+
 Focused Mock World tests require PostgreSQL and Redis:
 
 ```bash

@@ -1,21 +1,27 @@
 {
   "profile": "couple_afternoon",
   "location": {
-    "city": "上海",
-    "area": "徐汇"
+    "city": "\u4e0a\u6d77",
+    "area": "\u5f90\u6c47"
   },
   "pois": [
     {
       "poi_id": "activity_citywalk_201",
-      "name": "衡复安静街区漫步",
+      "name": "\u8861\u590d\u5b89\u9759\u8857\u533a\u6f2b\u6b65",
       "category": "activity",
-      "address": "上海市徐汇区复兴西路118号附近",
+      "address": "\u4e0a\u6d77\u5e02\u5f90\u6c47\u533a\u590d\u5174\u897f\u8def118\u53f7\u9644\u8fd1",
       "location": {
         "lat": 31.2051,
         "lng": 121.4428
       },
-      "tags": ["citywalk", "child_friendly", "light_activity", "outdoor", "quiet"],
-      "description": "树荫比较多的安静街区 citywalk，适合轻松散步、慢慢逛书店和小店。",
+      "tags": [
+        "citywalk",
+        "child_friendly",
+        "light_activity",
+        "outdoor",
+        "quiet"
+      ],
+      "description": "\u6811\u836b\u6bd4\u8f83\u591a\u7684\u5b89\u9759\u8857\u533a citywalk\uff0c\u9002\u5408\u8f7b\u677e\u6563\u6b65\u3001\u6162\u6162\u901b\u4e66\u5e97\u548c\u5c0f\u5e97\u3002",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -30,15 +36,21 @@
     },
     {
       "poi_id": "activity_gallery_201",
-      "name": "梧桐里小型画廊",
+      "name": "\u68a7\u6850\u91cc\u5c0f\u578b\u753b\u5eca",
       "category": "activity",
-      "address": "上海市徐汇区乌鲁木齐南路66号",
+      "address": "\u4e0a\u6d77\u5e02\u5f90\u6c47\u533a\u4e4c\u9c81\u6728\u9f50\u5357\u8def66\u53f7",
       "location": {
         "lat": 31.2017,
         "lng": 121.4379
       },
-      "tags": ["child_friendly", "indoor", "quiet", "gallery"],
-      "description": "体量不大的艺术空间，节奏安静，适合下雨或想坐下来慢看的时候。",
+      "tags": [
+        "child_friendly",
+        "indoor",
+        "quiet",
+        "gallery",
+        "citywalk"
+      ],
+      "description": "\u4f53\u91cf\u4e0d\u5927\u7684\u827a\u672f\u7a7a\u95f4\uff0c\u8282\u594f\u5b89\u9759\uff0c\u9002\u5408\u4e0b\u96e8\u6216\u60f3\u5750\u4e0b\u6765\u6162\u770b\u7684\u65f6\u5019\u3002 It can work as a quiet stop during a city walk, but today's timed entry inventory is unavailable.",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -52,16 +64,78 @@
       "sort_order": 20
     },
     {
+      "poi_id": "activity_conservatory_201",
+      "name": "Glass Conservatory Walk",
+      "category": "activity",
+      "address": "Xuhui Conservatory Lane 12",
+      "location": {
+        "lat": 31.2034,
+        "lng": 121.4411
+      },
+      "tags": [
+        "child_friendly",
+        "citywalk",
+        "outdoor",
+        "date_friendly"
+      ],
+      "description": "A romantic-looking conservatory stop that matches the date vibe, but the current timed entry inventory is sold out.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "13:00",
+            "end": "18:00"
+          }
+        ],
+        "last_entry": "17:20"
+      },
+      "sort_order": 15
+    },
+    {
+      "poi_id": "activity_courtyard_201",
+      "name": "Courtyard Passage Stop",
+      "category": "activity",
+      "address": "Xuhui Courtyard Street 20",
+      "location": {
+        "lat": 31.2047,
+        "lng": 121.4399
+      },
+      "tags": [
+        "child_friendly",
+        "citywalk",
+        "indoor",
+        "quiet",
+        "family_pause"
+      ],
+      "description": "A usable but quieter indoor courtyard stop that feels more like a family rest break than the canonical date-oriented city walk.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "12:30",
+            "end": "20:00"
+          }
+        ],
+        "last_entry": "19:00"
+      },
+      "sort_order": 18
+    },
+    {
       "poi_id": "restaurant_light_201",
-      "name": "花园轻食小馆",
+      "name": "\u82b1\u56ed\u8f7b\u98df\u5c0f\u9986",
       "category": "dining",
-      "address": "上海市徐汇区安福路136号",
+      "address": "\u4e0a\u6d77\u5e02\u5f90\u6c47\u533a\u5b89\u798f\u8def136\u53f7",
       "location": {
         "lat": 31.2041,
         "lng": 121.4402
       },
-      "tags": ["child_friendly", "lighter_options", "light_meal", "quiet"],
-      "description": "偏安静的轻食餐厅，沙拉、暖碗和清淡主菜选择多，适合 citywalk 后坐下来慢慢吃。",
+      "tags": [
+        "child_friendly",
+        "lighter_options",
+        "light_meal",
+        "quiet"
+      ],
+      "description": "\u504f\u5b89\u9759\u7684\u8f7b\u98df\u9910\u5385\uff0c\u6c99\u62c9\u3001\u6696\u7897\u548c\u6e05\u6de1\u4e3b\u83dc\u9009\u62e9\u591a\uff0c\u9002\u5408 citywalk \u540e\u5750\u4e0b\u6765\u6162\u6162\u5403\u3002",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -76,15 +150,20 @@
     },
     {
       "poi_id": "restaurant_bistro_201",
-      "name": "街角小酒馆",
+      "name": "\u8857\u89d2\u5c0f\u9152\u9986",
       "category": "dining",
-      "address": "上海市徐汇区武康路212号",
+      "address": "\u4e0a\u6d77\u5e02\u5f90\u6c47\u533a\u6b66\u5eb7\u8def212\u53f7",
       "location": {
         "lat": 31.2062,
         "lng": 121.4388
       },
-      "tags": ["child_friendly", "casual", "quiet"],
-      "description": "座位不多的街角小馆，氛围轻松，适合散步后继续聊天。",
+      "tags": [
+        "child_friendly",
+        "casual",
+        "quiet",
+        "lighter_options"
+      ],
+      "description": "\u5ea7\u4f4d\u4e0d\u591a\u7684\u8857\u89d2\u5c0f\u9986\uff0c\u6c1b\u56f4\u8f7b\u677e\uff0c\u9002\u5408\u6563\u6b65\u540e\u7ee7\u7eed\u804a\u5929\u3002 Light small plates are available, but it still skews more casual than the canonical light dinner.",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -96,6 +175,61 @@
         "last_entry": "21:30"
       },
       "sort_order": 40
+    },
+    {
+      "poi_id": "restaurant_patio_201",
+      "name": "Patio Greens Table",
+      "category": "dining",
+      "address": "Xuhui Patio Road 18",
+      "location": {
+        "lat": 31.2038,
+        "lng": 121.4395
+      },
+      "tags": [
+        "child_friendly",
+        "lighter_options",
+        "light_meal"
+      ],
+      "description": "A lighter patio menu that looks suitable on paper, but reservations are closed and there is no open queue.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:30",
+            "end": "20:30"
+          }
+        ],
+        "last_entry": "19:45"
+      },
+      "sort_order": 35
+    },
+    {
+      "poi_id": "restaurant_sharing_201",
+      "name": "Sharing Plates Supper Room",
+      "category": "dining",
+      "address": "Xuhui Sharing Street 24",
+      "location": {
+        "lat": 31.2058,
+        "lng": 121.4375
+      },
+      "tags": [
+        "child_friendly",
+        "lighter_options",
+        "casual",
+        "sharing_plates"
+      ],
+      "description": "A usable lighter menu, but the space leans more toward group sharing and casual chatter than the canonical couple dinner.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:00",
+            "end": "21:00"
+          }
+        ],
+        "last_entry": "20:15"
+      },
+      "sort_order": 38
     }
   ],
   "routes": [
@@ -105,7 +239,7 @@
       "mode": "walking",
       "distance_meters": 680,
       "duration_minutes": 10,
-      "summary": "沿梧桐街道慢走就能到，路程安静，适合继续散步。"
+      "summary": "\u6cbf\u68a7\u6850\u8857\u9053\u6162\u8d70\u5c31\u80fd\u5230\uff0c\u8def\u7a0b\u5b89\u9759\uff0c\u9002\u5408\u7ee7\u7eed\u6563\u6b65\u3002"
     },
     {
       "origin_id": "activity_citywalk_201",
@@ -113,7 +247,7 @@
       "mode": "walking",
       "distance_meters": 720,
       "duration_minutes": 11,
-      "summary": "街区步行连接顺畅，路口不多。"
+      "summary": "\u8857\u533a\u6b65\u884c\u8fde\u63a5\u987a\u7545\uff0c\u8def\u53e3\u4e0d\u591a\u3002"
     },
     {
       "origin_id": "activity_gallery_201",
@@ -121,16 +255,32 @@
       "mode": "walking",
       "distance_meters": 520,
       "duration_minutes": 8,
-      "summary": "从画廊出来步行几分钟即可到轻食餐厅。"
+      "summary": "\u4ece\u753b\u5eca\u51fa\u6765\u6b65\u884c\u51e0\u5206\u949f\u5373\u53ef\u5230\u8f7b\u98df\u9910\u5385\u3002"
+    },
+    {
+      "origin_id": "activity_courtyard_201",
+      "destination_id": "restaurant_light_201",
+      "mode": "walking",
+      "distance_meters": 840,
+      "duration_minutes": 12,
+      "summary": "A valid link, but slightly longer than the canonical citywalk-to-dinner route."
+    },
+    {
+      "origin_id": "activity_citywalk_201",
+      "destination_id": "restaurant_sharing_201",
+      "mode": "walking",
+      "distance_meters": 910,
+      "duration_minutes": 14,
+      "summary": "An alternate walking leg to a noisier dining option farther down the block."
     }
   ],
   "weather": {
-    "location": "徐汇",
+    "location": "\u5f90\u6c47",
     "date": "2026-05-16",
-    "condition": "多云",
+    "condition": "\u591a\u4e91",
     "temperature_c": 24,
     "precipitation_chance": 0.12,
-    "advisory": "天气适合慢走和轻量户外活动，晚些时候气温舒适。"
+    "advisory": "\u5929\u6c14\u9002\u5408\u6162\u8d70\u548c\u8f7b\u91cf\u6237\u5916\u6d3b\u52a8\uff0c\u665a\u4e9b\u65f6\u5019\u6c14\u6e29\u8212\u9002\u3002"
   },
   "queues": {
     "queue_restaurant_light_201": {
@@ -146,38 +296,100 @@
       "status": "open",
       "wait_minutes": 15,
       "parties_ahead": 3
+    },
+    "queue_restaurant_patio_201": {
+      "queue_id": "queue_restaurant_patio_201",
+      "poi_id": "restaurant_patio_201",
+      "status": "closed",
+      "wait_minutes": 40,
+      "parties_ahead": 10
+    },
+    "queue_restaurant_sharing_201": {
+      "queue_id": "queue_restaurant_sharing_201",
+      "poi_id": "restaurant_sharing_201",
+      "status": "open",
+      "wait_minutes": 20,
+      "parties_ahead": 5
     }
   },
   "table_availability": {
     "restaurant_light_201": {
       "restaurant_id": "restaurant_light_201",
       "available": true,
-      "time_slots": ["17:30", "18:00", "18:30"],
+      "time_slots": [
+        "17:30",
+        "18:00",
+        "18:30"
+      ],
       "max_party_size": 2,
-      "notes": "靠窗双人位可订。"
+      "notes": "\u9760\u7a97\u53cc\u4eba\u4f4d\u53ef\u8ba2\u3002"
     },
     "restaurant_bistro_201": {
       "restaurant_id": "restaurant_bistro_201",
       "available": true,
-      "time_slots": ["18:00", "18:30", "19:00"],
+      "time_slots": [
+        "18:00",
+        "18:30",
+        "19:00"
+      ],
       "max_party_size": 2,
-      "notes": "适合两人慢慢用餐。"
+      "notes": "\u9002\u5408\u4e24\u4eba\u6162\u6162\u7528\u9910\u3002"
+    },
+    "restaurant_patio_201": {
+      "restaurant_id": "restaurant_patio_201",
+      "available": false,
+      "time_slots": [],
+      "max_party_size": 2,
+      "notes": "Walk-ins are suspended for a private patio event."
+    },
+    "restaurant_sharing_201": {
+      "restaurant_id": "restaurant_sharing_201",
+      "available": true,
+      "time_slots": [
+        "18:15",
+        "18:45",
+        "19:15"
+      ],
+      "max_party_size": 4,
+      "notes": "Usable tables remain, but the room is louder and more casual."
     }
   },
   "ticket_availability": {
     "activity_citywalk_201": {
       "poi_id": "activity_citywalk_201",
       "available": true,
-      "time_slots": ["14:00", "15:00", "16:00"],
+      "time_slots": [
+        "14:00",
+        "15:00",
+        "16:00"
+      ],
       "remaining": 99,
       "price_cents": 0
     },
     "activity_gallery_201": {
       "poi_id": "activity_gallery_201",
-      "available": true,
-      "time_slots": ["14:30", "15:30", "16:30"],
-      "remaining": 18,
+      "available": false,
+      "time_slots": [],
+      "remaining": 0,
       "price_cents": 3800
+    },
+    "activity_conservatory_201": {
+      "poi_id": "activity_conservatory_201",
+      "available": false,
+      "time_slots": [],
+      "remaining": 0,
+      "price_cents": 4200
+    },
+    "activity_courtyard_201": {
+      "poi_id": "activity_courtyard_201",
+      "available": true,
+      "time_slots": [
+        "14:00",
+        "15:00",
+        "16:00"
+      ],
+      "remaining": 14,
+      "price_cents": 2600
     }
   },
   "addons": []

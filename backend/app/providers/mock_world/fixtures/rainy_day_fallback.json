@@ -1,21 +1,25 @@
 {
   "profile": "rainy_day_fallback",
   "location": {
-    "city": "上海",
-    "area": "黄浦"
+    "city": "\u4e0a\u6d77",
+    "area": "\u9ec4\u6d66"
   },
   "pois": [
     {
       "poi_id": "activity_market_401",
-      "name": "室内生活方式馆",
+      "name": "\u5ba4\u5185\u751f\u6d3b\u65b9\u5f0f\u9986",
       "category": "activity",
-      "address": "上海市黄浦区马当路186号",
+      "address": "\u4e0a\u6d77\u5e02\u9ec4\u6d66\u533a\u9a6c\u5f53\u8def186\u53f7",
       "location": {
         "lat": 31.2145,
         "lng": 121.4724
       },
-      "tags": ["indoor", "light_activity", "market"],
-      "description": "下雨时也能慢慢逛的室内馆，有座位和休息区，适合作为稳妥备选。",
+      "tags": [
+        "indoor",
+        "light_activity",
+        "market"
+      ],
+      "description": "\u4e0b\u96e8\u65f6\u4e5f\u80fd\u6162\u6162\u901b\u7684\u5ba4\u5185\u9986\uff0c\u6709\u5ea7\u4f4d\u548c\u4f11\u606f\u533a\uff0c\u9002\u5408\u4f5c\u4e3a\u7a33\u59a5\u5907\u9009\u3002",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -30,15 +34,19 @@
     },
     {
       "poi_id": "activity_booklounge_401",
-      "name": "雨天书房休息厅",
+      "name": "\u96e8\u5929\u4e66\u623f\u4f11\u606f\u5385",
       "category": "activity",
-      "address": "上海市黄浦区淡水路58号",
+      "address": "\u4e0a\u6d77\u5e02\u9ec4\u6d66\u533a\u6de1\u6c34\u8def58\u53f7",
       "location": {
         "lat": 31.2116,
         "lng": 121.4682
       },
-      "tags": ["indoor", "quiet", "light_activity"],
-      "description": "有座位的室内阅读休息空间，适合把户外计划改成安静停留。",
+      "tags": [
+        "indoor",
+        "quiet",
+        "light_activity"
+      ],
+      "description": "\u6709\u5ea7\u4f4d\u7684\u5ba4\u5185\u9605\u8bfb\u4f11\u606f\u7a7a\u95f4\uff0c\u9002\u5408\u628a\u6237\u5916\u8ba1\u5212\u6539\u6210\u5b89\u9759\u505c\u7559\u3002",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -52,16 +60,74 @@
       "sort_order": 20
     },
     {
+      "poi_id": "activity_arcade_401",
+      "name": "Indoor Arcade Hall",
+      "category": "activity",
+      "address": "Rainy Arcade Road 6",
+      "location": {
+        "lat": 31.2086,
+        "lng": 121.4331
+      },
+      "tags": [
+        "indoor",
+        "light_activity",
+        "market"
+      ],
+      "description": "A solid rainy-day indoor fallback in theory, but the current ticket batch is sold out.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "13:00",
+            "end": "18:30"
+          }
+        ],
+        "last_entry": "17:45"
+      },
+      "sort_order": 15
+    },
+    {
+      "poi_id": "activity_gardenhall_401",
+      "name": "Covered Garden Hall",
+      "category": "activity",
+      "address": "Rainy Hall Street 18",
+      "location": {
+        "lat": 31.2101,
+        "lng": 121.4317
+      },
+      "tags": [
+        "indoor",
+        "outdoor",
+        "light_activity"
+      ],
+      "description": "A usable semi-covered hall that still feels breezier and more outdoor-leaning than the canonical rainy-day market route.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "12:30",
+            "end": "20:00"
+          }
+        ],
+        "last_entry": "19:00"
+      },
+      "sort_order": 18
+    },
+    {
       "poi_id": "restaurant_soup_401",
-      "name": "热汤简餐屋",
+      "name": "\u70ed\u6c64\u7b80\u9910\u5c4b",
       "category": "dining",
-      "address": "上海市黄浦区瑞金二路99号",
+      "address": "\u4e0a\u6d77\u5e02\u9ec4\u6d66\u533a\u745e\u91d1\u4e8c\u8def99\u53f7",
       "location": {
         "lat": 31.2132,
         "lng": 121.4708
       },
-      "tags": ["comfort_food", "nearby", "quick_meal"],
-      "description": "离室内馆很近的简餐屋，适合雨天结束活动后尽快坐下吃一顿热食。",
+      "tags": [
+        "comfort_food",
+        "nearby",
+        "quick_meal"
+      ],
+      "description": "\u79bb\u5ba4\u5185\u9986\u5f88\u8fd1\u7684\u7b80\u9910\u5c4b\uff0c\u9002\u5408\u96e8\u5929\u7ed3\u675f\u6d3b\u52a8\u540e\u5c3d\u5feb\u5750\u4e0b\u5403\u4e00\u987f\u70ed\u98df\u3002",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -76,15 +142,18 @@
     },
     {
       "poi_id": "restaurant_rice_401",
-      "name": "街角饭碗店",
+      "name": "\u8857\u89d2\u996d\u7897\u5e97",
       "category": "dining",
-      "address": "上海市黄浦区重庆南路76号",
+      "address": "\u4e0a\u6d77\u5e02\u9ec4\u6d66\u533a\u91cd\u5e86\u5357\u8def76\u53f7",
       "location": {
         "lat": 31.2107,
         "lng": 121.4661
       },
-      "tags": ["quick_meal", "warm_food"],
-      "description": "不想久等时可以快速解决的一餐，离地铁和室内点都不远。",
+      "tags": [
+        "quick_meal",
+        "warm_food"
+      ],
+      "description": "\u4e0d\u60f3\u4e45\u7b49\u65f6\u53ef\u4ee5\u5feb\u901f\u89e3\u51b3\u7684\u4e00\u9910\uff0c\u79bb\u5730\u94c1\u548c\u5ba4\u5185\u70b9\u90fd\u4e0d\u8fdc\u3002",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -96,6 +165,60 @@
         "last_entry": "21:00"
       },
       "sort_order": 40
+    },
+    {
+      "poi_id": "restaurant_hotpot_401",
+      "name": "Hotpot Queue Counter",
+      "category": "dining",
+      "address": "Rainy Soup Lane 10",
+      "location": {
+        "lat": 31.2097,
+        "lng": 121.4342
+      },
+      "tags": [
+        "comfort_food",
+        "nearby",
+        "restaurant"
+      ],
+      "description": "A nearby warm-food option, but tables are unavailable and the queue is closed.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:00",
+            "end": "21:00"
+          }
+        ],
+        "last_entry": "20:00"
+      },
+      "sort_order": 35
+    },
+    {
+      "poi_id": "restaurant_cafe_401",
+      "name": "Warm Cafe Corner",
+      "category": "dining",
+      "address": "Rainy Cafe Street 14",
+      "location": {
+        "lat": 31.2089,
+        "lng": 121.4311
+      },
+      "tags": [
+        "warm_food",
+        "nearby",
+        "quiet"
+      ],
+      "description": "A usable nearby meal, but weaker and less purpose-built for the rainy-day fallback than the canonical soup stop.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:00",
+            "end": "21:00"
+          }
+        ],
+        "last_entry": "20:15"
+      },
+      "sort_order": 38
     }
   ],
   "routes": [
@@ -105,7 +228,7 @@
       "mode": "walking",
       "distance_meters": 320,
       "duration_minutes": 5,
-      "summary": "室内馆出来走几分钟就能到，尽量减少雨天暴露时间。"
+      "summary": "\u5ba4\u5185\u9986\u51fa\u6765\u8d70\u51e0\u5206\u949f\u5c31\u80fd\u5230\uff0c\u5c3d\u91cf\u51cf\u5c11\u96e8\u5929\u66b4\u9732\u65f6\u95f4\u3002"
     },
     {
       "origin_id": "activity_market_401",
@@ -113,7 +236,7 @@
       "mode": "walking",
       "distance_meters": 540,
       "duration_minutes": 8,
-      "summary": "沿有雨棚的街段步行可达。"
+      "summary": "\u6cbf\u6709\u96e8\u68da\u7684\u8857\u6bb5\u6b65\u884c\u53ef\u8fbe\u3002"
     },
     {
       "origin_id": "activity_booklounge_401",
@@ -121,16 +244,32 @@
       "mode": "walking",
       "distance_meters": 460,
       "duration_minutes": 7,
-      "summary": "从书房步行到热汤店不远，适合作为雨天保守路线。"
+      "summary": "\u4ece\u4e66\u623f\u6b65\u884c\u5230\u70ed\u6c64\u5e97\u4e0d\u8fdc\uff0c\u9002\u5408\u4f5c\u4e3a\u96e8\u5929\u4fdd\u5b88\u8def\u7ebf\u3002"
+    },
+    {
+      "origin_id": "activity_gardenhall_401",
+      "destination_id": "restaurant_soup_401",
+      "mode": "walking",
+      "distance_meters": 620,
+      "duration_minutes": 9,
+      "summary": "A valid covered walk, but slower than the canonical market-to-soup transfer."
+    },
+    {
+      "origin_id": "activity_market_401",
+      "destination_id": "restaurant_cafe_401",
+      "mode": "walking",
+      "distance_meters": 540,
+      "duration_minutes": 8,
+      "summary": "A usable route to the quieter cafe fallback nearby."
     }
   ],
   "weather": {
-    "location": "黄浦",
+    "location": "\u9ec4\u6d66",
     "date": "2026-05-16",
-    "condition": "中雨",
+    "condition": "\u4e2d\u96e8",
     "temperature_c": 21,
     "precipitation_chance": 0.88,
-    "advisory": "降雨概率很高，建议优先采用室内活动并缩短室外步行。"
+    "advisory": "\u964d\u96e8\u6982\u7387\u5f88\u9ad8\uff0c\u5efa\u8bae\u4f18\u5148\u91c7\u7528\u5ba4\u5185\u6d3b\u52a8\u5e76\u7f29\u77ed\u5ba4\u5916\u6b65\u884c\u3002"
   },
   "queues": {
     "queue_restaurant_soup_401": {
@@ -146,38 +285,105 @@
       "status": "open",
       "wait_minutes": 4,
       "parties_ahead": 1
+    },
+    "queue_restaurant_hotpot_401": {
+      "queue_id": "queue_restaurant_hotpot_401",
+      "poi_id": "restaurant_hotpot_401",
+      "status": "closed",
+      "wait_minutes": 30,
+      "parties_ahead": 7
+    },
+    "queue_restaurant_cafe_401": {
+      "queue_id": "queue_restaurant_cafe_401",
+      "poi_id": "restaurant_cafe_401",
+      "status": "open",
+      "wait_minutes": 16,
+      "parties_ahead": 4
     }
   },
   "table_availability": {
     "restaurant_soup_401": {
       "restaurant_id": "restaurant_soup_401",
       "available": true,
-      "time_slots": ["17:00", "17:30", "18:00"],
+      "time_slots": [
+        "17:00",
+        "17:30",
+        "18:00"
+      ],
       "max_party_size": 4,
-      "notes": "靠里侧座位适合雨天避雨。"
+      "notes": "\u9760\u91cc\u4fa7\u5ea7\u4f4d\u9002\u5408\u96e8\u5929\u907f\u96e8\u3002"
     },
     "restaurant_rice_401": {
       "restaurant_id": "restaurant_rice_401",
       "available": true,
-      "time_slots": ["17:00", "17:30", "18:00", "18:30"],
+      "time_slots": [
+        "17:00",
+        "17:30",
+        "18:00",
+        "18:30"
+      ],
       "max_party_size": 4,
-      "notes": "翻台稳定。"
+      "notes": "\u7ffb\u53f0\u7a33\u5b9a\u3002"
+    },
+    "restaurant_hotpot_401": {
+      "restaurant_id": "restaurant_hotpot_401",
+      "available": false,
+      "time_slots": [],
+      "max_party_size": 4,
+      "notes": "The hotpot line is closed because the kitchen is at capacity."
+    },
+    "restaurant_cafe_401": {
+      "restaurant_id": "restaurant_cafe_401",
+      "available": true,
+      "time_slots": [
+        "18:00",
+        "18:30",
+        "19:00"
+      ],
+      "max_party_size": 4,
+      "notes": "Tables remain, but the menu is lighter and less focused than the canonical soup fallback."
     }
   },
   "ticket_availability": {
     "activity_market_401": {
       "poi_id": "activity_market_401",
       "available": true,
-      "time_slots": ["14:00", "15:00", "16:00"],
+      "time_slots": [
+        "14:00",
+        "15:00",
+        "16:00"
+      ],
       "remaining": 36,
       "price_cents": 0
     },
     "activity_booklounge_401": {
       "poi_id": "activity_booklounge_401",
       "available": true,
-      "time_slots": ["14:30", "15:30", "16:30"],
+      "time_slots": [
+        "14:30",
+        "15:30",
+        "16:30"
+      ],
       "remaining": 22,
       "price_cents": 2000
+    },
+    "activity_arcade_401": {
+      "poi_id": "activity_arcade_401",
+      "available": false,
+      "time_slots": [],
+      "remaining": 0,
+      "price_cents": 2800
+    },
+    "activity_gardenhall_401": {
+      "poi_id": "activity_gardenhall_401",
+      "available": true,
+      "time_slots": [
+        "14:00",
+        "15:00",
+        "16:00"
+      ],
+      "remaining": 18,
+      "price_cents": 1200
     }
   },
   "addons": []
