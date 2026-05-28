@@ -342,6 +342,8 @@ The aggregate review passes only when all three closure checks stay true:
 
 That aggregate artifact gives reviewers one compact evidence chain tying the source failure path, the replayed report, and the internal observability metadata back to the same source benchmark report path.
 
+For the pinned V1.5 reviewer evidence package, including the exact review commands, canonical latest aliases, and tracked-versus-ignored ownership rules, see `docs/V1_5_REVIEW_EVIDENCE.md`.
+
 ## Memory Governance V1
 
 WeekendPilot already includes a narrow, releaseable memory-governance slice for V1. The current scope is read-only query shaping only: explicit user input still wins, advisory memory can help when the user is vague, and expired high-confidence memory is downgraded instead of disappearing before evaluation. The full release contract, exact rule matrix, and benchmark evidence mapping live in `docs/MEMORY_GOVERNANCE_RUNBOOK.md`.

@@ -22,12 +22,13 @@ frontend/test-results/
 frontend/blob-report/
 
 *.log
-var/*.err
-var/**/*.err
-var/*.pid
-var/**/*.pid
-var/*.jsonl
-var/**/*.jsonl
+var/
+
+# Local review scratch
+docs/artifacts/
+docs/TASK_WORKFLOW_PROMPTS.md
+docs/V1_DEVELOPMENT_REPORT.md
+qc
 
 .DS_Store
 Thumbs.db
