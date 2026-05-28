@@ -6,6 +6,87 @@ import pytest
 
 from backend.app.providers.mock_world import MockWorldProvider, build_mock_world_registry
 from backend.app.providers.mock_world.errors import MockWorldError
+from backend.app.providers.mock_world.loader import load_mock_world
+
+
+PROFILE_ACTIVITY_ORDER = {
+    "family_afternoon": [
+        "activity_museum_001",
+        "activity_story_atelier_001",
+        "activity_riverside_reading_001",
+        "activity_playground_001",
+        "activity_walk_001",
+    ],
+    "solo_afternoon": [
+        "activity_gallery_001",
+        "activity_studio_001",
+        "activity_boardgame_001",
+        "activity_walk_001",
+    ],
+    "couple_afternoon": [
+        "activity_citywalk_201",
+        "activity_conservatory_201",
+        "activity_courtyard_201",
+        "activity_gallery_201",
+    ],
+    "friends_gathering": [
+        "activity_lawn_301",
+        "activity_arcade_301",
+        "activity_promenade_301",
+        "activity_sports_301",
+    ],
+    "rainy_day_fallback": [
+        "activity_market_401",
+        "activity_arcade_401",
+        "activity_gardenhall_401",
+        "activity_booklounge_401",
+    ],
+    "budget_lite": [
+        "activity_park_501",
+        "activity_workshop_501",
+        "activity_designmall_501",
+        "activity_gallery_501",
+    ],
+}
+PROFILE_DINING_ORDER = {
+    "family_afternoon": [
+        "restaurant_light_001",
+        "restaurant_picnic_001",
+        "restaurant_garden_001",
+        "restaurant_family_001",
+        "restaurant_noodle_001",
+    ],
+    "solo_afternoon": [
+        "restaurant_light_001",
+        "restaurant_counter_001",
+        "restaurant_sharedplates_001",
+        "restaurant_noodle_001",
+    ],
+    "couple_afternoon": [
+        "restaurant_light_201",
+        "restaurant_patio_201",
+        "restaurant_sharing_201",
+        "restaurant_bistro_201",
+    ],
+    "friends_gathering": [
+        "restaurant_yard_301",
+        "restaurant_patio_301",
+        "restaurant_bistro_301",
+        "restaurant_noodle_301",
+    ],
+    "rainy_day_fallback": [
+        "restaurant_soup_401",
+        "restaurant_hotpot_401",
+        "restaurant_cafe_401",
+        "restaurant_rice_401",
+    ],
+    "budget_lite": [
+        "restaurant_bento_501",
+        "restaurant_cafe_501",
+        "restaurant_bistro_501",
+        "restaurant_noodle_501",
+    ],
+}
 
 
 def test_provider_name_is_mock_world() -> None:
@@ -14,17 +95,36 @@ def test_provider_name_is_mock_world() -> None:
     assert provider.name == "mock_world"
 
 
-def test_search_poi_returns_deterministic_activity_results() -> None:
-    provider = MockWorldProvider()
+@pytest.mark.parametrize(
+    ("profile", "expected_poi_ids"),
+    list(PROFILE_ACTIVITY_ORDER.items()),
+)
+def test_search_poi_returns_deterministic_activity_results(
+    profile: str,
+    expected_poi_ids: list[str],
+) -> None:
+    provider = MockWorldProvider(load_mock_world(profile))
 
     result = provider.invoke("search_poi", {"category": "activity"})
 
-    assert [poi["poi_id"] for poi in result["results"]] == [
-        "activity_museum_001",
-        "activity_playground_001",
-        "activity_walk_001",
-    ]
+    assert [poi["poi_id"] for poi in result["results"]] == expected_poi_ids
     assert all(poi["category"] == "activity" for poi in result["results"])
+
+
+@pytest.mark.parametrize(
+    ("profile", "expected_poi_ids"),
+    list(PROFILE_DINING_ORDER.items()),
+)
+def test_search_poi_returns_deterministic_dining_results(
+    profile: str,
+    expected_poi_ids: list[str],
+) -> None:
+    provider = MockWorldProvider(load_mock_world(profile))
+
+    result = provider.invoke("search_poi", {"category": "dining"})
+
+    assert [poi["poi_id"] for poi in result["results"]] == expected_poi_ids
+    assert all(poi["category"] == "dining" for poi in result["results"])
 
 
 def test_search_poi_filters_dining_category() -> None:
@@ -34,7 +134,7 @@ def test_search_poi_filters_dining_category() -> None:
 
     assert [poi["poi_id"] for poi in result["results"]] == [
         "restaurant_light_001",
-        "restaurant_family_001",
+        "restaurant_picnic_001",
     ]
     assert all(poi["category"] == "dining" for poi in result["results"])
 

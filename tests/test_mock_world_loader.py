@@ -7,12 +7,21 @@ from backend.app.providers.mock_world.loader import _validate_world, load_mock_w
 
 
 SUPPORTED_PROFILES = (
+    "family_afternoon",
     "solo_afternoon",
     "couple_afternoon",
     "friends_gathering",
     "rainy_day_fallback",
     "budget_lite",
 )
+MINIMUM_CATEGORY_COUNTS = {
+    "family_afternoon": {"activity": 5, "dining": 5},
+    "solo_afternoon": {"activity": 4, "dining": 4},
+    "couple_afternoon": {"activity": 4, "dining": 4},
+    "friends_gathering": {"activity": 4, "dining": 4},
+    "rainy_day_fallback": {"activity": 4, "dining": 4},
+    "budget_lite": {"activity": 4, "dining": 4},
+}
 
 
 def test_default_fixture_loads_family_afternoon_profile() -> None:
@@ -25,7 +34,7 @@ def test_default_fixture_loads_family_afternoon_profile() -> None:
     assert world["location"]["area"]
 
 
-@pytest.mark.parametrize("profile", SUPPORTED_PROFILES)
+@pytest.mark.parametrize("profile", SUPPORTED_PROFILES[1:])
 def test_explicit_fixture_loads_supported_profile(profile: str) -> None:
     world = load_mock_world(profile)
 
@@ -54,6 +63,26 @@ def test_default_fixture_has_required_top_level_keys() -> None:
 
 def test_default_fixture_poi_ids_are_unique() -> None:
     world = load_mock_world()
+
+    poi_ids = [poi["poi_id"] for poi in world["pois"]]
+
+    assert len(poi_ids) == len(set(poi_ids))
+
+
+@pytest.mark.parametrize("profile", SUPPORTED_PROFILES)
+def test_supported_profiles_expose_minimum_activity_and_dining_density(profile: str) -> None:
+    world = load_mock_world(profile)
+    counts = {
+        "activity": sum(1 for poi in world["pois"] if poi["category"] == "activity"),
+        "dining": sum(1 for poi in world["pois"] if poi["category"] == "dining"),
+    }
+
+    assert counts == MINIMUM_CATEGORY_COUNTS[profile]
+
+
+@pytest.mark.parametrize("profile", SUPPORTED_PROFILES)
+def test_supported_profiles_keep_unique_poi_ids(profile: str) -> None:
+    world = load_mock_world(profile)
 
     poi_ids = [poi["poi_id"] for poi in world["pois"]]
 

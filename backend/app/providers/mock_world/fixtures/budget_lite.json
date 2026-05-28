@@ -1,21 +1,25 @@
 {
   "profile": "budget_lite",
   "location": {
-    "city": "上海",
-    "area": "普陀"
+    "city": "\u4e0a\u6d77",
+    "area": "\u666e\u9640"
   },
   "pois": [
     {
       "poi_id": "activity_park_501",
-      "name": "河边免费公园步道",
+      "name": "\u6cb3\u8fb9\u514d\u8d39\u516c\u56ed\u6b65\u9053",
       "category": "activity",
-      "address": "上海市普陀区光复西路218号附近",
+      "address": "\u4e0a\u6d77\u5e02\u666e\u9640\u533a\u5149\u590d\u897f\u8def218\u53f7\u9644\u8fd1",
       "location": {
         "lat": 31.2447,
         "lng": 121.4203
       },
-      "tags": ["free_activity", "light_activity", "outdoor"],
-      "description": "完全免费、走起来轻松的公园步道，适合预算有限时先安排低成本活动。",
+      "tags": [
+        "free_activity",
+        "light_activity",
+        "outdoor"
+      ],
+      "description": "\u5b8c\u5168\u514d\u8d39\u3001\u8d70\u8d77\u6765\u8f7b\u677e\u7684\u516c\u56ed\u6b65\u9053\uff0c\u9002\u5408\u9884\u7b97\u6709\u9650\u65f6\u5148\u5b89\u6392\u4f4e\u6210\u672c\u6d3b\u52a8\u3002",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -30,15 +34,19 @@
     },
     {
       "poi_id": "activity_gallery_501",
-      "name": "社区免费展廊",
+      "name": "\u793e\u533a\u514d\u8d39\u5c55\u5eca",
       "category": "activity",
-      "address": "上海市普陀区岚皋路88号",
+      "address": "\u4e0a\u6d77\u5e02\u666e\u9640\u533a\u5c9a\u768b\u8def88\u53f7",
       "location": {
         "lat": 31.2385,
         "lng": 121.4144
       },
-      "tags": ["free_activity", "indoor", "quiet"],
-      "description": "社区里的免费小展廊，下雨或太热时也能作为低成本备选。",
+      "tags": [
+        "free_activity",
+        "indoor",
+        "quiet"
+      ],
+      "description": "\u793e\u533a\u91cc\u7684\u514d\u8d39\u5c0f\u5c55\u5eca\uff0c\u4e0b\u96e8\u6216\u592a\u70ed\u65f6\u4e5f\u80fd\u4f5c\u4e3a\u4f4e\u6210\u672c\u5907\u9009\u3002",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -52,16 +60,75 @@
       "sort_order": 20
     },
     {
+      "poi_id": "activity_workshop_501",
+      "name": "Budget Workshop Pop-up",
+      "category": "activity",
+      "address": "Budget Lane 5",
+      "location": {
+        "lat": 31.2215,
+        "lng": 121.4468
+      },
+      "tags": [
+        "free_activity",
+        "light_activity",
+        "indoor",
+        "budget_limited"
+      ],
+      "description": "A low-cost community workshop that matches the budget brief, but today's drop-in slots are already gone.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "13:00",
+            "end": "17:30"
+          }
+        ],
+        "last_entry": "16:30"
+      },
+      "sort_order": 15
+    },
+    {
+      "poi_id": "activity_designmall_501",
+      "name": "Design Mall Walkthrough",
+      "category": "activity",
+      "address": "Budget Avenue 12",
+      "location": {
+        "lat": 31.2228,
+        "lng": 121.4489
+      },
+      "tags": [
+        "light_activity",
+        "indoor",
+        "premium"
+      ],
+      "description": "A usable but pricier mall-style activity that fits the time window while pulling the plan away from the low-cost ideal.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:00",
+            "end": "21:00"
+          }
+        ],
+        "last_entry": "20:00"
+      },
+      "sort_order": 18
+    },
+    {
       "poi_id": "restaurant_bento_501",
-      "name": "平价便当小馆",
+      "name": "\u5e73\u4ef7\u4fbf\u5f53\u5c0f\u9986",
       "category": "dining",
-      "address": "上海市普陀区中山北路166号",
+      "address": "\u4e0a\u6d77\u5e02\u666e\u9640\u533a\u4e2d\u5c71\u5317\u8def166\u53f7",
       "location": {
         "lat": 31.2428,
         "lng": 121.4181
       },
-      "tags": ["budget_limited", "quick_meal", "value_set"],
-      "description": "套餐价格低、上餐快，适合预算有限时控制总花费。",
+      "tags": [
+        "budget_limited",
+        "quick_meal",
+        "value_set"
+      ],
+      "description": "\u5957\u9910\u4ef7\u683c\u4f4e\u3001\u4e0a\u9910\u5feb\uff0c\u9002\u5408\u9884\u7b97\u6709\u9650\u65f6\u63a7\u5236\u603b\u82b1\u8d39\u3002",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -76,15 +143,18 @@
     },
     {
       "poi_id": "restaurant_noodle_501",
-      "name": "街坊面馆",
+      "name": "\u8857\u574a\u9762\u9986",
       "category": "dining",
-      "address": "上海市普陀区铜川路98号",
+      "address": "\u4e0a\u6d77\u5e02\u666e\u9640\u533a\u94dc\u5ddd\u8def98\u53f7",
       "location": {
         "lat": 31.2404,
         "lng": 121.4137
       },
-      "tags": ["budget_limited", "quick_meal"],
-      "description": "价格平实、翻台快，适合不想在吃饭上花太多预算。",
+      "tags": [
+        "budget_limited",
+        "quick_meal"
+      ],
+      "description": "\u4ef7\u683c\u5e73\u5b9e\u3001\u7ffb\u53f0\u5feb\uff0c\u9002\u5408\u4e0d\u60f3\u5728\u5403\u996d\u4e0a\u82b1\u592a\u591a\u9884\u7b97\u3002",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -96,6 +166,59 @@
         "last_entry": "21:00"
       },
       "sort_order": 40
+    },
+    {
+      "poi_id": "restaurant_cafe_501",
+      "name": "Budget Cafe Counter",
+      "category": "dining",
+      "address": "Budget Avenue 16",
+      "location": {
+        "lat": 31.2231,
+        "lng": 121.4475
+      },
+      "tags": [
+        "budget_limited",
+        "quick_meal"
+      ],
+      "description": "The price point fits, but table service is unavailable and the queue is not accepting new parties.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:00",
+            "end": "20:00"
+          }
+        ],
+        "last_entry": "19:15"
+      },
+      "sort_order": 35
+    },
+    {
+      "poi_id": "restaurant_bistro_501",
+      "name": "Value Bistro Express",
+      "category": "dining",
+      "address": "Budget Avenue 20",
+      "location": {
+        "lat": 31.2244,
+        "lng": 121.4493
+      },
+      "tags": [
+        "quick_meal",
+        "value_set",
+        "premium"
+      ],
+      "description": "A usable dinner option, but it is more expensive than the canonical bento route.",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:00",
+            "end": "21:00"
+          }
+        ],
+        "last_entry": "20:15"
+      },
+      "sort_order": 38
     }
   ],
   "routes": [
@@ -105,7 +228,7 @@
       "mode": "walking",
       "distance_meters": 430,
       "duration_minutes": 6,
-      "summary": "从公园出来步行到便当店很近，路线直接。"
+      "summary": "\u4ece\u516c\u56ed\u51fa\u6765\u6b65\u884c\u5230\u4fbf\u5f53\u5e97\u5f88\u8fd1\uff0c\u8def\u7ebf\u76f4\u63a5\u3002"
     },
     {
       "origin_id": "activity_park_501",
@@ -113,7 +236,7 @@
       "mode": "walking",
       "distance_meters": 620,
       "duration_minutes": 9,
-      "summary": "沿主路走即可到面馆，步行强度低。"
+      "summary": "\u6cbf\u4e3b\u8def\u8d70\u5373\u53ef\u5230\u9762\u9986\uff0c\u6b65\u884c\u5f3a\u5ea6\u4f4e\u3002"
     },
     {
       "origin_id": "activity_gallery_501",
@@ -121,16 +244,32 @@
       "mode": "walking",
       "distance_meters": 570,
       "duration_minutes": 8,
-      "summary": "从展廊步行到便当店距离适中。"
+      "summary": "\u4ece\u5c55\u5eca\u6b65\u884c\u5230\u4fbf\u5f53\u5e97\u8ddd\u79bb\u9002\u4e2d\u3002"
+    },
+    {
+      "origin_id": "activity_designmall_501",
+      "destination_id": "restaurant_bento_501",
+      "mode": "walking",
+      "distance_meters": 710,
+      "duration_minutes": 10,
+      "summary": "A valid route, but it is longer than the canonical park-to-bento walk."
+    },
+    {
+      "origin_id": "activity_park_501",
+      "destination_id": "restaurant_bistro_501",
+      "mode": "walking",
+      "distance_meters": 890,
+      "duration_minutes": 12,
+      "summary": "A usable route to the pricier dinner fallback farther down the block."
     }
   ],
   "weather": {
-    "location": "普陀",
+    "location": "\u666e\u9640",
     "date": "2026-05-16",
-    "condition": "多云",
+    "condition": "\u591a\u4e91",
     "temperature_c": 25,
     "precipitation_chance": 0.18,
-    "advisory": "天气稳定，适合选择低成本户外路线。"
+    "advisory": "\u5929\u6c14\u7a33\u5b9a\uff0c\u9002\u5408\u9009\u62e9\u4f4e\u6210\u672c\u6237\u5916\u8def\u7ebf\u3002"
   },
   "queues": {
     "queue_restaurant_bento_501": {
@@ -146,38 +285,106 @@
       "status": "open",
       "wait_minutes": 4,
       "parties_ahead": 1
+    },
+    "queue_restaurant_cafe_501": {
+      "queue_id": "queue_restaurant_cafe_501",
+      "poi_id": "restaurant_cafe_501",
+      "status": "closed",
+      "wait_minutes": 28,
+      "parties_ahead": 7
+    },
+    "queue_restaurant_bistro_501": {
+      "queue_id": "queue_restaurant_bistro_501",
+      "poi_id": "restaurant_bistro_501",
+      "status": "open",
+      "wait_minutes": 18,
+      "parties_ahead": 4
     }
   },
   "table_availability": {
     "restaurant_bento_501": {
       "restaurant_id": "restaurant_bento_501",
       "available": true,
-      "time_slots": ["17:00", "17:30", "18:00", "18:30"],
+      "time_slots": [
+        "17:00",
+        "17:30",
+        "18:00",
+        "18:30"
+      ],
       "max_party_size": 2,
-      "notes": "便当档口旁的堂食位可直接落座。"
+      "notes": "\u4fbf\u5f53\u6863\u53e3\u65c1\u7684\u5802\u98df\u4f4d\u53ef\u76f4\u63a5\u843d\u5ea7\u3002"
     },
     "restaurant_noodle_501": {
       "restaurant_id": "restaurant_noodle_501",
       "available": true,
-      "time_slots": ["17:00", "17:30", "18:00", "18:30"],
+      "time_slots": [
+        "17:00",
+        "17:30",
+        "18:00",
+        "18:30"
+      ],
       "max_party_size": 2,
-      "notes": "适合一个人或两人快速吃完。"
+      "notes": "\u9002\u5408\u4e00\u4e2a\u4eba\u6216\u4e24\u4eba\u5feb\u901f\u5403\u5b8c\u3002"
+    },
+    "restaurant_cafe_501": {
+      "restaurant_id": "restaurant_cafe_501",
+      "available": false,
+      "time_slots": [],
+      "max_party_size": 2,
+      "notes": "Counter is short-staffed and not seating walk-ins."
+    },
+    "restaurant_bistro_501": {
+      "restaurant_id": "restaurant_bistro_501",
+      "available": true,
+      "time_slots": [
+        "18:00",
+        "18:30",
+        "19:00"
+      ],
+      "max_party_size": 2,
+      "notes": "Seats are available, but the spend is higher than the canonical budget route."
     }
   },
   "ticket_availability": {
     "activity_park_501": {
       "poi_id": "activity_park_501",
       "available": true,
-      "time_slots": ["14:00", "15:00", "16:00"],
+      "time_slots": [
+        "14:00",
+        "15:00",
+        "16:00"
+      ],
       "remaining": 99,
       "price_cents": 0
     },
     "activity_gallery_501": {
       "poi_id": "activity_gallery_501",
       "available": true,
-      "time_slots": ["14:30", "15:30", "16:30"],
+      "time_slots": [
+        "14:30",
+        "15:30",
+        "16:30"
+      ],
       "remaining": 30,
       "price_cents": 0
+    },
+    "activity_workshop_501": {
+      "poi_id": "activity_workshop_501",
+      "available": false,
+      "time_slots": [],
+      "remaining": 0,
+      "price_cents": 500
+    },
+    "activity_designmall_501": {
+      "poi_id": "activity_designmall_501",
+      "available": true,
+      "time_slots": [
+        "14:00",
+        "15:00",
+        "16:00"
+      ],
+      "remaining": 20,
+      "price_cents": 2600
     }
   },
   "addons": []
