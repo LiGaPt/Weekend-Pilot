@@ -41,6 +41,29 @@ Every public `DemoPlanPreview` now includes `action_manifest`, a stable executio
 
 `source = "proposed_actions"` is used for safe pre-confirmation previews, `source = "confirmed_actions"` is used after confirmation when persisted confirmed actions exist, and `source = "none"` is used when no valid public action preview is available.
 
+Every successful public `DemoRunSummary` now also includes an additive `progress` object:
+
+```json
+{
+  "schema_version": "public_demo_progress_v1",
+  "current_stage": "ready_for_confirmation",
+  "current_label": "推荐方案已准备好",
+  "stage_history": [
+    "understanding_request",
+    "planning_queries",
+    "searching_activities",
+    "searching_dining",
+    "checking_availability",
+    "building_itinerary",
+    "checking_route_time",
+    "reviewing_plan",
+    "ready_for_confirmation"
+  ]
+}
+```
+
+That snapshot is reconstructed from persisted workflow node history, ordered tool events, and demo continuation history only. This task does not add real-time transport for mid-request progress: no async start flow, polling endpoint, SSE stream, or WebSocket is introduced here.
+
 No external local-life provider, map provider, LangSmith upload, API key, token, or secret is required for the default Mock World path.
 
 ## Prerequisites
@@ -356,6 +379,7 @@ PostgreSQL, Redis, and migrations must already be ready.
 ## Expected Results
 
 - Planning stops at `awaiting_confirmation` before any write action.
+- Every successful public `DemoRunSummary` includes the additive `progress` snapshot, and refresh/readback preserves the same public-safe stage view after the run completes.
 - `Mock World` remains the default read path for the public demo and for benchmark-aligned checks.
 - The explicit `AMap 只读预览` path also stops at `awaiting_confirmation`, keeps `action_count = 0`, and never exposes a working confirm action in the UI.
 - Vague start requests can stop at `awaiting_clarification` before any plan is generated.

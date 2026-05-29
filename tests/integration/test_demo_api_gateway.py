@@ -49,6 +49,29 @@ REDACTED_PUBLIC_RUN_FIELDS = {
     "observability_status",
     "agent_roles",
 }
+PROGRESS_LABELS = {
+    "understanding_request": "\u6b63\u5728\u7406\u89e3\u9700\u6c42",
+    "planning_queries": "\u6b63\u5728\u89c4\u5212\u67e5\u8be2",
+    "searching_activities": "\u6b63\u5728\u67e5\u8be2\u6e38\u73a9\u5730\u70b9",
+    "searching_dining": "\u6b63\u5728\u67e5\u8be2\u9910\u5385",
+    "checking_availability": "\u6b63\u5728\u68c0\u67e5\u8425\u4e1a\u4e0e\u53ef\u7528\u6027",
+    "building_itinerary": "\u6b63\u5728\u7ec4\u5408\u884c\u7a0b",
+    "checking_route_time": "\u6b63\u5728\u8ba1\u7b97\u8def\u7ebf\u4e0e\u65f6\u95f4",
+    "reviewing_plan": "\u6b63\u5728\u590d\u6838\u65b9\u6848",
+    "ready_for_confirmation": "\u63a8\u8350\u65b9\u6848\u5df2\u51c6\u5907\u597d",
+    "executing_confirmed_actions": "\u5df2\u786e\u8ba4\uff0c\u6b63\u5728\u6267\u884c\u52a8\u4f5c",
+}
+READY_PROGRESS_HISTORY = [
+    "understanding_request",
+    "planning_queries",
+    "searching_activities",
+    "searching_dining",
+    "checking_availability",
+    "building_itinerary",
+    "checking_route_time",
+    "reviewing_plan",
+    "ready_for_confirmation",
+]
 VAGUE_USER_INPUT = "想周末出去玩一下。"
 
 
@@ -257,6 +280,20 @@ def _assert_plan_version(
     }
 
 
+def _assert_progress(
+    payload: dict[str, object],
+    *,
+    current_stage: str,
+    stage_history: list[str],
+) -> None:
+    assert payload["progress"] == {
+        "schema_version": "public_demo_progress_v1",
+        "current_stage": current_stage,
+        "current_label": PROGRESS_LABELS[current_stage],
+        "stage_history": stage_history,
+    }
+
+
 def _assert_action_manifest_preview(plan: dict[str, object]) -> None:
     manifest = plan["action_manifest"]
     assert isinstance(manifest, dict)
@@ -302,6 +339,11 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
         version_number=1,
         source_run_id=None,
         source_selected_plan_id=None,
+    )
+    _assert_progress(
+        start_body,
+        current_stage="ready_for_confirmation",
+        stage_history=READY_PROGRESS_HISTORY,
     )
     selected_start_plan = next(plan for plan in start_body["plans"] if plan["selected"])
     _assert_action_manifest_preview(selected_start_plan)
@@ -412,6 +454,11 @@ def test_demo_run_friends_group_start_persists_friends_world_and_confirms_succes
         source_run_id=None,
         source_selected_plan_id=None,
     )
+    _assert_progress(
+        start_body,
+        current_stage="ready_for_confirmation",
+        stage_history=READY_PROGRESS_HISTORY,
+    )
     selected_start_plan = next(plan for plan in start_body["plans"] if plan["selected"])
     _assert_action_manifest_preview(selected_start_plan)
     run_id = UUID(start_body["run_id"])
@@ -437,6 +484,11 @@ def test_demo_run_friends_group_start_persists_friends_world_and_confirms_succes
     assert confirm_body["run_id"] == str(run_id)
     assert confirm_body["status"] == "completed"
     assert confirm_body["action_count"] > 0
+    _assert_progress(
+        confirm_body,
+        current_stage="executing_confirmed_actions",
+        stage_history=[*READY_PROGRESS_HISTORY, "executing_confirmed_actions"],
+    )
     selected_confirmed_plan = next(plan for plan in confirm_body["plans"] if plan["selected"])
     _assert_action_manifest_confirmed(selected_confirmed_plan)
 
@@ -487,6 +539,11 @@ def test_demo_run_amap_preview_stays_read_only_and_preserves_profile(
     assert start_body["status"] == "awaiting_confirmation"
     assert start_body["read_profile"] == "amap"
     assert start_body["action_count"] == 0
+    _assert_progress(
+        start_body,
+        current_stage="ready_for_confirmation",
+        stage_history=READY_PROGRESS_HISTORY,
+    )
     run_id = UUID(start_body["run_id"])
 
     db = SessionLocal()
@@ -529,6 +586,11 @@ def test_demo_run_amap_preview_stays_read_only_and_preserves_profile(
     assert replan_body["read_profile"] == "amap"
     assert replan_body["status"] == "awaiting_confirmation"
     assert replan_body["run_id"] != start_body["run_id"]
+    _assert_progress(
+        replan_body,
+        current_stage="ready_for_confirmation",
+        stage_history=READY_PROGRESS_HISTORY,
+    )
 
     db = SessionLocal()
     try:
@@ -553,6 +615,11 @@ def test_demo_run_amap_preview_stays_read_only_and_preserves_profile(
         version_number=1,
         source_run_id=None,
         source_selected_plan_id=None,
+    )
+    _assert_progress(
+        status_body,
+        current_stage="ready_for_confirmation",
+        stage_history=READY_PROGRESS_HISTORY,
     )
     status_selected_plan = next(plan for plan in status_body["plans"] if plan["selected"])
     manifest = status_selected_plan["action_manifest"]
@@ -587,6 +654,11 @@ def test_demo_run_decline_creates_no_actions_and_blocks_later_confirm(client) ->
     decline_body = decline_response.json()
     assert decline_body["status"] == "declined"
     assert decline_body["action_count"] == 0
+    _assert_progress(
+        decline_body,
+        current_stage="ready_for_confirmation",
+        stage_history=READY_PROGRESS_HISTORY,
+    )
     selected = next(plan for plan in decline_body["plans"] if plan["selected"])
     _assert_action_manifest_preview(selected)
     assert selected["confirmation"]["status"] == "declined"
@@ -632,6 +704,11 @@ def test_demo_run_status_route_keeps_public_shape_after_internal_route_addition(
         source_run_id=None,
         source_selected_plan_id=None,
     )
+    _assert_progress(
+        payload,
+        current_stage="ready_for_confirmation",
+        stage_history=READY_PROGRESS_HISTORY,
+    )
     assert "trace_id" not in payload
     assert "tool_event_count" not in payload
     assert "node_history" not in payload
@@ -656,6 +733,11 @@ def test_demo_run_clarification_flow_reuses_session_and_keeps_version_v1(client)
     assert start_body["selected_plan_id"] is None
     assert start_body["plans"] == []
     assert start_body["action_count"] == 0
+    _assert_progress(
+        start_body,
+        current_stage="planning_queries",
+        stage_history=["understanding_request", "planning_queries"],
+    )
     assert start_body["clarification"] == {
         "prompt": "为了继续规划，请补充这次是谁一起去，以及大概什么时间出发、准备玩多久。",
         "missing_fields": ["scenario_or_participants", "time_window"],
@@ -665,6 +747,11 @@ def test_demo_run_clarification_flow_reuses_session_and_keeps_version_v1(client)
         version_number=1,
         source_run_id=None,
         source_selected_plan_id=None,
+    )
+    _assert_progress(
+        start_body,
+        current_stage="planning_queries",
+        stage_history=["understanding_request", "planning_queries"],
     )
     source_run_id = UUID(start_body["run_id"])
 
@@ -699,6 +786,16 @@ def test_demo_run_clarification_flow_reuses_session_and_keeps_version_v1(client)
         version_number=1,
         source_run_id=str(source_run_id),
         source_selected_plan_id=None,
+    )
+    _assert_progress(
+        clarify_body,
+        current_stage="ready_for_confirmation",
+        stage_history=READY_PROGRESS_HISTORY,
+    )
+    _assert_progress(
+        clarify_body,
+        current_stage="ready_for_confirmation",
+        stage_history=READY_PROGRESS_HISTORY,
     )
 
     db = SessionLocal()
@@ -914,6 +1011,11 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
         source_run_id=None,
         source_selected_plan_id=None,
     )
+    _assert_progress(
+        source_body,
+        current_stage="ready_for_confirmation",
+        stage_history=READY_PROGRESS_HISTORY,
+    )
 
     replan_response = test_client.post(
         f"/demo/runs/{source_run_id}/replan",
@@ -937,6 +1039,11 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
         source_run_id=str(source_run_id),
         source_selected_plan_id=source_selected_plan_id,
     )
+    _assert_progress(
+        replan_body,
+        current_stage="ready_for_confirmation",
+        stage_history=READY_PROGRESS_HISTORY,
+    )
     replan_selected_plan = next(plan for plan in replan_body["plans"] if plan["selected"])
     _assert_action_manifest_preview(replan_selected_plan)
 
@@ -959,6 +1066,11 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
         source_run_id=replan_body["run_id"],
         source_selected_plan_id=replan_body["selected_plan_id"],
     )
+    _assert_progress(
+        second_replan_body,
+        current_stage="ready_for_confirmation",
+        stage_history=READY_PROGRESS_HISTORY,
+    )
     second_replan_selected_plan = next(plan for plan in second_replan_body["plans"] if plan["selected"])
     _assert_action_manifest_preview(second_replan_selected_plan)
 
@@ -969,6 +1081,7 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
     assert source_after["status"] == source_body["status"]
     assert source_after["selected_plan_id"] == source_selected_plan_id
     assert source_after["plan_version"] == source_body["plan_version"]
+    assert source_after["progress"] == source_body["progress"]
 
     first_replan_status_response = test_client.get(f"/demo/runs/{replan_body['run_id']}")
     assert first_replan_status_response.status_code == 200
@@ -976,6 +1089,7 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
     assert first_replan_after["run_id"] == replan_body["run_id"]
     assert first_replan_after["selected_plan_id"] == replan_body["selected_plan_id"]
     assert first_replan_after["plan_version"] == replan_body["plan_version"]
+    assert first_replan_after["progress"] == replan_body["progress"]
 
     db = SessionLocal()
     try:
