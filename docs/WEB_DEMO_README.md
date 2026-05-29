@@ -323,6 +323,23 @@ Use a mobile viewport around 390px wide. Start a run and confirm the main contro
 
 ## Automated Checks
 
+### Regression Matrix
+
+Customer-surface browser regression is intentionally split into two layers:
+
+- Live desktop checks against the real local stack now cover the primary customer paths:
+  - happy path from start through confirm and execution feedback
+  - vague-request clarification continuation
+  - follow-up replan continuation with visible version advancement
+  - customer-safe redaction on the public page
+  - progress-stepper visibility plus closed-by-default completed-step disclosure behavior
+- Live mobile checks still run against the real local stack and focus on customer-visible controls plus document-level horizontal-overflow safety.
+- Targeted mocked desktop checks remain only for deterministic contract assertions that are difficult to force reliably from live data:
+  - selected second-plan replan index propagation
+  - AMap read-only preview notice and confirm block
+
+Treat the live checks as the primary regression gate for customer behavior. Treat the targeted mocked checks as narrow contract guards rather than replacements for the live browser flow.
+
 Install Playwright Chromium:
 
 ```bash
@@ -371,6 +388,12 @@ Run the full desktop browser regression before committing so the existing Englis
 
 ```bash
 npm --prefix frontend run e2e -- --project=desktop-chromium
+```
+
+Run the full mobile browser regression before committing to confirm the customer viewport still stays stable:
+
+```bash
+npm --prefix frontend run e2e -- --project=mobile-chromium
 ```
 
 The E2E config starts:

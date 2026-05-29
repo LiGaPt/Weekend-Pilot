@@ -2,10 +2,17 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 
 const forbiddenVisibleText = [
   "action_id",
+  "action_count",
   "tool_event_id",
   "event_id",
   "idempotency_key",
   "debug_trace",
+  "execution_status",
+  "feedback_status",
+  "trace_id",
+  "session_id",
+  "node_history",
+  "agent_roles",
   "api_key",
   "token",
   "secret",
@@ -13,8 +20,7 @@ const forbiddenVisibleText = [
 ];
 
 const explicitHappyPathPrompt =
-  "今天下午14点左右和爱人、5岁的孩子从徐汇出发，在家附近玩 4 小时，先安排室内亲子活动，再去吃一顿清淡晚餐，全程别太远。";
-
+  "\u4eca\u5929\u4e0b\u534814\u70b9\u5de6\u53f3\u548c\u7231\u4eba\u30015\u5c81\u7684\u5b69\u5b50\u4ece\u5f90\u6c47\u51fa\u53d1\uff0c\u5728\u5bb6\u9644\u8fd1\u73a94\u5c0f\u65f6\uff0c\u5148\u5b89\u6392\u5ba4\u5185\u4eb2\u5b50\u6d3b\u52a8\uff0c\u518d\u53bb\u5403\u4e00\u987f\u6e05\u6de1\u665a\u9910\uff0c\u5168\u7a0b\u522b\u592a\u8fdc\u3002";
 const stableHappyPathPrompt =
   "This afternoon I want to go out with my wife and child for a few hours. Not too far. My child is 5, and my wife is trying to eat lighter.";
 const friendsGroupPrompt =
@@ -22,10 +28,20 @@ const friendsGroupPrompt =
 const stableClarificationReply =
   "We are leaving around 2pm this afternoon from Xuhui with my wife and 5-year-old child for about 4 hours. Keep it nearby if possible, but going a bit farther is okay if it keeps the plan relaxed. Please start with an indoor child-friendly activity and then a light dinner.";
 const explicitHappyPathClarificationReply =
-  "今天下午14点左右和爱人、5岁的孩子从徐汇出发，在家附近玩 4 小时，先安排室内亲子活动，再去吃一顿清淡晚餐，全程别太远。";
+  "\u4eca\u5929\u4e0b\u534814\u70b9\u5de6\u53f3\u548c\u7231\u4eba\u30015\u5c81\u7684\u5b69\u5b50\u4ece\u5f90\u6c47\u51fa\u53d1\uff0c\u5728\u5bb6\u9644\u8fd1\u73a94\u5c0f\u65f6\uff0c\u5148\u5b89\u6392\u5ba4\u5185\u4eb2\u5b50\u6d3b\u52a8\uff0c\u518d\u53bb\u5403\u4e00\u987f\u6e05\u6de1\u665a\u9910\uff0c\u5168\u7a0b\u522b\u592a\u8fdc\u3002";
+const vagueChinesePrompt = "\u60f3\u5468\u672b\u51fa\u53bb\u73a9\u4e00\u4e0b\u3002";
+const vagueChineseClarificationReply =
+  "\u4eca\u5929\u4e0b\u5348\u4e00\u4e2a\u4eba\u51fa\u95e8\u73a9\u51e0\u4e2a\u5c0f\u65f6\uff0c\u522b\u592a\u8fdc\u3002";
+const liveReplanReply = "Keep it nearby, but make it a solo outing this time.";
 
 async function fillMainComposer(page: Page, prompt: string) {
   await page.getByRole("textbox").first().fill(prompt);
+}
+
+async function startRun(page: Page, prompt: string) {
+  await page.goto("/");
+  await fillMainComposer(page, prompt);
+  await page.getByTestId("start-button").click();
 }
 
 async function waitForConversationStage(page: Page) {
@@ -53,14 +69,14 @@ async function waitForConversationStage(page: Page) {
   if ((await page.getByTestId("clarification-card").count()) > 0) {
     const input = page.getByTestId("clarification-reply-input");
     if ((await input.count()) > 0 && (await input.isEditable().catch(() => false))) {
-        return "clarification";
-      }
+      return "clarification";
+    }
   }
   if ((await page.getByTestId("replan-panel").count()) > 0) {
     const input = page.getByTestId("replan-reply-input");
     if ((await input.count()) > 0 && (await input.isEditable().catch(() => false))) {
-        return "confirmation";
-      }
+      return "confirmation";
+    }
   }
   if ((await page.getByTestId("assistant-result-card").count()) > 0) {
     return "result";
@@ -86,6 +102,40 @@ async function currentRunInfoText(page: Page, testId: string) {
   return text;
 }
 
+async function expectThreadItemOrder(first: Locator, second: Locator) {
+  const [firstIndex, secondIndex] = await Promise.all([
+    first.evaluate((node) => {
+      const article = node.closest("article");
+      return article ? Array.from(document.querySelectorAll("article")).indexOf(article) : -1;
+    }),
+    second.evaluate((node) => {
+      const article = node.closest("article");
+      return article ? Array.from(document.querySelectorAll("article")).indexOf(article) : -1;
+    }),
+  ]);
+
+  expect(firstIndex).toBeGreaterThanOrEqual(0);
+  expect(secondIndex).toBeGreaterThanOrEqual(0);
+  expect(firstIndex).toBeLessThan(secondIndex);
+}
+
+async function expectLatestProgressStepperCollapsed(page: Page) {
+  const card = page.getByTestId("progress-stepper-card").last();
+  await expect(card).toBeVisible({ timeout: 60_000 });
+  await expect(card.getByTestId("progress-completed-toggle")).toHaveAttribute("aria-expanded", "false");
+  await expect(card.getByTestId("progress-completed-list")).toHaveCount(0);
+  return card;
+}
+
+async function expandLatestCompletedSteps(page: Page) {
+  const card = await expectLatestProgressStepperCollapsed(page);
+  const toggle = card.getByTestId("progress-completed-toggle");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(card.getByTestId("progress-completed-list")).toBeVisible();
+  return card;
+}
+
 async function continueToAwaitingConfirmation(
   page: Page,
   expectedVersion: string,
@@ -105,16 +155,15 @@ async function continueToAwaitingConfirmation(
   await expect(page.getByTestId("replan-panel")).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId("confirm-button")).toHaveCount(1);
   expect(await currentRunInfoText(page, "plan-version")).toBe(expectedVersion);
+  await expectLatestProgressStepperCollapsed(page);
 }
 
 async function startPresentableDemoRun(
   page: Page,
-  prompt?: string,
+  prompt: string = stableHappyPathPrompt,
   clarificationReply: string = stableClarificationReply,
 ) {
-  await page.goto("/");
-  await fillMainComposer(page, prompt ?? stableHappyPathPrompt);
-  await page.getByTestId("start-button").click();
+  await startRun(page, prompt);
   await continueToAwaitingConfirmation(page, "v1", clarificationReply);
 }
 
@@ -124,6 +173,10 @@ async function expectNoForbiddenVisibleText(page: Page) {
   for (const forbidden of forbiddenVisibleText) {
     expect(bodyText, `visible page text should not include ${forbidden}`).not.toContain(forbidden);
   }
+}
+
+async function expectExecutionTimelineCollapsed(resultCard: Locator) {
+  await expect(resultCard.getByTestId("execution-timeline")).toHaveCount(0);
 }
 
 function buildProgress(stage: string, stageHistory: string[], summaryOverrides: Record<string, string> = {}) {
@@ -268,8 +321,6 @@ function buildMockAwaitingRun(
 }
 
 const mockedStartRun = buildMockAwaitingRun("run-1", "plan-1", 1, "v1", null, null);
-const mockedReplannedRunV2 = buildMockAwaitingRun("run-2", "plan-2", 2, "v2", "run-1", "plan-1");
-const mockedReplannedRunV3 = buildMockAwaitingRun("run-3", "plan-3", 3, "v3", "run-2", "plan-2");
 const mockedStartRunWithTwoPlans = buildMockTwoPlanAwaitingRun();
 const mockedReplannedRunV2FromPlan2 = buildMockAwaitingRun("run-2", "plan-4", 2, "v2", "run-1", "plan-2");
 const mockedAmapRun = {
@@ -277,85 +328,6 @@ const mockedAmapRun = {
   run_id: "run-amap",
   read_profile: "amap",
 };
-const mockedCompletedRun = {
-  ...mockedStartRun,
-  status: "completed",
-  action_count: 1,
-  execution_status: "succeeded",
-  feedback_status: "written",
-  progress: buildProgress(
-    "executing_confirmed_actions",
-    [
-      "understanding_request",
-      "planning_queries",
-      "searching_activities",
-      "searching_dining",
-      "checking_availability",
-      "building_itinerary",
-      "checking_route_time",
-      "reviewing_plan",
-      "ready_for_confirmation",
-      "executing_confirmed_actions",
-    ],
-    {
-      searching_activities: "\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8",
-      searching_dining: "\u5df2\u627e\u5230 5 \u4e2a\u9910\u5385",
-      executing_confirmed_actions: "\u5df2\u5f00\u59cb\u6267\u884c 1 \u4e2a\u786e\u8ba4\u52a8\u4f5c",
-    },
-  ),
-  plans: [
-    {
-      ...mockedStartRun.plans[0],
-      status: "executed",
-      action_manifest: {
-        source: "confirmed_actions",
-        action_count: 1,
-        actions: [
-          {
-            action_ref: "draft_1_action_1",
-            execution_order: 1,
-            action_type: "reserve_restaurant",
-            target_id: "green-table",
-            payload_preview: { party_size: 3 },
-            reason: "Confirm to lock dinner seating.",
-          },
-        ],
-      },
-      confirmation: {
-        status: "confirmed",
-        action_count: 1,
-      },
-      execution: {
-        status: "succeeded",
-        started_at: "2026-05-26T14:00:00+08:00",
-        finished_at: "2026-05-26T14:02:00+08:00",
-        succeeded_count: 1,
-        failed_count: 0,
-        action_results: [
-          {
-            action_ref: "draft_1_action_1",
-            execution_order: 1,
-            tool_name: "reserve_restaurant",
-            target_id: "green-table",
-            status: "succeeded",
-          },
-        ],
-      },
-      feedback: {
-        status: "written",
-        headline: "Plan completed",
-        message: "The confirmed reservation completed successfully.",
-        completed_actions: [{ action_type: "reserve_restaurant", status: "succeeded" }],
-        failed_actions: [],
-        next_steps: ["Leave a little before 2pm."],
-      },
-    },
-  ],
-};
-
-async function expectTimelineDisclosure(locator: Locator) {
-  await expect(locator).toHaveCount(0);
-}
 
 test.describe("desktop web demo", () => {
   test.beforeEach(({}, testInfo) => {
@@ -363,21 +335,33 @@ test.describe("desktop web demo", () => {
   });
 
   test("starts a run, keeps the summary-first confirmation boundary, confirms, and shows feedback", async ({ page }) => {
-    await startPresentableDemoRun(page);
+    await startRun(page, stableHappyPathPrompt);
 
-    await expect(page.getByText("推荐方案摘要", { exact: true }).last()).toBeVisible();
+    await expect(page.locator("article.thread-row-user").getByText(stableHappyPathPrompt)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId("system-progress")).toBeVisible({ timeout: 60_000 });
+
+    await continueToAwaitingConfirmation(page, "v1");
+
+    await expect(page.getByTestId("system-progress")).toHaveCount(0);
+    await expect(page.getByText("\u63a8\u8350\u65b9\u6848\u6458\u8981", { exact: true }).last()).toBeVisible();
     await expect(page.getByTestId("confirm-button")).toBeVisible();
     await expect(page.getByTestId("run-id")).toHaveCount(0);
-    await expectTimelineDisclosure(page.locator(".timeline-list li"));
+    await expectNoForbiddenVisibleText(page);
 
-    await page.getByRole("button", { name: "时间线" }).last().click();
+    const progressCard = await expandLatestCompletedSteps(page);
+    await expect(progressCard.getByTestId("progress-completed-list")).toContainText("\u5df2\u627e\u5230");
+
+    await page.getByRole("button", { name: "\u65f6\u95f4\u7ebf" }).last().click();
     await expect(page.locator(".timeline-list li").first()).toBeVisible();
 
     await page.getByTestId("confirm-button").click();
 
-    await expect(page.getByTestId("assistant-result-card")).toBeVisible({ timeout: 60_000 });
-    await expect(page.locator('[data-testid="assistant-result-card"] h2')).toBeVisible();
-    await expectTimelineDisclosure(page.getByTestId("execution-timeline"));
+    const resultCard = page.getByTestId("assistant-result-card").last();
+    await expect(resultCard).toBeVisible({ timeout: 60_000 });
+    await expectThreadItemOrder(page.getByTestId("progress-stepper-card").last(), resultCard);
+    await expectExecutionTimelineCollapsed(resultCard);
+    await expectNoForbiddenVisibleText(page);
+
     await page.getByTestId("execution-timeline-toggle").click();
     await expect(page.getByTestId("execution-timeline")).toBeVisible();
     await expect(page.getByTestId("confirm-button")).toHaveCount(0);
@@ -388,7 +372,7 @@ test.describe("desktop web demo", () => {
 
     await page.getByTestId("decline-button").click();
 
-    await expect(page.getByText("已放弃当前方案")).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText("\u5df2\u653e\u5f03\u5f53\u524d\u65b9\u6848")).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId("confirm-button")).toHaveCount(0);
   });
 
@@ -436,8 +420,8 @@ test.describe("desktop web demo", () => {
     await startPresentableDemoRun(page, friendsGroupPrompt, friendsGroupPrompt);
 
     await expect(page.getByTestId("confirm-button")).toBeVisible();
-    await page.getByRole("button", { name: "活动与餐厅" }).last().click();
-    await expect(page.locator("body")).toContainText(/适合朋友聚会|group_friendly/);
+    await page.getByRole("button", { name: "\u6d3b\u52a8\u4e0e\u9910\u5385" }).last().click();
+    await expect(page.locator("body")).toContainText(/\u9002\u5408\u670b\u53cb\u805a\u4f1a|group_friendly/);
 
     await page.getByTestId("confirm-button").click();
 
@@ -445,83 +429,40 @@ test.describe("desktop web demo", () => {
   });
 
   test("continues a vague request through the clarification flow", async ({ page }) => {
-    await page.goto("/");
-    await fillMainComposer(page, "想周末出去玩一下。");
-    await page.getByTestId("start-button").click();
+    await startRun(page, vagueChinesePrompt);
 
-    await expect(page.getByTestId("clarification-card")).toBeVisible({ timeout: 60_000 });
-    expect(await currentRunInfoText(page, "plan-version")).toBe("v1");
+    await expect(page.getByTestId("system-progress")).toBeVisible({ timeout: 60_000 });
+    const clarificationCard = page.getByTestId("clarification-card").last();
+    await expect(clarificationCard).toBeVisible({ timeout: 60_000 });
+
     const sourceRunId = await currentRunInfoText(page, "run-id");
+    expect(await currentRunInfoText(page, "plan-version")).toBe("v1");
 
-    await page.getByTestId("clarification-reply-input").fill("今天下午一个人出门玩几个小时，别太远。");
+    const progressCard = await expectLatestProgressStepperCollapsed(page);
+    await expectThreadItemOrder(progressCard, clarificationCard);
+
+    await page.getByTestId("clarification-reply-input").fill(vagueChineseClarificationReply);
     await page.getByTestId("clarification-submit-button").click();
 
-    await continueToAwaitingConfirmation(page, "v1", "今天下午一个人出门玩几个小时，别太远。");
+    await continueToAwaitingConfirmation(page, "v1", vagueChineseClarificationReply);
     expect(await currentRunInfoText(page, "run-id")).not.toBe(sourceRunId);
+
+    await expectThreadItemOrder(page.getByTestId("progress-stepper-card").last(), page.getByTestId("replan-panel").last());
   });
 
   test("replans from the customer page and advances the visible version", async ({ page }) => {
-    const startBodies: Array<Record<string, unknown>> = [];
-    const replanBodies: Array<Record<string, unknown>> = [];
-    let replanCallCount = 0;
-
-    await page.route("**/demo/runs", async (route, request) => {
-      if (request.method() !== "POST") {
-        await route.fallback();
-        return;
-      }
-
-      startBodies.push((request.postDataJSON() as Record<string, unknown>) ?? {});
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(mockedStartRun),
-      });
-    });
-
-    await page.route(/\/demo\/runs\/[^/]+\/replan$/, async (route, request) => {
-      if (request.method() !== "POST") {
-        await route.fallback();
-        return;
-      }
-
-      replanBodies.push((request.postDataJSON() as Record<string, unknown>) ?? {});
-      const responseBody = replanCallCount === 0 ? mockedReplannedRunV2 : mockedReplannedRunV3;
-      replanCallCount += 1;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(responseBody),
-      });
-    });
-
     await startPresentableDemoRun(page);
-    expect(startBodies).toHaveLength(1);
-    expect(startBodies[0]?.selected_plan_index).toBe(0);
-    expect(startBodies[0]?.read_profile).toBe("mock_world");
 
     const sourceRunId = await currentRunInfoText(page, "run-id");
+    await expectThreadItemOrder(page.getByTestId("progress-stepper-card").last(), page.getByTestId("replan-panel").last());
 
-    await page.getByTestId("replan-reply-input").fill("Keep it nearby, but make it indoor this time.");
+    await page.getByTestId("replan-reply-input").fill(liveReplanReply);
     await page.getByTestId("replan-submit-button").click();
+
     await continueToAwaitingConfirmation(page, "v2");
-    expect(replanBodies[0]).toEqual({
-      user_input: "Keep it nearby, but make it indoor this time.",
-      selected_plan_index: 0,
-    });
-
-    const replannedRunId = await currentRunInfoText(page, "run-id");
-    expect(replannedRunId).not.toBe(sourceRunId);
-
-    await page.getByTestId("replan-reply-input").fill("Keep it nearby again, but reduce walking even more.");
-    await page.getByTestId("replan-submit-button").click();
-    await continueToAwaitingConfirmation(page, "v3");
-    expect(replanBodies[1]).toEqual({
-      user_input: "Keep it nearby again, but reduce walking even more.",
-      selected_plan_index: 0,
-    });
-
-    expect(await currentRunInfoText(page, "run-id")).not.toBe(replannedRunId);
+    expect(await currentRunInfoText(page, "run-id")).not.toBe(sourceRunId);
+    await expectThreadItemOrder(page.getByTestId("progress-stepper-card").last(), page.getByTestId("replan-panel").last());
+    await expectNoForbiddenVisibleText(page);
   });
 
   test("sends the selected second plan index when replanning from the customer page", async ({ page }) => {
@@ -595,42 +536,18 @@ test.describe("desktop web demo", () => {
     await expect(page.getByTestId("replan-panel")).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId("amap-read-only-notice")).toBeVisible();
     await expect(page.getByTestId("confirm-button")).toHaveCount(0);
-    expect(await currentRunInfoText(page, "active-read-profile")).toBe("AMap 只读预览");
+    expect(await currentRunInfoText(page, "active-read-profile")).toBe("AMap \u53ea\u8bfb\u9884\u89c8");
   });
 
   test("does not render forbidden internal or sensitive keys", async ({ page }) => {
-    await page.route("**/demo/runs", async (route, request) => {
-      if (request.method() !== "POST") {
-        await route.fallback();
-        return;
-      }
-
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(mockedStartRun),
-      });
-    });
-
-    await page.route(/\/demo\/runs\/[^/]+\/confirm$/, async (route, request) => {
-      if (request.method() !== "POST") {
-        await route.fallback();
-        return;
-      }
-
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(mockedCompletedRun),
-      });
-    });
-
     await startPresentableDemoRun(page, explicitHappyPathPrompt, explicitHappyPathClarificationReply);
+
+    await expect(page.getByTestId("run-id")).toHaveCount(0);
     await expectNoForbiddenVisibleText(page);
 
-    await page.getByTestId("confirm-button").click();
-
-    await expect(page.getByTestId("assistant-result-card")).toBeVisible({ timeout: 60_000 });
+    await openLatestRunInfo(page);
+    await expect(page.getByTestId("run-id").last()).toBeVisible();
+    await expect(page.getByTestId("plan-version").last()).toHaveText("v1");
     await expectNoForbiddenVisibleText(page);
   });
 });
@@ -641,15 +558,15 @@ test.describe("mobile web demo", () => {
   });
 
   test("loads the main flow without document-level horizontal overflow", async ({ page }) => {
-    await page.goto("/");
-    await fillMainComposer(page, stableHappyPathPrompt);
-    await page.getByTestId("start-button").click();
+    await startRun(page, stableHappyPathPrompt);
 
     const stage = await waitForConversationStage(page);
     if (stage === "confirmation") {
+      await expectLatestProgressStepperCollapsed(page);
       await expect(page.getByTestId("replan-panel")).toBeVisible();
-      await expect(page.getByRole("button", { name: "时间线" }).last()).toBeVisible();
+      await expect(page.getByRole("button", { name: "\u65f6\u95f4\u7ebf" }).last()).toBeVisible();
     } else {
+      await expectLatestProgressStepperCollapsed(page);
       await expect(page.getByTestId("clarification-card")).toBeVisible();
       await expect(page.getByTestId("clarification-submit-button")).toBeVisible();
     }
