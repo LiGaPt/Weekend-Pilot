@@ -286,12 +286,29 @@ def _assert_progress(
     current_stage: str,
     stage_history: list[str],
 ) -> None:
-    assert payload["progress"] == {
-        "schema_version": "public_demo_progress_v1",
-        "current_stage": current_stage,
-        "current_label": PROGRESS_LABELS[current_stage],
-        "stage_history": stage_history,
-    }
+    progress = payload["progress"]
+    assert progress["schema_version"] == "public_demo_progress_v1"
+    assert progress["current_stage"] == current_stage
+    assert progress["current_label"] == PROGRESS_LABELS[current_stage]
+    assert progress["stage_history"] == stage_history
+    steps = progress["steps"]
+    assert isinstance(steps, list)
+    assert [step["stage"] for step in steps] == stage_history
+    assert steps[-1]["status"] == "current"
+    for index, stage in enumerate(stage_history):
+        step = steps[index]
+        assert step["label"] == PROGRESS_LABELS[stage]
+        assert step["status"] == ("current" if index == len(stage_history) - 1 else "completed")
+        assert isinstance(step["summary"], str)
+        assert step["summary"]
+
+
+def _progress_step_summary(payload: dict[str, object], stage: str) -> str:
+    steps = payload["progress"]["steps"]
+    for step in steps:
+        if step["stage"] == stage:
+            return step["summary"]
+    raise AssertionError(f"Missing progress step {stage!r}")
 
 
 def _assert_action_manifest_preview(plan: dict[str, object]) -> None:
@@ -489,6 +506,9 @@ def test_demo_run_friends_group_start_persists_friends_world_and_confirms_succes
         current_stage="executing_confirmed_actions",
         stage_history=[*READY_PROGRESS_HISTORY, "executing_confirmed_actions"],
     )
+    assert _progress_step_summary(confirm_body, "executing_confirmed_actions") == (
+        f"\u5df2\u5f00\u59cb\u6267\u884c {confirm_body['action_count']} \u4e2a\u786e\u8ba4\u52a8\u4f5c"
+    )
     selected_confirmed_plan = next(plan for plan in confirm_body["plans"] if plan["selected"])
     _assert_action_manifest_confirmed(selected_confirmed_plan)
 
@@ -659,6 +679,9 @@ def test_demo_run_decline_creates_no_actions_and_blocks_later_confirm(client) ->
         current_stage="ready_for_confirmation",
         stage_history=READY_PROGRESS_HISTORY,
     )
+    assert _progress_step_summary(decline_body, "ready_for_confirmation") == (
+        "\u5df2\u8bb0\u5f55\u672c\u6b21\u6682\u4e0d\u786e\u8ba4"
+    )
     selected = next(plan for plan in decline_body["plans"] if plan["selected"])
     _assert_action_manifest_preview(selected)
     assert selected["confirmation"]["status"] == "declined"
@@ -709,6 +732,8 @@ def test_demo_run_status_route_keeps_public_shape_after_internal_route_addition(
         current_stage="ready_for_confirmation",
         stage_history=READY_PROGRESS_HISTORY,
     )
+    assert _progress_step_summary(payload, "searching_activities") == "\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8"
+    assert _progress_step_summary(payload, "searching_dining") == "\u5df2\u627e\u5230 5 \u4e2a\u9910\u5385"
     assert "trace_id" not in payload
     assert "tool_event_count" not in payload
     assert "node_history" not in payload

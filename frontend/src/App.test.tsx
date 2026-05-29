@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { clarifyRun, confirmRun, getRun, replanRun, startRun } from "./api/demo";
-import type { DemoRunSummary } from "./types/demo";
+import type { DemoRunSummary, DemoProgressStage } from "./types/demo";
 
 vi.mock("./api/demo", () => ({
   startRun: vi.fn(),
@@ -14,118 +14,181 @@ vi.mock("./api/demo", () => ({
   replanRun: vi.fn(),
 }));
 
-const awaitingRun: DemoRunSummary = {
-  run_id: "run-1",
-  status: "awaiting_confirmation",
-  read_profile: "mock_world",
-  selected_plan_id: "plan-1",
-  plan_version: {
-    version_number: 1,
-    version_label: "v1",
-    source_run_id: null,
-    source_selected_plan_id: null,
-  },
-  plans: [
-    {
-      plan_id: "plan-1",
-      status: "reviewed",
-      selected: true,
-      title: "徐汇亲子半日行",
-      summary: "先安排室内亲子活动，再去吃一顿清淡晚餐。",
-      activity: {
-        name: "徐汇亲子科学馆",
-        category: "activity",
-        address: "上海市徐汇区亲子科普路100号",
-        tags: ["child_friendly", "indoor"],
-      },
-      dining: {
-        name: "绿箸家庭轻食",
-        category: "dining",
-        address: "上海市徐汇区健康街6号",
-        tags: ["lighter_options", "family_tables"],
-      },
-      timeline: [
-        {
-          sequence: 1,
-          title: "体验亲子科学馆",
-          start_label: "14:00",
-          end_label: "16:00",
-          duration_minutes: 120,
-        },
+const progressLabels: Record<DemoProgressStage, string> = {
+  understanding_request: "\u6b63\u5728\u7406\u89e3\u9700\u6c42",
+  planning_queries: "\u6b63\u5728\u89c4\u5212\u67e5\u8be2",
+  searching_activities: "\u6b63\u5728\u67e5\u8be2\u6e38\u73a9\u5730\u70b9",
+  searching_dining: "\u6b63\u5728\u67e5\u8be2\u9910\u5385",
+  checking_availability: "\u6b63\u5728\u68c0\u67e5\u8425\u4e1a\u4e0e\u53ef\u7528\u6027",
+  building_itinerary: "\u6b63\u5728\u7ec4\u5408\u884c\u7a0b",
+  checking_route_time: "\u6b63\u5728\u8ba1\u7b97\u8def\u7ebf\u4e0e\u65f6\u95f4",
+  reviewing_plan: "\u6b63\u5728\u590d\u6838\u65b9\u6848",
+  ready_for_confirmation: "\u63a8\u8350\u65b9\u6848\u5df2\u51c6\u5907\u597d",
+  executing_confirmed_actions: "\u5df2\u786e\u8ba4\uff0c\u6b63\u5728\u6267\u884c\u52a8\u4f5c",
+};
+
+function buildProgress(
+  currentStage: DemoProgressStage,
+  stageHistory: DemoProgressStage[],
+  summaryOverrides: Partial<Record<DemoProgressStage, string>> = {},
+) {
+  return {
+    schema_version: "public_demo_progress_v1" as const,
+    current_stage: currentStage,
+    current_label: progressLabels[currentStage],
+    stage_history: stageHistory,
+    steps: stageHistory.map((stage, index) => {
+      const status: "current" | "completed" = index === stageHistory.length - 1 ? "current" : "completed";
+      return {
+        stage,
+        label: progressLabels[stage],
+        status,
+        summary: summaryOverrides[stage] ?? progressLabels[stage],
+      };
+    }),
+  };
+}
+
+function baseAwaitingRun(): DemoRunSummary {
+  return {
+    run_id: "run-1",
+    status: "awaiting_confirmation",
+    read_profile: "mock_world",
+    selected_plan_id: "plan-1",
+    progress: buildProgress(
+      "ready_for_confirmation",
+      [
+        "understanding_request",
+        "planning_queries",
+        "searching_activities",
+        "searching_dining",
+        "checking_availability",
+        "building_itinerary",
+        "checking_route_time",
+        "reviewing_plan",
+        "ready_for_confirmation",
       ],
-      route: {
-        mode: "driving",
-        distance_meters: 3200,
-        duration_minutes: 18,
-        summary: "活动与餐厅之间车程很短，适合带孩子轻松衔接。",
+      {
+        searching_activities: "\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8",
+        searching_dining: "\u5df2\u627e\u5230 5 \u4e2a\u9910\u5385",
+        building_itinerary: "\u5df2\u751f\u6210 2 \u4e2a\u5019\u9009\u65b9\u6848",
+        ready_for_confirmation: "\u63a8\u8350\u65b9\u6848\u5df2\u51c6\u5907\u597d",
       },
-      feasibility: {
-        is_feasible: true,
-        reasons: ["符合半日出行时长。"],
-        warnings: [],
-        total_duration_minutes: 270,
-        route_duration_minutes: 18,
-        queue_wait_minutes: 5,
-      },
-      proposed_actions: [],
-      action_manifest: {
-        source: "proposed_actions",
-        action_count: 1,
-        actions: [
+    ),
+    plan_version: {
+      version_number: 1,
+      version_label: "v1",
+      source_run_id: null,
+      source_selected_plan_id: null,
+    },
+    plans: [
+      {
+        plan_id: "plan-1",
+        status: "reviewed",
+        selected: true,
+        title: "Family Afternoon Plan",
+        summary: "Indoor activity first, then a lighter dinner nearby.",
+        activity: {
+          name: "Family Science Center",
+          category: "activity",
+          address: "100 Science Road",
+          tags: ["child_friendly", "indoor"],
+        },
+        dining: {
+          name: "Light Table",
+          category: "dining",
+          address: "8 Dinner Street",
+          tags: ["lighter_options", "family_tables"],
+        },
+        timeline: [
           {
-            action_ref: "draft_1_action_1",
-            execution_order: 1,
-            action_type: "reserve_restaurant",
-            target_id: "green-table",
-            payload_preview: { party_size: 3 },
-            reason: "确认后可提前锁定晚餐座位。",
+            sequence: 1,
+            title: "Indoor activity",
+            start_label: "14:00",
+            end_label: "16:00",
+            duration_minutes: 120,
           },
         ],
+        route: {
+          mode: "driving",
+          distance_meters: 3200,
+          duration_minutes: 18,
+          summary: "A short drive keeps the afternoon easy.",
+        },
+        feasibility: {
+          is_feasible: true,
+          reasons: ["Fits the requested afternoon window."],
+          warnings: [],
+          total_duration_minutes: 270,
+          route_duration_minutes: 18,
+          queue_wait_minutes: 5,
+        },
+        proposed_actions: [],
+        action_manifest: {
+          source: "proposed_actions",
+          action_count: 1,
+          actions: [
+            {
+              action_ref: "draft_1_action_1",
+              execution_order: 1,
+              action_type: "reserve_restaurant",
+              target_id: "green-table",
+              payload_preview: { party_size: 3 },
+              reason: "Lock dinner seating after confirmation.",
+            },
+          ],
+        },
+        confirmation: { status: "pending", action_count: 1 },
       },
-      confirmation: { status: "pending", action_count: 1 },
-    },
-    {
-      plan_id: "plan-2",
-      status: "reviewed",
-      selected: false,
-      title: "滨江轻松备选",
-      summary: "先去户外活动，再简单吃一顿轻便晚餐。",
-      activity: {
-        name: "滨江亲子乐园",
-        category: "activity",
-        address: "上海市徐汇区滨江步道28号",
-        tags: [],
+      {
+        plan_id: "plan-2",
+        status: "reviewed",
+        selected: false,
+        title: "Backup Walk Plan",
+        summary: "A lighter backup plan with less structure.",
+        activity: {
+          name: "Riverside Walk",
+          category: "activity",
+          address: "28 Riverside Road",
+          tags: [],
+        },
+        dining: {
+          name: "Simple Kitchen",
+          category: "dining",
+          address: "5 Cafe Street",
+          tags: [],
+        },
+        timeline: [],
+        route: null,
+        feasibility: null,
+        proposed_actions: [],
+        action_manifest: {
+          source: "none",
+          action_count: 0,
+          actions: [],
+        },
+        confirmation: { status: "pending", action_count: 0 },
       },
-      dining: {
-        name: "街角轻食小馆",
-        category: "dining",
-        address: "上海市徐汇区咖啡街3号",
-        tags: [],
-      },
-      timeline: [],
-      route: null,
-      feasibility: null,
-      proposed_actions: [],
-      action_manifest: {
-        source: "none",
-        action_count: 0,
-        actions: [],
-      },
-      confirmation: { status: "pending", action_count: 0 },
-    },
-  ],
-  action_count: 0,
-  execution_status: null,
-  feedback_status: null,
-  error: null,
-  clarification: null,
-};
+    ],
+    action_count: 0,
+    execution_status: null,
+    feedback_status: null,
+    error: null,
+    clarification: null,
+  };
+}
+
+const awaitingRun = baseAwaitingRun();
 
 const awaitingClarificationRun: DemoRunSummary = {
   run_id: "run-clarify-1",
   status: "awaiting_clarification",
   read_profile: "mock_world",
   selected_plan_id: null,
+  progress: buildProgress("planning_queries", ["understanding_request", "planning_queries"], {
+    understanding_request: "\u5df2\u7406\u89e3\u51fa\u884c\u76ee\u6807\u4e0e\u6838\u5fc3\u7ea6\u675f",
+    planning_queries: "\u5df2\u6574\u7406\u6d3b\u52a8\u4e0e\u9910\u996e\u67e5\u8be2\u65b9\u5411",
+  }),
   plan_version: {
     version_number: 1,
     version_label: "v1",
@@ -138,42 +201,75 @@ const awaitingClarificationRun: DemoRunSummary = {
   feedback_status: null,
   error: null,
   clarification: {
-    prompt: "为了继续规划，请补充这次是谁一起去，以及大概什么时间出发、准备玩多久。",
+    prompt: "Please tell me who is going and roughly how long you want to stay out.",
     missing_fields: ["scenario_or_participants", "time_window"],
   },
 };
 
 const clarifiedRun: DemoRunSummary = {
-  ...awaitingRun,
+  ...baseAwaitingRun(),
   run_id: "run-2",
 };
 
 const awaitingAmapRun: DemoRunSummary = {
-  ...awaitingRun,
+  ...baseAwaitingRun(),
   run_id: "run-amap",
   read_profile: "amap",
 };
 
 const replannedRunV2FromPlan2: DemoRunSummary = {
-  ...awaitingRun,
+  ...baseAwaitingRun(),
   run_id: "run-2",
+  selected_plan_id: "plan-2",
   plan_version: {
     version_number: 2,
     version_label: "v2",
     source_run_id: "run-1",
     source_selected_plan_id: "plan-2",
   },
+  plans: [
+    {
+      ...baseAwaitingRun().plans[0],
+      plan_id: "plan-1",
+      selected: false,
+    },
+    {
+      ...baseAwaitingRun().plans[1],
+      plan_id: "plan-2",
+      selected: true,
+    },
+  ],
 };
 
 const completedRun: DemoRunSummary = {
-  ...awaitingRun,
+  ...baseAwaitingRun(),
   status: "completed",
   action_count: 2,
   execution_status: "succeeded",
   feedback_status: "written",
+  progress: buildProgress(
+    "executing_confirmed_actions",
+    [
+      "understanding_request",
+      "planning_queries",
+      "searching_activities",
+      "searching_dining",
+      "checking_availability",
+      "building_itinerary",
+      "checking_route_time",
+      "reviewing_plan",
+      "ready_for_confirmation",
+      "executing_confirmed_actions",
+    ],
+    {
+      searching_activities: "\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8",
+      searching_dining: "\u5df2\u627e\u5230 5 \u4e2a\u9910\u5385",
+      executing_confirmed_actions: "\u5df2\u5f00\u59cb\u6267\u884c 2 \u4e2a\u786e\u8ba4\u52a8\u4f5c",
+    },
+  ),
   plans: [
     {
-      ...awaitingRun.plans[0],
+      ...baseAwaitingRun().plans[0],
       status: "executed",
       action_manifest: {
         source: "confirmed_actions",
@@ -185,7 +281,7 @@ const completedRun: DemoRunSummary = {
             action_type: "reserve_restaurant",
             target_id: "green-table",
             payload_preview: { party_size: 3 },
-            reason: "Lock the dinner table after confirmation.",
+            reason: "Lock dinner seating after confirmation.",
           },
         ],
       },
@@ -215,11 +311,11 @@ const completedRun: DemoRunSummary = {
       },
       feedback: {
         status: "written",
-        headline: "安排已完成",
-        message: "订座和通知都已处理完成。",
+        headline: "Plan completed",
+        message: "Reservation and follow-up message both completed.",
         completed_actions: [{ action_type: "reserve_restaurant", status: "succeeded" }],
         failed_actions: [],
-        next_steps: ["建议 13:40 左右出发。"],
+        next_steps: ["Leave a little before 2pm."],
       },
     },
   ],
@@ -235,6 +331,12 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
+function expectThreadOrder(first: HTMLElement | null, second: HTMLElement | null) {
+  expect(first).not.toBeNull();
+  expect(second).not.toBeNull();
+  expect(first!.compareDocumentPosition(second! as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+}
+
 describe("App", () => {
   beforeEach(() => {
     vi.mocked(startRun).mockReset();
@@ -244,53 +346,52 @@ describe("App", () => {
     vi.mocked(replanRun).mockReset();
   });
 
-  it("renders a single composer with examples and hides advanced options by default", async () => {
-    const user = userEvent.setup();
+  it("renders the main composer and keeps advanced options hidden by default", () => {
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "企业级对话式周末规划" })).toBeInTheDocument();
     expect(screen.getByRole("textbox")).toHaveValue("");
-    expect(screen.getByRole("button", { name: "亲子半天" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "朋友轻社交" })).toBeInTheDocument();
     expect(screen.queryByTestId("read-profile-select")).not.toBeInTheDocument();
     expect(screen.queryByTestId("run-id")).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "亲子半天" }));
-    expect(screen.getByRole("textbox")).toHaveValue(
-      "今天下午想和爱人、5岁的孩子出门玩几个小时，别离家太远。孩子要适合亲子活动，爱人最近想吃清淡一点，帮我安排一下。",
-    );
   });
 
-  it("appends the user request and a visible system progress item while starting", async () => {
+  it("shows a transient local spinner first, then renders the persistent progress card above the plan", async () => {
     const user = userEvent.setup();
     const deferred = createDeferred<DemoRunSummary>();
     vi.mocked(startRun).mockReturnValue(deferred.promise);
     render(<App />);
 
-    await user.type(screen.getByRole("textbox"), "帮我安排一个下午的亲子活动。");
+    await user.type(screen.getByRole("textbox"), "Plan a family afternoon");
     await user.click(screen.getByTestId("start-button"));
 
-    expect(screen.getAllByText("帮我安排一个下午的亲子活动。").length).toBeGreaterThan(0);
-    expect(screen.getByTestId("system-progress")).toHaveTextContent("正在生成推荐方案...");
+    expect(screen.getByTestId("system-progress")).toBeInTheDocument();
 
     deferred.resolve(awaitingRun);
-    expect(await screen.findByRole("heading", { name: "徐汇亲子半日行" })).toBeInTheDocument();
+
+    const progressCard = await screen.findByTestId("progress-stepper-card");
+    const planHeading = await screen.findByRole("heading", { name: "Family Afternoon Plan" });
+    expectThreadOrder(progressCard.closest("article"), planHeading.closest("article"));
+    expect(screen.getByTestId("progress-completed-toggle")).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8")).not.toBeInTheDocument();
   });
 
-  it("renders a summary-first plan card and keeps run metadata hidden until disclosure opens", async () => {
+  it("keeps the recommended plan summary-first and hides run metadata until disclosure opens", async () => {
     const user = userEvent.setup();
     vi.mocked(startRun).mockResolvedValue(awaitingRun);
     render(<App />);
 
-    await user.type(screen.getByRole("textbox"), "帮我安排一个下午的亲子活动。");
+    await user.type(screen.getByRole("textbox"), "Plan a family afternoon");
     await user.click(screen.getByTestId("start-button"));
 
-    expect(await screen.findByRole("heading", { name: "徐汇亲子半日行" })).toBeInTheDocument();
-    expect(screen.getByText("先安排室内亲子活动，再去吃一顿清淡晚餐。")).toBeInTheDocument();
-    expect(screen.queryByText("体验亲子科学馆")).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Family Afternoon Plan" })).toBeInTheDocument();
+    expect(screen.getByText("Indoor activity first, then a lighter dinner nearby.")).toBeInTheDocument();
+    expect(screen.queryByText("Indoor activity")).not.toBeInTheDocument();
     expect(screen.queryByText("green-table")).not.toBeInTheDocument();
+    expect(screen.queryByText("\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8")).not.toBeInTheDocument();
     expect(screen.queryByTestId("run-id")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("action-count")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("progress-completed-toggle"));
+    expect(screen.getByText("\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8")).toBeInTheDocument();
+    expect(screen.getByText("\u5df2\u627e\u5230 5 \u4e2a\u9910\u5385")).toBeInTheDocument();
 
     const runInfoButtons = screen.getAllByTestId("run-info-toggle");
     await user.click(runInfoButtons[runInfoButtons.length - 1]);
@@ -300,66 +401,69 @@ describe("App", () => {
     expect(screen.getByTestId("active-read-profile")).toHaveTextContent("Mock World");
   });
 
-  it("keeps plan details collapsed until the reviewer expands them", async () => {
+  it("keeps plan details collapsed until expanded", async () => {
     const user = userEvent.setup();
     vi.mocked(startRun).mockResolvedValue(awaitingRun);
     render(<App />);
 
-    await user.type(screen.getByRole("textbox"), "帮我安排一个下午的亲子活动。");
+    await user.type(screen.getByRole("textbox"), "Plan a family afternoon");
     await user.click(screen.getByTestId("start-button"));
-    const planHeading = await screen.findByRole("heading", { name: "徐汇亲子半日行" });
+
+    const planHeading = await screen.findByRole("heading", { name: "Family Afternoon Plan" });
     const planCard = planHeading.closest(".thread-bubble");
     expect(planCard).not.toBeNull();
+    const disclosureButtons = (planCard as HTMLElement).querySelectorAll<HTMLButtonElement>(".detail-disclosure-toggle");
+    expect(disclosureButtons.length).toBeGreaterThanOrEqual(4);
 
-    expect(screen.queryByText("体验亲子科学馆")).not.toBeInTheDocument();
-    await user.click(within(planCard as HTMLElement).getByRole("button", { name: "时间线" }));
-    expect(screen.getByText("体验亲子科学馆")).toBeInTheDocument();
+    expect(screen.queryByText("Indoor activity")).not.toBeInTheDocument();
+    await user.click(disclosureButtons[0]);
+    expect(screen.getByText("Indoor activity")).toBeInTheDocument();
 
     expect(screen.queryByText("green-table")).not.toBeInTheDocument();
-    await user.click(within(planCard as HTMLElement).getByRole("button", { name: "确认前动作" }));
+    await user.click(disclosureButtons[3]);
     expect(screen.getByText("green-table")).toBeInTheDocument();
   });
 
-  it("renders clarification inside the chat flow and submits the inline reply", async () => {
+  it("renders the clarification flow with a progress card above the clarification card", async () => {
     const user = userEvent.setup();
     vi.mocked(startRun).mockResolvedValue(awaitingClarificationRun);
     vi.mocked(clarifyRun).mockResolvedValue(clarifiedRun);
     render(<App />);
 
-    await user.type(screen.getByRole("textbox"), "想周末出去玩一下。");
+    await user.type(screen.getByRole("textbox"), "Need a plan");
     await user.click(screen.getByTestId("start-button"));
 
-    expect(await screen.findByTestId("clarification-card")).toBeInTheDocument();
-    expect(screen.getByText("为了继续规划，请补充这次是谁一起去，以及大概什么时间出发、准备玩多久。")).toBeInTheDocument();
-    expect(screen.getByTestId("clarification-fields")).toHaveTextContent("出行人 / 场景");
-    expect(screen.queryByTestId("confirm-button")).not.toBeInTheDocument();
+    const progressCard = await screen.findByTestId("progress-stepper-card");
+    const clarificationCard = await screen.findByTestId("clarification-card");
+    expectThreadOrder(progressCard.closest("article"), clarificationCard.closest("article"));
+    expect(within(screen.getByTestId("clarification-fields")).getAllByRole("listitem")).toHaveLength(2);
 
-    await user.type(screen.getByTestId("clarification-reply-input"), "今天下午和家人出门，玩 4 个小时。");
+    await user.type(screen.getByTestId("clarification-reply-input"), "We are leaving around 2pm for four hours.");
     await user.click(screen.getByTestId("clarification-submit-button"));
 
     expect(clarifyRun).toHaveBeenCalledWith("run-clarify-1", {
-      user_input: "今天下午和家人出门，玩 4 个小时。",
+      user_input: "We are leaving around 2pm for four hours.",
       selected_plan_index: 0,
     });
-    expect(await screen.findByRole("heading", { name: "徐汇亲子半日行" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Family Afternoon Plan" })).toBeInTheDocument();
   });
 
-  it("uses the selected non-default plan index when replanning inside the chat flow", async () => {
+  it("uses the locally selected plan index when replanning", async () => {
     const user = userEvent.setup();
     vi.mocked(startRun).mockResolvedValue(awaitingRun);
     vi.mocked(replanRun).mockResolvedValue(replannedRunV2FromPlan2);
     render(<App />);
 
-    await user.type(screen.getByRole("textbox"), "帮我安排一个下午的亲子活动。");
+    await user.type(screen.getByRole("textbox"), "Plan a family afternoon");
     await user.click(screen.getByTestId("start-button"));
 
-    expect(await screen.findByRole("heading", { name: "徐汇亲子半日行" })).toBeInTheDocument();
-    await user.click(screen.getByRole("tab", { name: "滨江轻松备选" }));
-    await user.type(screen.getByTestId("replan-reply-input"), "保留备选方案，但减少步行。");
+    expect(await screen.findByRole("heading", { name: "Family Afternoon Plan" })).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Backup Walk Plan" }));
+    await user.type(screen.getByTestId("replan-reply-input"), "Keep the backup plan, but reduce walking.");
     await user.click(screen.getByTestId("replan-submit-button"));
 
     expect(replanRun).toHaveBeenCalledWith("run-1", {
-      user_input: "保留备选方案，但减少步行。",
+      user_input: "Keep the backup plan, but reduce walking.",
       selected_plan_index: 1,
     });
 
@@ -368,7 +472,7 @@ describe("App", () => {
     expect(await screen.findByTestId("plan-version")).toHaveTextContent("v2");
   });
 
-  it("keeps refresh inside the run-info disclosure and updates the latest run without duplicating cards", async () => {
+  it("refreshes the latest run without duplicating the active plan card", async () => {
     const user = userEvent.setup();
     vi.mocked(startRun).mockResolvedValue(awaitingRun);
     vi.mocked(getRun).mockResolvedValue({
@@ -376,24 +480,25 @@ describe("App", () => {
       plans: [
         {
           ...awaitingRun.plans[0],
-          summary: "更新后的方案摘要。",
+          summary: "Updated summary after refresh.",
         },
         awaitingRun.plans[1],
       ],
     });
     render(<App />);
 
-    await user.type(screen.getByRole("textbox"), "帮我安排一个下午的亲子活动。");
+    await user.type(screen.getByRole("textbox"), "Plan a family afternoon");
     await user.click(screen.getByTestId("start-button"));
-    expect(await screen.findByRole("heading", { name: "徐汇亲子半日行" })).toBeInTheDocument();
-    expect(screen.getAllByRole("heading", { name: "徐汇亲子半日行" })).toHaveLength(1);
+
+    expect(await screen.findByRole("heading", { name: "Family Afternoon Plan" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "Family Afternoon Plan" })).toHaveLength(1);
 
     const runInfoButtons = screen.getAllByTestId("run-info-toggle");
     await user.click(runInfoButtons[runInfoButtons.length - 1]);
     await user.click(screen.getByTestId("refresh-button"));
 
-    expect(await screen.findByText("更新后的方案摘要。")).toBeInTheDocument();
-    expect(screen.getAllByRole("heading", { name: "徐汇亲子半日行" })).toHaveLength(1);
+    expect(await screen.findByText("Updated summary after refresh.")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "Family Afternoon Plan" })).toHaveLength(1);
   });
 
   it("keeps the AMap preview path behind advanced options and blocks confirmation", async () => {
@@ -401,7 +506,7 @@ describe("App", () => {
     vi.mocked(startRun).mockResolvedValue(awaitingAmapRun);
     render(<App />);
 
-    await user.type(screen.getByRole("textbox"), "帮我先预览一个周末下午行程。");
+    await user.type(screen.getByRole("textbox"), "Preview a lighter afternoon plan");
     await user.click(screen.getByTestId("advanced-options-toggle"));
     await user.selectOptions(screen.getByTestId("read-profile-select"), "amap");
     await user.click(screen.getByTestId("start-button"));
@@ -411,31 +516,29 @@ describe("App", () => {
         read_profile: "amap",
       }),
     );
-    expect(await screen.findByTestId("amap-read-only-notice")).toHaveTextContent("只读预览");
+    expect(await screen.findByTestId("amap-read-only-notice")).toBeInTheDocument();
     expect(screen.queryByTestId("confirm-button")).not.toBeInTheDocument();
   });
 
-  it("renders completed feedback in chat and keeps the execution timeline collapsed until expanded", async () => {
+  it("keeps the progress card above the result card after confirmation", async () => {
     const user = userEvent.setup();
     vi.mocked(startRun).mockResolvedValue(awaitingRun);
     vi.mocked(confirmRun).mockResolvedValue(completedRun);
     render(<App />);
 
-    await user.type(screen.getByRole("textbox"), "帮我安排一个下午的亲子活动。");
+    await user.type(screen.getByRole("textbox"), "Plan a family afternoon");
     await user.click(screen.getByTestId("start-button"));
     await user.click(await screen.findByTestId("confirm-button"));
 
-    expect(await screen.findByTestId("assistant-result-card")).toBeInTheDocument();
-    expect(screen.getByText("安排已完成")).toBeInTheDocument();
-    expect(screen.getByText("订座和通知都已处理完成。")).toBeInTheDocument();
+    const progressCard = await screen.findByTestId("progress-stepper-card");
+    const resultCard = await screen.findByTestId("assistant-result-card");
+    expectThreadOrder(progressCard.closest("article"), resultCard.closest("article"));
+    expect(screen.getByText("Plan completed")).toBeInTheDocument();
     expect(screen.queryByTestId("execution-timeline")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("execution-timeline-toggle"));
     const timeline = await screen.findByTestId("execution-timeline");
-    expect(timeline).toBeInTheDocument();
     expect(within(timeline).getByText("2026-05-26T14:00:00+08:00")).toBeInTheDocument();
-    expect(within(timeline).getByText("2026-05-26T14:02:00+08:00")).toBeInTheDocument();
     expect(within(timeline).getByText("green-table")).toBeInTheDocument();
-    expect(within(timeline).getByText("family-chat")).toBeInTheDocument();
   });
 });

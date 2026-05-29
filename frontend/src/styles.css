@@ -303,6 +303,86 @@ button {
   margin-top: 14px;
 }
 
+.progress-stepper-card {
+  display: grid;
+  gap: 14px;
+}
+
+.progress-step-current {
+  align-items: start;
+  background: linear-gradient(180deg, #f4fbfa 0%, #eef8f6 100%);
+  border: 1px solid #c8e4df;
+  border-radius: 16px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 14px;
+}
+
+.progress-step-current-marker {
+  align-items: center;
+  background: #0f766e;
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.progress-step-current-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.progress-step-current-label,
+.progress-step-current-summary,
+.progress-step-completed-label,
+.progress-step-completed-summary {
+  margin: 0;
+}
+
+.progress-step-current-label,
+.progress-step-completed-label {
+  color: #213341;
+  font-weight: 800;
+}
+
+.progress-step-current-summary,
+.progress-step-completed-summary {
+  color: #536171;
+  line-height: 1.55;
+}
+
+.progress-step-completed-shell {
+  background: #f8fafc;
+  border: 1px solid #e1e8ef;
+  border-radius: 14px;
+  overflow: clip;
+}
+
+.progress-step-completed-toggle {
+  background: #f8fafc;
+}
+
+.progress-step-completed-list {
+  border-top: 1px solid #e1e8ef;
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 12px;
+}
+
+.progress-step-completed-item {
+  background: #ffffff;
+  border: 1px solid #e1e8ef;
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
 .detail-disclosure {
   background: #f8fafc;
   border: 1px solid #e1e8ef;

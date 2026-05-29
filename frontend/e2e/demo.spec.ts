@@ -126,6 +126,34 @@ async function expectNoForbiddenVisibleText(page: Page) {
   }
 }
 
+function buildProgress(stage: string, stageHistory: string[], summaryOverrides: Record<string, string> = {}) {
+  const labels: Record<string, string> = {
+    understanding_request: "\u6b63\u5728\u7406\u89e3\u9700\u6c42",
+    planning_queries: "\u6b63\u5728\u89c4\u5212\u67e5\u8be2",
+    searching_activities: "\u6b63\u5728\u67e5\u8be2\u6e38\u73a9\u5730\u70b9",
+    searching_dining: "\u6b63\u5728\u67e5\u8be2\u9910\u5385",
+    checking_availability: "\u6b63\u5728\u68c0\u67e5\u8425\u4e1a\u4e0e\u53ef\u7528\u6027",
+    building_itinerary: "\u6b63\u5728\u7ec4\u5408\u884c\u7a0b",
+    checking_route_time: "\u6b63\u5728\u8ba1\u7b97\u8def\u7ebf\u4e0e\u65f6\u95f4",
+    reviewing_plan: "\u6b63\u5728\u590d\u6838\u65b9\u6848",
+    ready_for_confirmation: "\u63a8\u8350\u65b9\u6848\u5df2\u51c6\u5907\u597d",
+    executing_confirmed_actions: "\u5df2\u786e\u8ba4\uff0c\u6b63\u5728\u6267\u884c\u52a8\u4f5c",
+  };
+
+  return {
+    schema_version: "public_demo_progress_v1",
+    current_stage: stage,
+    current_label: labels[stage],
+    stage_history: stageHistory,
+    steps: stageHistory.map((current, index) => ({
+      stage: current,
+      label: labels[current],
+      status: index === stageHistory.length - 1 ? "current" : "completed",
+      summary: summaryOverrides[current] ?? labels[current],
+    })),
+  };
+}
+
 function buildMockPlan(planId: string, selected: boolean) {
   return {
     plan_id: planId,
@@ -205,6 +233,25 @@ function buildMockAwaitingRun(
     status: "awaiting_confirmation",
     read_profile: "mock_world",
     selected_plan_id: planId,
+    progress: buildProgress(
+      "ready_for_confirmation",
+      [
+        "understanding_request",
+        "planning_queries",
+        "searching_activities",
+        "searching_dining",
+        "checking_availability",
+        "building_itinerary",
+        "checking_route_time",
+        "reviewing_plan",
+        "ready_for_confirmation",
+      ],
+      {
+        searching_activities: "\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8",
+        searching_dining: "\u5df2\u627e\u5230 5 \u4e2a\u9910\u5385",
+        building_itinerary: "\u5df2\u751f\u6210 2 \u4e2a\u5019\u9009\u65b9\u6848",
+      },
+    ),
     plan_version: {
       version_number: versionNumber,
       version_label: versionLabel,
@@ -236,6 +283,26 @@ const mockedCompletedRun = {
   action_count: 1,
   execution_status: "succeeded",
   feedback_status: "written",
+  progress: buildProgress(
+    "executing_confirmed_actions",
+    [
+      "understanding_request",
+      "planning_queries",
+      "searching_activities",
+      "searching_dining",
+      "checking_availability",
+      "building_itinerary",
+      "checking_route_time",
+      "reviewing_plan",
+      "ready_for_confirmation",
+      "executing_confirmed_actions",
+    ],
+    {
+      searching_activities: "\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8",
+      searching_dining: "\u5df2\u627e\u5230 5 \u4e2a\u9910\u5385",
+      executing_confirmed_actions: "\u5df2\u5f00\u59cb\u6267\u884c 1 \u4e2a\u786e\u8ba4\u52a8\u4f5c",
+    },
+  ),
   plans: [
     {
       ...mockedStartRun.plans[0],
