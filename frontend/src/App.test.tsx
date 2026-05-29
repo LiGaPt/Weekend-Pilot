@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { clarifyRun, confirmRun, declineRun, replanRun, startRun } from "./api/demo";
+import { clarifyRun, confirmRun, getRun, replanRun, startRun } from "./api/demo";
 import type { DemoRunSummary } from "./types/demo";
 
 vi.mock("./api/demo", () => ({
@@ -30,8 +30,8 @@ const awaitingRun: DemoRunSummary = {
       plan_id: "plan-1",
       status: "reviewed",
       selected: true,
-      title: "徐汇亲子科学半日行",
-      summary: "先安排亲子活动，再去吃一顿清淡晚餐。",
+      title: "徐汇亲子半日行",
+      summary: "先安排室内亲子活动，再去吃一顿清淡晚餐。",
       activity: {
         name: "徐汇亲子科学馆",
         category: "activity",
@@ -39,15 +39,15 @@ const awaitingRun: DemoRunSummary = {
         tags: ["child_friendly", "indoor"],
       },
       dining: {
-        name: "绿碗家庭轻食",
+        name: "绿箸家庭轻食",
         category: "dining",
-        address: "上海市徐汇区健康弄66号",
+        address: "上海市徐汇区健康街6号",
         tags: ["lighter_options", "family_tables"],
       },
       timeline: [
         {
           sequence: 1,
-          title: "体验徐汇亲子科学馆",
+          title: "体验亲子科学馆",
           start_label: "14:00",
           end_label: "16:00",
           duration_minutes: 120,
@@ -61,7 +61,7 @@ const awaitingRun: DemoRunSummary = {
       },
       feasibility: {
         is_feasible: true,
-        reasons: ["符合下午半日出行时长。"],
+        reasons: ["符合半日出行时长。"],
         warnings: [],
         total_duration_minutes: 270,
         route_duration_minutes: 18,
@@ -88,7 +88,7 @@ const awaitingRun: DemoRunSummary = {
       plan_id: "plan-2",
       status: "reviewed",
       selected: false,
-      title: "滨江轻松备选方案",
+      title: "滨江轻松备选",
       summary: "先去户外活动，再简单吃一顿轻便晚餐。",
       activity: {
         name: "滨江亲子乐园",
@@ -99,7 +99,7 @@ const awaitingRun: DemoRunSummary = {
       dining: {
         name: "街角轻食小馆",
         category: "dining",
-        address: "上海市徐汇区咖啡街8号",
+        address: "上海市徐汇区咖啡街3号",
         tags: [],
       },
       timeline: [],
@@ -143,13 +143,9 @@ const awaitingClarificationRun: DemoRunSummary = {
   },
 };
 
-const awaitingClarificationRunRoundTwo: DemoRunSummary = {
-  ...awaitingClarificationRun,
-  run_id: "run-clarify-2",
-  clarification: {
-    prompt: "为了继续规划，请补充大概什么时间出发、准备玩多久。",
-    missing_fields: ["time_window"],
-  },
+const clarifiedRun: DemoRunSummary = {
+  ...awaitingRun,
+  run_id: "run-2",
 };
 
 const awaitingAmapRun: DemoRunSummary = {
@@ -158,53 +154,14 @@ const awaitingAmapRun: DemoRunSummary = {
   read_profile: "amap",
 };
 
-const clarifiedRun: DemoRunSummary = {
-  ...awaitingRun,
-  run_id: "run-2",
-  clarification: null,
-};
-
-const replannedRunV2: DemoRunSummary = {
-  ...awaitingRun,
-  run_id: "run-2",
-  plan_version: {
-    version_number: 2,
-    version_label: "v2",
-    source_run_id: "run-1",
-    source_selected_plan_id: "plan-1",
-  },
-  clarification: null,
-};
-
 const replannedRunV2FromPlan2: DemoRunSummary = {
-  ...replannedRunV2,
+  ...awaitingRun,
+  run_id: "run-2",
   plan_version: {
     version_number: 2,
     version_label: "v2",
     source_run_id: "run-1",
     source_selected_plan_id: "plan-2",
-  },
-};
-
-const replannedRunV3: DemoRunSummary = {
-  ...awaitingRun,
-  run_id: "run-3",
-  plan_version: {
-    version_number: 3,
-    version_label: "v3",
-    source_run_id: "run-2",
-    source_selected_plan_id: "plan-1",
-  },
-  clarification: null,
-};
-
-const replannedAwaitingClarificationRun: DemoRunSummary = {
-  ...awaitingClarificationRunRoundTwo,
-  plan_version: {
-    version_number: 2,
-    version_label: "v2",
-    source_run_id: "run-1",
-    source_selected_plan_id: "plan-1",
   },
 };
 
@@ -268,337 +225,184 @@ const completedRun: DemoRunSummary = {
   ],
 };
 
-const declinedRun: DemoRunSummary = {
-  ...awaitingRun,
-  status: "declined",
-  plans: [
-    {
-      ...awaitingRun.plans[0],
-      status: "declined",
-      confirmation: {
-        status: "declined",
-        declined_by: "web-demo-user",
-        reason: "User chose not to continue.",
-      },
-    },
-  ],
-};
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+  return { promise, resolve, reject };
+}
 
 describe("App", () => {
   beforeEach(() => {
     vi.mocked(startRun).mockReset();
+    vi.mocked(getRun).mockReset();
     vi.mocked(clarifyRun).mockReset();
     vi.mocked(confirmRun).mockReset();
-    vi.mocked(declineRun).mockReset();
     vi.mocked(replanRun).mockReset();
   });
 
-  it("renders the default prompt, default read profile, and start button", () => {
-    render(<App />);
-
-    expect(screen.getByRole("heading", { name: "周末出行规划预览" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox")).toHaveValue(
-      "\u4eca\u5929\u4e0b\u5348\u60f3\u548c\u7231\u4eba\u30015\u5c81\u7684\u5b69\u5b50\u51fa\u95e8\u73a9\u51e0\u4e2a\u5c0f\u65f6\uff0c\u522b\u79bb\u5bb6\u592a\u8fdc\u3002\u5b69\u5b50\u8981\u9002\u5408\u4eb2\u5b50\u6d3b\u52a8\uff0c\u7231\u4eba\u6700\u8fd1\u60f3\u5403\u6e05\u6de1\u4e00\u70b9\uff0c\u5e2e\u6211\u5b89\u6392\u4e00\u4e0b\u3002",
-    );
-    expect(screen.getByTestId("start-button")).toBeEnabled();
-    expect(screen.getByTestId("read-profile-select")).toHaveValue("mock_world");
-  });
-
-  it("disables start when the request is empty", async () => {
+  it("renders a single composer with examples and hides advanced options by default", async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.clear(screen.getByRole("textbox"));
+    expect(screen.getByRole("heading", { name: "企业级对话式周末规划" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "亲子半天" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "朋友轻社交" })).toBeInTheDocument();
+    expect(screen.queryByTestId("read-profile-select")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-id")).not.toBeInTheDocument();
 
-    expect(screen.getByTestId("start-button")).toBeDisabled();
-    expect(
-      screen.getByText((_, element) => element?.classList.contains("validation-text") ?? false),
-    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "亲子半天" }));
+    expect(screen.getByRole("textbox")).toHaveValue(
+      "今天下午想和爱人、5岁的孩子出门玩几个小时，别离家太远。孩子要适合亲子活动，爱人最近想吃清淡一点，帮我安排一下。",
+    );
   });
 
-  it("renders awaiting-confirmation status and plan details after successful start", async () => {
+  it("appends the user request and a visible system progress item while starting", async () => {
+    const user = userEvent.setup();
+    const deferred = createDeferred<DemoRunSummary>();
+    vi.mocked(startRun).mockReturnValue(deferred.promise);
+    render(<App />);
+
+    await user.type(screen.getByRole("textbox"), "帮我安排一个下午的亲子活动。");
+    await user.click(screen.getByTestId("start-button"));
+
+    expect(screen.getAllByText("帮我安排一个下午的亲子活动。").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("system-progress")).toHaveTextContent("正在生成推荐方案...");
+
+    deferred.resolve(awaitingRun);
+    expect(await screen.findByRole("heading", { name: "徐汇亲子半日行" })).toBeInTheDocument();
+  });
+
+  it("renders a summary-first plan card and keeps run metadata hidden until disclosure opens", async () => {
     const user = userEvent.setup();
     vi.mocked(startRun).mockResolvedValue(awaitingRun);
     render(<App />);
 
+    await user.type(screen.getByRole("textbox"), "帮我安排一个下午的亲子活动。");
     await user.click(screen.getByTestId("start-button"));
 
-    expect(await screen.findByRole("heading", { name: "徐汇亲子科学半日行" })).toBeInTheDocument();
-    expect(screen.getAllByText("等待确认").length).toBeGreaterThan(0);
+    expect(await screen.findByRole("heading", { name: "徐汇亲子半日行" })).toBeInTheDocument();
+    expect(screen.getByText("先安排室内亲子活动，再去吃一顿清淡晚餐。")).toBeInTheDocument();
+    expect(screen.queryByText("体验亲子科学馆")).not.toBeInTheDocument();
+    expect(screen.queryByText("green-table")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-id")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("action-count")).not.toBeInTheDocument();
+
+    const runInfoButtons = screen.getAllByTestId("run-info-toggle");
+    await user.click(runInfoButtons[runInfoButtons.length - 1]);
+
+    expect(screen.getByTestId("run-id")).toHaveTextContent("run-1");
     expect(screen.getByTestId("plan-version")).toHaveTextContent("v1");
-    expect(screen.getByText("徐汇亲子科学馆")).toBeInTheDocument();
-    expect(screen.getByText("绿碗家庭轻食")).toBeInTheDocument();
-    expect(screen.getByText("活动与餐厅之间车程很短，适合带孩子轻松衔接。")).toBeInTheDocument();
-    expect(screen.getByText("green-table")).toBeInTheDocument();
     expect(screen.getByTestId("active-read-profile")).toHaveTextContent("Mock World");
   });
 
-  it("does not render internal observability labels on the public page", async () => {
-    vi.mocked(startRun).mockResolvedValue(awaitingRun);
-    render(<App />);
-
-    expect(screen.queryByText("Trace ID")).not.toBeInTheDocument();
-  });
-
-  it("switches plan tabs without calling the backend", async () => {
+  it("keeps plan details collapsed until the reviewer expands them", async () => {
     const user = userEvent.setup();
     vi.mocked(startRun).mockResolvedValue(awaitingRun);
     render(<App />);
 
+    await user.type(screen.getByRole("textbox"), "帮我安排一个下午的亲子活动。");
     await user.click(screen.getByTestId("start-button"));
-    await user.click(await screen.findByRole("tab", { name: /滨江轻松备选方案/ }));
+    const planHeading = await screen.findByRole("heading", { name: "徐汇亲子半日行" });
+    const planCard = planHeading.closest(".thread-bubble");
+    expect(planCard).not.toBeNull();
 
-    expect(screen.getByText("滨江亲子乐园")).toBeInTheDocument();
-    expect(screen.queryByText("徐汇亲子科学馆")).not.toBeInTheDocument();
+    expect(screen.queryByText("体验亲子科学馆")).not.toBeInTheDocument();
+    await user.click(within(planCard as HTMLElement).getByRole("button", { name: "时间线" }));
+    expect(screen.getByText("体验亲子科学馆")).toBeInTheDocument();
+
+    expect(screen.queryByText("green-table")).not.toBeInTheDocument();
+    await user.click(within(planCard as HTMLElement).getByRole("button", { name: "确认前动作" }));
+    expect(screen.getByText("green-table")).toBeInTheDocument();
   });
 
-  it("confirms a selected plan and renders completed feedback", async () => {
-    const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingRun);
-    vi.mocked(confirmRun).mockResolvedValue(completedRun);
-    render(<App />);
-
-    await user.click(screen.getByTestId("start-button"));
-    await user.click(await screen.findByTestId("confirm-button"));
-
-    expect(confirmRun).toHaveBeenCalledWith("run-1", "plan-1");
-    expect(await screen.findByText("安排已完成")).toBeInTheDocument();
-    expect(screen.getByText("订座和通知都已处理完成。")).toBeInTheDocument();
-    expect(screen.getByTestId("execution-timeline")).toBeInTheDocument();
-    expect(screen.getByText("2026-05-26T14:00:00+08:00")).toBeInTheDocument();
-    expect(screen.getByText("2026-05-26T14:02:00+08:00")).toBeInTheDocument();
-    const timelineEntries = within(screen.getByTestId("execution-timeline")).getAllByRole("listitem");
-    expect(timelineEntries[0]).toHaveTextContent("第 1 步");
-    expect(timelineEntries[0]).toHaveTextContent("订座");
-    expect(timelineEntries[0]).toHaveTextContent("green-table");
-    expect(timelineEntries[0]).toHaveTextContent("成功");
-    expect(timelineEntries[1]).toHaveTextContent("第 2 步");
-    expect(timelineEntries[1]).toHaveTextContent("发送消息");
-    expect(timelineEntries[1]).toHaveTextContent("family-chat");
-  });
-
-  it("declines a selected plan and hides confirm action", async () => {
-    const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingRun);
-    vi.mocked(declineRun).mockResolvedValue(declinedRun);
-    render(<App />);
-
-    await user.click(screen.getByTestId("start-button"));
-    await user.click(await screen.findByTestId("decline-button"));
-
-    expect(declineRun).toHaveBeenCalledWith("run-1", "plan-1");
-    expect(screen.queryByTestId("confirm-button")).not.toBeInTheDocument();
-  });
-
-  it("renders API errors in user-readable form", async () => {
-    const user = userEvent.setup();
-    vi.mocked(startRun).mockRejectedValue(new Error("API connection failed."));
-    render(<App />);
-
-    await user.click(screen.getByTestId("start-button"));
-
-    const alert = await screen.findByRole("alert");
-    expect(within(alert).getByText(/./)).toBeInTheDocument();
-  });
-
-  it("renders a clarification panel when the run is awaiting clarification", async () => {
-    const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingClarificationRun);
-    render(<App />);
-
-    await user.click(screen.getByTestId("start-button"));
-
-    expect(await screen.findByTestId("clarification-panel")).toBeInTheDocument();
-    expect(screen.getByTestId("run-status")).toHaveTextContent("等待补充信息");
-    expect(screen.getByTestId("plan-version")).toHaveTextContent("v1");
-    expect(screen.getByTestId("action-count")).toHaveTextContent("0");
-    expect(
-      screen.getByText("为了继续规划，请补充这次是谁一起去，以及大概什么时间出发、准备玩多久。"),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("clarification-fields")).toHaveTextContent("出行人/场景");
-    expect(screen.getByTestId("clarification-fields")).toHaveTextContent("时间安排");
-    expect(screen.queryByTestId("confirm-button")).not.toBeInTheDocument();
-  });
-
-  it("disables clarification submit when the reply is empty", async () => {
-    const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingClarificationRun);
-    render(<App />);
-
-    await user.click(screen.getByTestId("start-button"));
-
-    const replyInput = await screen.findByTestId("clarification-reply-input");
-    const submitButton = screen.getByTestId("clarification-submit-button");
-
-    expect(submitButton).toBeDisabled();
-
-    await user.type(replyInput, "   ");
-
-    expect(submitButton).toBeDisabled();
-  });
-
-  it("submits a clarification reply and returns to plan review while keeping v1", async () => {
+  it("renders clarification inside the chat flow and submits the inline reply", async () => {
     const user = userEvent.setup();
     vi.mocked(startRun).mockResolvedValue(awaitingClarificationRun);
     vi.mocked(clarifyRun).mockResolvedValue(clarifiedRun);
     render(<App />);
 
+    await user.type(screen.getByRole("textbox"), "想周末出去玩一下。");
     await user.click(screen.getByTestId("start-button"));
-    await user.type(
-      await screen.findByTestId("clarification-reply-input"),
-      "今天下午一个人出门玩几个小时，别太远。",
-    );
+
+    expect(await screen.findByTestId("clarification-card")).toBeInTheDocument();
+    expect(screen.getByText("为了继续规划，请补充这次是谁一起去，以及大概什么时间出发、准备玩多久。")).toBeInTheDocument();
+    expect(screen.getByTestId("clarification-fields")).toHaveTextContent("出行人 / 场景");
+    expect(screen.queryByTestId("confirm-button")).not.toBeInTheDocument();
+
+    await user.type(screen.getByTestId("clarification-reply-input"), "今天下午和家人出门，玩 4 个小时。");
     await user.click(screen.getByTestId("clarification-submit-button"));
 
     expect(clarifyRun).toHaveBeenCalledWith("run-clarify-1", {
-      user_input: "今天下午一个人出门玩几个小时，别太远。",
+      user_input: "今天下午和家人出门，玩 4 个小时。",
       selected_plan_index: 0,
     });
-    expect(await screen.findByRole("heading", { name: /徐汇亲子科学半日行/ })).toBeInTheDocument();
-    expect(screen.getByTestId("run-status")).toHaveTextContent("等待确认");
-    expect(screen.getByTestId("run-id")).toHaveTextContent("run-2");
-    expect(screen.getByTestId("plan-version")).toHaveTextContent("v1");
+    expect(await screen.findByRole("heading", { name: "徐汇亲子半日行" })).toBeInTheDocument();
   });
 
-  it("keeps the clarification panel visible when clarification is still required", async () => {
-    const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingClarificationRun);
-    vi.mocked(clarifyRun).mockResolvedValue(awaitingClarificationRunRoundTwo);
-    render(<App />);
-
-    await user.click(screen.getByTestId("start-button"));
-    await user.type(await screen.findByTestId("clarification-reply-input"), "和朋友一起去。");
-    await user.click(screen.getByTestId("clarification-submit-button"));
-
-    expect(await screen.findByTestId("clarification-panel")).toBeInTheDocument();
-    expect(screen.getByTestId("run-id")).toHaveTextContent("run-clarify-2");
-    expect(screen.getByTestId("clarification-fields")).toHaveTextContent("时间安排");
-    expect(screen.getByText("为了继续规划，请补充大概什么时间出发、准备玩多久。")).toBeInTheDocument();
-    expect(screen.queryByTestId("confirm-button")).not.toBeInTheDocument();
-  });
-
-  it("renders a replan panel when the run is awaiting confirmation", async () => {
-    const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingRun);
-    render(<App />);
-
-    await user.click(screen.getByTestId("start-button"));
-
-    expect(await screen.findByTestId("replan-panel")).toBeInTheDocument();
-    expect(screen.getByTestId("replan-submit-button")).toBeDisabled();
-    expect(screen.getByText("继续调整方案")).toBeInTheDocument();
-  });
-
-  it("disables replan submit when the reply is empty", async () => {
-    const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingRun);
-    render(<App />);
-
-    await user.click(screen.getByTestId("start-button"));
-
-    const replyInput = await screen.findByTestId("replan-reply-input");
-    const submitButton = screen.getByTestId("replan-submit-button");
-
-    expect(submitButton).toBeDisabled();
-
-    await user.type(replyInput, "   ");
-
-    expect(submitButton).toBeDisabled();
-  });
-
-  it("submits a replan request and advances the visible version", async () => {
-    const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingRun);
-    vi.mocked(replanRun).mockResolvedValue(replannedRunV2);
-    render(<App />);
-
-    await user.click(screen.getByTestId("start-button"));
-    await user.type(
-      await screen.findByTestId("replan-reply-input"),
-      "Keep it nearby, but make it a solo outing this time.",
-    );
-    await user.click(screen.getByTestId("replan-submit-button"));
-
-    expect(replanRun).toHaveBeenCalledWith("run-1", {
-      user_input: "Keep it nearby, but make it a solo outing this time.",
-      selected_plan_index: 0,
-    });
-    expect(await screen.findByTestId("run-id")).toHaveTextContent("run-2");
-    expect(screen.getByTestId("plan-version")).toHaveTextContent("v2");
-    expect(screen.getByTestId("confirm-button")).toBeInTheDocument();
-  });
-
-  it("submits the selected second plan index when replanning", async () => {
+  it("uses the selected non-default plan index when replanning inside the chat flow", async () => {
     const user = userEvent.setup();
     vi.mocked(startRun).mockResolvedValue(awaitingRun);
     vi.mocked(replanRun).mockResolvedValue(replannedRunV2FromPlan2);
     render(<App />);
 
+    await user.type(screen.getByRole("textbox"), "帮我安排一个下午的亲子活动。");
     await user.click(screen.getByTestId("start-button"));
-    const tabs = await screen.findAllByRole("tab");
-    await user.click(tabs[1]);
 
-    expect(tabs[0]).toHaveAttribute("aria-selected", "false");
-    expect(tabs[1]).toHaveAttribute("aria-selected", "true");
-    expect(screen.queryByText("green-table")).not.toBeInTheDocument();
-
-    await user.type(await screen.findByTestId("replan-reply-input"), "Keep the backup plan, but reduce walking.");
+    expect(await screen.findByRole("heading", { name: "徐汇亲子半日行" })).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "滨江轻松备选" }));
+    await user.type(screen.getByTestId("replan-reply-input"), "保留备选方案，但减少步行。");
     await user.click(screen.getByTestId("replan-submit-button"));
 
     expect(replanRun).toHaveBeenCalledWith("run-1", {
-      user_input: "Keep the backup plan, but reduce walking.",
+      user_input: "保留备选方案，但减少步行。",
       selected_plan_index: 1,
     });
-    expect(await screen.findByTestId("run-id")).toHaveTextContent("run-2");
-    expect(screen.getByTestId("plan-version")).toHaveTextContent("v2");
-  });
 
-  it("supports repeated replans and shows v3 on the next run", async () => {
-    const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingRun);
-    vi.mocked(replanRun).mockResolvedValueOnce(replannedRunV2).mockResolvedValueOnce(replannedRunV3);
-    render(<App />);
-
-    await user.click(screen.getByTestId("start-button"));
-    const replanInput = await screen.findByTestId("replan-reply-input");
-
-    await user.type(replanInput, "Keep it nearby, but make it a solo outing this time.");
-    await user.click(screen.getByTestId("replan-submit-button"));
+    const runInfoButtons = screen.getAllByTestId("run-info-toggle");
+    await user.click(runInfoButtons[runInfoButtons.length - 1]);
     expect(await screen.findByTestId("plan-version")).toHaveTextContent("v2");
-
-    const nextInput = screen.getByTestId("replan-reply-input");
-    await user.type(nextInput, "Reduce walking even more.");
-    await user.click(screen.getByTestId("replan-submit-button"));
-
-    expect(replanRun).toHaveBeenNthCalledWith(2, "run-2", {
-      user_input: "Reduce walking even more.",
-      selected_plan_index: 0,
-    });
-    expect(await screen.findByTestId("run-id")).toHaveTextContent("run-3");
-    expect(screen.getByTestId("plan-version")).toHaveTextContent("v3");
   });
 
-  it("switches back to the clarification panel when replan needs more user input", async () => {
+  it("keeps refresh inside the run-info disclosure and updates the latest run without duplicating cards", async () => {
     const user = userEvent.setup();
     vi.mocked(startRun).mockResolvedValue(awaitingRun);
-    vi.mocked(replanRun).mockResolvedValue(replannedAwaitingClarificationRun);
+    vi.mocked(getRun).mockResolvedValue({
+      ...awaitingRun,
+      plans: [
+        {
+          ...awaitingRun.plans[0],
+          summary: "更新后的方案摘要。",
+        },
+        awaitingRun.plans[1],
+      ],
+    });
     render(<App />);
 
+    await user.type(screen.getByRole("textbox"), "帮我安排一个下午的亲子活动。");
     await user.click(screen.getByTestId("start-button"));
-    await user.type(await screen.findByTestId("replan-reply-input"), "改成和朋友一起，但时间还没定。");
-    await user.click(screen.getByTestId("replan-submit-button"));
+    expect(await screen.findByRole("heading", { name: "徐汇亲子半日行" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "徐汇亲子半日行" })).toHaveLength(1);
 
-    expect(await screen.findByTestId("clarification-panel")).toBeInTheDocument();
-    expect(screen.getByTestId("run-id")).toHaveTextContent("run-clarify-2");
-    expect(screen.getByTestId("plan-version")).toHaveTextContent("v2");
-    expect(screen.queryByTestId("replan-panel")).not.toBeInTheDocument();
+    const runInfoButtons = screen.getAllByTestId("run-info-toggle");
+    await user.click(runInfoButtons[runInfoButtons.length - 1]);
+    await user.click(screen.getByTestId("refresh-button"));
+
+    expect(await screen.findByText("更新后的方案摘要。")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "徐汇亲子半日行" })).toHaveLength(1);
   });
 
-  it("sends the selected read profile when starting a run", async () => {
+  it("keeps the AMap preview path behind advanced options and blocks confirmation", async () => {
     const user = userEvent.setup();
     vi.mocked(startRun).mockResolvedValue(awaitingAmapRun);
     render(<App />);
 
+    await user.type(screen.getByRole("textbox"), "帮我先预览一个周末下午行程。");
+    await user.click(screen.getByTestId("advanced-options-toggle"));
     await user.selectOptions(screen.getByTestId("read-profile-select"), "amap");
     await user.click(screen.getByTestId("start-button"));
 
@@ -607,47 +411,31 @@ describe("App", () => {
         read_profile: "amap",
       }),
     );
-  });
-
-  it("shows AMAP as the active read profile and blocks confirmation for the read-only preview path", async () => {
-    const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingAmapRun);
-    render(<App />);
-
-    await user.click(screen.getByTestId("start-button"));
-
-    expect(await screen.findByTestId("active-read-profile")).toHaveTextContent(
-      "AMap \u53ea\u8bfb\u9884\u89c8",
-    );
-    expect(screen.getByTestId("amap-read-only-notice")).toHaveTextContent(
-      "\u53ea\u8bfb\u9884\u89c8",
-    );
+    expect(await screen.findByTestId("amap-read-only-notice")).toHaveTextContent("只读预览");
     expect(screen.queryByTestId("confirm-button")).not.toBeInTheDocument();
-    expect(screen.getByTestId("decline-button")).toBeEnabled();
-    expect(screen.getByTestId("refresh-button")).toBeEnabled();
   });
 
-  it("shows a neutral execution timeline state when execution exists without visible actions", async () => {
+  it("renders completed feedback in chat and keeps the execution timeline collapsed until expanded", async () => {
     const user = userEvent.setup();
     vi.mocked(startRun).mockResolvedValue(awaitingRun);
-    vi.mocked(confirmRun).mockResolvedValue({
-      ...completedRun,
-      plans: [
-        {
-          ...completedRun.plans[0],
-          execution: {
-            ...completedRun.plans[0].execution!,
-            action_results: [],
-          },
-        },
-      ],
-    });
+    vi.mocked(confirmRun).mockResolvedValue(completedRun);
     render(<App />);
 
+    await user.type(screen.getByRole("textbox"), "帮我安排一个下午的亲子活动。");
     await user.click(screen.getByTestId("start-button"));
     await user.click(await screen.findByTestId("confirm-button"));
 
-    expect(await screen.findByTestId("execution-timeline")).toBeInTheDocument();
-    expect(screen.getByText("已生成执行结果，但当前没有可展示的执行动作。")).toBeInTheDocument();
+    expect(await screen.findByTestId("assistant-result-card")).toBeInTheDocument();
+    expect(screen.getByText("安排已完成")).toBeInTheDocument();
+    expect(screen.getByText("订座和通知都已处理完成。")).toBeInTheDocument();
+    expect(screen.queryByTestId("execution-timeline")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("execution-timeline-toggle"));
+    const timeline = await screen.findByTestId("execution-timeline");
+    expect(timeline).toBeInTheDocument();
+    expect(within(timeline).getByText("2026-05-26T14:00:00+08:00")).toBeInTheDocument();
+    expect(within(timeline).getByText("2026-05-26T14:02:00+08:00")).toBeInTheDocument();
+    expect(within(timeline).getByText("green-table")).toBeInTheDocument();
+    expect(within(timeline).getByText("family-chat")).toBeInTheDocument();
   });
 });

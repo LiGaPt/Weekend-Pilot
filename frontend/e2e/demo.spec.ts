@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 
 const forbiddenVisibleText = [
   "action_id",
@@ -13,7 +13,7 @@ const forbiddenVisibleText = [
 ];
 
 const explicitHappyPathPrompt =
-  "今天下午14点左右和爱人、5岁的孩子从徐汇出发，在家附近玩4小时，先安排室内亲子活动，再去吃一顿清淡晚餐，全程别太远。";
+  "今天下午14点左右和爱人、5岁的孩子从徐汇出发，在家附近玩 4 小时，先安排室内亲子活动，再去吃一顿清淡晚餐，全程别太远。";
 
 const stableHappyPathPrompt =
   "This afternoon I want to go out with my wife and child for a few hours. Not too far. My child is 5, and my wife is trying to eat lighter.";
@@ -22,14 +22,68 @@ const friendsGroupPrompt =
 const stableClarificationReply =
   "We are leaving around 2pm this afternoon from Xuhui with my wife and 5-year-old child for about 4 hours. Keep it nearby if possible, but going a bit farther is okay if it keeps the plan relaxed. Please start with an indoor child-friendly activity and then a light dinner.";
 const explicitHappyPathClarificationReply =
-  "今天下午14点左右和爱人、5岁的孩子从徐汇出发，在家附近玩4小时，先安排室内亲子活动，再去吃一顿清淡晚餐，全程别太远。";
+  "今天下午14点左右和爱人、5岁的孩子从徐汇出发，在家附近玩 4 小时，先安排室内亲子活动，再去吃一顿清淡晚餐，全程别太远。";
 
-async function startDemoRun(page: Page, prompt?: string) {
-  await page.goto("/");
-  await page.getByRole("textbox").fill(prompt ?? stableHappyPathPrompt);
-  await page.getByTestId("start-button").click();
-  await expect(page.getByTestId("run-status")).toHaveText("等待确认", { timeout: 60_000 });
-  await expect(page.getByTestId("action-count")).toHaveText("0");
+async function fillMainComposer(page: Page, prompt: string) {
+  await page.getByRole("textbox").first().fill(prompt);
+}
+
+async function waitForConversationStage(page: Page) {
+  await expect
+    .poll(async () => {
+      if ((await page.getByTestId("clarification-card").count()) > 0) {
+        const input = page.getByTestId("clarification-reply-input");
+        if ((await input.count()) > 0 && (await input.isEditable().catch(() => false))) {
+          return "clarification";
+        }
+      }
+      if ((await page.getByTestId("replan-panel").count()) > 0) {
+        const input = page.getByTestId("replan-reply-input");
+        if ((await input.count()) > 0 && (await input.isEditable().catch(() => false))) {
+          return "confirmation";
+        }
+      }
+      if ((await page.getByTestId("assistant-result-card").count()) > 0) {
+        return "result";
+      }
+      return "pending";
+    }, { timeout: 60_000 })
+    .toMatch(/clarification|confirmation|result/);
+
+  if ((await page.getByTestId("clarification-card").count()) > 0) {
+    const input = page.getByTestId("clarification-reply-input");
+    if ((await input.count()) > 0 && (await input.isEditable().catch(() => false))) {
+        return "clarification";
+      }
+  }
+  if ((await page.getByTestId("replan-panel").count()) > 0) {
+    const input = page.getByTestId("replan-reply-input");
+    if ((await input.count()) > 0 && (await input.isEditable().catch(() => false))) {
+        return "confirmation";
+      }
+  }
+  if ((await page.getByTestId("assistant-result-card").count()) > 0) {
+    return "result";
+  }
+  return "result";
+}
+
+async function openLatestRunInfo(page: Page) {
+  const toggle = page.getByTestId("run-info-toggle").last();
+  await expect(toggle).toBeVisible({ timeout: 60_000 });
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") {
+    await toggle.click();
+  }
+}
+
+async function currentRunInfoText(page: Page, testId: string) {
+  await openLatestRunInfo(page);
+  const text = (await page.getByTestId(testId).last().innerText()).trim();
+  const toggle = page.getByTestId("run-info-toggle").last();
+  if ((await toggle.getAttribute("aria-expanded")) === "true") {
+    await toggle.click();
+  }
+  return text;
 }
 
 async function continueToAwaitingConfirmation(
@@ -37,25 +91,20 @@ async function continueToAwaitingConfirmation(
   expectedVersion: string,
   clarificationReply: string = stableClarificationReply,
 ) {
-  await expect(page.getByTestId("plan-version")).toHaveText(expectedVersion, { timeout: 60_000 });
   for (let clarificationAttempt = 0; clarificationAttempt < 2; clarificationAttempt += 1) {
-    await expect
-      .poll(async () => (await page.getByTestId("run-status").innerText()).trim(), { timeout: 60_000 })
-      .toMatch(/等待确认|等待补充信息/);
-
-    if ((await page.getByTestId("run-status").innerText()).trim() === "等待确认") {
+    const stage = await waitForConversationStage(page);
+    if (stage === "confirmation") {
       break;
     }
 
-    await expect(page.getByTestId("plan-version")).toHaveText(expectedVersion);
-    await expect(page.getByTestId("clarification-panel")).toBeVisible();
+    expect(stage).toBe("clarification");
     await page.getByTestId("clarification-reply-input").fill(clarificationReply);
     await page.getByTestId("clarification-submit-button").click();
   }
 
-  await expect(page.getByTestId("run-status")).toHaveText("等待确认", { timeout: 60_000 });
-  await expect(page.getByTestId("plan-version")).toHaveText(expectedVersion);
-  await expect(page.getByTestId("action-count")).toHaveText("0");
+  await expect(page.getByTestId("replan-panel")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId("confirm-button")).toHaveCount(1);
+  expect(await currentRunInfoText(page, "plan-version")).toBe(expectedVersion);
 }
 
 async function startPresentableDemoRun(
@@ -64,7 +113,7 @@ async function startPresentableDemoRun(
   clarificationReply: string = stableClarificationReply,
 ) {
   await page.goto("/");
-  await page.getByRole("textbox").fill(prompt ?? stableHappyPathPrompt);
+  await fillMainComposer(page, prompt ?? stableHappyPathPrompt);
   await page.getByTestId("start-button").click();
   await continueToAwaitingConfirmation(page, "v1", clarificationReply);
 }
@@ -75,13 +124,6 @@ async function expectNoForbiddenVisibleText(page: Page) {
   for (const forbidden of forbiddenVisibleText) {
     expect(bodyText, `visible page text should not include ${forbidden}`).not.toContain(forbidden);
   }
-}
-
-async function visibleActionCount(page: Page) {
-  const text = (await page.getByTestId("action-count").innerText()).trim();
-  const count = Number.parseInt(text, 10);
-  expect(Number.isNaN(count), `action count should be numeric, got ${text}`).toBe(false);
-  return count;
 }
 
 function buildMockPlan(planId: string, selected: boolean) {
@@ -183,6 +225,11 @@ const mockedReplannedRunV2 = buildMockAwaitingRun("run-2", "plan-2", 2, "v2", "r
 const mockedReplannedRunV3 = buildMockAwaitingRun("run-3", "plan-3", 3, "v3", "run-2", "plan-2");
 const mockedStartRunWithTwoPlans = buildMockTwoPlanAwaitingRun();
 const mockedReplannedRunV2FromPlan2 = buildMockAwaitingRun("run-2", "plan-4", 2, "v2", "run-1", "plan-2");
+const mockedAmapRun = {
+  ...mockedStartRun,
+  run_id: "run-amap",
+  read_profile: "amap",
+};
 const mockedCompletedRun = {
   ...mockedStartRun,
   status: "completed",
@@ -239,27 +286,33 @@ const mockedCompletedRun = {
   ],
 };
 
+async function expectTimelineDisclosure(locator: Locator) {
+  await expect(locator).toHaveCount(0);
+}
+
 test.describe("desktop web demo", () => {
   test.beforeEach(({}, testInfo) => {
     test.skip(testInfo.project.name !== "desktop-chromium", "Desktop coverage runs only once.");
   });
 
-  test("starts a run, preserves confirmation boundary, confirms, and shows feedback", async ({ page }) => {
+  test("starts a run, keeps the summary-first confirmation boundary, confirms, and shows feedback", async ({ page }) => {
     await startPresentableDemoRun(page);
 
-    await expect(page.getByText("确认边界")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "行程时间线" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "执行动作预览" })).toBeVisible();
+    await expect(page.getByText("推荐方案摘要", { exact: true }).last()).toBeVisible();
     await expect(page.getByTestId("confirm-button")).toBeVisible();
-    expect(await visibleActionCount(page)).toBe(0);
+    await expect(page.getByTestId("run-id")).toHaveCount(0);
+    await expectTimelineDisclosure(page.locator(".timeline-list li"));
+
+    await page.getByRole("button", { name: "时间线" }).last().click();
+    await expect(page.locator(".timeline-list li").first()).toBeVisible();
 
     await page.getByTestId("confirm-button").click();
 
-    await expect(page.getByTestId("run-status")).toHaveText("已完成", { timeout: 60_000 });
-    await expect(page.getByText("执行与反馈")).toBeVisible();
-    await expect(page.getByText("执行时间线")).toBeVisible();
-    await expect(page.getByText("已完成动作")).toBeVisible();
-    expect(await visibleActionCount(page)).toBeGreaterThan(0);
+    await expect(page.getByTestId("assistant-result-card")).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator('[data-testid="assistant-result-card"] h2')).toBeVisible();
+    await expectTimelineDisclosure(page.getByTestId("execution-timeline"));
+    await page.getByTestId("execution-timeline-toggle").click();
+    await expect(page.getByTestId("execution-timeline")).toBeVisible();
     await expect(page.getByTestId("confirm-button")).toHaveCount(0);
   });
 
@@ -268,18 +321,19 @@ test.describe("desktop web demo", () => {
 
     await page.getByTestId("decline-button").click();
 
-    await expect(page.getByTestId("run-status")).toHaveText("已放弃", { timeout: 60_000 });
+    await expect(page.getByText("已放弃当前方案")).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId("confirm-button")).toHaveCount(0);
   });
 
-  test("refreshes status without losing the current run", async ({ page }) => {
+  test("refreshes status without duplicating the current run card", async ({ page }) => {
     await startPresentableDemoRun(page);
-    const runId = (await page.getByTestId("run-id").innerText()).trim();
+    const runId = await currentRunInfoText(page, "run-id");
 
-    await page.getByTestId("refresh-button").click();
+    await openLatestRunInfo(page);
+    await page.getByTestId("refresh-button").last().click();
 
-    await expect(page.getByTestId("run-status")).toHaveText("等待确认", { timeout: 60_000 });
-    await expect(page.getByTestId("run-id")).toHaveText(runId);
+    await expect(page.getByTestId("replan-panel")).toBeVisible({ timeout: 60_000 });
+    expect(await currentRunInfoText(page, "run-id")).toBe(runId);
   });
 
   test("reaches a confirmable plan from the Chinese reviewer prompt", async ({ page }) => {
@@ -297,10 +351,8 @@ test.describe("desktop web demo", () => {
 
     await startPresentableDemoRun(page, explicitHappyPathPrompt, explicitHappyPathClarificationReply);
 
-    await expect(page.getByTestId("run-status")).toHaveText("等待确认", { timeout: 60_000 });
-    await expect(page.getByTestId("plan-version")).toHaveText("v1");
-    await expect(page.getByTestId("action-count")).toHaveText("0");
     await expect(page.getByTestId("confirm-button")).toBeVisible();
+    expect(await currentRunInfoText(page, "plan-version")).toBe("v1");
     await expect(page.getByTestId("amap-read-only-notice")).toHaveCount(0);
 
     if (clarificationBodies.length > 0) {
@@ -313,45 +365,32 @@ test.describe("desktop web demo", () => {
     }
   });
 
-  test("friends-group public sample reaches the confirm boundary and completion", async ({ page }) => {
+  test("friends-group sample reaches the confirm boundary and completion", async ({ page }) => {
     await startPresentableDemoRun(page, friendsGroupPrompt, friendsGroupPrompt);
 
-    await expect(page.getByTestId("run-status")).toHaveText("等待确认", { timeout: 60_000 });
-    await expect(page.getByTestId("plan-version")).toHaveText("v1");
-    await expect(page.getByTestId("action-count")).toHaveText("0");
     await expect(page.getByTestId("confirm-button")).toBeVisible();
-    await expect(page.getByTestId("amap-read-only-notice")).toHaveCount(0);
-    await expect(page.locator("body")).toContainText("group_friendly");
+    await page.getByRole("button", { name: "活动与餐厅" }).last().click();
+    await expect(page.locator("body")).toContainText(/适合朋友聚会|group_friendly/);
 
     await page.getByTestId("confirm-button").click();
 
-    await expect(page.getByTestId("run-status")).toHaveText("已完成", { timeout: 60_000 });
-    expect(await visibleActionCount(page)).toBeGreaterThan(0);
+    await expect(page.getByTestId("assistant-result-card")).toBeVisible({ timeout: 60_000 });
   });
 
   test("continues a vague request through the clarification flow", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("textbox").fill("想周末出去玩一下。");
+    await fillMainComposer(page, "想周末出去玩一下。");
     await page.getByTestId("start-button").click();
 
-    await expect(page.getByTestId("run-status")).toHaveText("等待补充信息", { timeout: 60_000 });
-    await expect(page.getByTestId("plan-version")).toHaveText("v1");
-    await expect(page.getByTestId("action-count")).toHaveText("0");
-    await expect(page.getByTestId("clarification-panel")).toBeVisible();
+    await expect(page.getByTestId("clarification-card")).toBeVisible({ timeout: 60_000 });
+    expect(await currentRunInfoText(page, "plan-version")).toBe("v1");
+    const sourceRunId = await currentRunInfoText(page, "run-id");
 
-    const sourceRunId = (await page.getByTestId("run-id").innerText()).trim();
-
-    await page
-      .getByTestId("clarification-reply-input")
-      .fill("今天下午一个人出门玩几个小时，别太远。");
+    await page.getByTestId("clarification-reply-input").fill("今天下午一个人出门玩几个小时，别太远。");
     await page.getByTestId("clarification-submit-button").click();
 
-    await expect(page.getByTestId("run-status")).toHaveText("等待确认", { timeout: 60_000 });
-    await expect(page.getByTestId("plan-version")).toHaveText("v1");
-    await expect(page.getByTestId("confirm-button")).toBeVisible();
-
-    const nextRunId = (await page.getByTestId("run-id").innerText()).trim();
-    expect(nextRunId).not.toBe(sourceRunId);
+    await continueToAwaitingConfirmation(page, "v1", "今天下午一个人出门玩几个小时，别太远。");
+    expect(await currentRunInfoText(page, "run-id")).not.toBe(sourceRunId);
   });
 
   test("replans from the customer page and advances the visible version", async ({ page }) => {
@@ -394,14 +433,9 @@ test.describe("desktop web demo", () => {
     expect(startBodies[0]?.selected_plan_index).toBe(0);
     expect(startBodies[0]?.read_profile).toBe("mock_world");
 
-    await expect(page.getByTestId("plan-version")).toHaveText("v1");
-    await expect(page.getByTestId("replan-panel")).toBeVisible();
+    const sourceRunId = await currentRunInfoText(page, "run-id");
 
-    const sourceRunId = (await page.getByTestId("run-id").innerText()).trim();
-
-    await page
-      .getByTestId("replan-reply-input")
-      .fill("Keep it nearby, but make it indoor this time.");
+    await page.getByTestId("replan-reply-input").fill("Keep it nearby, but make it indoor this time.");
     await page.getByTestId("replan-submit-button").click();
     await continueToAwaitingConfirmation(page, "v2");
     expect(replanBodies[0]).toEqual({
@@ -409,11 +443,7 @@ test.describe("desktop web demo", () => {
       selected_plan_index: 0,
     });
 
-    await expect(page.getByTestId("run-status")).toHaveText("等待确认", { timeout: 60_000 });
-    await expect(page.getByTestId("plan-version")).toHaveText("v2");
-    await expect(page.getByTestId("confirm-button")).toBeVisible();
-
-    const replannedRunId = (await page.getByTestId("run-id").innerText()).trim();
+    const replannedRunId = await currentRunInfoText(page, "run-id");
     expect(replannedRunId).not.toBe(sourceRunId);
 
     await page.getByTestId("replan-reply-input").fill("Keep it nearby again, but reduce walking even more.");
@@ -424,9 +454,7 @@ test.describe("desktop web demo", () => {
       selected_plan_index: 0,
     });
 
-    await expect(page.getByTestId("run-status")).toHaveText("等待确认", { timeout: 60_000 });
-    await expect(page.getByTestId("plan-version")).toHaveText("v3");
-    await expect(page.getByTestId("run-id")).not.toHaveText(replannedRunId);
+    expect(await currentRunInfoText(page, "run-id")).not.toBe(replannedRunId);
   });
 
   test("sends the selected second plan index when replanning from the customer page", async ({ page }) => {
@@ -477,6 +505,32 @@ test.describe("desktop web demo", () => {
     });
   });
 
+  test("keeps AMap preview behind advanced options and blocks confirmation", async ({ page }) => {
+    await page.route("**/demo/runs", async (route, request) => {
+      if (request.method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(mockedAmapRun),
+      });
+    });
+
+    await page.goto("/");
+    await fillMainComposer(page, stableHappyPathPrompt);
+    await page.getByTestId("advanced-options-toggle").click();
+    await page.getByTestId("read-profile-select").selectOption("amap");
+    await page.getByTestId("start-button").click();
+
+    await expect(page.getByTestId("replan-panel")).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId("amap-read-only-notice")).toBeVisible();
+    await expect(page.getByTestId("confirm-button")).toHaveCount(0);
+    expect(await currentRunInfoText(page, "active-read-profile")).toBe("AMap 只读预览");
+  });
+
   test("does not render forbidden internal or sensitive keys", async ({ page }) => {
     await page.route("**/demo/runs", async (route, request) => {
       if (request.method() !== "POST") {
@@ -509,7 +563,7 @@ test.describe("desktop web demo", () => {
 
     await page.getByTestId("confirm-button").click();
 
-    await expect(page.getByTestId("run-status")).toHaveText("已完成", { timeout: 60_000 });
+    await expect(page.getByTestId("assistant-result-card")).toBeVisible({ timeout: 60_000 });
     await expectNoForbiddenVisibleText(page);
   });
 });
@@ -521,19 +575,15 @@ test.describe("mobile web demo", () => {
 
   test("loads the main flow without document-level horizontal overflow", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("textbox").fill(stableHappyPathPrompt);
+    await fillMainComposer(page, stableHappyPathPrompt);
     await page.getByTestId("start-button").click();
 
-    await expect
-      .poll(async () => (await page.getByTestId("run-status").innerText()).trim(), { timeout: 60_000 })
-      .toMatch(/等待确认|等待补充信息/);
-
-    const status = (await page.getByTestId("run-status").innerText()).trim();
-    if (status === "等待确认") {
-      await expect(page.getByTestId("confirm-button")).toBeVisible();
-      await expect(page.getByRole("heading", { name: "行程时间线" })).toBeVisible();
+    const stage = await waitForConversationStage(page);
+    if (stage === "confirmation") {
+      await expect(page.getByTestId("replan-panel")).toBeVisible();
+      await expect(page.getByRole("button", { name: "时间线" }).last()).toBeVisible();
     } else {
-      await expect(page.getByTestId("clarification-panel")).toBeVisible();
+      await expect(page.getByTestId("clarification-card")).toBeVisible();
       await expect(page.getByTestId("clarification-submit-button")).toBeVisible();
     }
 

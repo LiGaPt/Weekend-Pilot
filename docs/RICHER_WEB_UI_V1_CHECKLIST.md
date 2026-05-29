@@ -12,9 +12,9 @@ Use it together with:
 
 | Capability | Authoritative surface | Reviewer action | Visible evidence to confirm |
 | --- | --- | --- | --- |
-| planning | `http://127.0.0.1:5173/` | Start a Mock World run from the customer page and wait for plan review. | A selected plan is visible with `行程时间线`, route, feasibility, and `执行动作预览`. |
-| confirmation | `http://127.0.0.1:5173/` | Keep the run at `awaiting_confirmation` before clicking `确认当前方案`. | The `确认边界` section is visible, the confirm button is present, and `动作数` remains `0` before confirmation. |
-| execution timeline | `http://127.0.0.1:5173/` | Confirm the selected plan and wait for execution to finish. | The page shows `执行时间线` with ordered steps, action/tool labels, targets, statuses, plus compact start and finish timestamps when present. |
+| planning | `http://127.0.0.1:5173/` | Start a Mock World run from the customer page and wait for plan review. | The page first shows your request and a system-progress row, then renders an assistant `推荐方案摘要` card with closed-by-default disclosures for timeline, activity/dining, route/feasibility, and confirmation actions. |
+| confirmation | `http://127.0.0.1:5173/` | Keep the run at `awaiting_confirmation` before clicking `确认当前方案`. | The confirm button is visible inside the latest assistant plan card, while `run_id`, `action_count`, raw `execution_status`, and raw `feedback_status` remain hidden unless the reviewer opens `运行信息`. |
+| execution timeline | `http://127.0.0.1:5173/` | Confirm the selected plan and wait for execution to finish. | The page renders a later assistant result card in the same chat stream; `执行时间线` is collapsed by default and expands to ordered steps, action/tool labels, targets, statuses, plus compact start and finish timestamps when present. |
 
 ## Internal Reviewer-only Evidence
 
@@ -27,8 +27,8 @@ Use it together with:
 ## Reviewer Sequence
 
 1. Start backend and both frontends as described in `docs/WEB_DEMO_README.md`.
-2. On `5173`, verify planning and confirmation using a Mock World run.
-3. Confirm the run and verify the customer-facing execution timeline.
+2. On `5173`, verify the chat-first planning flow using a Mock World run.
+3. Confirm the summary-first plan card, hidden-by-default customer metadata, and the customer-facing execution timeline.
 4. Copy the resulting `run_id`.
 5. On `5174`, verify `Benchmark Summary` first. This panel should load before any run ID is entered.
 6. Load the copied `run_id` and verify `Trace Summary`.
