@@ -343,6 +343,7 @@ The aggregate review passes only when all three closure checks stay true:
 That aggregate artifact gives reviewers one compact evidence chain tying the source failure path, the replayed report, and the internal observability metadata back to the same source benchmark report path.
 
 For the pinned V1.5 reviewer evidence package, including the exact review commands, canonical latest aliases, and tracked-versus-ignored ownership rules, see `docs/V1_5_REVIEW_EVIDENCE.md`.
+Run `python scripts/verify_review_evidence.py` before submission to validate the official docs and current latest aliases together.
 
 ## Memory Governance V1
 
