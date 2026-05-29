@@ -4,6 +4,13 @@
 
 The Web demo is the primary MVP review path for WeekendPilot. It runs the React/Vite frontend against the FastAPI demo API, defaults to the Mock World provider, pauses before write tools, and continues execution only after explicit confirmation. The visible demo copy and Mock World family-afternoon content are localized in Chinese for competition review.
 
+The customer page at `5173` is now chat-first:
+
+- the first screen shows one primary composer plus a small example-entry strip
+- user requests, system progress, clarification prompts, replans, and final execution feedback appear in one chronological conversation stream
+- the assistant shows a recommended plan summary first, then reveals timeline, activity/dining, route/feasibility, and confirmation-action details only when the reviewer expands them
+- `run_id`, read path, visible plan version, and refresh now live behind a closed-by-default `运行信息` disclosure instead of a default-visible inspector
+
 The public page now exposes two explicit read paths:
 
 - `Mock World`: the default deterministic demo and the unchanged benchmark baseline
@@ -138,20 +145,21 @@ For the V1 richer UI closure, use `docs/RICHER_WEB_UI_V1_CHECKLIST.md` as the ca
 ### Happy Path
 
 1. Open `http://127.0.0.1:5173`.
-2. Keep the default Chinese family afternoon request or enter an equivalent request.
+2. Either enter an equivalent request into the main composer or click the `亲子半天` example chip to populate it.
 3. Click `开始规划`.
-4. Confirm the run reaches `awaiting_confirmation`.
-5. Confirm the visible plan version label is `v1`.
-6. Confirm the action count is `0`.
-7. Review the selected plan, timeline, route, feasibility, and the visible `action_manifest` preview.
-8. Confirm the selected plan shows `action_manifest.source = proposed_actions`.
-9. Click `确认当前方案`.
-10. Confirm the run reaches `completed`.
-11. Confirm execution and feedback are visible.
-12. Confirm the page now renders `执行时间线`.
-13. Confirm the timeline entries are ordered and show step number, action/tool label, target, and status.
-14. Confirm the action count is greater than `0`.
-15. Confirm the selected plan now shows `action_manifest.source = confirmed_actions`.
+4. Confirm the conversation stream first shows your user message and an in-chat system progress row.
+5. Confirm the run reaches `awaiting_confirmation` and the assistant shows `推荐方案摘要`.
+6. Confirm the selected plan first appears as a summary card rather than a fully expanded panel.
+7. Confirm `run_id`, `action_count`, raw `execution_status`, and raw `feedback_status` are not visible by default.
+8. Expand `时间线`, `活动与餐厅`, `路线与可执行性`, and `确认前动作` only as needed to review details.
+9. Open `运行信息` only if you need `run_id`, visible plan version, current read path, or refresh.
+10. Confirm the selected plan still shows `action_manifest.source = proposed_actions` after opening `确认前动作`.
+11. Click `确认当前方案`.
+12. Confirm the run reaches `completed`.
+13. Confirm execution and feedback are visible as a later assistant card in the same chat flow.
+14. Confirm the page now renders `执行时间线`, but keeps it collapsed by default.
+15. Expand the execution timeline and confirm the timeline entries are ordered and show step number, action/tool label, target, and status.
+16. Confirm the selected plan now shows `action_manifest.source = confirmed_actions`.
 
 The automated desktop browser suite now keeps two happy-path starts in scope:
 
@@ -163,7 +171,7 @@ The Chinese smoke accepts either `awaiting_confirmation` directly or `awaiting_c
 ### Friends Group Happy Path
 
 1. Open `http://127.0.0.1:5173`.
-2. Keep the read-path selector on `Mock World`.
+2. Keep the read path on `Mock World`.
 3. Replace the default family sample with:
 
 ```text
@@ -171,37 +179,37 @@ This afternoon I want to hang out with friends nearby for a few hours. Start wit
 ```
 
 4. Click `开始规划`.
-5. Confirm the run reaches `awaiting_confirmation`.
-6. Confirm the visible plan version label is still `v1`.
-7. Confirm the action count is `0` before confirmation.
-8. Confirm the visible plan content reflects the friends-group fixture rather than the family fixture, for example by showing friends-oriented candidate content such as `group_friendly`.
-9. Confirm the page does not show the `AMap 只读预览` notice.
-10. Click `确认当前方案`.
-11. Confirm the run reaches `completed`.
-12. Confirm the action count becomes greater than `0`.
+5. Confirm the run reaches the in-chat confirmation state.
+6. Open `运行信息` and confirm the visible plan version label is still `v1`.
+7. Expand `活动与餐厅` if needed and confirm the visible plan content reflects the friends-group fixture rather than the family fixture, for example by showing friends-oriented tags such as `适合朋友聚会`.
+8. Confirm the page does not show the `AMap 只读预览` notice.
+9. Click `确认当前方案`.
+10. Confirm the run reaches `completed`.
+11. Confirm the final assistant result card is visible in the same chat flow.
 
 This path is intentionally additive. The default customer-page sample remains the family afternoon request, while explicit friends-group Mock World prompts now route to the canonical `friends_gathering` world.
 
 ### AMap Read-only Preview Path
 
 1. Open `http://127.0.0.1:5173`.
-2. Change the read-path selector from `Mock World` to `AMap 只读预览`.
-3. Start the run.
-4. Confirm the run reaches `awaiting_confirmation`.
-5. Confirm the run inspector shows the active read path as `AMap 只读预览`.
+2. Open `高级选项`.
+3. Change the read-path selector from `Mock World` to `AMap 只读预览`.
+4. Start the run.
+4. Confirm the run reaches the in-chat confirmation state.
+5. Open `运行信息` and confirm the active read path is `AMap 只读预览`.
 6. Confirm the page shows the read-only preview notice and does not render a confirm action.
 7. Confirm refresh is still available.
 8. Confirm decline is still available.
 9. If you call `POST /demo/runs/<run_id>/confirm`, confirm the API returns HTTP `409` with `AMAP read-only demo runs cannot be confirmed.`.
-10. Confirm the run still has `action_count = 0` and no write-side effects.
+10. Confirm the run has no write-side effects.
 
 ### Clarification Path
 
 1. Start a fresh run with a vague request such as `想周末出去玩一下。`
-2. Confirm the run reaches `awaiting_clarification`.
+2. Confirm the run reaches `awaiting_clarification` in the chat flow.
 3. Confirm the visible response shows `plans = []`, `selected_plan_id = null`, and a non-null `clarification` summary.
-4. Confirm the visible plan version label still shows `v1`.
-5. Confirm the page renders the `需要补充信息` panel with:
+4. Open `运行信息` and confirm the visible plan version label still shows `v1`.
+5. Confirm the page renders the in-chat clarification card with:
    - the backend `clarification.prompt`
    - a visible `待补充项` list
    - a dedicated `补充说明` textarea
@@ -228,21 +236,21 @@ curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/clarify \
 3. Click `暂不继续`.
 4. Confirm the run reaches `declined`.
 5. Confirm `确认当前方案` is no longer available.
-6. Confirm the action count remains `0`.
+6. Confirm there are still no write-side effects.
 
 ### Follow-up Replan Path
 
 1. Start a fresh run and wait for `awaiting_confirmation`.
-2. Confirm the page shows a `继续调整方案` panel with a dedicated textarea and submit button.
-3. Confirm the visible `plan_version.version_label` is `v1`.
+2. Confirm the latest assistant plan card shows an inline `继续调整方案` textarea and submit button.
+3. Open `运行信息` and confirm the visible `plan_version.version_label` is `v1`.
 4. Record the visible `run_id`.
 5. Enter a follow-up such as `Keep it nearby, but make it a solo outing this time.`
-6. Click `重新规划当前方案`.
+6. Click `基于当前方案继续规划`.
 7. Confirm the page updates to a different `run_id`.
 8. Confirm the new run also reaches `awaiting_confirmation`.
-9. Confirm the visible version label advances to `v2`.
+9. Open `运行信息` and confirm the visible version label advances to `v2`.
 10. Enter another follow-up such as `Reduce walking even more.`
-11. Click `重新规划当前方案` again.
+11. Click `基于当前方案继续规划` again.
 12. Confirm the page stays on `awaiting_confirmation` and now shows `plan_version.version_label = v3`.
 13. Confirm the public page still does not expose `session_id` or conversation history.
 
@@ -263,14 +271,14 @@ curl -X POST http://127.0.0.1:8000/demo/runs/<run_id>/replan \
 ### Refresh Path
 
 1. Start a run.
-2. Copy or inspect the visible run ID.
-3. Click `刷新状态`.
+2. Open `运行信息`.
+3. Copy or inspect the visible run ID, then click `刷新当前状态`.
 4. Confirm the same run ID remains visible.
-5. Confirm the run still shows the expected status.
+5. Confirm the latest assistant card is updated in place rather than duplicated.
 
 ### Mobile Smoke
 
-Use a mobile viewport around 390px wide. Start a run and confirm the main controls and selected plan remain visible without document-level horizontal scrolling.
+Use a mobile viewport around 390px wide. Start a run and confirm the main controls, latest assistant card, and disclosure buttons remain visible without document-level horizontal scrolling.
 
 ### Internal Richer UI Review
 
@@ -354,15 +362,16 @@ PostgreSQL, Redis, and migrations must already be ready.
 - Bounded recovery can also stop at `awaiting_clarification` when deterministic recovery is exhausted and user tradeoff input is required.
 - The initial public run shows `plan_version.version_label = v1`.
 - Clarification-only turns keep the visible version label at `v1` until the first real plan is produced.
-- Action count is `0` before confirmation.
+- The customer page first shows only the composer and example-entry strip.
+- The customer page shows user turns, system progress, clarifications, replans, and execution results in one chronological chat stream.
+- `run_id`, `action_count`, raw `execution_status`, and raw `feedback_status` are not visible by default.
 - Pre-confirmation selected plans expose `action_manifest.source = proposed_actions` when preview actions exist.
 - Confirmation executes write actions through the deterministic workflow.
 - Completed execution and feedback are visible after confirmation.
-- Action count is greater than `0` after confirmation.
 - Confirmed or executed plans expose `action_manifest.source = confirmed_actions` when persisted confirmed actions exist.
 - Declining a run leaves no confirm action available.
 - Replanning returns a new `run_id`, increments the visible version label, and still reuses the internal conversation session.
-- Refresh preserves the current visible run.
+- Refresh preserves the current visible run and updates the latest assistant card in place.
 - The page does not expose internal or sensitive keys such as `action_id`, `tool_event_id`, `idempotency_key`, `debug_trace`, `api_key`, `token`, `secret`, or `authorization`.
 
 ## Troubleshooting
