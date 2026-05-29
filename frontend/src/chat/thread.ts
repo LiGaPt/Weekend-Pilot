@@ -4,6 +4,7 @@ import type {
   DemoClarificationSummary,
   DemoExecutionActionResultSummary,
   DemoPlanPreview,
+  DemoProgressStepSummary,
   DemoReadProfile,
   DemoRunSummary,
 } from "../types/demo";
@@ -40,9 +41,25 @@ export type ConversationThreadItem =
       text: string;
     }
   | PendingConversationAction
+  | AssistantProgressCardItem
   | AssistantClarificationItem
   | AssistantPlanCardItem
   | AssistantResultCardItem;
+
+export type AssistantProgressCardItem = {
+  id: string;
+  kind: "assistant_progress_card";
+  runId: string;
+  currentStage: string;
+  currentLabel: string;
+  currentSummary: string;
+  completedSteps: Array<{
+    stage: string;
+    label: string;
+    summary: string;
+  }>;
+  completedCollapsedByDefault: true;
+};
 
 export type AssistantClarificationItem = {
   id: string;
@@ -161,6 +178,11 @@ export function projectRunItems(run: DemoRunSummary, selectedPlanId?: string | n
   const items: ConversationThreadItem[] = [];
   const clarification = isClarificationSummary(run.clarification) ? run.clarification : null;
   const resolvedPlan = choosePlan(run, selectedPlanId ?? null);
+  const progressItem = buildProgressItem(run);
+
+  if (progressItem) {
+    items.push(progressItem);
+  }
 
   if (run.status === "awaiting_clarification" && clarification) {
     items.push(buildClarificationItem(run, clarification));
@@ -176,6 +198,51 @@ export function projectRunItems(run: DemoRunSummary, selectedPlanId?: string | n
   }
 
   return items;
+}
+
+function buildProgressItem(run: DemoRunSummary): AssistantProgressCardItem | null {
+  const steps = normalizeProgressSteps(run.progress?.steps);
+  if (!steps.length) {
+    return null;
+  }
+
+  const currentStep = steps[steps.length - 1];
+  const currentSummary = safeText(currentStep.summary) || safeText(run.progress.current_label) || currentStep.label;
+
+  return {
+    id: `${run.run_id}-progress`,
+    kind: "assistant_progress_card",
+    runId: run.run_id,
+    currentStage: currentStep.stage,
+    currentLabel: currentStep.label,
+    currentSummary,
+    completedSteps: steps.slice(0, -1).map((step) => ({
+      stage: step.stage,
+      label: step.label,
+      summary: step.summary,
+    })),
+    completedCollapsedByDefault: true,
+  };
+}
+
+function normalizeProgressSteps(value: unknown): DemoProgressStepSummary[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((step): step is DemoProgressStepSummary => {
+    if (!step || typeof step !== "object") {
+      return false;
+    }
+
+    const candidate = step as Partial<DemoProgressStepSummary>;
+    return (
+      typeof candidate.stage === "string" &&
+      typeof candidate.label === "string" &&
+      typeof candidate.summary === "string" &&
+      (candidate.status === "completed" || candidate.status === "current")
+    );
+  });
 }
 
 function buildClarificationItem(run: DemoRunSummary, clarification: DemoClarificationSummary): AssistantClarificationItem {

@@ -145,12 +145,22 @@ DemoProgressStage = Literal[
     "executing_confirmed_actions",
 ]
 
+DemoProgressStepStatus = Literal["completed", "current"]
+
+
+class DemoProgressStepSummary(BaseModel):
+    stage: DemoProgressStage
+    label: str
+    status: DemoProgressStepStatus
+    summary: str
+
 
 class DemoProgressSummary(BaseModel):
     schema_version: Literal["public_demo_progress_v1"] = "public_demo_progress_v1"
     current_stage: DemoProgressStage
     current_label: str
     stage_history: list[DemoProgressStage] = Field(default_factory=list)
+    steps: list[DemoProgressStepSummary] = Field(default_factory=list)
 
 
 class DemoActionManifestItemSummary(BaseModel):

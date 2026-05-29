@@ -1,13 +1,67 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clarifyRun, confirmRun, declineRun, getRun, replanRun, startRun } from "./demo";
 import { FrontendApiError } from "../shared/http";
-import type { DemoRunSummary } from "../types/demo";
+import type { DemoProgressStage, DemoRunSummary } from "../types/demo";
+
+const progressLabels: Record<DemoProgressStage, string> = {
+  understanding_request: "\u6b63\u5728\u7406\u89e3\u9700\u6c42",
+  planning_queries: "\u6b63\u5728\u89c4\u5212\u67e5\u8be2",
+  searching_activities: "\u6b63\u5728\u67e5\u8be2\u6e38\u73a9\u5730\u70b9",
+  searching_dining: "\u6b63\u5728\u67e5\u8be2\u9910\u5385",
+  checking_availability: "\u6b63\u5728\u68c0\u67e5\u8425\u4e1a\u4e0e\u53ef\u7528\u6027",
+  building_itinerary: "\u6b63\u5728\u7ec4\u5408\u884c\u7a0b",
+  checking_route_time: "\u6b63\u5728\u8ba1\u7b97\u8def\u7ebf\u4e0e\u65f6\u95f4",
+  reviewing_plan: "\u6b63\u5728\u590d\u6838\u65b9\u6848",
+  ready_for_confirmation: "\u63a8\u8350\u65b9\u6848\u5df2\u51c6\u5907\u597d",
+  executing_confirmed_actions: "\u5df2\u786e\u8ba4\uff0c\u6b63\u5728\u6267\u884c\u52a8\u4f5c",
+};
+
+function buildProgress(
+  currentStage: DemoProgressStage,
+  stageHistory: DemoProgressStage[],
+  summaryOverrides: Partial<Record<DemoProgressStage, string>> = {},
+) {
+  return {
+    schema_version: "public_demo_progress_v1" as const,
+    current_stage: currentStage,
+    current_label: progressLabels[currentStage],
+    stage_history: stageHistory,
+    steps: stageHistory.map((stage, index) => {
+      const status: "current" | "completed" = index === stageHistory.length - 1 ? "current" : "completed";
+      return {
+        stage,
+        label: progressLabels[stage],
+        status,
+        summary: summaryOverrides[stage] ?? progressLabels[stage],
+      };
+    }),
+  };
+}
 
 const summary: DemoRunSummary = {
   run_id: "run-1",
   status: "awaiting_confirmation",
   read_profile: "mock_world",
   selected_plan_id: "plan-1",
+  progress: buildProgress(
+    "ready_for_confirmation",
+    [
+      "understanding_request",
+      "planning_queries",
+      "searching_activities",
+      "searching_dining",
+      "checking_availability",
+      "building_itinerary",
+      "checking_route_time",
+      "reviewing_plan",
+      "ready_for_confirmation",
+    ],
+    {
+      searching_activities: "\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8",
+      searching_dining: "\u5df2\u627e\u5230 5 \u4e2a\u9910\u5385",
+      building_itinerary: "\u5df2\u751f\u6210 2 \u4e2a\u5019\u9009\u65b9\u6848",
+    },
+  ),
   plan_version: {
     version_number: 1,
     version_label: "v1",

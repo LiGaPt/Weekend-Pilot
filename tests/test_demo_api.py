@@ -25,6 +25,28 @@ _PROGRESS_LABELS = {
     "executing_confirmed_actions": "\u5df2\u786e\u8ba4\uff0c\u6b63\u5728\u6267\u884c\u52a8\u4f5c",
 }
 
+_PROGRESS_SUMMARIES = {
+    "understanding_request": "\u5df2\u7406\u89e3\u51fa\u884c\u76ee\u6807\u4e0e\u6838\u5fc3\u7ea6\u675f",
+    "planning_queries": "\u5df2\u6574\u7406\u6d3b\u52a8\u4e0e\u9910\u996e\u67e5\u8be2\u65b9\u5411",
+    "searching_activities": "\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8",
+    "searching_dining": "\u5df2\u627e\u5230 5 \u4e2a\u9910\u5385",
+    "checking_availability": "\u5df2\u5b8c\u6210\u8425\u4e1a\u4e0e\u53ef\u7528\u6027\u68c0\u67e5",
+    "building_itinerary": "\u5df2\u751f\u6210 2 \u4e2a\u5019\u9009\u65b9\u6848",
+    "checking_route_time": "\u5df2\u5b8c\u6210\u8def\u7ebf\u4e0e\u65f6\u95f4\u6d4b\u7b97",
+    "reviewing_plan": "\u5df2\u5b8c\u6210\u63a8\u8350\u65b9\u6848\u590d\u6838",
+    "ready_for_confirmation": "\u63a8\u8350\u65b9\u6848\u5df2\u51c6\u5907\u597d",
+    "executing_confirmed_actions": "\u5df2\u5f00\u59cb\u6267\u884c 2 \u4e2a\u786e\u8ba4\u52a8\u4f5c",
+}
+
+
+def _step(stage: str, status: str, summary: str | None = None) -> dict[str, str]:
+    return {
+        "stage": stage,
+        "label": _PROGRESS_LABELS[stage],
+        "status": status,
+        "summary": summary or _PROGRESS_SUMMARIES[stage],
+    }
+
 
 def _progress(
     current_stage: str = "ready_for_confirmation",
@@ -32,11 +54,16 @@ def _progress(
     stage_history: list[str] | None = None,
 ) -> dict[str, object]:
     history = stage_history or [current_stage]
+    steps = [
+        _step(stage, "current" if index == len(history) - 1 else "completed")
+        for index, stage in enumerate(history)
+    ]
     return {
         "schema_version": "public_demo_progress_v1",
         "current_stage": current_stage,
         "current_label": _PROGRESS_LABELS[current_stage],
         "stage_history": history,
+        "steps": steps,
     }
 
 
@@ -214,6 +241,17 @@ def test_demo_run_summary_serializes_minimal_web_safe_payload() -> None:
             "checking_route_time",
             "reviewing_plan",
             "ready_for_confirmation",
+        ],
+        "steps": [
+            _step("understanding_request", "completed"),
+            _step("planning_queries", "completed"),
+            _step("searching_activities", "completed"),
+            _step("searching_dining", "completed"),
+            _step("checking_availability", "completed"),
+            _step("building_itinerary", "completed"),
+            _step("checking_route_time", "completed"),
+            _step("reviewing_plan", "completed"),
+            _step("ready_for_confirmation", "current", "\u63a8\u8350\u65b9\u6848\u5df2\u51c6\u5907\u597d"),
         ],
     }
     assert "trace_id" not in dumped

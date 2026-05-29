@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { ProgressStepperCard } from "./ProgressStepperCard";
 import type { DemoPlanPreview } from "../types/demo";
 import type {
   AssistantClarificationItem,
@@ -99,6 +100,10 @@ export function ConversationThread({
               </div>
             </article>
           );
+        }
+
+        if (item.kind === "assistant_progress_card") {
+          return <ProgressStepperCard key={item.id} item={item} />;
         }
 
         if (item.kind === "assistant_clarification") {

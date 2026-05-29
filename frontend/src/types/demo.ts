@@ -126,6 +126,35 @@ export type DemoClarificationSummary = {
   missing_fields: string[];
 };
 
+export type DemoProgressStage =
+  | "understanding_request"
+  | "planning_queries"
+  | "searching_activities"
+  | "searching_dining"
+  | "checking_availability"
+  | "building_itinerary"
+  | "checking_route_time"
+  | "reviewing_plan"
+  | "ready_for_confirmation"
+  | "executing_confirmed_actions";
+
+export type DemoProgressStepStatus = "completed" | "current";
+
+export type DemoProgressStepSummary = {
+  stage: DemoProgressStage;
+  label: string;
+  status: DemoProgressStepStatus;
+  summary: string;
+};
+
+export type DemoProgressSummary = {
+  schema_version: "public_demo_progress_v1";
+  current_stage: DemoProgressStage;
+  current_label: string;
+  stage_history: DemoProgressStage[];
+  steps: DemoProgressStepSummary[];
+};
+
 export type DemoClarifyRunRequest = {
   user_input: string;
   selected_plan_index: number;
@@ -159,6 +188,7 @@ export type DemoRunSummary = {
   status: string;
   read_profile: DemoReadProfile;
   selected_plan_id: string | null;
+  progress: DemoProgressSummary;
   plan_version: DemoPlanVersionSummary;
   plans: DemoPlanPreview[];
   action_count: number;

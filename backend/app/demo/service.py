@@ -454,6 +454,7 @@ class DemoWorkflowService:
         feedback = selected_plan_json.get("feedback") if isinstance(selected_plan_json, dict) else None
         execution_status = execution.get("status") if isinstance(execution, dict) else None
         feedback_status = feedback.get("status") if isinstance(feedback, dict) else None
+        action_count = self._action_count(run_id)
 
         return DemoRunSummary(
             run_id=run.run_id,
@@ -463,12 +464,14 @@ class DemoWorkflowService:
             progress=build_demo_progress_summary(
                 run,
                 tool_events,
+                plan_count=len(plan_rows),
+                action_count=action_count,
                 execution_status=execution_status,
                 feedback_status=feedback_status,
             ),
             plan_version=summarize_plan_version(run.metadata_json),
             plans=[self._plan_preview(plan) for plan in plan_rows],
-            action_count=self._action_count(run_id),
+            action_count=action_count,
             execution_status=execution_status,
             feedback_status=feedback_status,
             error=self._error(run),

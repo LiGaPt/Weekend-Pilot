@@ -8,6 +8,7 @@ The customer page at `5173` is now chat-first:
 
 - the first screen shows one primary composer plus a small example-entry strip
 - user requests, system progress, clarification prompts, replans, and final execution feedback appear in one chronological conversation stream
+- once a run summary arrives, the transient system-progress row gives way to one persistent progress stepper with the current step highlighted and completed steps hidden behind a disclosure by default
 - the assistant shows a recommended plan summary first, then reveals timeline, activity/dining, route/feasibility, and confirmation-action details only when the reviewer expands them
 - `run_id`, read path, visible plan version, and refresh now live behind a closed-by-default `运行信息` disclosure instead of a default-visible inspector
 
@@ -62,7 +63,9 @@ Every successful public `DemoRunSummary` now also includes an additive `progress
 }
 ```
 
-That snapshot is reconstructed from persisted workflow node history, ordered tool events, and demo continuation history only. This task does not add real-time transport for mid-request progress: no async start flow, polling endpoint, SSE stream, or WebSocket is introduced here.
+The `progress` payload now also includes additive `steps[]` entries. Each step contains `stage`, `label`, `status`, and `summary`, which is the customer-safe contract for the stepper UI. The default Mock World family path now surfaces public milestones such as `已找到 5 个活动` and `已找到 5 个餐厅` after reviewers expand the completed-step disclosure.
+
+That snapshot is reconstructed from persisted workflow node history, ordered tool events, plan rows, and demo continuation history only. This task does not add real-time transport for mid-request progress: no async start flow, polling endpoint, SSE stream, or WebSocket is introduced here.
 
 No external local-life provider, map provider, LangSmith upload, API key, token, or secret is required for the default Mock World path.
 
@@ -171,6 +174,8 @@ For the V1 richer UI closure, use `docs/RICHER_WEB_UI_V1_CHECKLIST.md` as the ca
 2. Either enter an equivalent request into the main composer or click the `亲子半天` example chip to populate it.
 3. Click `开始规划`.
 4. Confirm the conversation stream first shows your user message and an in-chat system progress row.
+5. Confirm the run reaches `awaiting_confirmation`, the transient row disappears, and one persistent progress stepper appears above the plan card.
+6. Expand the completed-step disclosure and verify public-safe evidence such as `已找到 5 个活动` and `已找到 5 个餐厅`.
 5. Confirm the run reaches `awaiting_confirmation` and the assistant shows `推荐方案摘要`.
 6. Confirm the selected plan first appears as a summary card rather than a fully expanded panel.
 7. Confirm `run_id`, `action_count`, raw `execution_status`, and raw `feedback_status` are not visible by default.
