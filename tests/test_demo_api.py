@@ -12,6 +12,34 @@ from backend.app.demo.service import sanitize_demo_payload
 from backend.app.main import create_app
 
 
+_PROGRESS_LABELS = {
+    "understanding_request": "\u6b63\u5728\u7406\u89e3\u9700\u6c42",
+    "planning_queries": "\u6b63\u5728\u89c4\u5212\u67e5\u8be2",
+    "searching_activities": "\u6b63\u5728\u67e5\u8be2\u6e38\u73a9\u5730\u70b9",
+    "searching_dining": "\u6b63\u5728\u67e5\u8be2\u9910\u5385",
+    "checking_availability": "\u6b63\u5728\u68c0\u67e5\u8425\u4e1a\u4e0e\u53ef\u7528\u6027",
+    "building_itinerary": "\u6b63\u5728\u7ec4\u5408\u884c\u7a0b",
+    "checking_route_time": "\u6b63\u5728\u8ba1\u7b97\u8def\u7ebf\u4e0e\u65f6\u95f4",
+    "reviewing_plan": "\u6b63\u5728\u590d\u6838\u65b9\u6848",
+    "ready_for_confirmation": "\u63a8\u8350\u65b9\u6848\u5df2\u51c6\u5907\u597d",
+    "executing_confirmed_actions": "\u5df2\u786e\u8ba4\uff0c\u6b63\u5728\u6267\u884c\u52a8\u4f5c",
+}
+
+
+def _progress(
+    current_stage: str = "ready_for_confirmation",
+    *,
+    stage_history: list[str] | None = None,
+) -> dict[str, object]:
+    history = stage_history or [current_stage]
+    return {
+        "schema_version": "public_demo_progress_v1",
+        "current_stage": current_stage,
+        "current_label": _PROGRESS_LABELS[current_stage],
+        "stage_history": history,
+    }
+
+
 def test_create_app_includes_demo_routes() -> None:
     app = create_app()
     paths = {route.path for route in app.routes}
@@ -131,6 +159,19 @@ def test_demo_run_summary_serializes_minimal_web_safe_payload() -> None:
         execution_status=None,
         feedback_status=None,
         error=None,
+        progress=_progress(
+            stage_history=[
+                "understanding_request",
+                "planning_queries",
+                "searching_activities",
+                "searching_dining",
+                "checking_availability",
+                "building_itinerary",
+                "checking_route_time",
+                "reviewing_plan",
+                "ready_for_confirmation",
+            ]
+        ),
     )
 
     dumped = summary.model_dump(mode="json")
@@ -159,6 +200,22 @@ def test_demo_run_summary_serializes_minimal_web_safe_payload() -> None:
             }
         ],
     }
+    assert dumped["progress"] == {
+        "schema_version": "public_demo_progress_v1",
+        "current_stage": "ready_for_confirmation",
+        "current_label": "\u63a8\u8350\u65b9\u6848\u5df2\u51c6\u5907\u597d",
+        "stage_history": [
+            "understanding_request",
+            "planning_queries",
+            "searching_activities",
+            "searching_dining",
+            "checking_availability",
+            "building_itinerary",
+            "checking_route_time",
+            "reviewing_plan",
+            "ready_for_confirmation",
+        ],
+    }
     assert "trace_id" not in dumped
     assert "session_id" not in dumped
     assert "conversation" not in dumped
@@ -180,6 +237,7 @@ def test_demo_run_summary_requires_plan_version() -> None:
             execution_status=None,
             feedback_status=None,
             error=None,
+            progress=_progress(),
         )
 
 
@@ -200,6 +258,10 @@ def test_demo_run_summary_serializes_clarification_payload() -> None:
         execution_status=None,
         feedback_status=None,
         error=None,
+        progress=_progress(
+            "planning_queries",
+            stage_history=["understanding_request", "planning_queries"],
+        ),
         clarification={
             "prompt": "为了继续规划，请补充这次是谁一起去，以及大概什么时间出发、准备玩多久。",
             "missing_fields": ["scenario_or_participants", "time_window"],
@@ -231,6 +293,19 @@ def test_demo_run_summary_serializes_recovery_clarification_payload() -> None:
         execution_status=None,
         feedback_status=None,
         error=None,
+        progress=_progress(
+            "reviewing_plan",
+            stage_history=[
+                "understanding_request",
+                "planning_queries",
+                "searching_activities",
+                "searching_dining",
+                "checking_availability",
+                "building_itinerary",
+                "checking_route_time",
+                "reviewing_plan",
+            ],
+        ),
         clarification={
             "prompt": (
                 "\u4e3a\u4e86\u7ee7\u7eed\u89c4\u5212\uff0c\u8bf7\u544a\u8bc9\u6211\u662f\u5426\u53ef\u4ee5"
@@ -270,6 +345,7 @@ def test_demo_run_summary_allows_null_clarification_for_non_clarification_runs()
         execution_status=None,
         feedback_status=None,
         error=None,
+        progress=_progress(),
         clarification=None,
     )
 
@@ -303,5 +379,6 @@ def test_demo_plan_preview_requires_action_manifest() -> None:
                 "execution_status": None,
                 "feedback_status": None,
                 "error": None,
+                "progress": _progress(),
             }
         )

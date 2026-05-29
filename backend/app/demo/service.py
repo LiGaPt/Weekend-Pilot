@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from backend.app.confirmation import HumanConfirmationService, PlanConfirmationError
 from backend.app.core.config import Settings
 from backend.app.demo.replan import build_follow_up_intent
+from backend.app.demo.progress import build_demo_progress_summary
 from backend.app.demo.world_profile import resolve_mock_world_demo_profile
 from backend.app.execution import DeterministicExecutionWorkflow, ExecutionWorkflowError
 from backend.app.feedback import DeterministicFeedbackWriter, FeedbackWriterError
@@ -447,20 +448,29 @@ class DemoWorkflowService:
         plans = PlanRepository(self.session)
         selected_plan = plans.get_selected_for_run(run_id)
         plan_rows = plans.list_for_run(run_id)
+        tool_events = ToolEventRepository(self.session).list_for_run(run_id)
         selected_plan_json = self._plan_json(selected_plan) if selected_plan is not None else {}
         execution = selected_plan_json.get("execution") if isinstance(selected_plan_json, dict) else None
         feedback = selected_plan_json.get("feedback") if isinstance(selected_plan_json, dict) else None
+        execution_status = execution.get("status") if isinstance(execution, dict) else None
+        feedback_status = feedback.get("status") if isinstance(feedback, dict) else None
 
         return DemoRunSummary(
             run_id=run.run_id,
             status=run.status,
             read_profile=self._read_profile_for_tool_profile(run.tool_profile),
             selected_plan_id=selected_plan.plan_id if selected_plan is not None else None,
+            progress=build_demo_progress_summary(
+                run,
+                tool_events,
+                execution_status=execution_status,
+                feedback_status=feedback_status,
+            ),
             plan_version=summarize_plan_version(run.metadata_json),
             plans=[self._plan_preview(plan) for plan in plan_rows],
             action_count=self._action_count(run_id),
-            execution_status=execution.get("status") if isinstance(execution, dict) else None,
-            feedback_status=feedback.get("status") if isinstance(feedback, dict) else None,
+            execution_status=execution_status,
+            feedback_status=feedback_status,
             error=self._error(run),
             clarification=self._clarification_summary(run),
         )

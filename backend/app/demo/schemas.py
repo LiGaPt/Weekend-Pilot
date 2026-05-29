@@ -132,6 +132,27 @@ class DemoClarificationSummary(BaseModel):
     missing_fields: list[str] = Field(default_factory=list)
 
 
+DemoProgressStage = Literal[
+    "understanding_request",
+    "planning_queries",
+    "searching_activities",
+    "searching_dining",
+    "checking_availability",
+    "building_itinerary",
+    "checking_route_time",
+    "reviewing_plan",
+    "ready_for_confirmation",
+    "executing_confirmed_actions",
+]
+
+
+class DemoProgressSummary(BaseModel):
+    schema_version: Literal["public_demo_progress_v1"] = "public_demo_progress_v1"
+    current_stage: DemoProgressStage
+    current_label: str
+    stage_history: list[DemoProgressStage] = Field(default_factory=list)
+
+
 class DemoActionManifestItemSummary(BaseModel):
     action_ref: str | None = None
     execution_order: int | None = Field(default=None, ge=1)
@@ -170,6 +191,7 @@ class DemoRunSummary(BaseModel):
     status: str
     read_profile: DemoReadProfile
     selected_plan_id: UUID | None = None
+    progress: DemoProgressSummary
     plan_version: DemoPlanVersionSummary
     plans: list[DemoPlanPreview] = Field(default_factory=list)
     action_count: int = 0
