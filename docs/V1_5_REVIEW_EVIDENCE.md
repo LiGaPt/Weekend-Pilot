@@ -43,3 +43,7 @@ Run the following commands from the repository root when you need to refresh evi
 
 `docs/COMPETITION_SUBMISSION_DESIGN.md` is the concise submission-facing summary.
 This document is the reviewer-facing evidence package reference and ownership map.
+
+## Verification
+
+Run `python scripts/verify_review_evidence.py` before submission to validate the official docs and the four current latest aliases together.
