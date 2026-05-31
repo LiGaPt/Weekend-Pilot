@@ -1,36 +1,18 @@
-import { AlertCircle, Compass, Loader2, RotateCcw, Send, SlidersHorizontal, Sparkles } from "lucide-react";
+import { AlertCircle, Loader2, Send } from "lucide-react";
 import { useMemo, useState } from "react";
-import { clarifyRun, confirmRun, declineRun, getRun, replanRun, startRun } from "./api/demo";
+import { clarifyRun, confirmRun, declineRun, replanRun, startRun } from "./api/demo";
 import { ConversationThread } from "./chat/ConversationThread";
 import {
   choosePlan,
   isClarificationSummary,
   progressLabelForState,
   projectConversationThread,
-  readProfileHelper,
   resolveSelectedPlanIndex,
   statusLabel,
   type ConversationHistoryEntry,
   type PendingConversationAction,
 } from "./chat/thread";
 import type { DemoReadProfile, DemoReplanRunRequest, DemoRunSummary } from "./types/demo";
-
-const EXAMPLE_PROMPTS = [
-  {
-    label: "亲子半天",
-    prompt:
-      "今天下午想和爱人、5岁的孩子出门玩几个小时，别离家太远。孩子要适合亲子活动，爱人最近想吃清淡一点，帮我安排一下。",
-  },
-  {
-    label: "朋友轻社交",
-    prompt:
-      "This afternoon I want to hang out with friends nearby for a few hours. Start with an outdoor walk and chatting, then find a casual dinner place that's good for sharing. Not too far.",
-  },
-  {
-    label: "只读预览",
-    prompt: "帮我先预览一个适合周末下午的附近轻松行程，不要直接执行任何动作。",
-  },
-];
 
 const GENERIC_ERROR_MESSAGE = "演示请求失败，请稍后重试。";
 
@@ -48,18 +30,18 @@ type RequestState =
   | "declined"
   | "error";
 
+type ComposerMode = "start" | "clarify" | "replan";
+
 const TERMINAL_SUCCESS_STATUSES = new Set(["completed", "partially_completed", "failed", "skipped"]);
+const INPUT_ACTION_STATES = new Set<RequestState>(["starting", "clarifying", "replanning"]);
 
 export default function App() {
   const [userInput, setUserInput] = useState("");
   const [selectedReadProfile, setSelectedReadProfile] = useState<DemoReadProfile>("mock_world");
   const [run, setRun] = useState<DemoRunSummary | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
-  const [clarificationReply, setClarificationReply] = useState("");
-  const [replanReply, setReplanReply] = useState("");
   const [requestState, setRequestState] = useState<RequestState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [advancedOptionsOpen, setAdvancedOptionsOpen] = useState(false);
   const [conversationEntries, setConversationEntries] = useState<ConversationHistoryEntry[]>([]);
 
   const selectedPlan = useMemo(() => choosePlan(run, selectedPlanId), [run, selectedPlanId]);
@@ -72,17 +54,22 @@ export default function App() {
   const isInFlight = ["starting", "clarifying", "replanning", "refreshing", "confirming", "declining"].includes(
     requestState,
   );
-  const canRefresh = Boolean(run?.run_id) && !isInFlight;
   const isAwaitingClarification = run?.status === "awaiting_clarification";
   const isAwaitingConfirmation = run?.status === "awaiting_confirmation";
   const isAmapPreview = run?.read_profile === "amap";
-  const clarificationReplyIsEmpty = clarificationReply.trim().length === 0;
-  const replanReplyIsEmpty = replanReply.trim().length === 0;
   const showClarificationComposer = Boolean(isAwaitingClarification && clarificationPayload);
-  const canClarify = Boolean(showClarificationComposer && run?.run_id && !clarificationReplyIsEmpty && !isInFlight);
+  const composerMode = resolveComposerMode(showClarificationComposer, isAwaitingConfirmation, selectedPlan);
   const canConfirm = Boolean(isAwaitingConfirmation && selectedPlan && !isInFlight && !isAmapPreview);
   const canDecline = Boolean(isAwaitingConfirmation && selectedPlan && !isInFlight);
-  const canReplan = Boolean(isAwaitingConfirmation && selectedPlan && run?.run_id && !replanReplyIsEmpty && !isInFlight);
+  const canSubmit = canSubmitComposer({
+    mode: composerMode,
+    run,
+    selectedPlan,
+    inputIsEmpty,
+    isInFlight,
+    showClarificationComposer,
+    isAwaitingConfirmation,
+  });
 
   const pendingAction: PendingConversationAction | null = isInFlight
     ? {
@@ -104,20 +91,36 @@ export default function App() {
     [conversationEntries, pendingAction, run?.run_id, selectedPlanId],
   );
 
+  async function handleComposerSubmit() {
+    if (!canSubmit) {
+      return;
+    }
+
+    if (composerMode === "clarify") {
+      await handleClarify();
+      return;
+    }
+
+    if (composerMode === "replan") {
+      await handleReplan();
+      return;
+    }
+
+    await handleStart();
+  }
+
   async function handleStart() {
     if (inputIsEmpty || isInFlight) {
       return;
     }
 
     appendUserEntry("start", trimmedInput);
-    setClarificationReply("");
-    setReplanReply("");
 
     await runAction("starting", () =>
       startRun({
         user_input: trimmedInput,
         external_user_id: buildDemoExternalUserId(),
-        display_name: "Web Demo User",
+        display_name: "网页用户",
         case_id: "web-demo",
         selected_plan_index: 0,
         read_profile: selectedReadProfile,
@@ -126,45 +129,27 @@ export default function App() {
   }
 
   async function handleReplan() {
-    if (!run?.run_id || !canReplan) {
+    if (!run?.run_id || !selectedPlan || inputIsEmpty || isInFlight) {
       return;
     }
 
-    appendUserEntry("replan", replanReply.trim());
+    appendUserEntry("replan", trimmedInput);
     const selectedPlanIndex = resolveSelectedPlanIndex(run, selectedPlanId);
 
-    await runAction(
-      "replanning",
-      () => replanRun(run.run_id, buildReplanRequest(replanReply, selectedPlanIndex)),
-      () => {
-        setReplanReply("");
-      },
-    );
-  }
-
-  async function handleRefresh() {
-    if (!run?.run_id || isInFlight) {
-      return;
-    }
-    await runAction("refreshing", () => getRun(run.run_id));
+    await runAction("replanning", () => replanRun(run.run_id, buildReplanRequest(trimmedInput, selectedPlanIndex)));
   }
 
   async function handleClarify() {
-    if (!run?.run_id || !canClarify) {
+    if (!run?.run_id || !showClarificationComposer || inputIsEmpty || isInFlight) {
       return;
     }
 
-    appendUserEntry("clarify", clarificationReply.trim());
-    await runAction(
-      "clarifying",
-      () =>
-        clarifyRun(run.run_id, {
-          user_input: clarificationReply.trim(),
-          selected_plan_index: 0,
-        }),
-      () => {
-        setClarificationReply("");
-      },
+    appendUserEntry("clarify", trimmedInput);
+    await runAction("clarifying", () =>
+      clarifyRun(run.run_id, {
+        user_input: trimmedInput,
+        selected_plan_index: 0,
+      }),
     );
   }
 
@@ -199,7 +184,7 @@ export default function App() {
       setSelectedPlanId(nextRun.selected_plan_id ?? nextRun.plans[0]?.plan_id ?? null);
       setRequestState(stateFromRun(nextRun));
 
-      if (nextState === "starting") {
+      if (INPUT_ACTION_STATES.has(nextState)) {
         setUserInput("");
       }
     } catch (error) {
@@ -241,135 +226,14 @@ export default function App() {
     });
   }
 
-  function resetComposer() {
-    setUserInput("");
-    setSelectedReadProfile("mock_world");
-    setAdvancedOptionsOpen(false);
-    setErrorMessage(null);
-  }
-
   return (
     <main className="app-shell customer-chat-shell">
-      <section className="app-header customer-chat-header" aria-labelledby="app-title">
-        <div>
-          <p className="eyebrow">WeekendPilot Web Demo</p>
-          <h1 id="app-title">企业级对话式周末规划</h1>
-          <p className="hero-supporting-copy">先给你推荐方案摘要，再按需展开时间线、餐厅、路线和确认动作。</p>
+      <header className="chat-topbar" aria-label="周末规划助手">
+        <div className="chat-brand-block">
+          <p className="chat-brand">周末规划助手</p>
         </div>
         <StatusBadge status={requestState === "idle" ? "ready" : requestState} />
-      </section>
-
-      <section className="chat-hero">
-        <div className="chat-hero-copy">
-          <div className="hero-kicker">
-            <Sparkles size={16} aria-hidden="true" />
-            <span>Chat-First Customer Surface</span>
-          </div>
-          <h2>只保留一个主输入框，剩下的进度和方案都在聊天流里完成。</h2>
-          <p>
-            默认走 Mock World。需要只读实时预览时，再从高级选项切到 AMap。内部运行 ID、动作计数和原始状态字段不会默认铺开。
-          </p>
-        </div>
-
-        <section className="panel chat-composer-card" aria-labelledby="request-title">
-          <div className="section-heading">
-            <Compass size={18} aria-hidden="true" />
-            <h2 id="request-title">告诉我这次想怎么安排</h2>
-          </div>
-
-          <label className="field-label" htmlFor="request-input">
-            需求描述
-          </label>
-          <textarea
-            id="request-input"
-            value={userInput}
-            onChange={(event) => setUserInput(event.target.value)}
-            rows={5}
-            disabled={isInFlight}
-            placeholder="例如：今天下午想带孩子在家附近玩几个小时，再吃一顿清淡晚餐。"
-          />
-
-          <div className="field-stack">
-            <p className="field-label">示例入口</p>
-            <div className="example-chip-row">
-              {EXAMPLE_PROMPTS.map((example) => (
-                <button
-                  key={example.label}
-                  className="example-chip"
-                  type="button"
-                  onClick={() => setUserInput(example.prompt)}
-                  disabled={isInFlight}
-                >
-                  {example.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="field-stack advanced-options-shell">
-            <button
-              className="advanced-options-toggle"
-              type="button"
-              onClick={() => setAdvancedOptionsOpen((current) => !current)}
-              data-testid="advanced-options-toggle"
-              aria-expanded={advancedOptionsOpen}
-            >
-              <span className="advanced-options-label">
-                <SlidersHorizontal size={16} aria-hidden="true" />
-                <span>高级选项</span>
-              </span>
-              <span>{advancedOptionsOpen ? "收起" : "展开"}</span>
-            </button>
-
-            {advancedOptionsOpen ? (
-              <div className="advanced-options-panel">
-                <label className="field-label" htmlFor="read-profile-select">
-                  读取路径
-                </label>
-                <select
-                  id="read-profile-select"
-                  className="select-input"
-                  value={selectedReadProfile}
-                  disabled={isInFlight}
-                  onChange={(event) => setSelectedReadProfile(event.target.value as DemoReadProfile)}
-                  data-testid="read-profile-select"
-                >
-                  <option value="mock_world">Mock World</option>
-                  <option value="amap">AMap 只读预览</option>
-                </select>
-                <p className="helper-text">{readProfileHelper(selectedReadProfile)}</p>
-              </div>
-            ) : null}
-          </div>
-
-          {inputIsEmpty ? <p className="validation-text">请输入需求，或先点一个示例入口。</p> : null}
-
-          <div className="button-row">
-            <button
-              className="primary-button"
-              type="button"
-              onClick={handleStart}
-              disabled={inputIsEmpty || isInFlight}
-              data-testid="start-button"
-            >
-              {requestState === "starting" ? <Loader2 className="spin" size={17} /> : <Send size={17} />}
-              <span>{requestState === "starting" ? "生成中..." : "开始规划"}</span>
-            </button>
-
-            <button className="secondary-button" type="button" onClick={resetComposer} disabled={isInFlight}>
-              <RotateCcw size={17} />
-              <span>清空输入</span>
-            </button>
-          </div>
-
-          {visibleErrorMessage ? (
-            <div className="error-banner" role="alert">
-              <AlertCircle size={18} aria-hidden="true" />
-              <span>{visibleErrorMessage}</span>
-            </div>
-          ) : null}
-        </section>
-      </section>
+      </header>
 
       <section className="chat-thread-stage" aria-label="对话式规划进度">
         {threadItems.length ? (
@@ -377,29 +241,65 @@ export default function App() {
             items={threadItems}
             activeRunId={run?.run_id ?? null}
             requestState={requestState}
-            clarificationReply={clarificationReply}
-            replanReply={replanReply}
-            canClarify={canClarify}
             canConfirm={canConfirm}
             canDecline={canDecline}
-            canReplan={canReplan}
-            canRefresh={canRefresh}
             onSelectPlan={setSelectedPlanId}
-            onClarificationReplyChange={setClarificationReply}
-            onClarificationSubmit={handleClarify}
-            onReplanReplyChange={setReplanReply}
-            onReplanSubmit={handleReplan}
             onConfirm={handleConfirm}
             onDecline={handleDecline}
-            onRefresh={handleRefresh}
           />
         ) : (
-          <section className="chat-thread-empty-state">
-            <p className="eyebrow">Conversation Preview</p>
-            <h2>首屏不再展示运行摘要或大面板</h2>
-            <p>提交需求后，这里会按时间顺序出现你的请求、系统进度、推荐方案摘要、补充问题和最终结果。</p>
+          <section className="chat-thread-empty-state" aria-label="空对话">
+            <h1>今天想怎么安排？</h1>
           </section>
         )}
+      </section>
+
+      <section className="chat-composer-shell" data-testid="chat-composer" aria-label="发送消息">
+        <div className="chat-composer">
+          {visibleErrorMessage ? (
+            <div className="error-banner composer-error" role="alert">
+              <AlertCircle size={18} aria-hidden="true" />
+              <span>{visibleErrorMessage}</span>
+            </div>
+          ) : null}
+
+          <div className="composer-row">
+            <label className="sr-only" htmlFor="request-input">
+              {labelForComposerMode(composerMode)}
+            </label>
+            <textarea
+              id="request-input"
+              data-testid="main-composer-input"
+              value={userInput}
+              onChange={(event) => setUserInput(event.target.value)}
+              onKeyDown={(event) => {
+                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                  void handleComposerSubmit();
+                }
+              }}
+              rows={1}
+              disabled={isInFlight}
+              placeholder={placeholderForComposerMode(composerMode)}
+            />
+            <button
+              className="primary-button composer-submit-button"
+              type="button"
+              onClick={() => void handleComposerSubmit()}
+              disabled={!canSubmit}
+              data-testid="start-button"
+              aria-label={submitLabelForState(requestState, composerMode)}
+            >
+              {isInputActionInFlight(requestState) ? <Loader2 className="spin" size={18} /> : <Send size={18} />}
+              <span>{submitLabelForState(requestState, composerMode)}</span>
+            </button>
+          </div>
+
+          {run !== null && contextForComposerMode(composerMode) ? (
+            <div className="composer-footer">
+              <span className="composer-context">{contextForComposerMode(composerMode)}</span>
+            </div>
+          ) : null}
+        </div>
       </section>
     </main>
   );
@@ -408,6 +308,49 @@ export default function App() {
 function StatusBadge({ status }: { status: string }) {
   const label = status === "ready" ? "准备就绪" : statusLabel(status) ?? status;
   return <span className={`status-badge status-${status.replace(/[^a-z0-9_-]/gi, "-")}`}>{label}</span>;
+}
+
+function resolveComposerMode(
+  showClarificationComposer: boolean,
+  isAwaitingConfirmation: boolean,
+  selectedPlan: unknown,
+): ComposerMode {
+  if (showClarificationComposer) {
+    return "clarify";
+  }
+  if (isAwaitingConfirmation && selectedPlan) {
+    return "replan";
+  }
+  return "start";
+}
+
+function canSubmitComposer({
+  mode,
+  run,
+  selectedPlan,
+  inputIsEmpty,
+  isInFlight,
+  showClarificationComposer,
+  isAwaitingConfirmation,
+}: {
+  mode: ComposerMode;
+  run: DemoRunSummary | null;
+  selectedPlan: unknown;
+  inputIsEmpty: boolean;
+  isInFlight: boolean;
+  showClarificationComposer: boolean;
+  isAwaitingConfirmation: boolean;
+}) {
+  if (inputIsEmpty || isInFlight) {
+    return false;
+  }
+  if (mode === "clarify") {
+    return Boolean(run?.run_id && showClarificationComposer);
+  }
+  if (mode === "replan") {
+    return Boolean(run?.run_id && isAwaitingConfirmation && selectedPlan);
+  }
+  return true;
 }
 
 function stateFromRun(run: DemoRunSummary): RequestState {
@@ -424,6 +367,59 @@ function stateFromRun(run: DemoRunSummary): RequestState {
     return "completed";
   }
   return "idle";
+}
+
+function isInputActionInFlight(state: RequestState) {
+  return INPUT_ACTION_STATES.has(state);
+}
+
+function labelForComposerMode(mode: ComposerMode) {
+  if (mode === "clarify") {
+    return "补充信息";
+  }
+  if (mode === "replan") {
+    return "继续调整方案";
+  }
+  return "需求描述";
+}
+
+function placeholderForComposerMode(mode: ComposerMode) {
+  if (mode === "clarify") {
+    return "补充出发时间、同行人、时长或偏好...";
+  }
+  if (mode === "replan") {
+    return "输入新的限制或偏好，例如：少走路、换成一个人、预算低一点...";
+  }
+  return "例如：今天下午想带孩子在家附近玩几个小时，再吃一顿清淡晚餐。";
+}
+
+function submitLabelForState(state: RequestState, mode: ComposerMode) {
+  if (state === "starting") {
+    return "生成中...";
+  }
+  if (state === "clarifying") {
+    return "提交中...";
+  }
+  if (state === "replanning") {
+    return "调整中...";
+  }
+  if (mode === "clarify") {
+    return "提交补充";
+  }
+  if (mode === "replan") {
+    return "继续调整";
+  }
+  return "开始规划";
+}
+
+function contextForComposerMode(mode: ComposerMode) {
+  if (mode === "clarify") {
+    return "补充信息会接到当前对话里。";
+  }
+  if (mode === "replan") {
+    return "输入要求后会生成新的方案版本。";
+  }
+  return "";
 }
 
 function errorMessageForDisplay(error: unknown) {

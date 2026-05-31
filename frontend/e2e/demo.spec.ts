@@ -35,7 +35,7 @@ const vagueChineseClarificationReply =
 const liveReplanReply = "Keep it nearby, but make it a solo outing this time.";
 
 async function fillMainComposer(page: Page, prompt: string) {
-  await page.getByRole("textbox").first().fill(prompt);
+  await page.getByTestId("main-composer-input").fill(prompt);
 }
 
 async function startRun(page: Page, prompt: string) {
@@ -47,16 +47,16 @@ async function startRun(page: Page, prompt: string) {
 async function waitForConversationStage(page: Page) {
   await expect
     .poll(async () => {
-      if ((await page.getByTestId("clarification-card").count()) > 0) {
-        const input = page.getByTestId("clarification-reply-input");
-        if ((await input.count()) > 0 && (await input.isEditable().catch(() => false))) {
-          return "clarification";
-        }
-      }
       if ((await page.getByTestId("replan-panel").count()) > 0) {
-        const input = page.getByTestId("replan-reply-input");
+        const input = page.getByTestId("main-composer-input");
         if ((await input.count()) > 0 && (await input.isEditable().catch(() => false))) {
           return "confirmation";
+        }
+      }
+      if ((await page.getByTestId("clarification-card").count()) > 0) {
+        const input = page.getByTestId("main-composer-input");
+        if ((await input.count()) > 0 && (await input.isEditable().catch(() => false))) {
+          return "clarification";
         }
       }
       if ((await page.getByTestId("assistant-result-card").count()) > 0) {
@@ -66,16 +66,16 @@ async function waitForConversationStage(page: Page) {
     }, { timeout: 60_000 })
     .toMatch(/clarification|confirmation|result/);
 
-  if ((await page.getByTestId("clarification-card").count()) > 0) {
-    const input = page.getByTestId("clarification-reply-input");
-    if ((await input.count()) > 0 && (await input.isEditable().catch(() => false))) {
-      return "clarification";
-    }
-  }
   if ((await page.getByTestId("replan-panel").count()) > 0) {
-    const input = page.getByTestId("replan-reply-input");
+    const input = page.getByTestId("main-composer-input");
     if ((await input.count()) > 0 && (await input.isEditable().catch(() => false))) {
       return "confirmation";
+    }
+  }
+  if ((await page.getByTestId("clarification-card").count()) > 0) {
+    const input = page.getByTestId("main-composer-input");
+    if ((await input.count()) > 0 && (await input.isEditable().catch(() => false))) {
+      return "clarification";
     }
   }
   if ((await page.getByTestId("assistant-result-card").count()) > 0) {
@@ -84,22 +84,10 @@ async function waitForConversationStage(page: Page) {
   return "result";
 }
 
-async function openLatestRunInfo(page: Page) {
-  const toggle = page.getByTestId("run-info-toggle").last();
-  await expect(toggle).toBeVisible({ timeout: 60_000 });
-  if ((await toggle.getAttribute("aria-expanded")) !== "true") {
-    await toggle.click();
-  }
-}
-
-async function currentRunInfoText(page: Page, testId: string) {
-  await openLatestRunInfo(page);
-  const text = (await page.getByTestId(testId).last().innerText()).trim();
-  const toggle = page.getByTestId("run-info-toggle").last();
-  if ((await toggle.getAttribute("aria-expanded")) === "true") {
-    await toggle.click();
-  }
-  return text;
+async function currentVisiblePlanVersion(page: Page) {
+  const versionBadge = page.locator(".thread-badge").filter({ hasText: /^v\d+$/ }).last();
+  await expect(versionBadge).toBeVisible({ timeout: 60_000 });
+  return (await versionBadge.innerText()).trim();
 }
 
 async function expectThreadItemOrder(first: Locator, second: Locator) {
@@ -148,13 +136,13 @@ async function continueToAwaitingConfirmation(
     }
 
     expect(stage).toBe("clarification");
-    await page.getByTestId("clarification-reply-input").fill(clarificationReply);
-    await page.getByTestId("clarification-submit-button").click();
+    await page.getByTestId("main-composer-input").fill(clarificationReply);
+    await page.getByTestId("start-button").click();
   }
 
   await expect(page.getByTestId("replan-panel")).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId("confirm-button")).toHaveCount(1);
-  expect(await currentRunInfoText(page, "plan-version")).toBe(expectedVersion);
+  expect(await currentVisiblePlanVersion(page)).toBe(expectedVersion);
   await expectLatestProgressStepperCollapsed(page);
 }
 
@@ -376,17 +364,6 @@ test.describe("desktop web demo", () => {
     await expect(page.getByTestId("confirm-button")).toHaveCount(0);
   });
 
-  test("refreshes status without duplicating the current run card", async ({ page }) => {
-    await startPresentableDemoRun(page);
-    const runId = await currentRunInfoText(page, "run-id");
-
-    await openLatestRunInfo(page);
-    await page.getByTestId("refresh-button").last().click();
-
-    await expect(page.getByTestId("replan-panel")).toBeVisible({ timeout: 60_000 });
-    expect(await currentRunInfoText(page, "run-id")).toBe(runId);
-  });
-
   test("reaches a confirmable plan from the Chinese reviewer prompt", async ({ page }) => {
     const clarificationBodies: Array<Record<string, unknown>> = [];
 
@@ -403,7 +380,7 @@ test.describe("desktop web demo", () => {
     await startPresentableDemoRun(page, explicitHappyPathPrompt, explicitHappyPathClarificationReply);
 
     await expect(page.getByTestId("confirm-button")).toBeVisible();
-    expect(await currentRunInfoText(page, "plan-version")).toBe("v1");
+    expect(await currentVisiblePlanVersion(page)).toBe("v1");
     await expect(page.getByTestId("amap-read-only-notice")).toHaveCount(0);
 
     if (clarificationBodies.length > 0) {
@@ -435,17 +412,15 @@ test.describe("desktop web demo", () => {
     const clarificationCard = page.getByTestId("clarification-card").last();
     await expect(clarificationCard).toBeVisible({ timeout: 60_000 });
 
-    const sourceRunId = await currentRunInfoText(page, "run-id");
-    expect(await currentRunInfoText(page, "plan-version")).toBe("v1");
+    expect(await currentVisiblePlanVersion(page)).toBe("v1");
 
     const progressCard = await expectLatestProgressStepperCollapsed(page);
     await expectThreadItemOrder(progressCard, clarificationCard);
 
-    await page.getByTestId("clarification-reply-input").fill(vagueChineseClarificationReply);
-    await page.getByTestId("clarification-submit-button").click();
+    await page.getByTestId("main-composer-input").fill(vagueChineseClarificationReply);
+    await page.getByTestId("start-button").click();
 
     await continueToAwaitingConfirmation(page, "v1", vagueChineseClarificationReply);
-    expect(await currentRunInfoText(page, "run-id")).not.toBe(sourceRunId);
 
     await expectThreadItemOrder(page.getByTestId("progress-stepper-card").last(), page.getByTestId("replan-panel").last());
   });
@@ -453,14 +428,12 @@ test.describe("desktop web demo", () => {
   test("replans from the customer page and advances the visible version", async ({ page }) => {
     await startPresentableDemoRun(page);
 
-    const sourceRunId = await currentRunInfoText(page, "run-id");
     await expectThreadItemOrder(page.getByTestId("progress-stepper-card").last(), page.getByTestId("replan-panel").last());
 
-    await page.getByTestId("replan-reply-input").fill(liveReplanReply);
-    await page.getByTestId("replan-submit-button").click();
+    await page.getByTestId("main-composer-input").fill(liveReplanReply);
+    await page.getByTestId("start-button").click();
 
     await continueToAwaitingConfirmation(page, "v2");
-    expect(await currentRunInfoText(page, "run-id")).not.toBe(sourceRunId);
     await expectThreadItemOrder(page.getByTestId("progress-stepper-card").last(), page.getByTestId("replan-panel").last());
     await expectNoForbiddenVisibleText(page);
   });
@@ -503,8 +476,8 @@ test.describe("desktop web demo", () => {
     await expect(planTabs.nth(0)).toHaveAttribute("aria-selected", "false");
     await expect(planTabs.nth(1)).toHaveAttribute("aria-selected", "true");
 
-    await page.getByTestId("replan-reply-input").fill("Keep the backup plan, but reduce walking.");
-    await page.getByTestId("replan-submit-button").click();
+    await page.getByTestId("main-composer-input").fill("Keep the backup plan, but reduce walking.");
+    await page.getByTestId("start-button").click();
 
     await continueToAwaitingConfirmation(page, "v2");
     expect(replanBodies[0]).toEqual({
@@ -513,7 +486,7 @@ test.describe("desktop web demo", () => {
     });
   });
 
-  test("keeps AMap preview behind advanced options and blocks confirmation", async ({ page }) => {
+  test("blocks confirmation when the server returns a map read-only preview", async ({ page }) => {
     await page.route("**/demo/runs", async (route, request) => {
       if (request.method() !== "POST") {
         await route.fallback();
@@ -529,25 +502,20 @@ test.describe("desktop web demo", () => {
 
     await page.goto("/");
     await fillMainComposer(page, stableHappyPathPrompt);
-    await page.getByTestId("advanced-options-toggle").click();
-    await page.getByTestId("read-profile-select").selectOption("amap");
     await page.getByTestId("start-button").click();
 
     await expect(page.getByTestId("replan-panel")).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId("amap-read-only-notice")).toBeVisible();
+    await expect(page.getByTestId("amap-read-only-notice")).toContainText("地图只读预览");
     await expect(page.getByTestId("confirm-button")).toHaveCount(0);
-    expect(await currentRunInfoText(page, "active-read-profile")).toBe("AMap \u53ea\u8bfb\u9884\u89c8");
+    await expect(page.locator("body")).not.toContainText("AMap");
   });
 
   test("does not render forbidden internal or sensitive keys", async ({ page }) => {
     await startPresentableDemoRun(page, explicitHappyPathPrompt, explicitHappyPathClarificationReply);
 
     await expect(page.getByTestId("run-id")).toHaveCount(0);
-    await expectNoForbiddenVisibleText(page);
-
-    await openLatestRunInfo(page);
-    await expect(page.getByTestId("run-id").last()).toBeVisible();
-    await expect(page.getByTestId("plan-version").last()).toHaveText("v1");
+    await expect(page.getByTestId("run-info-toggle")).toHaveCount(0);
     await expectNoForbiddenVisibleText(page);
   });
 });
@@ -568,7 +536,7 @@ test.describe("mobile web demo", () => {
     } else {
       await expectLatestProgressStepperCollapsed(page);
       await expect(page.getByTestId("clarification-card")).toBeVisible();
-      await expect(page.getByTestId("clarification-submit-button")).toBeVisible();
+      await expect(page.getByTestId("start-button")).toBeVisible();
     }
 
     const hasHorizontalOverflow = await page.evaluate(

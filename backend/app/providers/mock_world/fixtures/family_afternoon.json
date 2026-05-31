@@ -62,7 +62,7 @@
     },
     {
       "poi_id": "activity_walk_001",
-      "name": "\u6b66\u5eb7\u8def\u4eb2\u5b50Citywalk",
+      "name": "武康路亲子城市漫步",
       "category": "activity",
       "address": "\u4e0a\u6d77\u5e02\u5f90\u6c47\u533a\u6b66\u5eb7\u8def",
       "location": {
@@ -90,9 +90,9 @@
     },
     {
       "poi_id": "activity_story_atelier_001",
-      "name": "Story Atelier House",
+      "name": "亲子手作小屋",
       "category": "activity",
-      "address": "Family Studio Road 12",
+      "address": "上海市徐汇区亲子手作路12号",
       "location": {
         "lat": 31.1914,
         "lng": 121.4398
@@ -102,7 +102,7 @@
         "indoor",
         "creative"
       ],
-      "description": "A child-friendly craft stop that would normally fit the family plan, but today's ticket inventory is sold out.",
+      "description": "适合亲子手作体验，但今天票务已售罄。",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -117,9 +117,9 @@
     },
     {
       "poi_id": "activity_riverside_reading_001",
-      "name": "Riverside Reading Hall",
+      "name": "滨江亲子阅读馆",
       "category": "activity",
-      "address": "Family Riverside Walk 20",
+      "address": "上海市徐汇区滨江阅读步道20号",
       "location": {
         "lat": 31.1888,
         "lng": 121.4447
@@ -130,7 +130,7 @@
         "quiet",
         "reading"
       ],
-      "description": "A usable but quieter child-friendly stop that feels slower and less playful than the canonical family outing route.",
+      "description": "安静的亲子阅读空间，适合作为节奏更慢的备选活动。",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -186,7 +186,7 @@
         "balanced_menu",
         "lighter_options"
       ],
-      "description": "\u7a33\u5b9a\u7684\u5bb6\u5ead\u9910\u5385\uff0c\u6709\u513f\u7ae5\u6905\u548c\u53e3\u5473\u6e29\u548c\u7684\u5bb6\u5e38\u83dc\u3002 Lighter dishes are available, but it remains a weaker fit than the canonical light family meal.",
+      "description": "\u7a33\u5b9a\u7684\u5bb6\u5ead\u9910\u5385\uff0c\u6709\u513f\u7ae5\u6905\u548c\u53e3\u5473\u6e29\u548c\u7684\u5bb6\u5e38\u83dc\u3002也提供清淡菜品，但整体匹配度弱于首选轻食餐厅。",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -214,7 +214,7 @@
         "simple",
         "lighter_options"
       ],
-      "description": "\u9762\u6761\u548c\u5c0f\u9984\u9968\u9009\u62e9\u7b80\u5355\uff0c\u9002\u5408\u5feb\u901f\u89e3\u51b3\u665a\u9910\u3002 Lighter dishes are available, but it remains a weaker fit than the canonical light family meal.",
+      "description": "\u9762\u6761\u548c\u5c0f\u9984\u9968\u9009\u62e9\u7b80\u5355\uff0c\u9002\u5408\u5feb\u901f\u89e3\u51b3\u665a\u9910\u3002也提供清淡菜品，但整体匹配度弱于首选轻食餐厅。",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -229,9 +229,9 @@
     },
     {
       "poi_id": "restaurant_picnic_001",
-      "name": "Picnic Greens Table",
+      "name": "野餐绿蔬餐桌",
       "category": "dining",
-      "address": "Family Garden Road 9",
+      "address": "上海市徐汇区花园路9号",
       "location": {
         "lat": 31.1931,
         "lng": 121.4427
@@ -241,7 +241,7 @@
         "lighter_options",
         "family_tables"
       ],
-      "description": "A lighter family-friendly dining room that looks suitable, but tables are unavailable and the queue is closed.",
+      "description": "清淡、亲子友好的备选餐厅，但当前桌位不可订且排队关闭。",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -256,9 +256,9 @@
     },
     {
       "poi_id": "restaurant_garden_001",
-      "name": "Garden Supper Room",
+      "name": "花园家庭轻食餐室",
       "category": "dining",
-      "address": "Family Garden Road 15",
+      "address": "上海市徐汇区花园路15号",
       "location": {
         "lat": 31.1904,
         "lng": 121.4449
@@ -268,7 +268,7 @@
         "lighter_options",
         "quiet"
       ],
-      "description": "A usable lighter family meal, but it is slower and less polished than the canonical light dining choice.",
+      "description": "可作为清淡家庭晚餐备选，但服务节奏比首选轻食餐厅更慢。",
       "opening_hours": {
         "is_open": true,
         "windows": [
@@ -372,7 +372,7 @@
       "mode": "walking",
       "distance_meters": 1180,
       "duration_minutes": 16,
-      "summary": "A longer but usable museum-to-garden-dining route for the fallback family dinner."
+      "summary": "博物馆到花园轻食餐厅的步行路线稍长，但仍可用于备选家庭晚餐。"
     },
     {
       "origin_id": "activity_riverside_reading_001",
@@ -380,7 +380,7 @@
       "mode": "walking",
       "distance_meters": 980,
       "duration_minutes": 14,
-      "summary": "A valid walking link, but it is longer than the canonical museum-to-light-dining path."
+      "summary": "这条步行路线可用，但比首选的科学馆到轻食餐厅路线稍长。"
     }
   ],
   "weather": {
@@ -468,7 +468,7 @@
       "available": false,
       "time_slots": [],
       "max_party_size": 4,
-      "notes": "Dining room is closed for a private event."
+      "notes": "餐厅因包场活动暂停接待。"
     },
     "restaurant_garden_001": {
       "restaurant_id": "restaurant_garden_001",
@@ -479,7 +479,7 @@
         "19:00"
       ],
       "max_party_size": 4,
-      "notes": "Usable family tables remain, but service is slower than the canonical option."
+      "notes": "仍有家庭桌位可用，但服务节奏比首选餐厅更慢。"
     }
   },
   "ticket_availability": {

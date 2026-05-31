@@ -37,12 +37,115 @@ button {
 }
 
 .customer-chat-shell {
-  background:
-    radial-gradient(circle at top left, rgb(15 118 110 / 0.12), transparent 32%),
-    radial-gradient(circle at top right, rgb(14 165 233 / 0.08), transparent 24%),
-    linear-gradient(180deg, #f7fafb 0%, #eef3f7 100%);
+  background: #f6f8fb;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+}
+
+.chat-topbar {
+  align-items: center;
+  border-bottom: 1px solid #e1e8ef;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 16px;
+  justify-content: space-between;
+  margin: 0 auto;
+  max-width: 980px;
+  padding: 18px 22px;
+  width: 100%;
+}
+
+.chat-brand-block {
   display: grid;
-  gap: 24px;
+  gap: 2px;
+}
+
+.chat-brand {
+  color: #162331;
+  font-size: 18px;
+  font-weight: 850;
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.chat-composer-shell {
+  background: linear-gradient(180deg, rgb(246 248 251 / 0), #f6f8fb 22%);
+  bottom: 0;
+  flex: 0 0 auto;
+  padding: 18px 18px 22px;
+  position: sticky;
+  z-index: 10;
+}
+
+.chat-composer {
+  background: #ffffff;
+  border: 1px solid #d6e0ea;
+  border-radius: 18px;
+  box-shadow: 0 16px 42px rgb(22 35 49 / 0.1);
+  display: grid;
+  gap: 12px;
+  margin: 0 auto;
+  max-width: 980px;
+  padding: 12px;
+  width: 100%;
+}
+
+.composer-row {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.composer-submit-button {
+  min-height: 48px;
+  min-width: 118px;
+}
+
+.composer-footer {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  min-height: 28px;
+}
+
+.composer-options-toggle {
+  background: transparent;
+  border: 1px solid #d7e1ea;
+  border-radius: 999px;
+  gap: 7px;
+  min-height: 30px;
+  padding: 6px 10px;
+}
+
+.composer-options-panel {
+  background: #f8fafc;
+  border: 1px solid #e1e8ef;
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.composer-context {
+  color: #6b7787;
+  font-size: 13px;
+}
+
+.composer-error {
+  margin-top: 0;
+}
+
+.sr-only {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }
 
 .app-header {
@@ -83,6 +186,12 @@ button {
   margin: 0 auto;
   max-width: 1440px;
   width: 100%;
+}
+
+.customer-chat-shell .chat-thread-stage {
+  flex: 1 1 auto;
+  max-width: 980px;
+  padding: 24px 18px 8px;
 }
 
 .chat-hero {
@@ -190,8 +299,8 @@ button {
 
 .conversation-thread {
   display: grid;
-  gap: 16px;
-  padding-bottom: 24px;
+  gap: 14px;
+  padding-bottom: 8px;
 }
 
 .thread-row {
@@ -207,9 +316,9 @@ button {
 }
 
 .thread-bubble {
-  border-radius: 22px;
-  max-width: min(920px, 100%);
-  padding: 18px 20px;
+  border-radius: 18px;
+  max-width: min(780px, 100%);
+  padding: 16px 18px;
 }
 
 .thread-bubble-user {
@@ -438,6 +547,17 @@ button {
   margin-top: 6px;
 }
 
+.inline-hint-block {
+  background: #f8fafc;
+  border: 1px solid #e1e8ef;
+  border-radius: 12px;
+  color: #536171;
+  font-size: 13px;
+  line-height: 1.45;
+  margin-top: 12px;
+  padding: 10px 12px;
+}
+
 .run-info-block {
   border-top: 1px solid #e7edf3;
   margin-top: 12px;
@@ -457,17 +577,24 @@ button {
 }
 
 .chat-thread-empty-state {
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid #dbe3ea;
-  border-radius: 20px;
+  align-content: center;
+  color: #233342;
   display: grid;
-  gap: 10px;
-  justify-items: start;
-  padding: 22px;
+  justify-items: center;
+  min-height: min(62vh, 520px);
+  padding: 24px;
+  text-align: center;
 }
 
 .chat-thread-empty-state p {
   color: #536171;
+  margin: 0;
+}
+
+.chat-thread-empty-state h1 {
+  font-size: clamp(28px, 5vw, 56px);
+  letter-spacing: 0;
+  line-height: 1.05;
   margin: 0;
 }
 
@@ -572,6 +699,16 @@ textarea {
   padding: 12px;
   resize: vertical;
   width: 100%;
+}
+
+.chat-composer textarea {
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  max-height: 180px;
+  min-height: 48px;
+  padding: 13px 12px;
+  resize: none;
 }
 
 .text-input {
@@ -1380,6 +1517,35 @@ dd {
 @media (max-width: 560px) {
   .app-shell {
     padding: 10px;
+  }
+
+  .customer-chat-shell {
+    padding: 0;
+  }
+
+  .chat-topbar {
+    padding: 14px 14px;
+  }
+
+  .chat-composer-shell {
+    padding: 12px 10px 14px;
+  }
+
+  .chat-composer {
+    border-radius: 16px;
+    padding: 10px;
+  }
+
+  .composer-row {
+    grid-template-columns: 1fr;
+  }
+
+  .composer-submit-button {
+    width: 100%;
+  }
+
+  .customer-chat-shell .chat-thread-stage {
+    padding: 16px 10px 4px;
   }
 
   .panel {

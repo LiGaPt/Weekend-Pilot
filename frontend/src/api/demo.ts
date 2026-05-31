@@ -100,9 +100,9 @@ function localizedResponseMessage(message: string, status: number): string {
     "Run not found.": "\u672a\u627e\u5230\u5bf9\u5e94\u7684\u6f14\u793a\u8fd0\u884c\u3002",
     "Demo run was not found.": "\u672a\u627e\u5230\u5bf9\u5e94\u7684\u6f14\u793a\u8fd0\u884c\u3002",
     "AMAP read path is not configured for this environment.":
-      "\u672c\u5730\u73af\u5883\u672a\u914d\u7f6e AMap \u53ea\u8bfb\u9884\u89c8\u6240\u9700\u7684\u5bc6\u94a5\u3002",
+      "\u672c\u5730\u73af\u5883\u672a\u914d\u7f6e\u5730\u56fe\u53ea\u8bfb\u9884\u89c8\u6240\u9700\u7684\u5bc6\u94a5\u3002",
     "AMAP read-only demo runs cannot be confirmed.":
-      "AMap \u53ea\u8bfb\u9884\u89c8\u8def\u5f84\u4e0d\u652f\u6301\u786e\u8ba4\u6267\u884c\u3002",
+      "\u5730\u56fe\u53ea\u8bfb\u9884\u89c8\u8def\u5f84\u4e0d\u652f\u6301\u786e\u8ba4\u6267\u884c\u3002",
     "Source run status does not allow clarification.":
       "\u5f53\u524d\u8fd0\u884c\u5df2\u4e0d\u80fd\u7ee7\u7eed\u8865\u5145\u4fe1\u606f\uff0c\u8bf7\u5237\u65b0\u72b6\u6001\u540e\u91cd\u8bd5\u3002",
     "Source run is missing session persistence for clarification.":

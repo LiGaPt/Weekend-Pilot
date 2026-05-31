@@ -298,7 +298,7 @@ describe("projectConversationThread", () => {
 
     const planCard = items.find((item) => item.kind === "assistant_plan_card");
     expect(planCard?.planId).toBe("plan-2");
-    expect(planCard?.title).toBe("Backup Walk Plan");
+    expect(planCard?.title).toBe("备选散步方案");
     expect(planCard?.alternativePlans.map((plan) => [plan.planId, plan.selected])).toEqual([
       ["plan-1", false],
       ["plan-2", true],
@@ -321,7 +321,7 @@ describe("projectConversationThread", () => {
     const resultCard = items.find((item) => item.kind === "assistant_result_card");
     expect(resultCard?.timelineCollapsedByDefault).toBe(true);
     expect(resultCard?.executionTimeline.map((step) => step.executionOrder)).toEqual([1, 2]);
-    expect(resultCard?.headline).toBe("Plan completed");
+    expect(resultCard?.headline).toBe("安排已完成");
   });
 
   it("renders clarification cards after the progress card in the clarification flow", () => {

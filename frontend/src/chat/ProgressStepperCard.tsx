@@ -14,13 +14,13 @@ export function ProgressStepperCard({ item }: ProgressStepperCardProps) {
       <div className="thread-bubble thread-bubble-assistant progress-stepper-card" data-testid="progress-stepper-card">
         <div className="assistant-card-header progress-stepper-header">
           <div>
-            <p className="thread-label">\u5f53\u524d\u8fdb\u5ea6</p>
+            <p className="thread-label">当前进度</p>
             <h2>{item.currentLabel}</h2>
           </div>
-          <span className="thread-badge progress-stepper-stage">\u5f53\u524d\u6b65\u9aa4</span>
+          <span className="thread-badge progress-stepper-stage">当前步骤</span>
         </div>
 
-        <section className="progress-step-current" aria-label="\u5f53\u524d\u6b65\u9aa4">
+        <section className="progress-step-current" aria-label="当前步骤">
           <div className="progress-step-current-marker" aria-hidden="true">
             <CheckCircle2 size={18} />
           </div>
@@ -40,7 +40,7 @@ export function ProgressStepperCard({ item }: ProgressStepperCardProps) {
               aria-expanded={completedOpen}
             >
               <span>
-                {`\u5df2\u5b8c\u6210\u6b65\u9aa4 (${item.completedSteps.length})`}
+                {`已完成步骤 (${item.completedSteps.length})`}
               </span>
               {completedOpen ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
             </button>

@@ -1,4 +1,5 @@
 import type {
+  DemoActionManifestItemSummary,
   DemoActionManifestSummary,
   DemoCandidateSummary,
   DemoClarificationSummary,
@@ -144,6 +145,70 @@ type ProjectConversationThreadOptions = {
 
 const RESULT_RUN_STATUSES = new Set(["completed", "partially_completed", "failed", "skipped", "declined"]);
 
+const EXACT_USER_TEXT_LABELS: Record<string, string> = {
+  "Family Afternoon Plan": "亲子下午方案",
+  "Backup Walk Plan": "备选散步方案",
+  "Indoor activity": "室内亲子活动",
+  "Indoor activity first, then a lighter dinner nearby.": "先安排室内亲子活动，再去附近吃清淡晚餐。",
+  "A lighter backup plan with less structure.": "节奏更轻的备选方案。",
+  "A short drive keeps the afternoon easy.": "短途驾车，下午节奏更轻松。",
+  "Fits the requested afternoon window.": "符合下午出行时间。",
+  "Plan completed": "安排已完成",
+  "Reservation and follow-up message both completed.": "订座和后续消息都已完成。",
+  "Leave a little before 2pm.": "建议 14:00 前稍早出发。",
+  "A longer but usable museum-to-garden-dining route for the fallback family dinner.":
+    "博物馆到花园轻食餐厅的步行路线稍长，但仍可用于备选家庭晚餐。",
+  "A valid walking link, but it is longer than the canonical museum-to-light-dining path.":
+    "这条步行路线可用，但比首选的科学馆到轻食餐厅路线稍长。",
+  "A child-friendly craft stop that would normally fit the family plan, but today's ticket inventory is sold out.":
+    "适合亲子手作体验，但今天票务已售罄。",
+  "A usable but quieter child-friendly stop that feels slower and less playful than the canonical family outing route.":
+    "安静的亲子阅读空间，适合作为节奏更慢的备选活动。",
+  "A lighter family-friendly dining room that looks suitable, but tables are unavailable and the queue is closed.":
+    "清淡、亲子友好的备选餐厅，但当前桌位不可订且排队关闭。",
+  "A usable lighter family meal, but it is slower and less polished than the canonical light dining choice.":
+    "可作为清淡家庭晚餐备选，但服务节奏比首选轻食餐厅更慢。",
+  "Dining room is closed for a private event.": "餐厅因包场活动暂停接待。",
+  "Usable family tables remain, but service is slower than the canonical option.":
+    "仍有家庭桌位可用，但服务节奏比首选餐厅更慢。",
+  "Lock dinner seating after confirmation.": "确认后可提前锁定晚餐座位。",
+  "User chose not to continue.": "用户选择暂不继续。",
+};
+
+const INLINE_USER_TEXT_REPLACEMENTS: Array<[string, string]> = [
+  ["Garden Supper Room", "花园家庭轻食餐室"],
+  ["Riverside Reading Hall", "滨江亲子阅读馆"],
+  ["Story Atelier House", "亲子手作小屋"],
+  ["Picnic Greens Table", "野餐绿蔬餐桌"],
+  ["Family Science Center", "亲子科学中心"],
+  ["Light Table", "轻食餐桌"],
+  ["Riverside Walk", "滨江散步路线"],
+  ["Simple Kitchen", "简餐厨房"],
+  ["100 Science Road", "上海市徐汇区科学路100号"],
+  ["8 Dinner Street", "上海市徐汇区晚餐街8号"],
+  ["28 Riverside Road", "上海市徐汇区滨江路28号"],
+  ["5 Cafe Street", "上海市徐汇区咖啡街5号"],
+  ["Family Garden Road 15", "上海市徐汇区花园路15号"],
+  ["Family Garden Road 9", "上海市徐汇区花园路9号"],
+  ["Family Riverside Walk 20", "上海市徐汇区滨江阅读步道20号"],
+  ["Family Studio Road 12", "上海市徐汇区亲子手作路12号"],
+  ["Lighter dishes are available, but it remains a weaker fit than the canonical light family meal.", "也提供清淡菜品，但整体匹配度弱于首选轻食餐厅。"],
+];
+
+const TARGET_ID_LABELS: Record<string, string> = {
+  activity_museum_001: "徐汇亲子科学馆",
+  activity_playground_001: "滨江亲子乐园",
+  activity_walk_001: "武康路亲子城市漫步",
+  activity_story_atelier_001: "亲子手作小屋",
+  activity_riverside_reading_001: "滨江亲子阅读馆",
+  restaurant_light_001: "绿碗家庭轻食",
+  restaurant_family_001: "晴天家庭厨房",
+  restaurant_noodle_001: "简单面馆",
+  restaurant_picnic_001: "野餐绿蔬餐桌",
+  restaurant_garden_001: "花园家庭轻食餐室",
+  addon_drinks_001: "小水分补给站",
+};
+
 export function projectConversationThread({
   entries,
   activeRunId,
@@ -268,7 +333,7 @@ function buildPlanCardItem(
 ): AssistantPlanCardItem {
   const planOptions = run.plans.map((candidate, index) => ({
     planId: candidate.plan_id,
-    title: candidate.title?.trim() || `方案 ${index + 1}`,
+    title: userFacingText(candidate.title) || `方案 ${index + 1}`,
     selected: candidate.plan_id === plan.plan_id,
   }));
   const isReadOnlyPreview = run.read_profile === "amap";
@@ -281,8 +346,8 @@ function buildPlanCardItem(
     kind: "assistant_plan_card",
     runId: run.run_id,
     planId: plan.plan_id,
-    title: plan.title?.trim() || "推荐方案",
-    summary: plan.summary?.trim() || "已生成一份可继续确认的推荐方案。",
+    title: userFacingText(plan.title) || "推荐方案",
+    summary: userFacingText(plan.summary) || "已生成一份可继续确认的推荐方案。",
     versionLabel: run.plan_version.version_label,
     visibleBadges: [run.plan_version.version_label, statusLabel(run.status) || run.status],
     alternativePlans: planOptions,
@@ -324,7 +389,7 @@ function buildPlanCardItem(
 }
 
 function buildResultCardItem(run: DemoRunSummary, plan: DemoPlanPreview): AssistantResultCardItem {
-  const executionTimeline = normalizeExecutionActions(plan.execution?.action_results);
+  const executionTimeline = normalizeExecutionActions(plan.execution?.action_results, plan);
   const feedback = plan.feedback;
   const isDeclined = run.status === "declined" || plan.confirmation?.status === "declined";
   const outcomeLabel = isDeclined ? "已放弃" : statusLabel(plan.execution?.status || run.execution_status) || "执行结果";
@@ -335,11 +400,11 @@ function buildResultCardItem(run: DemoRunSummary, plan: DemoPlanPreview): Assist
     runId: run.run_id,
     planId: plan.plan_id,
     headline:
-      feedback?.headline?.trim() ||
+      userFacingText(feedback?.headline) ||
       (isDeclined ? "已放弃当前方案" : statusLabel(plan.execution?.status || run.status) || "执行结果"),
     message:
       userFacingText(plan.confirmation?.reason) ||
-      feedback?.message?.trim() ||
+      userFacingText(feedback?.message) ||
       (isDeclined ? "已在执行前放弃当前方案。" : null),
     outcomeLabel,
     executionTimeline,
@@ -423,6 +488,16 @@ export function display(value?: string | number | null) {
   return String(value);
 }
 
+export function displayUserText(value?: string | number | null) {
+  if (value === null || value === undefined || value === "") {
+    return "暂无";
+  }
+  if (typeof value === "number") {
+    return String(value);
+  }
+  return userFacingText(value) || "暂无";
+}
+
 export function numberValue(value?: number | null) {
   return typeof value === "number" ? String(value) : undefined;
 }
@@ -468,6 +543,8 @@ export function tagLabel(value: string) {
     playground: "游乐场",
     citywalk: "城市漫步",
     light_activity: "轻量活动",
+    creative: "手作创意",
+    reading: "阅读空间",
     lighter_options: "清淡选项",
     quiet: "安静",
     vegetable_forward: "多蔬轻食",
@@ -497,7 +574,10 @@ export function safeText(value: unknown) {
   return typeof value === "string" && value.trim() ? value : null;
 }
 
-export function normalizeExecutionActions(actions?: DemoExecutionActionResultSummary[]): ExecutionTimelineStep[] {
+export function normalizeExecutionActions(
+  actions?: DemoExecutionActionResultSummary[],
+  plan?: DemoPlanPreview,
+): ExecutionTimelineStep[] {
   if (!Array.isArray(actions)) {
     return [];
   }
@@ -513,7 +593,9 @@ export function normalizeExecutionActions(actions?: DemoExecutionActionResultSum
         actionRef: safeText(action.action_ref),
         executionOrder,
         label: actionLabel(safeText(action.tool_name) || safeText(action.action_type)) || "动作",
-        targetId: safeText(action.target_id),
+        targetId: plan
+          ? actionTargetLabel(plan, safeText(action.target_id), safeText(action.tool_name) || safeText(action.action_type))
+          : userFacingText(safeText(action.target_id)),
         statusLabel: executionActionStatusLabel(safeText(action.status)),
       };
     })
@@ -585,10 +667,20 @@ export function userFacingText(value?: string | null) {
     return null;
   }
 
-  const mapped: Record<string, string> = {
-    "User chose not to continue.": "用户选择暂不继续。",
-  };
-  return mapped[value] ?? value;
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const exact = EXACT_USER_TEXT_LABELS[trimmed];
+  if (exact) {
+    return exact;
+  }
+
+  return INLINE_USER_TEXT_REPLACEMENTS.reduce(
+    (text, [source, replacement]) => text.split(source).join(replacement),
+    trimmed,
+  );
 }
 
 export function statusLabel(value?: string | null) {
@@ -622,19 +714,19 @@ export function statusLabel(value?: string | null) {
 
 export function readProfileLabel(profile?: DemoReadProfile | null) {
   if (profile === "amap") {
-    return "AMap 只读预览";
+    return "地图只读预览";
   }
   if (profile === "mock_world") {
-    return "Mock World";
+    return "本地演示数据";
   }
   return null;
 }
 
 export function readProfileHelper(profile: DemoReadProfile) {
   if (profile === "amap") {
-    return "AMap 路径仅用于本地只读预览，在确认前停止，不会执行写操作。";
+    return "地图只读预览会在确认前停止，不会执行写操作。";
   }
-  return "Mock World 是默认路径，也是 benchmark 的稳定默认值。";
+  return "使用本地演示数据生成稳定示例。";
 }
 
 export function isClarificationSummary(
@@ -654,9 +746,48 @@ export function candidateSummaryLines(candidate?: DemoCandidateSummary | null) {
   }
 
   return [
-    candidate.name?.trim() || null,
+    candidateName(candidate),
     categoryLabel(candidate.category) || null,
-    candidate.address?.trim() || null,
+    userFacingText(candidate.address),
     candidate.tags?.length ? candidate.tags.map(tagLabel).join("、") : null,
   ].filter((line): line is string => Boolean(line));
+}
+
+export function actionTargetLabel(
+  plan: DemoPlanPreview,
+  targetId?: string | null,
+  actionType?: string | null,
+) {
+  const normalizedTargetId = safeText(targetId);
+  if (!normalizedTargetId) {
+    return "目标待确认";
+  }
+
+  const matchedCandidate = [plan.activity, plan.dining].find(
+    (candidate) => candidate?.candidate_id === normalizedTargetId,
+  );
+  const matchedName = candidateName(matchedCandidate);
+  if (matchedName) {
+    return actionType === "join_queue" ? `${matchedName}排队取号` : matchedName;
+  }
+
+  if (actionType === "book_ticket") {
+    return candidateName(plan.activity) || TARGET_ID_LABELS[normalizedTargetId] || "活动目标待确认";
+  }
+  if (actionType === "reserve_restaurant" || actionType === "join_queue") {
+    const diningName = candidateName(plan.dining) || TARGET_ID_LABELS[normalizedTargetId];
+    if (diningName) {
+      return actionType === "join_queue" ? `${diningName}排队取号` : diningName;
+    }
+    return "餐厅目标待确认";
+  }
+
+  return TARGET_ID_LABELS[normalizedTargetId] || "目标待确认";
+}
+
+function candidateName(candidate?: DemoCandidateSummary | null) {
+  if (!candidate) {
+    return null;
+  }
+  return userFacingText(candidate.name);
 }
