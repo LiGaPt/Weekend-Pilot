@@ -18,6 +18,7 @@ The public page now exposes two explicit read paths:
 - `AMap 只读预览`: an explicit local preview path that uses live read tools only, returns reviewed plans, and stops before confirmation
 
 The public demo API now also supports `POST /demo/runs/{run_id}/clarify` for clarification replies and `POST /demo/runs/{run_id}/replan` for follow-up replanning. A vague start request, or a bounded recovery path that needs an explicit user tradeoff, can stop in `awaiting_clarification` with `plans = []`, `selected_plan_id = null`, and a compact `clarification` summary that contains the public follow-up prompt plus the missing supported fields.
+An additive backend stream now also exists at `POST /demo/runs/stream`. It covers only the initial planning start request, reuses the same public-safe progress contract, and fits alongside the existing customer page rather than replacing it. The current page can keep its existing request/summary flow while reviewers or later frontend work consume the live stream directly.
 Every public `DemoRunSummary` includes a compact `plan_version` object: the initial run starts at `v1`, and each follow-up replan returns a new `run_id` with the next visible version label. Clarification-only turns do not advance that visible version. A source run that ends in `awaiting_clarification` stays at `v1`, and the first clarification continuation that produces real plans also remains at `v1`. The internal conversation session is reused, but that session state remains internal and is still not exposed in `DemoRunSummary`.
 Every public `DemoPlanPreview` now includes `action_manifest`, a stable execution-preview summary with this shape:
 
@@ -65,7 +66,28 @@ Every successful public `DemoRunSummary` now also includes an additive `progress
 
 The `progress` payload now also includes additive `steps[]` entries. Each step contains `stage`, `label`, `status`, and `summary`, which is the customer-safe contract for the stepper UI. The default Mock World family path now surfaces public milestones such as `已找到 5 个活动` and `已找到 5 个餐厅` after reviewers expand the completed-step disclosure.
 
-That snapshot is reconstructed from persisted workflow node history, ordered tool events, plan rows, and demo continuation history only. This task does not add real-time transport for mid-request progress: no async start flow, polling endpoint, SSE stream, or WebSocket is introduced here.
+That snapshot is reconstructed from persisted workflow node history, ordered tool events, plan rows, and demo continuation history only.
+
+The new streamed start route uses these event names only:
+
+- `progress`: one public-safe `DemoProgressSummary`
+- `summary`: one final `DemoRunSummary`
+- `error`: one public-safe startup/runtime failure message
+
+Reviewer/developer SSE example:
+
+```bash
+curl -N -X POST http://127.0.0.1:8000/demo/runs/stream \
+  -H "Content-Type: application/json" \
+  -d "{\"user_input\":\"This afternoon I want to go out with my wife and child for a few hours. Not too far. My child is 5, and my wife is trying to eat lighter.\",\"external_user_id\":\"web-demo-user\",\"display_name\":\"Web Demo User\",\"case_id\":\"web-demo\",\"selected_plan_index\":0,\"read_profile\":\"mock_world\"}"
+```
+
+Remaining non-goals for this transport slice:
+
+- no clarify/replan/confirm/decline SSE routes
+- no polling fallback
+- no WebSocket transport
+- no reconnect or resume cursor
 
 No external local-life provider, map provider, LangSmith upload, API key, token, or secret is required for the default Mock World path.
 
@@ -418,6 +440,7 @@ PostgreSQL, Redis, and migrations must already be ready.
 
 - Planning stops at `awaiting_confirmation` before any write action.
 - Every successful public `DemoRunSummary` includes the additive `progress` snapshot, and refresh/readback preserves the same public-safe stage view after the run completes.
+- `POST /demo/runs/stream` emits one or more `progress` events before the final `summary` event for the normal Mock World start path.
 - `Mock World` remains the default read path for the public demo and for benchmark-aligned checks.
 - The explicit `AMap 只读预览` path also stops at `awaiting_confirmation`, keeps `action_count = 0`, and never exposes a working confirm action in the UI.
 - Vague start requests can stop at `awaiting_clarification` before any plan is generated.

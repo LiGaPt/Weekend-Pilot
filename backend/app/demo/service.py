@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,12 @@ from backend.app.demo.world_profile import resolve_mock_world_demo_profile
 from backend.app.execution import DeterministicExecutionWorkflow, ExecutionWorkflowError
 from backend.app.feedback import DeterministicFeedbackWriter, FeedbackWriterError
 from backend.app.demo.action_manifest import summarize_action_manifest
+from backend.app.demo.streaming import (
+    derive_stream_progress_summary,
+    encode_sse_event,
+    is_duplicate_progress_snapshot,
+    serialize_progress_summary,
+)
 from backend.app.demo.versioning import (
     build_clarification_plan_version_metadata,
     build_initial_plan_version_metadata,
@@ -51,6 +58,9 @@ from backend.app.demo.schemas import (
     DemoPlanPreview,
     DemoReplanRunRequest,
     DemoRunSummary,
+    DemoRunStreamErrorEvent,
+    DemoRunStreamProgressEvent,
+    DemoRunStreamSummaryEvent,
     DemoStartRunRequest,
 )
 
@@ -181,6 +191,142 @@ class DemoWorkflowService:
         )
         self.session.commit()
         return self.build_summary(result.run_id)
+
+    def start_run_stream(
+        self,
+        request: DemoStartRunRequest,
+        *,
+        override: DemoStartRunOverride | None = None,
+    ) -> Iterator[str]:
+        default_tool_profile, default_world_profile = self._workflow_profiles_for_start_request(request)
+        tool_profile = override.tool_profile if override is not None and override.tool_profile else default_tool_profile
+        world_profile = (
+            override.world_profile if override is not None and override.world_profile else default_world_profile
+        )
+        agent_version = override.agent_version if override is not None and override.agent_version else "agent-v1"
+        prompt_version = (
+            override.prompt_version if override is not None and override.prompt_version else "prompt-v1"
+        )
+        runner = WeekendPilotWorkflowRunner(
+            WeekendPilotWorkflowDependencies(
+                session=self.session,
+                cache=self.cache,
+                rate_limiter=self._rate_limiter_for_external_user(request.external_user_id),
+                trace_buffer_path=self.trace_buffer_path,
+                settings=self.workflow_settings,
+                llm_client=self.workflow_llm_client,
+            )
+        )
+        workflow_request = WeekendPilotWorkflowRequest(
+            user_input=request.user_input,
+            external_user_id=request.external_user_id,
+            display_name=request.display_name,
+            case_id=request.case_id,
+            tool_profile=tool_profile,
+            world_profile=world_profile,
+            agent_version=agent_version,
+            prompt_version=prompt_version,
+            auto_confirm=False,
+            selected_plan_index=request.selected_plan_index,
+        )
+        event_index = 0
+        last_progress_snapshot: str | None = None
+        last_run_id: UUID | None = None
+        terminal_state: dict[str, Any] | None = None
+        tool_events = ToolEventRepository(self.session)
+        plans = PlanRepository(self.session)
+
+        try:
+            for state in runner.stream(workflow_request):
+                terminal_state = state
+                run_id = state.get("run_id")
+                if not isinstance(run_id, UUID):
+                    continue
+
+                last_run_id = run_id
+                if state.get("status") == "error":
+                    continue
+
+                progress = derive_stream_progress_summary(
+                    state,
+                    tool_events.list_for_run(run_id),
+                    persisted_plan_count=len(plans.list_for_run(run_id)),
+                )
+                if is_duplicate_progress_snapshot(last_progress_snapshot, progress):
+                    continue
+
+                event_index += 1
+                yield encode_sse_event(
+                    "progress",
+                    DemoRunStreamProgressEvent(
+                        event_index=event_index,
+                        run_id=run_id,
+                        progress=progress,
+                    ),
+                )
+                last_progress_snapshot = serialize_progress_summary(progress)
+
+            if terminal_state is None:
+                raise DemoServiceError(500, "Demo workflow request failed.")
+
+            result = runner.result_from_stream_state(terminal_state)
+            if result.status == "error" or result.run_id is None:
+                self.session.rollback()
+                public_error = self._workflow_start_error(result, "Demo workflow request failed.")
+                event_index += 1
+                yield encode_sse_event(
+                    "error",
+                    DemoRunStreamErrorEvent(
+                        event_index=event_index,
+                        run_id=last_run_id,
+                        message=public_error.message,
+                    ),
+                )
+                return
+
+            runs = AgentRunRepository(self.session)
+            run = runs.get_by_id(result.run_id)
+            if run is None:
+                raise DemoServiceError(500, "Demo workflow run disappeared.")
+
+            self._ensure_conversation_baseline(run, request)
+            self._persist_demo_metadata(
+                result.run_id,
+                result,
+                plan_version=build_initial_plan_version_metadata(),
+            )
+            self.session.commit()
+            summary = self.build_summary(result.run_id)
+            event_index += 1
+            yield encode_sse_event(
+                "summary",
+                DemoRunStreamSummaryEvent(
+                    event_index=event_index,
+                    summary=summary,
+                ),
+            )
+        except DemoServiceError as exc:
+            self.session.rollback()
+            event_index += 1
+            yield encode_sse_event(
+                "error",
+                DemoRunStreamErrorEvent(
+                    event_index=event_index,
+                    run_id=last_run_id,
+                    message=exc.message,
+                ),
+            )
+        except Exception:
+            self.session.rollback()
+            event_index += 1
+            yield encode_sse_event(
+                "error",
+                DemoRunStreamErrorEvent(
+                    event_index=event_index,
+                    run_id=last_run_id,
+                    message="Demo workflow request failed.",
+                ),
+            )
 
     def get_run(self, run_id: UUID) -> DemoRunSummary:
         return self.build_summary(run_id)

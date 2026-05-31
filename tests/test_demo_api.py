@@ -7,7 +7,14 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from backend.app.demo.schemas import DemoReplanRunRequest, DemoRunSummary, DemoStartRunRequest
+from backend.app.demo.schemas import (
+    DemoReplanRunRequest,
+    DemoRunStreamErrorEvent,
+    DemoRunStreamProgressEvent,
+    DemoRunStreamSummaryEvent,
+    DemoRunSummary,
+    DemoStartRunRequest,
+)
 from backend.app.demo.service import sanitize_demo_payload
 from backend.app.main import create_app
 
@@ -72,6 +79,7 @@ def test_create_app_includes_demo_routes() -> None:
     paths = {route.path for route in app.routes}
 
     assert "/demo/runs" in paths
+    assert "/demo/runs/stream" in paths
     assert "/demo/runs/{run_id}" in paths
     assert "/demo/runs/{run_id}/clarify" in paths
     assert "/demo/runs/{run_id}/replan" in paths
@@ -420,3 +428,48 @@ def test_demo_plan_preview_requires_action_manifest() -> None:
                 "progress": _progress(),
             }
         )
+
+
+def test_demo_run_stream_event_models_validate_public_payloads() -> None:
+    summary = DemoRunSummary.model_validate(
+        {
+            "run_id": str(uuid4()),
+            "status": "awaiting_confirmation",
+            "read_profile": "mock_world",
+            "selected_plan_id": None,
+            "plan_version": {
+                "version_number": 1,
+                "version_label": "v1",
+                "source_run_id": None,
+                "source_selected_plan_id": None,
+            },
+            "plans": [],
+            "action_count": 0,
+            "execution_status": None,
+            "feedback_status": None,
+            "error": None,
+            "clarification": None,
+            "progress": _progress(),
+        }
+    )
+
+    progress_event = DemoRunStreamProgressEvent.model_validate(
+        {
+            "event_index": 1,
+            "run_id": str(uuid4()),
+            "progress": _progress(),
+        }
+    )
+    summary_event = DemoRunStreamSummaryEvent(event_index=2, summary=summary)
+    error_event = DemoRunStreamErrorEvent.model_validate(
+        {
+            "event_index": 3,
+            "run_id": None,
+            "message": "AMAP read path is not configured for this environment.",
+        }
+    )
+
+    assert progress_event.event_index == 1
+    assert progress_event.progress.current_stage == "ready_for_confirmation"
+    assert summary_event.summary.run_id == summary.run_id
+    assert error_event.message == "AMAP read path is not configured for this environment."
