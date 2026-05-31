@@ -155,6 +155,14 @@ For the canonical reviewer closure flow, run `python scripts/run_recovery_replay
 
 The internal review surface now also loads `GET /internal/benchmarks/release-gate-v1/summary` on page load and renders a dedicated `Benchmark Summary` panel even before a run ID is entered. That panel is intentionally scoped to the canonical latest alias `var/formal-benchmarks/latest-release_gate_v1-run-report.json`.
 
+Reviewer scan order on `5174` should now be:
+
+1. Start with the release-gate hero in `Benchmark Summary`.
+2. Check status, overall score, and pass/fail/error counts first.
+3. Copy the canonical latest alias directly from the page when you need to cite the benchmark report path.
+4. Load a specific `run_id`.
+5. Inspect `Trace Summary`, then `Benchmark Artifacts`, then `Recovery Visualization`.
+
 ## Richer Web UI V1 Reviewer Flow
 
 For the V1 richer UI closure, use `docs/RICHER_WEB_UI_V1_CHECKLIST.md` as the canonical acceptance checklist. The shortest reviewer sequence is:
@@ -162,9 +170,11 @@ For the V1 richer UI closure, use `docs/RICHER_WEB_UI_V1_CHECKLIST.md` as the ca
 1. On `5173`, verify planning and confirmation with a Mock World run.
 2. Confirm the selected plan and verify the customer-facing `执行时间线`.
 3. Copy the resulting `run_id`.
-4. On `5174`, verify `Benchmark Summary` before loading any run.
-5. Load the copied `run_id` and verify `Trace Summary`.
-6. Run `python scripts/run_recovery_replay_review.py`, then load the emitted recovery `run_id` and verify `Recovery Visualization`.
+4. On `5174`, verify the release-gate hero in `Benchmark Summary` before loading any run.
+5. Confirm the page exposes the canonical latest alias `var/formal-benchmarks/latest-release_gate_v1-run-report.json` and a direct copy action for that path.
+6. Load the copied `run_id` and verify `Trace Summary`.
+7. Review `Benchmark Artifacts`, making sure the current run report path is distinct from the canonical latest release-gate alias path.
+8. Run `python scripts/run_recovery_replay_review.py`, then load the emitted recovery `run_id` and verify `Recovery Visualization`, including the replay report copy action.
 
 ## Manual Demo Flow
 

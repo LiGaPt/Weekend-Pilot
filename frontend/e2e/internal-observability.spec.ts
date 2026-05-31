@@ -167,8 +167,10 @@ test.describe("internal observability surface", () => {
 
     await expect(page.getByRole("heading", { name: "Internal Observability Review" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Benchmark Summary" })).toBeVisible();
+    await expect(page.getByText(/^Latest Release Gate$/)).toBeVisible();
     await expect(page.getByText("Benchmark release gate v1")).toBeVisible();
     await expect(page.getByText("var/formal-benchmarks/latest-release_gate_v1-run-report.json")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copy latest alias" })).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Run ID" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Load Run" })).toBeVisible();
     await expect(page.getByTestId("start-button")).toHaveCount(0);
@@ -178,7 +180,9 @@ test.describe("internal observability surface", () => {
     await page.getByRole("button", { name: "Load Run" }).click();
 
     await expect(page.getByRole("heading", { name: "Trace Summary" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copy run report path" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Recovery Visualization" })).toBeVisible();
     await expect(page.getByText("Recovery stopped after route failure.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copy replay report path" })).toBeVisible();
   });
 });
