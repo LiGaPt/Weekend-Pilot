@@ -6,9 +6,7 @@ import {
   ChevronUp,
   Loader2,
   MapPinned,
-  RefreshCw,
   Route,
-  Send,
   Utensils,
   XCircle,
 } from "lucide-react";
@@ -24,58 +22,41 @@ import type {
   PlanSectionSummary,
 } from "./thread";
 import {
+  actionTargetLabel,
   actionExecutionLabel,
   actionLabel,
   actionManifestSourceLabel,
   candidateSummaryLines,
   display,
+  displayUserText,
   distance,
   feedbackStatusLabel,
   feasibilityLabel,
   minutes,
   routeMode,
+  userFacingText,
 } from "./thread";
 
 type ConversationThreadProps = {
   items: ConversationThreadItem[];
   activeRunId: string | null;
   requestState: string;
-  clarificationReply: string;
-  replanReply: string;
-  canClarify: boolean;
   canConfirm: boolean;
   canDecline: boolean;
-  canReplan: boolean;
-  canRefresh: boolean;
   onSelectPlan: (planId: string) => void;
-  onClarificationReplyChange: (value: string) => void;
-  onClarificationSubmit: () => void;
-  onReplanReplyChange: (value: string) => void;
-  onReplanSubmit: () => void;
   onConfirm: () => void;
   onDecline: () => void;
-  onRefresh: () => void;
 };
 
 export function ConversationThread({
   items,
   activeRunId,
   requestState,
-  clarificationReply,
-  replanReply,
-  canClarify,
   canConfirm,
   canDecline,
-  canReplan,
-  canRefresh,
   onSelectPlan,
-  onClarificationReplyChange,
-  onClarificationSubmit,
-  onReplanReplyChange,
-  onReplanSubmit,
   onConfirm,
   onDecline,
-  onRefresh,
 }: ConversationThreadProps) {
   return (
     <div className="conversation-thread" aria-live="polite">
@@ -112,13 +93,6 @@ export function ConversationThread({
               key={item.id}
               item={item}
               isActive={item.runId === activeRunId}
-              requestState={requestState}
-              reply={clarificationReply}
-              canClarify={canClarify}
-              canRefresh={canRefresh}
-              onReplyChange={onClarificationReplyChange}
-              onSubmit={onClarificationSubmit}
-              onRefresh={onRefresh}
             />
           );
         }
@@ -130,17 +104,11 @@ export function ConversationThread({
               item={item}
               isActive={item.runId === activeRunId}
               requestState={requestState}
-              replanReply={replanReply}
               canConfirm={canConfirm}
               canDecline={canDecline}
-              canReplan={canReplan}
-              canRefresh={canRefresh}
               onSelectPlan={onSelectPlan}
-              onReplanReplyChange={onReplanReplyChange}
-              onReplanSubmit={onReplanSubmit}
               onConfirm={onConfirm}
               onDecline={onDecline}
-              onRefresh={onRefresh}
             />
           );
         }
@@ -154,26 +122,12 @@ export function ConversationThread({
 function ClarificationCard({
   item,
   isActive,
-  requestState,
-  reply,
-  canClarify,
-  canRefresh,
-  onReplyChange,
-  onSubmit,
-  onRefresh,
 }: {
   item: AssistantClarificationItem;
   isActive: boolean;
-  requestState: string;
-  reply: string;
-  canClarify: boolean;
-  canRefresh: boolean;
-  onReplyChange: (value: string) => void;
-  onSubmit: () => void;
-  onRefresh: () => void;
 }) {
   return (
-    <article className="thread-row thread-row-assistant">
+    <article className="thread-row thread-row-assistant" data-testid="clarification-card">
       <div className="thread-bubble thread-bubble-assistant">
         <div className="assistant-card-header">
           <div>
@@ -191,33 +145,10 @@ function ClarificationCard({
           ))}
         </ul>
         {isActive ? (
-          <div className="inline-form-block" data-testid="clarification-card">
-            <label className="field-label" htmlFor="clarification-reply-input">
-              补充说明
-            </label>
-            <textarea
-              id="clarification-reply-input"
-              value={reply}
-              onChange={(event) => onReplyChange(event.target.value)}
-              rows={4}
-              disabled={requestState === "clarifying"}
-              data-testid="clarification-reply-input"
-            />
-            <div className="button-row">
-              <button
-                className="primary-button"
-                type="button"
-                onClick={onSubmit}
-                disabled={!canClarify}
-                data-testid="clarification-submit-button"
-              >
-                {requestState === "clarifying" ? <Loader2 className="spin" size={17} /> : <Send size={17} />}
-                <span>{requestState === "clarifying" ? "提交中..." : "提交补充信息"}</span>
-              </button>
-            </div>
+          <div className="inline-hint-block">
+            <span>在下方输入框补充信息后发送。</span>
           </div>
         ) : null}
-        <RunInfoDisclosure item={item} isActive={isActive} canRefresh={canRefresh} onRefresh={onRefresh} />
       </div>
     </article>
   );
@@ -227,32 +158,20 @@ function PlanCard({
   item,
   isActive,
   requestState,
-  replanReply,
   canConfirm,
   canDecline,
-  canReplan,
-  canRefresh,
   onSelectPlan,
-  onReplanReplyChange,
-  onReplanSubmit,
   onConfirm,
   onDecline,
-  onRefresh,
 }: {
   item: AssistantPlanCardItem;
   isActive: boolean;
   requestState: string;
-  replanReply: string;
   canConfirm: boolean;
   canDecline: boolean;
-  canReplan: boolean;
-  canRefresh: boolean;
   onSelectPlan: (planId: string) => void;
-  onReplanReplyChange: (value: string) => void;
-  onReplanSubmit: () => void;
   onConfirm: () => void;
   onDecline: () => void;
-  onRefresh: () => void;
 }) {
   return (
     <article className="thread-row thread-row-assistant">
@@ -299,7 +218,7 @@ function PlanCard({
         {item.readOnlyPreview ? (
           <div className="notice-banner" data-testid="amap-read-only-notice">
             <AlertCircle size={18} aria-hidden="true" />
-            <span>AMap 只读预览会在确认前停止，不会执行任何写操作。</span>
+            <span>地图只读预览会在确认前停止，不会执行任何写操作。</span>
           </div>
         ) : null}
 
@@ -333,36 +252,12 @@ function PlanCard({
             </div>
 
             {item.canReplan ? (
-              <div className="inline-form-block" data-testid="replan-panel">
-                <label className="field-label" htmlFor="replan-reply-input">
-                  继续调整方案
-                </label>
-                <textarea
-                  id="replan-reply-input"
-                  value={replanReply}
-                  onChange={(event) => onReplanReplyChange(event.target.value)}
-                  rows={4}
-                  disabled={requestState === "replanning"}
-                  data-testid="replan-reply-input"
-                />
-                <div className="button-row">
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={onReplanSubmit}
-                    disabled={!canReplan}
-                    data-testid="replan-submit-button"
-                  >
-                    {requestState === "replanning" ? <Loader2 className="spin" size={17} /> : <Send size={17} />}
-                    <span>{requestState === "replanning" ? "调整中..." : "基于当前方案继续规划"}</span>
-                  </button>
-                </div>
+              <div className="inline-hint-block" data-testid="replan-panel">
+                <span>要调整方案，直接在下方输入新的要求。</span>
               </div>
             ) : null}
           </div>
         ) : null}
-
-        <RunInfoDisclosure item={item} isActive={isActive} canRefresh={canRefresh} onRefresh={onRefresh} />
       </div>
     </article>
   );
@@ -480,7 +375,7 @@ function TimelineSection({ plan }: { plan: DemoPlanPreview }) {
               <span className="time-range">
                 {item.start_label || "待定"} - {item.end_label || "待定"}
               </span>
-              <span className="timeline-title">{item.title || "未命名站点"}</span>
+              <span className="timeline-title">{userFacingText(item.title) || "未命名站点"}</span>
               <span className="muted">{minutes(item.duration_minutes)}</span>
             </li>
           ))}
@@ -552,7 +447,7 @@ function RouteFeasibilitySection({ plan }: { plan: DemoPlanPreview }) {
           </div>
           <div>
             <dt>摘要</dt>
-            <dd>{display(plan.route?.summary)}</dd>
+            <dd>{displayUserText(plan.route?.summary)}</dd>
           </div>
         </dl>
       </section>
@@ -599,8 +494,8 @@ function PreConfirmationActionsSection({ plan }: { plan: DemoPlanPreview }) {
           {plan.action_manifest.actions.map((action, index) => (
             <li key={`${action.action_ref ?? action.action_type ?? index}`}>
               <span className="action-type">{actionLabel(action.action_type) || "动作"}</span>
-              <span>{action.target_id || "暂无目标"}</span>
-              <span className="muted">{action.reason || "暂无说明。"}</span>
+              <span>{actionTargetLabel(plan, action.target_id, action.action_type)}</span>
+              <span className="muted">{displayUserText(action.reason)}</span>
               <span className="requirement">{actionExecutionLabel(action.execution_order)}</span>
             </li>
           ))}
@@ -631,7 +526,10 @@ function FeedbackList({ title, items }: { title: string; items: Record<string, u
             <span>{actionLabel(readString(item.action_type) || readString(item.tool_name)) || "动作"}</span>
             <span>{feedbackStatusLabel(readString(item.status)) || "未知"}</span>
             <span className="muted">
-              {readString(item.message) || readString(item.target_label) || readString(item.target_id) || "暂无详情。"}
+              {userFacingText(readString(item.message)) ||
+                userFacingText(readString(item.target_label)) ||
+                userFacingText(readString(item.target_id)) ||
+                "暂无详情。"}
             </span>
           </li>
         ))}
@@ -647,76 +545,13 @@ function TextList({ title, items }: { title: string; items: string[] }) {
       {items.length ? (
         <ul>
           {items.map((item) => (
-            <li key={item}>{item}</li>
+            <li key={item}>{userFacingText(item) || item}</li>
           ))}
         </ul>
       ) : (
         <p className="muted">暂无。</p>
       )}
     </div>
-  );
-}
-
-function RunInfoDisclosure({
-  item,
-  isActive,
-  canRefresh,
-  onRefresh,
-}: {
-  item: AssistantClarificationItem | AssistantPlanCardItem;
-  isActive: boolean;
-  canRefresh: boolean;
-  onRefresh: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <section className="run-info-block">
-      <button
-        className="detail-disclosure-toggle run-info-toggle"
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-        data-testid="run-info-toggle"
-        aria-expanded={open}
-      >
-        <span>运行信息</span>
-        {open ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
-      </button>
-      {open ? (
-        <div className="run-info-body">
-          <dl className="compact-list">
-            <div>
-              <dt>运行 ID</dt>
-              <dd className="mono" data-testid="run-id">
-                {item.hiddenRunInfo.runId}
-              </dd>
-            </div>
-            <div>
-              <dt>方案版本</dt>
-              <dd data-testid="plan-version">{item.hiddenRunInfo.versionLabel}</dd>
-            </div>
-            <div>
-              <dt>读取路径</dt>
-              <dd data-testid="active-read-profile">{item.hiddenRunInfo.readProfileLabel}</dd>
-            </div>
-          </dl>
-          {isActive ? (
-            <div className="button-row">
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={onRefresh}
-                disabled={!canRefresh}
-                data-testid="refresh-button"
-              >
-                <RefreshCw size={17} />
-                <span>刷新当前状态</span>
-              </button>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </section>
   );
 }
 

@@ -235,7 +235,7 @@ describe("demo API client", () => {
     } satisfies Partial<FrontendApiError>);
   });
 
-  it("localizes the AMAP configuration error detail", async () => {
+  it("localizes the map preview configuration error detail", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(
@@ -250,11 +250,11 @@ describe("demo API client", () => {
     await expect(getRun("run-1")).rejects.toMatchObject({
       name: "DemoApiError",
       status: 500,
-      message: "\u672c\u5730\u73af\u5883\u672a\u914d\u7f6e AMap \u53ea\u8bfb\u9884\u89c8\u6240\u9700\u7684\u5bc6\u94a5\u3002",
+      message: "\u672c\u5730\u73af\u5883\u672a\u914d\u7f6e\u5730\u56fe\u53ea\u8bfb\u9884\u89c8\u6240\u9700\u7684\u5bc6\u94a5\u3002",
     } satisfies Partial<FrontendApiError>);
   });
 
-  it("localizes the AMAP read-only confirm rejection detail", async () => {
+  it("localizes the map preview read-only confirm rejection detail", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(
@@ -269,7 +269,7 @@ describe("demo API client", () => {
     await expect(confirmRun("run-1", "plan-1")).rejects.toMatchObject({
       name: "DemoApiError",
       status: 409,
-      message: "AMap \u53ea\u8bfb\u9884\u89c8\u8def\u5f84\u4e0d\u652f\u6301\u786e\u8ba4\u6267\u884c\u3002",
+      message: "\u5730\u56fe\u53ea\u8bfb\u9884\u89c8\u8def\u5f84\u4e0d\u652f\u6301\u786e\u8ba4\u6267\u884c\u3002",
     } satisfies Partial<FrontendApiError>);
   });
 

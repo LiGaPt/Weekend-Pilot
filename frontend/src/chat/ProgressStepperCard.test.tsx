@@ -32,8 +32,13 @@ describe("ProgressStepperCard", () => {
     render(<ProgressStepperCard item={item} />);
 
     expect(screen.getByTestId("progress-stepper-card")).toBeInTheDocument();
+    expect(screen.getByText("当前进度")).toBeInTheDocument();
+    expect(screen.getByText("当前步骤")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "当前步骤" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "\u63a8\u8350\u65b9\u6848\u5df2\u51c6\u5907\u597d" })).toBeInTheDocument();
     expect(screen.getAllByText("\u63a8\u8350\u65b9\u6848\u5df2\u51c6\u5907\u597d").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "已完成步骤 (2)" })).toBeInTheDocument();
+    expect(screen.queryAllByText(/\\u|\\U/)).toHaveLength(0);
     expect(screen.queryByText("\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8")).not.toBeInTheDocument();
     expect(screen.queryByText("\u5df2\u627e\u5230 5 \u4e2a\u9910\u5385")).not.toBeInTheDocument();
 

@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { clarifyRun, confirmRun, getRun, replanRun, startRun } from "./api/demo";
+import { clarifyRun, confirmRun, replanRun, startRun } from "./api/demo";
 import type { DemoRunSummary, DemoProgressStage } from "./types/demo";
 
 vi.mock("./api/demo", () => ({
@@ -340,18 +340,29 @@ function expectThreadOrder(first: HTMLElement | null, second: HTMLElement | null
 describe("App", () => {
   beforeEach(() => {
     vi.mocked(startRun).mockReset();
-    vi.mocked(getRun).mockReset();
     vi.mocked(clarifyRun).mockReset();
     vi.mocked(confirmRun).mockReset();
     vi.mocked(replanRun).mockReset();
   });
 
-  it("renders the main composer and keeps advanced options hidden by default", () => {
+  it("renders one bottom composer without project-design copy", () => {
     render(<App />);
 
-    expect(screen.getByRole("textbox")).toHaveValue("");
+    expect(screen.getByTestId("main-composer-input")).toHaveValue("");
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
+    expect(screen.getByTestId("chat-composer")).toBeInTheDocument();
     expect(screen.queryByTestId("read-profile-select")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("advanced-options-toggle")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-info-toggle")).not.toBeInTheDocument();
     expect(screen.queryByTestId("run-id")).not.toBeInTheDocument();
+    expect(screen.queryByText("WeekendPilot")).not.toBeInTheDocument();
+    expect(screen.queryByText("Mock World")).not.toBeInTheDocument();
+    expect(screen.queryByText("AMap")).not.toBeInTheDocument();
+    expect(screen.queryByText("企业级对话式周末规划")).not.toBeInTheDocument();
+    expect(screen.queryByText("Chat-First Customer Surface")).not.toBeInTheDocument();
+    expect(screen.queryByText("只保留一个主输入框，剩下的进度和方案都在聊天流里完成。")).not.toBeInTheDocument();
+    expect(screen.queryByText("首屏不再展示运行摘要或大面板")).not.toBeInTheDocument();
+    expect(screen.queryByText("示例入口")).not.toBeInTheDocument();
   });
 
   it("shows a transient local spinner first, then renders the persistent progress card above the plan", async () => {
@@ -360,7 +371,7 @@ describe("App", () => {
     vi.mocked(startRun).mockReturnValue(deferred.promise);
     render(<App />);
 
-    await user.type(screen.getByRole("textbox"), "Plan a family afternoon");
+    await user.type(screen.getByTestId("main-composer-input"), "Plan a family afternoon");
     await user.click(screen.getByTestId("start-button"));
 
     expect(screen.getByTestId("system-progress")).toBeInTheDocument();
@@ -368,37 +379,32 @@ describe("App", () => {
     deferred.resolve(awaitingRun);
 
     const progressCard = await screen.findByTestId("progress-stepper-card");
-    const planHeading = await screen.findByRole("heading", { name: "Family Afternoon Plan" });
+    const planHeading = await screen.findByRole("heading", { name: "亲子下午方案" });
     expectThreadOrder(progressCard.closest("article"), planHeading.closest("article"));
     expect(screen.getByTestId("progress-completed-toggle")).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8")).not.toBeInTheDocument();
   });
 
-  it("keeps the recommended plan summary-first and hides run metadata until disclosure opens", async () => {
+  it("keeps the recommended plan summary-first without exposing run metadata", async () => {
     const user = userEvent.setup();
     vi.mocked(startRun).mockResolvedValue(awaitingRun);
     render(<App />);
 
-    await user.type(screen.getByRole("textbox"), "Plan a family afternoon");
+    await user.type(screen.getByTestId("main-composer-input"), "Plan a family afternoon");
     await user.click(screen.getByTestId("start-button"));
 
-    expect(await screen.findByRole("heading", { name: "Family Afternoon Plan" })).toBeInTheDocument();
-    expect(screen.getByText("Indoor activity first, then a lighter dinner nearby.")).toBeInTheDocument();
-    expect(screen.queryByText("Indoor activity")).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "亲子下午方案" })).toBeInTheDocument();
+    expect(screen.getByText("先安排室内亲子活动，再去附近吃清淡晚餐。")).toBeInTheDocument();
+    expect(screen.queryByText("室内亲子活动")).not.toBeInTheDocument();
     expect(screen.queryByText("green-table")).not.toBeInTheDocument();
     expect(screen.queryByText("\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8")).not.toBeInTheDocument();
     expect(screen.queryByTestId("run-id")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-info-toggle")).not.toBeInTheDocument();
+    expect(screen.queryByText("Mock World")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("progress-completed-toggle"));
     expect(screen.getByText("\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8")).toBeInTheDocument();
     expect(screen.getByText("\u5df2\u627e\u5230 5 \u4e2a\u9910\u5385")).toBeInTheDocument();
-
-    const runInfoButtons = screen.getAllByTestId("run-info-toggle");
-    await user.click(runInfoButtons[runInfoButtons.length - 1]);
-
-    expect(screen.getByTestId("run-id")).toHaveTextContent("run-1");
-    expect(screen.getByTestId("plan-version")).toHaveTextContent("v1");
-    expect(screen.getByTestId("active-read-profile")).toHaveTextContent("Mock World");
   });
 
   it("keeps plan details collapsed until expanded", async () => {
@@ -406,22 +412,22 @@ describe("App", () => {
     vi.mocked(startRun).mockResolvedValue(awaitingRun);
     render(<App />);
 
-    await user.type(screen.getByRole("textbox"), "Plan a family afternoon");
+    await user.type(screen.getByTestId("main-composer-input"), "Plan a family afternoon");
     await user.click(screen.getByTestId("start-button"));
 
-    const planHeading = await screen.findByRole("heading", { name: "Family Afternoon Plan" });
+    const planHeading = await screen.findByRole("heading", { name: "亲子下午方案" });
     const planCard = planHeading.closest(".thread-bubble");
     expect(planCard).not.toBeNull();
     const disclosureButtons = (planCard as HTMLElement).querySelectorAll<HTMLButtonElement>(".detail-disclosure-toggle");
     expect(disclosureButtons.length).toBeGreaterThanOrEqual(4);
 
-    expect(screen.queryByText("Indoor activity")).not.toBeInTheDocument();
+    expect(screen.queryByText("室内亲子活动")).not.toBeInTheDocument();
     await user.click(disclosureButtons[0]);
-    expect(screen.getByText("Indoor activity")).toBeInTheDocument();
+    expect(screen.getByText("室内亲子活动")).toBeInTheDocument();
 
     expect(screen.queryByText("green-table")).not.toBeInTheDocument();
     await user.click(disclosureButtons[3]);
-    expect(screen.getByText("green-table")).toBeInTheDocument();
+    expect(screen.getByText("轻食餐桌")).toBeInTheDocument();
   });
 
   it("renders the clarification flow with a progress card above the clarification card", async () => {
@@ -430,22 +436,23 @@ describe("App", () => {
     vi.mocked(clarifyRun).mockResolvedValue(clarifiedRun);
     render(<App />);
 
-    await user.type(screen.getByRole("textbox"), "Need a plan");
+    await user.type(screen.getByTestId("main-composer-input"), "Need a plan");
     await user.click(screen.getByTestId("start-button"));
 
     const progressCard = await screen.findByTestId("progress-stepper-card");
     const clarificationCard = await screen.findByTestId("clarification-card");
     expectThreadOrder(progressCard.closest("article"), clarificationCard.closest("article"));
     expect(within(screen.getByTestId("clarification-fields")).getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
 
-    await user.type(screen.getByTestId("clarification-reply-input"), "We are leaving around 2pm for four hours.");
-    await user.click(screen.getByTestId("clarification-submit-button"));
+    await user.type(screen.getByTestId("main-composer-input"), "We are leaving around 2pm for four hours.");
+    await user.click(screen.getByTestId("start-button"));
 
     expect(clarifyRun).toHaveBeenCalledWith("run-clarify-1", {
       user_input: "We are leaving around 2pm for four hours.",
       selected_plan_index: 0,
     });
-    expect(await screen.findByRole("heading", { name: "Family Afternoon Plan" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "亲子下午方案" })).toBeInTheDocument();
   });
 
   it("uses the locally selected plan index when replanning", async () => {
@@ -454,70 +461,41 @@ describe("App", () => {
     vi.mocked(replanRun).mockResolvedValue(replannedRunV2FromPlan2);
     render(<App />);
 
-    await user.type(screen.getByRole("textbox"), "Plan a family afternoon");
+    await user.type(screen.getByTestId("main-composer-input"), "Plan a family afternoon");
     await user.click(screen.getByTestId("start-button"));
 
-    expect(await screen.findByRole("heading", { name: "Family Afternoon Plan" })).toBeInTheDocument();
-    await user.click(screen.getByRole("tab", { name: "Backup Walk Plan" }));
-    await user.type(screen.getByTestId("replan-reply-input"), "Keep the backup plan, but reduce walking.");
-    await user.click(screen.getByTestId("replan-submit-button"));
+    expect(await screen.findByRole("heading", { name: "亲子下午方案" })).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "备选散步方案" }));
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
+    await user.type(screen.getByTestId("main-composer-input"), "Keep the backup plan, but reduce walking.");
+    await user.click(screen.getByTestId("start-button"));
 
     expect(replanRun).toHaveBeenCalledWith("run-1", {
       user_input: "Keep the backup plan, but reduce walking.",
       selected_plan_index: 1,
     });
 
-    const runInfoButtons = screen.getAllByTestId("run-info-toggle");
-    await user.click(runInfoButtons[runInfoButtons.length - 1]);
-    expect(await screen.findByTestId("plan-version")).toHaveTextContent("v2");
+    expect(await screen.findByText("v2")).toBeInTheDocument();
+    expect(screen.queryByTestId("run-info-toggle")).not.toBeInTheDocument();
   });
 
-  it("refreshes the latest run without duplicating the active plan card", async () => {
-    const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingRun);
-    vi.mocked(getRun).mockResolvedValue({
-      ...awaitingRun,
-      plans: [
-        {
-          ...awaitingRun.plans[0],
-          summary: "Updated summary after refresh.",
-        },
-        awaitingRun.plans[1],
-      ],
-    });
-    render(<App />);
-
-    await user.type(screen.getByRole("textbox"), "Plan a family afternoon");
-    await user.click(screen.getByTestId("start-button"));
-
-    expect(await screen.findByRole("heading", { name: "Family Afternoon Plan" })).toBeInTheDocument();
-    expect(screen.getAllByRole("heading", { name: "Family Afternoon Plan" })).toHaveLength(1);
-
-    const runInfoButtons = screen.getAllByTestId("run-info-toggle");
-    await user.click(runInfoButtons[runInfoButtons.length - 1]);
-    await user.click(screen.getByTestId("refresh-button"));
-
-    expect(await screen.findByText("Updated summary after refresh.")).toBeInTheDocument();
-    expect(screen.getAllByRole("heading", { name: "Family Afternoon Plan" })).toHaveLength(1);
-  });
-
-  it("keeps the AMap preview path behind advanced options and blocks confirmation", async () => {
+  it("blocks confirmation when the server returns a map read-only preview", async () => {
     const user = userEvent.setup();
     vi.mocked(startRun).mockResolvedValue(awaitingAmapRun);
     render(<App />);
 
-    await user.type(screen.getByRole("textbox"), "Preview a lighter afternoon plan");
-    await user.click(screen.getByTestId("advanced-options-toggle"));
-    await user.selectOptions(screen.getByTestId("read-profile-select"), "amap");
+    await user.type(screen.getByTestId("main-composer-input"), "Preview a lighter afternoon plan");
     await user.click(screen.getByTestId("start-button"));
 
     expect(startRun).toHaveBeenCalledWith(
       expect.objectContaining({
-        read_profile: "amap",
+        read_profile: "mock_world",
       }),
     );
     expect(await screen.findByTestId("amap-read-only-notice")).toBeInTheDocument();
+    expect(screen.getByTestId("amap-read-only-notice")).toHaveTextContent("地图只读预览");
     expect(screen.queryByTestId("confirm-button")).not.toBeInTheDocument();
+    expect(screen.queryByText("AMap")).not.toBeInTheDocument();
   });
 
   it("keeps the progress card above the result card after confirmation", async () => {
@@ -526,19 +504,19 @@ describe("App", () => {
     vi.mocked(confirmRun).mockResolvedValue(completedRun);
     render(<App />);
 
-    await user.type(screen.getByRole("textbox"), "Plan a family afternoon");
+    await user.type(screen.getByTestId("main-composer-input"), "Plan a family afternoon");
     await user.click(screen.getByTestId("start-button"));
     await user.click(await screen.findByTestId("confirm-button"));
 
     const progressCard = await screen.findByTestId("progress-stepper-card");
     const resultCard = await screen.findByTestId("assistant-result-card");
     expectThreadOrder(progressCard.closest("article"), resultCard.closest("article"));
-    expect(screen.getByText("Plan completed")).toBeInTheDocument();
+    expect(screen.getByText("安排已完成")).toBeInTheDocument();
     expect(screen.queryByTestId("execution-timeline")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("execution-timeline-toggle"));
     const timeline = await screen.findByTestId("execution-timeline");
     expect(within(timeline).getByText("2026-05-26T14:00:00+08:00")).toBeInTheDocument();
-    expect(within(timeline).getByText("green-table")).toBeInTheDocument();
+    expect(within(timeline).getByText("轻食餐桌")).toBeInTheDocument();
   });
 });
