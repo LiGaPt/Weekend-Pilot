@@ -831,6 +831,236 @@ dd {
   margin-bottom: 10px;
 }
 
+.observability-benchmark-hero-panel {
+  border-color: #c9d8e6;
+  box-shadow: 0 10px 24px rgb(15 23 42 / 0.06);
+}
+
+.observability-benchmark-hero {
+  align-items: start;
+  background:
+    linear-gradient(135deg, rgb(238 248 255 / 0.95), rgb(248 250 252 / 1)),
+    #f8fafc;
+  border: 1px solid #d4e4f7;
+  border-radius: 12px;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+  padding: 18px;
+}
+
+.observability-benchmark-hero-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.observability-benchmark-hero-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.observability-benchmark-hero-heading h3 {
+  color: #18314a;
+  font-size: 24px;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.observability-benchmark-scoreboard {
+  align-items: start;
+  background: #ffffff;
+  border: 1px solid #d7e3ef;
+  border-radius: 12px;
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 16px;
+}
+
+.observability-benchmark-scoreboard strong {
+  color: #18314a;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.observability-score-label {
+  color: #5f7184;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.observability-metric-grid,
+.observability-rollup-grid,
+.observability-preview-grid,
+.observability-path-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.observability-metric-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.observability-rollup-grid,
+.observability-preview-grid,
+.observability-path-stack {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.observability-metric-card,
+.observability-rollup-card,
+.observability-preview-card,
+.observability-path-field {
+  background: #f8fafc;
+  border: 1px solid #e1e8ef;
+  border-radius: 10px;
+}
+
+.observability-metric-card {
+  display: grid;
+  gap: 6px;
+  min-height: 110px;
+  padding: 14px;
+}
+
+.observability-metric-card span,
+.observability-preview-card span,
+.observability-path-field-header span {
+  color: #5f7184;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.observability-metric-card strong {
+  color: #18314a;
+  font-size: 21px;
+  line-height: 1.2;
+}
+
+.observability-metric-card small {
+  color: #5f7184;
+  font-size: 12px;
+}
+
+.observability-stage-lane-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.observability-stage-lane {
+  background: #f8fafc;
+  border: 1px solid #e1e8ef;
+  border-radius: 10px;
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.observability-stage-lane-header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.observability-stage-track {
+  background: #e8eef5;
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.observability-stage-fill {
+  background: linear-gradient(90deg, #0f766e, #38b2ac);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  min-width: 12%;
+}
+
+.observability-rollup-card,
+.observability-preview-card,
+.observability-path-field {
+  padding: 14px;
+}
+
+.observability-rollup-card .section-heading {
+  margin-bottom: 10px;
+}
+
+.observability-rollup-card .section-heading h3 {
+  font-size: 14px;
+}
+
+.observability-inline-meta {
+  color: #5f7184;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 4px;
+}
+
+.observability-inline-meta span {
+  font-size: 12px;
+}
+
+.observability-inline-eyebrow {
+  margin-bottom: 4px;
+}
+
+.observability-preview-card p,
+.observability-path-value {
+  color: #24384a;
+  margin: 8px 0 0;
+}
+
+.observability-path-field {
+  display: grid;
+  gap: 12px;
+}
+
+.observability-path-field-body {
+  display: grid;
+  gap: 12px;
+}
+
+.observability-copy-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.observability-copy-button {
+  min-width: 156px;
+}
+
+.observability-copy-feedback {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.observability-copy-feedback-success {
+  color: #0f766e;
+}
+
+.observability-copy-feedback-error {
+  color: #b42318;
+}
+
+.observability-path-empty {
+  margin: 0;
+}
+
 .plan-tabs {
   background: #e9eef3;
   border: 1px solid #d8e0e8;
@@ -1096,6 +1326,10 @@ dd {
   .plan-grid,
   .detail-grid-two,
   .action-panel,
+  .observability-metric-grid,
+  .observability-rollup-grid,
+  .observability-preview-grid,
+  .observability-path-stack,
   .observability-placeholder-grid,
   .observability-summary-grid,
   .observability-secondary-grid,
@@ -1132,6 +1366,10 @@ dd {
 
   .chat-hero-copy h2 {
     max-width: none;
+  }
+
+  .observability-benchmark-hero {
+    grid-template-columns: 1fr;
   }
 
   .thread-bubble {

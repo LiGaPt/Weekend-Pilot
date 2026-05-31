@@ -1,8 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  getLatestReleaseGateBenchmarkSummary,
-  getObservabilityRun,
-} from "./api";
+import { getLatestReleaseGateBenchmarkSummary, getObservabilityRun } from "./api";
 import { FrontendApiError } from "../shared/http";
 import type {
   InternalActionLedgerSummary,
@@ -11,10 +8,17 @@ import type {
   InternalRecoveryPathSummary,
   InternalReleaseGateBenchmarkSummary,
   InternalToolEventSummary,
+  InternalWorkflowTimingSummary,
 } from "./types";
 
 const GENERIC_ERROR_MESSAGE = "Internal observability request failed. Please try again.";
 const BENCHMARK_GENERIC_ERROR_MESSAGE = "Internal benchmark summary request failed. Please try again.";
+const COPY_FEEDBACK_RESET_MS = 1800;
+
+type CopyFeedbackState = {
+  key: string;
+  status: "success" | "error";
+} | null;
 
 export function ObservabilityPage() {
   const [runId, setRunId] = useState("");
@@ -26,6 +30,7 @@ export function ObservabilityPage() {
   const [benchmarkMissingMessage, setBenchmarkMissingMessage] = useState<string | null>(null);
   const [benchmarkErrorMessage, setBenchmarkErrorMessage] = useState<string | null>(null);
   const [isBenchmarkLoading, setIsBenchmarkLoading] = useState(true);
+  const [copyFeedback, setCopyFeedback] = useState<CopyFeedbackState>(null);
 
   useEffect(() => {
     let active = true;
@@ -68,6 +73,20 @@ export function ObservabilityPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (copyFeedback === null) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setCopyFeedback((current) => (current?.key === copyFeedback.key ? null : current));
+    }, COPY_FEEDBACK_RESET_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [copyFeedback]);
+
   async function handleLoad() {
     const trimmed = runId.trim();
     if (!trimmed) {
@@ -96,6 +115,25 @@ export function ObservabilityPage() {
     }
   }
 
+  async function handleCopyPath(copyKey: string, path: string) {
+    try {
+      if (typeof navigator === "undefined" || typeof navigator.clipboard?.writeText !== "function") {
+        throw new Error("Clipboard is unavailable.");
+      }
+      await navigator.clipboard.writeText(path);
+      setCopyFeedback({ key: copyKey, status: "success" });
+    } catch {
+      setCopyFeedback({ key: copyKey, status: "error" });
+    }
+  }
+
+  function getCopyFeedback(copyKey: string) {
+    if (copyFeedback?.key !== copyKey) {
+      return null;
+    }
+    return copyFeedback.status === "success" ? "Copied" : "Copy failed";
+  }
+
   return (
     <main className="app-shell observability-shell">
       <section className="app-header" aria-labelledby="observability-title">
@@ -111,6 +149,8 @@ export function ObservabilityPage() {
           missingMessage={benchmarkMissingMessage}
           errorMessage={benchmarkErrorMessage}
           isLoading={isBenchmarkLoading}
+          onCopyPath={handleCopyPath}
+          copyFeedback={getCopyFeedback("latest-release-gate-alias-hero")}
         />
 
         <section className="panel observability-panel">
@@ -142,7 +182,12 @@ export function ObservabilityPage() {
         </section>
 
         {result ? (
-          <ObservabilityResult result={result} />
+          <ObservabilityResult
+            result={result}
+            latestReleaseGateAliasPath={benchmarkSummary?.report_path ?? null}
+            onCopyPath={handleCopyPath}
+            copyFeedbackForKey={getCopyFeedback}
+          />
         ) : (
           <section className="empty-workspace observability-empty">
             <h2>Internal Run Summary</h2>
@@ -163,14 +208,18 @@ function BenchmarkSummaryPanel({
   missingMessage,
   errorMessage,
   isLoading,
+  onCopyPath,
+  copyFeedback,
 }: {
   summary: InternalReleaseGateBenchmarkSummary | null;
   missingMessage: string | null;
   errorMessage: string | null;
   isLoading: boolean;
+  onCopyPath: (copyKey: string, path: string) => Promise<void>;
+  copyFeedback: string | null;
 }) {
   return (
-    <section className="panel observability-review-section">
+    <section className="panel observability-review-section observability-benchmark-hero-panel">
       <div className="section-heading">
         <h2>Benchmark Summary</h2>
       </div>
@@ -190,17 +239,39 @@ function BenchmarkSummaryPanel({
 
       {!isLoading && summary ? (
         <div className="observability-review-stack">
-          <dl className="metadata-list observability-list">
-            <MetaItem label="Suite ID" value={summary.suite_id} mono />
-            <MetaItem label="Suite Title" value={summary.suite_title} />
-            <MetaItem label="Run Status" value={summary.run_status} />
-            <MetaItem label="Case Count" value={String(summary.case_count)} />
-            <MetaItem label="Passed" value={String(summary.passed_count)} />
-            <MetaItem label="Failed" value={String(summary.failed_count)} />
-            <MetaItem label="Error" value={String(summary.error_count)} />
-            <MetaItem label="Overall Score" value={String(summary.overall_score)} />
-            <MetaItem label="Report Path" value={summary.report_path} mono />
-          </dl>
+          <section className="observability-benchmark-hero">
+            <div className="observability-benchmark-hero-copy">
+              <p className="eyebrow">Latest Release Gate</p>
+              <div className="observability-benchmark-hero-heading">
+                <h3>{summary.suite_title}</h3>
+                <StatusBadge status={summary.run_status} />
+              </div>
+              <p className="muted">
+                Canonical reviewer-facing release gate evidence for <span className="mono">{summary.suite_id}</span>.
+              </p>
+            </div>
+
+            <div className="observability-benchmark-scoreboard">
+              <span className="observability-score-label">Overall Score</span>
+              <strong>{formatScore(summary.overall_score)}</strong>
+            </div>
+          </section>
+
+          <div className="observability-metric-grid">
+            <MetricCard label="Case Count" value={String(summary.case_count)} />
+            <MetricCard label="Passed" value={String(summary.passed_count)} />
+            <MetricCard label="Failed" value={String(summary.failed_count)} />
+            <MetricCard label="Errors" value={String(summary.error_count)} />
+          </div>
+
+          <PathField
+            label="Latest Release Gate Alias"
+            path={summary.report_path}
+            copyLabel="Copy latest alias"
+            copyKey="latest-release-gate-alias-hero"
+            onCopyPath={onCopyPath}
+            copyFeedback={copyFeedback}
+          />
 
           <div className="observability-count-grid">
             <CountMapPanel title="Levels" items={summary.matrix_summary.level_counts} />
@@ -214,8 +285,20 @@ function BenchmarkSummaryPanel({
   );
 }
 
-function ObservabilityResult({ result }: { result: InternalObservabilityRunSummary }) {
+function ObservabilityResult({
+  result,
+  latestReleaseGateAliasPath,
+  onCopyPath,
+  copyFeedbackForKey,
+}: {
+  result: InternalObservabilityRunSummary;
+  latestReleaseGateAliasPath: string | null;
+  onCopyPath: (copyKey: string, path: string) => Promise<void>;
+  copyFeedbackForKey: (copyKey: string) => string | null;
+}) {
   const timing = result.workflow_timing_summary;
+  const slowestStage = getSlowestStage(timing);
+  const longestStageDuration = slowestStage?.total_duration_ms ?? 0;
 
   return (
     <div className="workspace observability-workspace">
@@ -253,20 +336,36 @@ function ObservabilityResult({ result }: { result: InternalObservabilityRunSumma
             </div>
             {timing ? (
               <>
-                <dl className="metadata-list observability-list">
-                  <MetaItem label="Schema" value={timing.schema_version} />
-                  <MetaItem label="Total Duration" value={`${timing.total_duration_ms} ms`} />
-                  <MetaItem label="Stage Count" value={String(timing.stage_count)} />
-                </dl>
-                <ul className="observability-stage-list">
+                <div className="observability-metric-grid observability-timing-grid">
+                  <MetricCard label="Total Duration" value={`${timing.total_duration_ms} ms`} />
+                  <MetricCard label="Stage Count" value={String(timing.stage_count)} />
+                  <MetricCard
+                    label="Slowest Stage"
+                    value={slowestStage ? slowestStage.node_name : "N/A"}
+                    detail={slowestStage ? `${slowestStage.total_duration_ms} ms` : null}
+                    mono={slowestStage !== null}
+                  />
+                </div>
+
+                <ol className="observability-stage-lane-list">
                   {timing.stages.map((stage) => (
-                    <li key={stage.node_name}>
-                      <strong>{stage.node_name}</strong>
-                      <span>{stage.total_duration_ms} ms</span>
-                      <span>attempts: {stage.attempt_count}</span>
+                    <li key={stage.node_name} className="observability-stage-lane">
+                      <div className="observability-stage-lane-header">
+                        <strong className="mono">{stage.node_name}</strong>
+                        <span>{stage.total_duration_ms} ms</span>
+                      </div>
+                      <div className="observability-stage-track" aria-hidden="true">
+                        <span
+                          className="observability-stage-fill"
+                          style={{
+                            width: `${getRelativeWidth(stage.total_duration_ms, longestStageDuration)}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="muted">attempts: {stage.attempt_count}</span>
                     </li>
                   ))}
-                </ul>
+                </ol>
               </>
             ) : (
               <p className="muted">No workflow timing summary is available for this run yet.</p>
@@ -342,8 +441,17 @@ function ObservabilityResult({ result }: { result: InternalObservabilityRunSumma
       <div className="observability-placeholder-grid">
         <ToolEventsPanel items={result.tool_event_summaries} />
         <ActionLedgerPanel items={result.action_ledger_summaries} />
-        <BenchmarkArtifactsPanel summary={result.benchmark_artifact_summary} />
-        <RecoveryPathPanel summary={result.recovery_path_summary} />
+        <BenchmarkArtifactsPanel
+          summary={result.benchmark_artifact_summary}
+          latestReleaseGateAliasPath={latestReleaseGateAliasPath}
+          onCopyPath={onCopyPath}
+          copyFeedbackForKey={copyFeedbackForKey}
+        />
+        <RecoveryPathPanel
+          summary={result.recovery_path_summary}
+          onCopyPath={onCopyPath}
+          copyFeedback={copyFeedbackForKey("replay-report-path")}
+        />
       </div>
     </div>
   );
@@ -373,7 +481,17 @@ function CountMapPanel({ title, items }: { title: string; items: Record<string, 
   );
 }
 
-function BenchmarkArtifactsPanel({ summary }: { summary: InternalBenchmarkArtifactSummary | null }) {
+function BenchmarkArtifactsPanel({
+  summary,
+  latestReleaseGateAliasPath,
+  onCopyPath,
+  copyFeedbackForKey,
+}: {
+  summary: InternalBenchmarkArtifactSummary | null;
+  latestReleaseGateAliasPath: string | null;
+  onCopyPath: (copyKey: string, path: string) => Promise<void>;
+  copyFeedbackForKey: (copyKey: string) => string | null;
+}) {
   const hasDetailedArtifact =
     summary !== null &&
     (summary.benchmark_status !== null ||
@@ -412,8 +530,26 @@ function BenchmarkArtifactsPanel({ summary }: { summary: InternalBenchmarkArtifa
               label="Action Count"
               value={summary.action_count === null ? null : String(summary.action_count)}
             />
-            <MetaItem label="Report Path" value={summary.report_path} mono />
           </dl>
+
+          <div className="observability-path-stack">
+            <PathField
+              label="Current Run Report"
+              path={summary.report_path}
+              copyLabel="Copy run report path"
+              copyKey="current-run-report"
+              onCopyPath={onCopyPath}
+              copyFeedback={copyFeedbackForKey("current-run-report")}
+            />
+            <PathField
+              label="Latest Release Gate Alias"
+              path={latestReleaseGateAliasPath}
+              copyLabel="Copy latest alias path"
+              copyKey="latest-release-gate-alias-artifacts"
+              onCopyPath={onCopyPath}
+              copyFeedback={copyFeedbackForKey("latest-release-gate-alias-artifacts")}
+            />
+          </div>
 
           <section className="panel">
             <div className="section-heading">
@@ -501,7 +637,17 @@ function BenchmarkArtifactsPanel({ summary }: { summary: InternalBenchmarkArtifa
   );
 }
 
-function RecoveryPathPanel({ summary }: { summary: InternalRecoveryPathSummary | null }) {
+function RecoveryPathPanel({
+  summary,
+  onCopyPath,
+  copyFeedback,
+}: {
+  summary: InternalRecoveryPathSummary | null;
+  onCopyPath: (copyKey: string, path: string) => Promise<void>;
+  copyFeedback: string | null;
+}) {
+  const latestAttempt = getLatestRecoveryAttempt(summary);
+
   return (
     <section className="panel">
       <div className="section-heading">
@@ -511,25 +657,35 @@ function RecoveryPathPanel({ summary }: { summary: InternalRecoveryPathSummary |
         <p className="muted">This run did not enter bounded recovery.</p>
       ) : (
         <>
-          <dl className="metadata-list observability-list">
-            <MetaItem label="Attempt Count" value={String(summary.attempt_count)} />
-            <MetaItem label="Max Attempts" value={String(summary.max_attempts)} />
-          </dl>
+          <div className="observability-metric-grid">
+            <MetricCard label="Attempt Count" value={String(summary.attempt_count)} />
+            <MetricCard label="Max Attempts" value={String(summary.max_attempts)} />
+            <MetricCard
+              label="Latest Attempt"
+              value={latestAttempt ? latestAttempt.status : "N/A"}
+              detail={latestAttempt ? latestAttempt.recovery_action : null}
+            />
+          </div>
 
           {summary.attempts.length ? (
             <section className="panel">
               <div className="section-heading">
                 <h3>Attempts</h3>
               </div>
-              <ul className="observability-detail-list">
-                {summary.attempts.map((attempt) => (
+              <ol className="observability-detail-list">
+                {summary.attempts
+                  .slice()
+                  .sort((left, right) => left.attempt_index - right.attempt_index)
+                  .map((attempt) => (
                   <li key={`${attempt.attempt_index}-${attempt.recovery_action}-${attempt.status}`}>
                     <div className="observability-detail-header">
-                      <strong>{attempt.recovery_action}</strong>
-                      <span>{attempt.status}</span>
+                      <div>
+                        <p className="eyebrow observability-inline-eyebrow">Attempt {attempt.attempt_index}</p>
+                        <strong>{attempt.recovery_action}</strong>
+                      </div>
+                      <StatusBadge status={attempt.status} />
                     </div>
                     <dl className="metadata-list observability-list">
-                      <MetaItem label="Attempt Index" value={String(attempt.attempt_index)} />
                       <MetaItem label="Source Node" value={attempt.source_node} />
                       <MetaItem label="Route To" value={attempt.route_to} />
                       <MetaItem label="Error Type" value={attempt.error_type} />
@@ -539,7 +695,7 @@ function RecoveryPathPanel({ summary }: { summary: InternalRecoveryPathSummary |
                     </dl>
                   </li>
                 ))}
-              </ul>
+              </ol>
             </section>
           ) : (
             <p className="muted">Recovery metadata exists for this run, but no valid recovery attempts are available.</p>
@@ -552,12 +708,15 @@ function RecoveryPathPanel({ summary }: { summary: InternalRecoveryPathSummary |
               </div>
               <dl className="metadata-list observability-list">
                 <MetaItem label="Case ID" value={summary.replay_source.case_id} mono />
-                <MetaItem
-                  label="Benchmark Report Path"
-                  value={summary.replay_source.benchmark_report_path}
-                  mono
-                />
               </dl>
+              <PathField
+                label="Benchmark Report Path"
+                path={summary.replay_source.benchmark_report_path}
+                copyLabel="Copy replay report path"
+                copyKey="replay-report-path"
+                onCopyPath={onCopyPath}
+                copyFeedback={copyFeedback}
+              />
             </section>
           ) : null}
         </>
@@ -567,32 +726,55 @@ function RecoveryPathPanel({ summary }: { summary: InternalRecoveryPathSummary |
 }
 
 function ToolEventsPanel({ items }: { items: InternalToolEventSummary[] }) {
+  const rollup = getToolEventRollup(items);
+
   return (
     <section className="panel">
       <div className="section-heading">
         <h2>Tool Events</h2>
       </div>
       {items.length ? (
-        <ul className="observability-detail-list">
+        <>
+          <div className="observability-metric-grid observability-tool-rollup-grid">
+            <MetricCard label="Total Events" value={String(rollup.totalCount)} />
+            <MetricCard label="Read Events" value={String(rollup.readCount)} />
+            <MetricCard label="Write Events" value={String(rollup.writeCount)} />
+            <MetricCard label="Providers" value={String(Object.keys(rollup.providerCounts).length)} />
+          </div>
+
+          <div className="observability-rollup-grid">
+            <CompactCountList title="By Status" items={rollup.statusCounts} />
+            <CompactCountList title="By Type" items={rollup.typeCounts} />
+            <CompactCountList title="By Provider" items={rollup.providerCounts} />
+          </div>
+
+          <ul className="observability-detail-list">
           {items.map((item, index) => (
             <li key={`${item.tool_name}-${item.created_at}-${index}`}>
               <div className="observability-detail-header">
-                <strong>{item.tool_name}</strong>
-                <span>{item.status}</span>
+                <div>
+                  <strong>{item.tool_name}</strong>
+                  <div className="observability-inline-meta">
+                    <span>{item.tool_type}</span>
+                    <span>{item.provider}</span>
+                    <span>{item.latency_ms === null ? "Latency N/A" : `${item.latency_ms} ms`}</span>
+                  </div>
+                </div>
+                <StatusBadge status={item.status} />
               </div>
               <dl className="metadata-list observability-list">
-                <MetaItem label="Type" value={item.tool_type} />
-                <MetaItem label="Provider" value={item.provider} />
                 <MetaItem label="Cache Hit" value={booleanLabel(item.cache_hit)} />
-                <MetaItem label="Latency" value={item.latency_ms === null ? null : `${item.latency_ms} ms`} />
                 <MetaItem label="Created At" value={item.created_at} />
-                <MetaItem label="Request Preview" value={stringifyValue(item.request_preview)} />
-                <MetaItem label="Response Preview" value={stringifyValue(item.response_preview)} />
-                <MetaItem label="Error Preview" value={stringifyValue(item.error_preview)} />
               </dl>
+              <div className="observability-preview-grid">
+                <PreviewField label="Request Preview" value={stringifyValue(item.request_preview)} />
+                <PreviewField label="Response Preview" value={stringifyValue(item.response_preview)} />
+                <PreviewField label="Error Preview" value={stringifyValue(item.error_preview)} />
+              </div>
             </li>
           ))}
-        </ul>
+          </ul>
+        </>
       ) : (
         <p className="muted">No tool events were recorded for this run.</p>
       )}
@@ -627,6 +809,116 @@ function ActionLedgerPanel({ items }: { items: InternalActionLedgerSummary[] }) 
         </ul>
       ) : (
         <p className="muted">No action ledger entries were recorded for this run.</p>
+      )}
+    </section>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  detail,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  detail?: string | null;
+  mono?: boolean;
+}) {
+  return (
+    <div className="observability-metric-card">
+      <span>{label}</span>
+      <strong className={mono ? "mono" : undefined}>{value}</strong>
+      {detail ? <small>{detail}</small> : null}
+    </div>
+  );
+}
+
+function PathField({
+  label,
+  path,
+  copyLabel,
+  copyKey,
+  onCopyPath,
+  copyFeedback,
+}: {
+  label: string;
+  path: string | null;
+  copyLabel: string;
+  copyKey: string;
+  onCopyPath: (copyKey: string, path: string) => Promise<void>;
+  copyFeedback: string | null;
+}) {
+  const hasPath = hasTextValue(path);
+
+  return (
+    <section className="observability-path-field">
+      <div className="observability-path-field-header">
+        <span>{label}</span>
+      </div>
+      <div className="observability-path-field-body">
+        <p className="mono observability-path-value">{hasPath ? path : "N/A"}</p>
+        {hasPath ? (
+          <div className="observability-copy-row">
+            <button
+              className="secondary-button observability-copy-button"
+              type="button"
+              onClick={() => void onCopyPath(copyKey, path)}
+            >
+              {copyLabel}
+            </button>
+            {copyFeedback ? (
+              <span
+                role="status"
+                aria-live="polite"
+                className={`observability-copy-feedback ${
+                  copyFeedback === "Copied" ? "observability-copy-feedback-success" : "observability-copy-feedback-error"
+                }`}
+              >
+                {copyFeedback}
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          <p className="muted observability-path-empty">Path not available.</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function PreviewField({ label, value }: { label: string; value: string | null }) {
+  if (!hasTextValue(value)) {
+    return null;
+  }
+
+  return (
+    <section className="observability-preview-card">
+      <span>{label}</span>
+      <p className="mono">{value}</p>
+    </section>
+  );
+}
+
+function CompactCountList({ title, items }: { title: string; items: Record<string, number> }) {
+  const entries = Object.entries(items).sort(([left], [right]) => left.localeCompare(right));
+
+  return (
+    <section className="observability-rollup-card">
+      <div className="section-heading">
+        <h3>{title}</h3>
+      </div>
+      {entries.length ? (
+        <ul className="observability-chip-list observability-chip-list-compact">
+          {entries.map(([label, count]) => (
+            <li key={`${title}-${label}`}>
+              <span>{label}</span>
+              <strong>{count}</strong>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted">No summary values are available.</p>
       )}
     </section>
   );
@@ -667,4 +959,85 @@ function stringifyValue(value: unknown) {
     return value;
   }
   return JSON.stringify(value);
+}
+
+function getSlowestStage(timing: InternalWorkflowTimingSummary | null) {
+  if (timing === null || timing.stages.length === 0) {
+    return null;
+  }
+
+  return timing.stages.reduce((slowest, candidate) =>
+    candidate.total_duration_ms > slowest.total_duration_ms ? candidate : slowest,
+  );
+}
+
+function getRelativeWidth(stageDurationMs: number, maxDurationMs: number) {
+  if (maxDurationMs <= 0) {
+    return 0;
+  }
+
+  return Math.max(12, Math.round((stageDurationMs / maxDurationMs) * 100));
+}
+
+function getToolEventRollup(items: InternalToolEventSummary[]) {
+  const typeCounts: Record<string, number> = {};
+  const statusCounts: Record<string, number> = {};
+  const providerCounts: Record<string, number> = {};
+
+  let readCount = 0;
+  let writeCount = 0;
+
+  for (const item of items) {
+    typeCounts[item.tool_type] = (typeCounts[item.tool_type] ?? 0) + 1;
+    statusCounts[item.status] = (statusCounts[item.status] ?? 0) + 1;
+    providerCounts[item.provider] = (providerCounts[item.provider] ?? 0) + 1;
+
+    if (item.tool_type === "read") {
+      readCount += 1;
+    } else {
+      writeCount += 1;
+    }
+  }
+
+  return {
+    totalCount: items.length,
+    readCount,
+    writeCount,
+    typeCounts,
+    statusCounts,
+    providerCounts,
+  };
+}
+
+function getLatestRecoveryAttempt(summary: InternalRecoveryPathSummary | null) {
+  if (summary === null || summary.attempts.length === 0) {
+    return null;
+  }
+
+  return summary.attempts.reduce((latest, candidate) =>
+    candidate.attempt_index > latest.attempt_index ? candidate : latest,
+  );
+}
+
+function formatScore(score: number) {
+  if (Number.isInteger(score)) {
+    return score.toFixed(0);
+  }
+
+  return score.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function hasTextValue(value: string | null | undefined): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function StatusBadge({ status }: { status: string | null }) {
+  const label = hasTextValue(status) ? status : "N/A";
+  const className = `status-badge ${getStatusClassName(label)}`.trim();
+
+  return <span className={className}>{label}</span>;
+}
+
+function getStatusClassName(status: string) {
+  return `status-${status.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
 }

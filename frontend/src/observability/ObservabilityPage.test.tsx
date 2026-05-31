@@ -172,8 +172,10 @@ describe("ObservabilityPage", () => {
     expect(screen.getByRole("heading", { name: "Internal Observability Review" })).toBeInTheDocument();
     expect(screen.getByText("Paste a run ID to inspect the internal workflow summary.")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "Benchmark Summary" })).toBeInTheDocument();
+    expect(screen.getByText("Latest Release Gate")).toBeInTheDocument();
     expect(screen.getByText("Benchmark release gate v1")).toBeInTheDocument();
     expect(screen.getByText("var/formal-benchmarks/latest-release_gate_v1-run-report.json")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy latest alias" })).toBeInTheDocument();
   });
 
   it("validates empty run IDs before loading", async () => {
@@ -196,7 +198,8 @@ describe("ObservabilityPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Trace Summary" })).toBeInTheDocument();
     expect(await screen.findAllByText("trace-1")).toHaveLength(2);
-    expect(screen.getByText("execute_searches")).toBeInTheDocument();
+    expect(screen.getByText("Slowest Stage")).toBeInTheDocument();
+    expect(screen.getAllByText("execute_searches")).toHaveLength(2);
     expect(screen.getByText("supervisor")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Tool Events" })).toBeInTheDocument();
     expect(screen.getByText("search_poi")).toBeInTheDocument();
@@ -207,14 +210,51 @@ describe("ObservabilityPage", () => {
     expect(screen.getByText("solo_afternoon_v1")).toBeInTheDocument();
     expect(screen.getByText("Solo afternoon local-life plan")).toBeInTheDocument();
     expect(screen.getByText("var/benchmarks/solo_afternoon_v1.json")).toBeInTheDocument();
+    expect(screen.getByText("Current Run Report")).toBeInTheDocument();
+    expect(screen.getAllByText("Latest Release Gate Alias")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Copy run report path" })).toBeInTheDocument();
     expect(screen.getByText("locallife_bench_v1")).toBeInTheDocument();
     expect(screen.getByText("light_activity")).toBeInTheDocument();
     expect(screen.getByText("Workflow reached the expected path.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Recovery Visualization" })).toBeInTheDocument();
-    expect(screen.getByText("stop_safely")).toBeInTheDocument();
+    expect(screen.getByText("Latest Attempt")).toBeInTheDocument();
+    expect(screen.getAllByText("stop_safely")).toHaveLength(2);
     expect(screen.getByText("Recovery stopped after route failure.")).toBeInTheDocument();
     expect(screen.getByText("family_route_failure_v1")).toBeInTheDocument();
     expect(screen.getByText("var/benchmarks/family_route_failure_v1.json")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy replay report path" })).toBeInTheDocument();
+  });
+
+  it("copies the latest alias path and shows success feedback", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<ObservabilityPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Copy latest alias" }));
+
+    expect(writeText).toHaveBeenCalledWith("var/formal-benchmarks/latest-release_gate_v1-run-report.json");
+    expect(screen.getByText("Copied")).toBeInTheDocument();
+  });
+
+  it("shows copy failure feedback when clipboard write fails", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockRejectedValue(new Error("clipboard denied"));
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<ObservabilityPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Copy latest alias" }));
+
+    expect(writeText).toHaveBeenCalledWith("var/formal-benchmarks/latest-release_gate_v1-run-report.json");
+    expect(screen.getByText("Copy failed")).toBeInTheDocument();
   });
 
   it("shows a reviewer-readable missing state when the latest benchmark report is unavailable", async () => {
