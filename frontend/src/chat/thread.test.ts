@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { projectConversationThread, resolveSelectedPlanIndex } from "./thread";
+import { buildProgressCardItem, projectConversationThread, resolveSelectedPlanIndex } from "./thread";
 import type { DemoRunSummary, DemoProgressStage } from "../types/demo";
 
 const progressLabels: Record<DemoProgressStage, string> = {
@@ -267,6 +267,40 @@ const completedRun: DemoRunSummary = {
 };
 
 describe("projectConversationThread", () => {
+  it("projects a live pending progress card without inventing a separate thread item kind", () => {
+    const pendingProgress = buildProgressCardItem(
+      "run-live-1",
+      buildProgress("searching_dining", [
+        "understanding_request",
+        "planning_queries",
+        "searching_activities",
+        "searching_dining",
+      ], {
+        searching_activities: "已找到 5 个活动",
+        searching_dining: "已找到 5 个餐厅",
+      }),
+    );
+
+    const items = projectConversationThread({
+      entries: [{ id: "start-1", kind: "user", event: "start", text: "Plan a family afternoon" }],
+      activeRunId: null,
+      selectedPlanId: null,
+      pendingAction: pendingProgress,
+    });
+
+    expect(items).toHaveLength(2);
+    expect(items[0].kind).toBe("user_message");
+    expect(items[1].kind).toBe("assistant_progress_card");
+
+    const progressItem = items[1];
+    if (progressItem.kind !== "assistant_progress_card") {
+      throw new Error("Expected the live pending item to project as an assistant progress card.");
+    }
+    expect(progressItem.completedCollapsedByDefault).toBe(true);
+    expect(progressItem.completedSteps).toHaveLength(3);
+    expect(progressItem.completedSteps[1]?.summary).toBe("正在规划查询");
+  });
+
   it("projects the progress card before the plan card and keeps completed steps hidden in data", () => {
     const items = projectConversationThread({
       entries: [{ id: "run-1", kind: "run", run: awaitingRun }],

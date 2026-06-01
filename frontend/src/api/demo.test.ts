@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clarifyRun, confirmRun, declineRun, getRun, replanRun, startRun } from "./demo";
+import * as demoApi from "./demo";
+import { clarifyRun, confirmRun, declineRun, getRun, replanRun, startRun, startRunStream } from "./demo";
 import { FrontendApiError } from "../shared/http";
-import type { DemoProgressStage, DemoRunSummary } from "../types/demo";
+import type { DemoProgressStage, DemoRunSummary, DemoRunStreamProgressEvent } from "../types/demo";
 
 const progressLabels: Record<DemoProgressStage, string> = {
   understanding_request: "\u6b63\u5728\u7406\u89e3\u9700\u6c42",
@@ -99,6 +100,24 @@ const summary: DemoRunSummary = {
   clarification: null,
 };
 
+function createStreamResponse(chunks: string[], init?: ResponseInit) {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const encoder = new TextEncoder();
+      for (const chunk of chunks) {
+        controller.enqueue(encoder.encode(chunk));
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream" },
+    ...init,
+  });
+}
+
 describe("demo API client", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(summary), { status: 200 })));
@@ -106,6 +125,10 @@ describe("demo API client", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("exports a streamed start helper for /demo/runs/stream", () => {
+    expect(typeof demoApi.startRunStream).toBe("function");
   });
 
   it("posts startRun to /demo/runs with the expected body", async () => {
@@ -133,6 +156,87 @@ describe("demo API client", () => {
         }),
       }),
     );
+  });
+
+  it("posts startRunStream to /demo/runs/stream, delivers progress, and resolves with the final summary", async () => {
+    const streamedSummary = {
+      ...summary,
+      run_id: "run-stream-1",
+    };
+    const progressEvents: DemoRunStreamProgressEvent[] = [];
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createStreamResponse([
+          `event: progress\ndata: ${JSON.stringify({
+            event_index: 1,
+            run_id: "run-stream-1",
+            progress: buildProgress("searching_activities", [
+              "understanding_request",
+              "planning_queries",
+              "searching_activities",
+            ], {
+              searching_activities: "已找到 5 个活动",
+            }),
+          })}\n\n`,
+          `event: progress\ndata: ${JSON.stringify({
+            event_index: 2,
+            run_id: "run-stream-1",
+            progress: buildProgress("searching_dining", [
+              "understanding_request",
+              "planning_queries",
+              "searching_activities",
+              "searching_dining",
+            ], {
+              searching_activities: "已找到 5 个活动",
+              searching_dining: "已找到 5 个餐厅",
+            }),
+          })}\n\n`,
+          `event: summary\ndata: ${JSON.stringify({
+            event_index: 3,
+            summary: streamedSummary,
+          })}\n\n`,
+        ]),
+      ),
+    );
+
+    const result = await startRunStream(
+      {
+        user_input: "Family afternoon",
+        external_user_id: "web-demo-user",
+        display_name: "Web Demo User",
+        case_id: "web-demo",
+        selected_plan_index: 0,
+        read_profile: "mock_world",
+      },
+      {
+        onProgress: (event) => {
+          progressEvents.push(event);
+        },
+      },
+    );
+
+    expect(fetch).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/demo/runs/stream",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_input: "Family afternoon",
+          external_user_id: "web-demo-user",
+          display_name: "Web Demo User",
+          case_id: "web-demo",
+          selected_plan_index: 0,
+          read_profile: "mock_world",
+        }),
+      }),
+    );
+    expect(progressEvents.map((event) => [event.event_index, event.progress.current_stage])).toEqual([
+      [1, "searching_activities"],
+      [2, "searching_dining"],
+    ]);
+    expect(result).toEqual(streamedSummary);
   });
 
   it("calls getRun with the run ID", async () => {
@@ -232,6 +336,89 @@ describe("demo API client", () => {
       name: "DemoApiError",
       status: 404,
       message: "\u672a\u627e\u5230\u5bf9\u5e94\u7684\u6f14\u793a\u8fd0\u884c\u3002",
+    } satisfies Partial<FrontendApiError>);
+  });
+
+  it("localizes streamed error events", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createStreamResponse([
+          `event: error\ndata: ${JSON.stringify({
+            event_index: 1,
+            run_id: "run-1",
+            message: "AMAP read path is not configured for this environment.",
+          })}\n\n`,
+        ]),
+      ),
+    );
+
+    await expect(
+      startRunStream({
+        user_input: "Family afternoon",
+        external_user_id: "web-demo-user",
+        display_name: "Web Demo User",
+        case_id: "web-demo",
+        selected_plan_index: 0,
+        read_profile: "mock_world",
+      }),
+    ).rejects.toMatchObject({
+      name: "DemoApiError",
+      status: 500,
+      message: "本地环境未配置地图只读预览所需的密钥。",
+    } satisfies Partial<FrontendApiError>);
+  });
+
+  it("rejects when the streamed start response has no body", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 200 })));
+
+    await expect(
+      startRunStream({
+        user_input: "Family afternoon",
+        external_user_id: "web-demo-user",
+        display_name: "Web Demo User",
+        case_id: "web-demo",
+        selected_plan_index: 0,
+        read_profile: "mock_world",
+      }),
+    ).rejects.toMatchObject({
+      name: "DemoApiError",
+      status: 500,
+      message: "演示服务返回了无效的实时进度响应。",
+    } satisfies Partial<FrontendApiError>);
+  });
+
+  it("rejects when the streamed start response ends without a summary", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createStreamResponse([
+          `event: progress\ndata: ${JSON.stringify({
+            event_index: 1,
+            run_id: "run-1",
+            progress: buildProgress("searching_activities", [
+              "understanding_request",
+              "planning_queries",
+              "searching_activities",
+            ]),
+          })}\n\n`,
+        ]),
+      ),
+    );
+
+    await expect(
+      startRunStream({
+        user_input: "Family afternoon",
+        external_user_id: "web-demo-user",
+        display_name: "Web Demo User",
+        case_id: "web-demo",
+        selected_plan_index: 0,
+        read_profile: "mock_world",
+      }),
+    ).rejects.toMatchObject({
+      name: "DemoApiError",
+      status: 500,
+      message: "演示请求失败，请稍后重试。",
     } satisfies Partial<FrontendApiError>);
   });
 

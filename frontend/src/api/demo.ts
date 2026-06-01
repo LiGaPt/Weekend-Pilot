@@ -1,10 +1,21 @@
 import type {
   DemoClarifyRunRequest,
   DemoReplanRunRequest,
+  DemoRunStreamErrorEvent,
+  DemoRunStreamProgressEvent,
+  DemoRunStreamSummaryEvent,
   DemoRunSummary,
   DemoStartRunRequest,
 } from "../types/demo";
 import { API_BASE_URL, FrontendApiError } from "../shared/http";
+import { readSseStream } from "./sse";
+
+const INVALID_STREAM_MESSAGE = "\u6f14\u793a\u670d\u52a1\u8fd4\u56de\u4e86\u65e0\u6548\u7684\u5b9e\u65f6\u8fdb\u5ea6\u54cd\u5e94\u3002";
+const GENERIC_STREAM_FAILURE_MESSAGE = "\u6f14\u793a\u8bf7\u6c42\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002";
+
+export type DemoStartRunStreamHandlers = {
+  onProgress?: (event: DemoRunStreamProgressEvent) => void;
+};
 
 export async function startRun(input: DemoStartRunRequest): Promise<DemoRunSummary> {
   return request<DemoRunSummary>("/demo/runs", {
@@ -12,6 +23,52 @@ export async function startRun(input: DemoStartRunRequest): Promise<DemoRunSumma
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
+}
+
+export async function startRunStream(
+  input: DemoStartRunRequest,
+  handlers: DemoStartRunStreamHandlers = {},
+): Promise<DemoRunSummary> {
+  const response = await fetchResponse("/demo/runs/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.body) {
+    throw new FrontendApiError(INVALID_STREAM_MESSAGE, effectiveStreamStatus(response.status));
+  }
+
+  for await (const frame of readSseStream(response.body)) {
+    if (frame.event === "progress") {
+      const payload = parseStreamEvent(frame.data);
+      if (isProgressEvent(payload)) {
+        handlers.onProgress?.(payload);
+      }
+      continue;
+    }
+
+    if (frame.event === "summary") {
+      const payload = parseStreamEvent(frame.data);
+      if (isSummaryEvent(payload)) {
+        return payload.summary;
+      }
+      throw new FrontendApiError(INVALID_STREAM_MESSAGE, effectiveStreamStatus(response.status));
+    }
+
+    if (frame.event === "error") {
+      const payload = parseStreamEvent(frame.data);
+      if (isErrorEvent(payload)) {
+        throw new FrontendApiError(
+          localizedResponseMessage(payload.message, effectiveStreamStatus(response.status)),
+          effectiveStreamStatus(response.status),
+        );
+      }
+      throw new FrontendApiError(INVALID_STREAM_MESSAGE, effectiveStreamStatus(response.status));
+    }
+  }
+
+  throw new FrontendApiError(GENERIC_STREAM_FAILURE_MESSAGE, effectiveStreamStatus(response.status));
 }
 
 export async function getRun(runId: string): Promise<DemoRunSummary> {
@@ -55,6 +112,11 @@ export async function declineRun(runId: string, planId?: string | null): Promise
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetchResponse(path, init);
+  return (await response.json()) as T;
+}
+
+async function fetchResponse(path: string, init?: RequestInit): Promise<Response> {
   const url = `${API_BASE_URL}${path}`;
   let response: Response;
 
@@ -68,7 +130,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new FrontendApiError(await responseMessage(response), response.status);
   }
 
-  return (await response.json()) as T;
+  return response;
 }
 
 async function responseMessage(response: Response): Promise<string> {
@@ -93,6 +155,14 @@ async function responseMessage(response: Response): Promise<string> {
 function connectionMessage(error: unknown): string {
   void error;
   return "\u65e0\u6cd5\u8fde\u63a5\u6f14\u793a\u670d\u52a1\uff0c\u8bf7\u786e\u8ba4\u540e\u7aef\u6b63\u5728\u8fd0\u884c\u3002";
+}
+
+function parseStreamEvent(payload: string): unknown {
+  try {
+    return JSON.parse(payload) as unknown;
+  } catch {
+    throw new FrontendApiError(INVALID_STREAM_MESSAGE, 500);
+  }
 }
 
 function localizedResponseMessage(message: string, status: number): string {
@@ -123,10 +193,42 @@ function localizedResponseMessage(message: string, status: number): string {
   return knownMessages[message] ?? statusFallbackMessage(status);
 }
 
+function effectiveStreamStatus(status: number): number {
+  return status >= 400 ? status : 500;
+}
+
 function statusFallbackMessage(status: number): string {
   return `\u6f14\u793a\u8bf7\u6c42\u5931\u8d25\uff08HTTP ${status}\uff09\u3002`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isProgressEvent(value: unknown): value is DemoRunStreamProgressEvent {
+  return (
+    isRecord(value) &&
+    typeof value.event_index === "number" &&
+    typeof value.run_id === "string" &&
+    isRecord(value.progress)
+  );
+}
+
+function isSummaryEvent(value: unknown): value is DemoRunStreamSummaryEvent {
+  return (
+    isRecord(value) &&
+    typeof value.event_index === "number" &&
+    isRecord(value.summary) &&
+    typeof value.summary.run_id === "string"
+  );
+}
+
+function isErrorEvent(value: unknown): value is DemoRunStreamErrorEvent {
+  return (
+    isRecord(value) &&
+    typeof value.event_index === "number" &&
+    (typeof value.run_id === "string" || value.run_id === null) &&
+    typeof value.message === "string" &&
+    value.message.trim().length > 0
+  );
 }
