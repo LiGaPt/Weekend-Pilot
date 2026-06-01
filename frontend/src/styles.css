@@ -259,6 +259,12 @@ button {
   padding: 8px 12px;
 }
 
+.example-chip.active {
+  background: #dff1ed;
+  border-color: #90cfc6;
+  color: #0b4f4a;
+}
+
 .example-chip:hover:not(:disabled) {
   background: #dff1ed;
 }

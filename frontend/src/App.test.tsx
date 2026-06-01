@@ -355,6 +355,15 @@ describe("App", () => {
     expect(screen.getByTestId("main-composer-input")).toHaveValue("");
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
     expect(screen.getByTestId("chat-composer")).toBeInTheDocument();
+    expect(screen.getByTestId("scenario-selector")).toBeInTheDocument();
+    expect(screen.getAllByTestId(/^scenario-chip-/).map((chip) => chip.textContent)).toEqual([
+      "亲子",
+      "朋友",
+      "单人",
+      "情侣",
+      "雨天",
+      "预算",
+    ]);
     expect(screen.queryByTestId("read-profile-select")).not.toBeInTheDocument();
     expect(screen.queryByTestId("advanced-options-toggle")).not.toBeInTheDocument();
     expect(screen.queryByTestId("run-info-toggle")).not.toBeInTheDocument();
@@ -367,6 +376,69 @@ describe("App", () => {
     expect(screen.queryByText("只保留一个主输入框，剩下的进度和方案都在聊天流里完成。")).not.toBeInTheDocument();
     expect(screen.queryByText("首屏不再展示运行摘要或大面板")).not.toBeInTheDocument();
     expect(screen.queryByText("示例入口")).not.toBeInTheDocument();
+  });
+
+  it("fills the composer and sends mock_world_profile when a scenario chip is selected", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByTestId("scenario-chip-friends_gathering"));
+
+    expect(screen.getByTestId("main-composer-input")).toHaveValue(
+      "今天下午想和朋友在附近聚会几个小时，先安排户外散步聊天，再找一家适合分享的轻松晚餐，不要太远。",
+    );
+    expect(screen.getByTestId("scenario-chip-friends_gathering")).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByTestId("start-button"));
+
+    expect(startRunStream).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_input: "今天下午想和朋友在附近聚会几个小时，先安排户外散步聊天，再找一家适合分享的轻松晚餐，不要太远。",
+        read_profile: "mock_world",
+        mock_world_profile: "friends_gathering",
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("clears the explicit scenario selection when the active chip is clicked again", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByTestId("scenario-chip-friends_gathering"));
+    expect(screen.getByTestId("main-composer-input")).toHaveValue(
+      "今天下午想和朋友在附近聚会几个小时，先安排户外散步聊天，再找一家适合分享的轻松晚餐，不要太远。",
+    );
+
+    await user.click(screen.getByTestId("scenario-chip-friends_gathering"));
+
+    expect(screen.getByTestId("main-composer-input")).toHaveValue(
+      "今天下午想和朋友在附近聚会几个小时，先安排户外散步聊天，再找一家适合分享的轻松晚餐，不要太远。",
+    );
+    expect(screen.getByTestId("scenario-chip-friends_gathering")).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("hides the scenario selector when the run enters clarification mode", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startRunStream).mockResolvedValue(awaitingClarificationRun);
+    render(<App />);
+
+    await user.type(screen.getByTestId("main-composer-input"), "Need a plan");
+    await user.click(screen.getByTestId("start-button"));
+
+    expect(await screen.findByTestId("clarification-card")).toBeInTheDocument();
+    expect(screen.queryByTestId("scenario-selector")).not.toBeInTheDocument();
+  });
+
+  it("hides the scenario selector when the run enters replan mode", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(screen.getByTestId("main-composer-input"), "Plan a family afternoon");
+    await user.click(screen.getByTestId("start-button"));
+
+    expect(await screen.findByTestId("replan-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("scenario-selector")).not.toBeInTheDocument();
   });
 
   it("shows a transient local spinner first, then renders the persistent progress card above the plan", async () => {
@@ -499,6 +571,7 @@ describe("App", () => {
     expectThreadOrder(progressCard.closest("article"), clarificationCard.closest("article"));
     expect(within(screen.getByTestId("clarification-fields")).getAllByRole("listitem")).toHaveLength(2);
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
+    expect(screen.queryByTestId("scenario-selector")).not.toBeInTheDocument();
 
     await user.type(screen.getByTestId("main-composer-input"), "We are leaving around 2pm for four hours.");
     await user.click(screen.getByTestId("start-button"));

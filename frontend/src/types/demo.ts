@@ -1,4 +1,11 @@
 export type DemoReadProfile = "mock_world" | "amap";
+export type DemoMockWorldProfile =
+  | "family_afternoon"
+  | "friends_gathering"
+  | "solo_afternoon"
+  | "couple_afternoon"
+  | "rainy_day_fallback"
+  | "budget_lite";
 
 export type DemoStartRunRequest = {
   user_input: string;
@@ -7,6 +14,7 @@ export type DemoStartRunRequest = {
   case_id: string;
   selected_plan_index: number;
   read_profile?: DemoReadProfile;
+  mock_world_profile?: DemoMockWorldProfile;
 };
 
 export type DemoCandidateSummary = {

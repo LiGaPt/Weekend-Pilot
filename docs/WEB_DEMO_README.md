@@ -6,16 +6,14 @@ The Web demo is the primary MVP review path for WeekendPilot. It runs the React/
 
 The customer page at `5173` is now chat-first:
 
-- the first screen shows one primary composer plus a small example-entry strip
+- the first screen shows one primary composer plus six fixed Mock World scenario chips: `亲子`, `朋友`, `单人`, `情侣`, `雨天`, and `预算`
 - user requests, system progress, clarification prompts, replans, and final execution feedback appear in one chronological conversation stream
 - once a run summary arrives, the transient system-progress row gives way to one persistent progress stepper with the current step highlighted and completed steps hidden behind a disclosure by default
 - the assistant shows a recommended plan summary first, then reveals timeline, activity/dining, route/feasibility, and confirmation-action details only when the reviewer expands them
 - `run_id`, read path, visible plan version, and refresh now live behind a closed-by-default `运行信息` disclosure instead of a default-visible inspector
 
-The public page now exposes two explicit read paths:
-
-- `Mock World`: the default deterministic demo and the unchanged benchmark baseline
-- `AMap 只读预览`: an explicit local preview path that uses live read tools only, returns reviewed plans, and stops before confirmation
+The public page now keeps the customer start path on `Mock World` and exposes six fixed scenario chips that map to canonical prompts plus explicit `mock_world_profile` values. Those chips are start-only, they only fill the composer, and they do not auto-submit.
+This task does not restore a customer-side AMap selector. Live `AMap` preview remains API-only and read-only for local review.
 
 The public demo API now also supports `POST /demo/runs/{run_id}/clarify` for clarification replies and `POST /demo/runs/{run_id}/replan` for follow-up replanning. A vague start request, or a bounded recovery path that needs an explicit user tradeoff, can stop in `awaiting_clarification` with `plans = []`, `selected_plan_id = null`, and a compact `clarification` summary that contains the public follow-up prompt plus the missing supported fields.
 An additive backend stream now also exists at `POST /demo/runs/stream`. It covers only the initial planning start request, reuses the same public-safe progress contract, and is now the transport used by the customer page for the initial start flow. Because this route is a `POST`, the frontend consumes it with `fetch` plus `ReadableStream` SSE parsing rather than browser `EventSource`. If that stream transport fails before any valid live `progress` event is received, the frontend now retries the same start request once through synchronous `POST /demo/runs`. For the default Mock World happy path, that stream now emits ordered search milestones inside the existing `progress` event type: first `searching_activities`, then `searching_dining`, before later stages such as `checking_availability`. Clarify, replan, confirm, decline, and run readback remain synchronous in this task.
@@ -104,7 +102,7 @@ No external local-life provider, map provider, LangSmith upload, API key, token,
 
 Playwright does not start Docker and does not run migrations. Keep these prerequisites explicit so failures are easy to diagnose.
 
-If you want to exercise the `AMap 只读预览` selector locally, set `AMAP_MAPS_API_KEY` in local `.env`. That key is not required for Mock World runs, benchmark runs, or the default test suite.
+If you want to exercise the API-only AMAP read preview locally, set `AMAP_MAPS_API_KEY` in local `.env` and call the demo API with `read_profile="amap"`. That key is not required for Mock World runs, benchmark runs, or the default test suite.
 
 ## Backend Setup
 
@@ -206,7 +204,7 @@ For the V1 richer UI closure, use `docs/RICHER_WEB_UI_V1_CHECKLIST.md` as the ca
 ### Happy Path
 
 1. Open `http://127.0.0.1:5173`.
-2. Either enter an equivalent request into the main composer or click the `亲子半天` example chip to populate it.
+2. Either enter an equivalent request into the main composer or click the `亲子` scenario chip to populate it.
 3. Click `开始规划`.
 4. Confirm the conversation stream first shows your user message and early progress feedback. Depending on timing, this may appear first as the transient in-chat system progress row or directly as the persistent progress stepper card.
 5. Confirm the run reaches `awaiting_confirmation`, any transient row disappears, and one persistent progress stepper appears above the plan card.
@@ -234,8 +232,7 @@ The Chinese smoke accepts either `awaiting_confirmation` directly or `awaiting_c
 ### Friends Group Happy Path
 
 1. Open `http://127.0.0.1:5173`.
-2. Keep the read path on `Mock World`.
-3. Replace the default family sample with:
+2. Click the `朋友` scenario chip, or replace the default family sample with:
 
 ```text
 This afternoon I want to hang out with friends nearby for a few hours. Start with an outdoor walk and chatting, then find a casual dinner place that's good for sharing. Not too far.
@@ -245,7 +242,7 @@ This afternoon I want to hang out with friends nearby for a few hours. Start wit
 5. Confirm the run reaches the in-chat confirmation state.
 6. Open `运行信息` and confirm the visible plan version label is still `v1`.
 7. Expand `活动与餐厅` if needed and confirm the visible plan content reflects the friends-group fixture rather than the family fixture, for example by showing friends-oriented tags such as `适合朋友聚会`.
-8. Confirm the page does not show the `AMap 只读预览` notice.
+8. Confirm the page does not show any `AMap 只读预览` notice.
 9. Click `确认当前方案`.
 10. Confirm the run reaches `completed`.
 11. Confirm the final assistant result card is visible in the same chat flow.
@@ -254,17 +251,20 @@ This path is intentionally additive. The default customer-page sample remains th
 
 ### AMap Read-only Preview Path
 
-1. Open `http://127.0.0.1:5173`.
-2. Open `高级选项`.
-3. Change the read-path selector from `Mock World` to `AMap 只读预览`.
-4. Start the run.
-4. Confirm the run reaches the in-chat confirmation state.
-5. Open `运行信息` and confirm the active read path is `AMap 只读预览`.
-6. Confirm the page shows the read-only preview notice and does not render a confirm action.
-7. Confirm refresh is still available.
-8. Confirm decline is still available.
-9. If you call `POST /demo/runs/<run_id>/confirm`, confirm the API returns HTTP `409` with `AMAP read-only demo runs cannot be confirmed.`.
-10. Confirm the run has no write-side effects.
+The customer page does not expose an AMap selector in this task. To review the existing read-only preview path, use the API directly:
+
+1. Start a run with `read_profile="amap"`:
+
+```bash
+curl -X POST http://127.0.0.1:8000/demo/runs \
+  -H "Content-Type: application/json" \
+  -d "{\"user_input\":\"Plan a light family afternoon nearby.\",\"external_user_id\":\"web-demo-user\",\"display_name\":\"Web Demo User\",\"case_id\":\"web-demo\",\"selected_plan_index\":0,\"read_profile\":\"amap\"}"
+```
+
+2. Confirm the response reaches `awaiting_confirmation`.
+3. Confirm the response `read_profile` is `amap`.
+4. If you call `POST /demo/runs/<run_id>/confirm`, confirm the API returns HTTP `409` with `AMAP read-only demo runs cannot be confirmed.`.
+5. Confirm the run has no write-side effects.
 
 ### Clarification Path
 
@@ -449,12 +449,12 @@ PostgreSQL, Redis, and migrations must already be ready.
 - On the default Mock World happy path, the stream emits ordered search-count milestones inside `progress`: first `searching_activities` with `已找到 5 个活动`, then `searching_dining` with `已找到 5 个餐厅`, before the first `checking_availability` event.
 - Clarify, replan, confirm, decline, and readback remain on their existing synchronous routes in this task.
 - `Mock World` remains the default read path for the public demo and for benchmark-aligned checks.
-- The explicit `AMap 只读预览` path also stops at `awaiting_confirmation`, keeps `action_count = 0`, and never exposes a working confirm action in the UI.
+- The API-only `AMap` read preview path also stops at `awaiting_confirmation`, keeps `action_count = 0`, and never exposes a working confirm action.
 - Vague start requests can stop at `awaiting_clarification` before any plan is generated.
 - Bounded recovery can also stop at `awaiting_clarification` when deterministic recovery is exhausted and user tradeoff input is required.
 - The initial public run shows `plan_version.version_label = v1`.
 - Clarification-only turns keep the visible version label at `v1` until the first real plan is produced.
-- The customer page first shows only the composer and example-entry strip.
+- The customer page first shows the composer and the six fixed Mock World scenario chips.
 - The customer page shows user turns, system progress, clarifications, replans, and execution results in one chronological chat stream.
 - `run_id`, `action_count`, raw `execution_status`, and raw `feedback_status` are not visible by default.
 - Pre-confirmation selected plans expose `action_manifest.source = proposed_actions` when preview actions exist.
@@ -474,7 +474,7 @@ PostgreSQL, Redis, and migrations must already be ready.
 - Browser launch fails: rerun `npm --prefix frontend run e2e:install`.
 - Frontend points at the wrong API: set `VITE_API_BASE_URL` in `frontend/.env`.
 - LangSmith is unavailable: no action is required for the Mock World demo path.
-- AMap preview start fails with a configuration error: set `AMAP_MAPS_API_KEY` in local `.env`, or switch the selector back to `Mock World`.
+- AMap preview start fails with a configuration error: set `AMAP_MAPS_API_KEY` in local `.env`, or use the default Mock World customer flow instead.
 
 ## What Not To Commit
 

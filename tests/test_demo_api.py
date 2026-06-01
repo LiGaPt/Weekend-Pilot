@@ -114,6 +114,28 @@ def test_start_request_defaults_read_profile_to_mock_world() -> None:
     assert request.read_profile == "mock_world"
 
 
+@pytest.mark.parametrize(
+    "profile",
+    [
+        "family_afternoon",
+        "friends_gathering",
+        "solo_afternoon",
+        "couple_afternoon",
+        "rainy_day_fallback",
+        "budget_lite",
+    ],
+)
+def test_start_request_accepts_supported_mock_world_profile_values(profile: str) -> None:
+    request = DemoStartRunRequest(user_input="Family afternoon", mock_world_profile=profile)
+
+    assert request.mock_world_profile == profile
+
+
+def test_start_request_rejects_unknown_mock_world_profile() -> None:
+    with pytest.raises(ValidationError):
+        DemoStartRunRequest(user_input="Family afternoon", mock_world_profile="unknown_profile")
+
+
 def test_replan_request_rejects_empty_user_input() -> None:
     with pytest.raises(ValidationError):
         DemoReplanRunRequest(user_input="")

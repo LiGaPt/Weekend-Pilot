@@ -7,6 +7,14 @@ from pydantic import BaseModel, Field
 
 
 DemoReadProfile = Literal["mock_world", "amap"]
+DemoMockWorldProfile = Literal[
+    "family_afternoon",
+    "friends_gathering",
+    "solo_afternoon",
+    "couple_afternoon",
+    "rainy_day_fallback",
+    "budget_lite",
+]
 
 
 class DemoStartRunRequest(BaseModel):
@@ -16,6 +24,7 @@ class DemoStartRunRequest(BaseModel):
     case_id: str | None = "web-demo"
     selected_plan_index: int = Field(default=0, ge=0)
     read_profile: DemoReadProfile = "mock_world"
+    mock_world_profile: DemoMockWorldProfile | None = None
 
 
 class DemoReplanRunRequest(BaseModel):
