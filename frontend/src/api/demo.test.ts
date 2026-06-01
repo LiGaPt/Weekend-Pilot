@@ -118,6 +118,14 @@ function createStreamResponse(chunks: string[], init?: ResponseInit) {
   });
 }
 
+function createJsonResponse(body: unknown, init?: ResponseInit) {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+    ...init,
+  });
+}
+
 describe("demo API client", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(summary), { status: 200 })));
@@ -237,6 +245,78 @@ describe("demo API client", () => {
       [2, "searching_dining"],
     ]);
     expect(result).toEqual(streamedSummary);
+  });
+
+  it("falls back to /demo/runs when /demo/runs/stream returns 404 before any progress", async () => {
+    const fallbackSummary = {
+      ...summary,
+      run_id: "run-fallback-404",
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn()
+        .mockResolvedValueOnce(createJsonResponse({ detail: "Route not found." }, { status: 404 }))
+        .mockResolvedValueOnce(createJsonResponse(fallbackSummary)),
+    );
+
+    const result = await startRunStream({
+      user_input: "Family afternoon",
+      external_user_id: "web-demo-user",
+      display_name: "Web Demo User",
+      case_id: "web-demo",
+      selected_plan_index: 0,
+      read_profile: "mock_world",
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenNthCalledWith(
+      1,
+      "http://127.0.0.1:8000/demo/runs/stream",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      "http://127.0.0.1:8000/demo/runs",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(result).toEqual(fallbackSummary);
+  });
+
+  it("falls back to /demo/runs when the stream response has no body before any progress", async () => {
+    const fallbackSummary = {
+      ...summary,
+      run_id: "run-fallback-no-body",
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn()
+        .mockResolvedValueOnce(new Response(null, { status: 200 }))
+        .mockResolvedValueOnce(createJsonResponse(fallbackSummary)),
+    );
+
+    const result = await startRunStream({
+      user_input: "Family afternoon",
+      external_user_id: "web-demo-user",
+      display_name: "Web Demo User",
+      case_id: "web-demo",
+      selected_plan_index: 0,
+      read_profile: "mock_world",
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenNthCalledWith(
+      1,
+      "http://127.0.0.1:8000/demo/runs/stream",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      "http://127.0.0.1:8000/demo/runs",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(result).toEqual(fallbackSummary);
   });
 
   it("calls getRun with the run ID", async () => {
@@ -369,6 +449,7 @@ describe("demo API client", () => {
     } satisfies Partial<FrontendApiError>);
   });
 
+  /* Legacy pre-fallback expectation removed by Task 085.
   it("rejects when the streamed start response has no body", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 200 })));
 
@@ -387,6 +468,7 @@ describe("demo API client", () => {
       message: "演示服务返回了无效的实时进度响应。",
     } satisfies Partial<FrontendApiError>);
   });
+  */
 
   it("rejects when the streamed start response ends without a summary", async () => {
     vi.stubGlobal(
@@ -420,6 +502,102 @@ describe("demo API client", () => {
       status: 500,
       message: "演示请求失败，请稍后重试。",
     } satisfies Partial<FrontendApiError>);
+  });
+
+  it("does not fall back when the stream emits an explicit error event", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createStreamResponse([
+          `event: error\ndata: ${JSON.stringify({
+            event_index: 1,
+            run_id: "run-1",
+            message: "AMAP read path is not configured for this environment.",
+          })}\n\n`,
+        ]),
+      ),
+    );
+
+    await expect(
+      startRunStream({
+        user_input: "Family afternoon",
+        external_user_id: "web-demo-user",
+        display_name: "Web Demo User",
+        case_id: "web-demo",
+        selected_plan_index: 0,
+        read_profile: "mock_world",
+      }),
+    ).rejects.toBeInstanceOf(FrontendApiError);
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fall back after one valid progress event if the stream later ends without summary", async () => {
+    const progressEvents: DemoRunStreamProgressEvent[] = [];
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createStreamResponse([
+          `event: progress\ndata: ${JSON.stringify({
+            event_index: 1,
+            run_id: "run-1",
+            progress: buildProgress("searching_activities", [
+              "understanding_request",
+              "planning_queries",
+              "searching_activities",
+            ]),
+          })}\n\n`,
+        ]),
+      ),
+    );
+
+    await expect(
+      startRunStream(
+        {
+          user_input: "Family afternoon",
+          external_user_id: "web-demo-user",
+          display_name: "Web Demo User",
+          case_id: "web-demo",
+          selected_plan_index: 0,
+          read_profile: "mock_world",
+        },
+        {
+          onProgress: (event) => {
+            progressEvents.push(event);
+          },
+        },
+      ),
+    ).rejects.toBeInstanceOf(FrontendApiError);
+
+    expect(progressEvents).toHaveLength(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces the sync failure if the fallback /demo/runs request also fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn()
+        .mockResolvedValueOnce(createJsonResponse({ detail: "Route not found." }, { status: 404 }))
+        .mockResolvedValueOnce(createJsonResponse({ detail: "Run not found." }, { status: 404 })),
+    );
+
+    await expect(
+      startRunStream({
+        user_input: "Family afternoon",
+        external_user_id: "web-demo-user",
+        display_name: "Web Demo User",
+        case_id: "web-demo",
+        selected_plan_index: 0,
+        read_profile: "mock_world",
+      }),
+    ).rejects.toMatchObject({
+      name: "DemoApiError",
+      status: 404,
+      message: "\u672a\u627e\u5230\u5bf9\u5e94\u7684\u6f14\u793a\u8fd0\u884c\u3002",
+    } satisfies Partial<FrontendApiError>);
+
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it("localizes the map preview configuration error detail", async () => {
