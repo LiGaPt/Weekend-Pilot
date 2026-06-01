@@ -19,7 +19,7 @@ from backend.app.execution import DeterministicExecutionWorkflow, ExecutionWorkf
 from backend.app.feedback import DeterministicFeedbackWriter, FeedbackWriterError
 from backend.app.demo.action_manifest import summarize_action_manifest
 from backend.app.demo.streaming import (
-    derive_stream_progress_summary,
+    derive_stream_progress_summaries,
     encode_sse_event,
     is_duplicate_progress_snapshot,
     serialize_progress_summary,
@@ -247,24 +247,25 @@ class DemoWorkflowService:
                 if state.get("status") == "error":
                     continue
 
-                progress = derive_stream_progress_summary(
+                progress_summaries = derive_stream_progress_summaries(
                     state,
                     tool_events.list_for_run(run_id),
                     persisted_plan_count=len(plans.list_for_run(run_id)),
                 )
-                if is_duplicate_progress_snapshot(last_progress_snapshot, progress):
-                    continue
+                for progress in progress_summaries:
+                    if is_duplicate_progress_snapshot(last_progress_snapshot, progress):
+                        continue
 
-                event_index += 1
-                yield encode_sse_event(
-                    "progress",
-                    DemoRunStreamProgressEvent(
-                        event_index=event_index,
-                        run_id=run_id,
-                        progress=progress,
-                    ),
-                )
-                last_progress_snapshot = serialize_progress_summary(progress)
+                    event_index += 1
+                    yield encode_sse_event(
+                        "progress",
+                        DemoRunStreamProgressEvent(
+                            event_index=event_index,
+                            run_id=run_id,
+                            progress=progress,
+                        ),
+                    )
+                    last_progress_snapshot = serialize_progress_summary(progress)
 
             if terminal_state is None:
                 raise DemoServiceError(500, "Demo workflow request failed.")

@@ -151,6 +151,28 @@ def build_live_demo_progress_summary(
     )
 
 
+def build_live_demo_progress_milestones(
+    state: Mapping[str, Any],
+    tool_events: Sequence[ToolEvent] | None,
+    *,
+    persisted_plan_count: int | None = None,
+) -> list[DemoProgressSummary]:
+    progress = build_live_demo_progress_summary(
+        state,
+        tool_events,
+        persisted_plan_count=persisted_plan_count,
+    )
+    if not _is_execute_searches_state(state):
+        return [progress]
+
+    milestones = [
+        milestone
+        for stage in ("searching_activities", "searching_dining")
+        if (milestone := _truncate_progress_summary(progress, stage)) is not None
+    ]
+    return milestones or [progress]
+
+
 def _stage_history(
     node_history: Sequence[str],
     search_stages: Sequence[DemoProgressStage],
@@ -396,3 +418,35 @@ def _extend_unique(items: list[DemoProgressStage], values: Iterable[DemoProgress
 def _append_unique(items: list[DemoProgressStage], value: DemoProgressStage) -> None:
     if value not in items:
         items.append(value)
+
+
+def _is_execute_searches_state(state: Mapping[str, Any]) -> bool:
+    node_history = _string_list(state.get("node_history"))
+    return bool(node_history) and node_history[-1] == "execute_searches"
+
+
+def _truncate_progress_summary(
+    progress: DemoProgressSummary,
+    target_stage: DemoProgressStage,
+) -> DemoProgressSummary | None:
+    try:
+        end_index = progress.stage_history.index(target_stage)
+    except ValueError:
+        return None
+
+    steps = [
+        DemoProgressStepSummary(
+            stage=step.stage,
+            label=step.label,
+            status="current" if index == end_index else "completed",
+            summary=step.summary,
+        )
+        for index, step in enumerate(progress.steps[: end_index + 1])
+    ]
+    return DemoProgressSummary(
+        schema_version=progress.schema_version,
+        current_stage=target_stage,
+        current_label=DEMO_PROGRESS_LABELS[target_stage],
+        stage_history=list(progress.stage_history[: end_index + 1]),
+        steps=steps,
+    )
