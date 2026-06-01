@@ -7,7 +7,7 @@ from typing import Any
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
-from backend.app.demo.progress import build_live_demo_progress_summary
+from backend.app.demo.progress import build_live_demo_progress_milestones
 from backend.app.demo.schemas import DemoProgressSummary
 from backend.app.models.runtime import ToolEvent
 
@@ -37,13 +37,13 @@ def is_duplicate_progress_snapshot(
     return previous_snapshot == serialize_progress_summary(progress)
 
 
-def derive_stream_progress_summary(
+def derive_stream_progress_summaries(
     state: Mapping[str, Any],
     tool_events: Sequence[ToolEvent] | None,
     *,
     persisted_plan_count: int | None = None,
-) -> DemoProgressSummary:
-    return build_live_demo_progress_summary(
+) -> list[DemoProgressSummary]:
+    return build_live_demo_progress_milestones(
         state,
         tool_events,
         persisted_plan_count=persisted_plan_count,

@@ -4,7 +4,7 @@ import json
 from uuid import uuid4
 
 from backend.app.demo.streaming import (
-    derive_stream_progress_summary,
+    derive_stream_progress_summaries,
     encode_sse_event,
     is_duplicate_progress_snapshot,
     serialize_progress_summary,
@@ -105,7 +105,7 @@ def test_duplicate_progress_snapshots_are_detected() -> None:
 
 def test_live_progress_uses_in_memory_draft_count_before_plan_rows_exist() -> None:
     run_id = uuid4()
-    progress = derive_stream_progress_summary(
+    summaries = derive_stream_progress_summaries(
         {
             "run_id": run_id,
             "status": "running",
@@ -122,13 +122,15 @@ def test_live_progress_uses_in_memory_draft_count_before_plan_rows_exist() -> No
         persisted_plan_count=0,
     )
 
+    assert len(summaries) == 1
+    progress = summaries[0]
     assert progress.current_stage == "building_itinerary"
     assert progress.steps[-1].summary == "已生成 2 个候选方案"
 
 
-def test_execute_searches_can_surface_both_search_stages_in_one_snapshot() -> None:
+def test_execute_searches_can_surface_ordered_search_milestones() -> None:
     run_id = uuid4()
-    progress = derive_stream_progress_summary(
+    summaries = derive_stream_progress_summaries(
         {
             "run_id": run_id,
             "status": "running",
@@ -146,12 +148,82 @@ def test_execute_searches_can_surface_both_search_stages_in_one_snapshot() -> No
         ],
     )
 
-    assert progress.current_stage == "searching_dining"
-    assert progress.stage_history == [
+    assert len(summaries) == 2
+
+    activity_progress = summaries[0]
+    assert activity_progress.current_stage == "searching_activities"
+    assert activity_progress.stage_history == [
+        "understanding_request",
+        "planning_queries",
+        "searching_activities",
+    ]
+    assert activity_progress.steps[-1].status == "current"
+    assert activity_progress.steps[-1].summary == "已找到 2 个活动"
+
+    dining_progress = summaries[1]
+    assert dining_progress.current_stage == "searching_dining"
+    assert dining_progress.stage_history == [
         "understanding_request",
         "planning_queries",
         "searching_activities",
         "searching_dining",
     ]
-    assert progress.steps[-2].summary == "已找到 2 个活动"
-    assert progress.steps[-1].summary == "已找到 3 个餐厅"
+    assert dining_progress.steps[-2].status == "completed"
+    assert dining_progress.steps[-2].summary == "已找到 2 个活动"
+    assert dining_progress.steps[-1].status == "current"
+    assert dining_progress.steps[-1].summary == "已找到 3 个餐厅"
+
+
+def test_execute_searches_with_only_activity_evidence_emits_one_milestone() -> None:
+    run_id = uuid4()
+    summaries = derive_stream_progress_summaries(
+        {
+            "run_id": run_id,
+            "status": "running",
+            "node_history": [
+                "initialize",
+                "parse_intent",
+                "load_memory",
+                "generate_queries",
+                "execute_searches",
+            ],
+        },
+        [
+            _tool_event(run_id, sequence=1, category="activity", response_json={"candidate_count": 4}),
+        ],
+    )
+
+    assert len(summaries) == 1
+    progress = summaries[0]
+    assert progress.current_stage == "searching_activities"
+    assert progress.stage_history == [
+        "understanding_request",
+        "planning_queries",
+        "searching_activities",
+    ]
+    assert progress.steps[-1].summary == "已找到 4 个活动"
+
+
+def test_execute_searches_with_malformed_counts_falls_back_to_generic_summary() -> None:
+    run_id = uuid4()
+    summaries = derive_stream_progress_summaries(
+        {
+            "run_id": run_id,
+            "status": "running",
+            "node_history": [
+                "initialize",
+                "parse_intent",
+                "load_memory",
+                "generate_queries",
+                "execute_searches",
+            ],
+        },
+        [
+            _tool_event(run_id, sequence=1, category="activity", response_json={"candidate_count": "bad"}),
+        ],
+    )
+
+    assert len(summaries) == 1
+    progress = summaries[0]
+    assert progress.current_stage == "searching_activities"
+    assert progress.steps[-1].summary == "已完成活动候选查找"

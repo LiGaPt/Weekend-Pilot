@@ -392,6 +392,52 @@ def test_demo_run_stream_happy_path_emits_progress_then_final_summary(client) ->
     assert status_response.json() == summary
 
 
+def test_demo_run_stream_happy_path_emits_ordered_search_milestones(client) -> None:
+    test_client, case_ids, external_user_ids = client
+
+    with test_client.stream("POST", "/demo/runs/stream", json=_start_payload(case_ids, external_user_ids)) as response:
+        assert response.status_code == 200
+        events = _read_sse_events(response)
+
+    progress_events = [payload for event_name, payload in events if event_name == "progress"]
+    assert progress_events
+
+    activity_index = next(
+        (
+            index
+            for index, payload in enumerate(progress_events)
+            if payload["progress"]["current_stage"] == "searching_activities"
+        ),
+        None,
+    )
+    assert activity_index is not None
+    assert _progress_step_summary(progress_events[activity_index], "searching_activities") == "已找到 5 个活动"
+
+    dining_index = next(
+        (
+            index
+            for index, payload in enumerate(progress_events)
+            if payload["progress"]["current_stage"] == "searching_dining"
+        ),
+        None,
+    )
+    assert dining_index is not None
+    assert _progress_step_summary(progress_events[dining_index], "searching_dining") == "已找到 5 个餐厅"
+
+    assert activity_index < dining_index
+
+    checking_index = next(
+        (
+            index
+            for index, payload in enumerate(progress_events)
+            if payload["progress"]["current_stage"] == "checking_availability"
+        ),
+        None,
+    )
+    if checking_index is not None:
+        assert dining_index < checking_index
+
+
 def test_demo_run_stream_clarification_path_ends_with_summary(client) -> None:
     test_client, case_ids, external_user_ids = client
     payload = _start_payload(case_ids, external_user_ids, user_input=VAGUE_USER_INPUT)
