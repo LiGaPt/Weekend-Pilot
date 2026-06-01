@@ -31,6 +31,32 @@ FRIENDS_GROUP_INPUT = (
     "Start with an outdoor walk and chatting, then find a casual dinner place that's good for sharing. "
     "Not too far."
 )
+EXPLICIT_MOCK_WORLD_PRESETS = [
+    (
+        "family_afternoon",
+        "今天下午想和妻子、5 岁孩子在附近出门玩几个小时，先安排室内亲子活动，再吃一顿清淡晚餐，不要太远。",
+    ),
+    (
+        "friends_gathering",
+        "今天下午想和朋友在附近聚会几个小时，先安排户外散步聊天，再找一家适合分享的轻松晚餐，不要太远。",
+    ),
+    (
+        "solo_afternoon",
+        "今天下午想一个人在附近轻松待几个小时，先安排轻量活动，再吃一顿清淡的简餐，不要太远。",
+    ),
+    (
+        "couple_afternoon",
+        "今天下午想和伴侣在附近出门几个小时，先安排 citywalk，再吃一顿清淡晚餐，不要太远。",
+    ),
+    (
+        "rainy_day_fallback",
+        "今天下午想和朋友在附近待几个小时，外面下雨，优先安排室内活动，再找一家热一点的简餐，不要太远。",
+    ),
+    (
+        "budget_lite",
+        "今天下午想一个人在附近待几个小时，尽量控制预算，先安排免费或低价活动，再吃一顿便宜简餐，不要太远。",
+    ),
+]
 FORBIDDEN_RESPONSE_KEYS = {
     "action_id",
     "tool_event_id",
@@ -669,6 +695,53 @@ def test_demo_run_friends_group_start_persists_friends_world_and_confirms_succes
         assert run.tool_profile == "mock_world"
         assert run.world_profile == "friends_gathering"
         assert _count_actions(db, run_id) > 0
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize(("mock_world_profile", "user_input"), EXPLICIT_MOCK_WORLD_PRESETS)
+def test_demo_run_start_with_explicit_mock_world_profile_persists_selected_world(
+    client,
+    mock_world_profile: str,
+    user_input: str,
+) -> None:
+    test_client, case_ids, external_user_ids = client
+    payload = _start_payload(case_ids, external_user_ids, user_input=user_input)
+    payload["mock_world_profile"] = mock_world_profile
+
+    start_response = test_client.post("/demo/runs", json=payload)
+
+    assert start_response.status_code == 200
+    start_body = start_response.json()
+    _assert_no_forbidden_keys(start_body)
+    _assert_public_run_redaction(start_body)
+    assert start_body["status"] == "awaiting_confirmation"
+    assert start_body["read_profile"] == "mock_world"
+    assert start_body["action_count"] == 0
+    assert start_body["selected_plan_id"]
+    assert start_body["plans"]
+    assert "mock_world_profile" not in start_body
+    _assert_plan_version(
+        start_body,
+        version_number=1,
+        source_run_id=None,
+        source_selected_plan_id=None,
+    )
+    _assert_progress(
+        start_body,
+        current_stage="ready_for_confirmation",
+        stage_history=READY_PROGRESS_HISTORY,
+    )
+    selected_start_plan = next(plan for plan in start_body["plans"] if plan["selected"])
+    _assert_action_manifest_preview(selected_start_plan)
+    run_id = UUID(start_body["run_id"])
+
+    db = SessionLocal()
+    try:
+        assert _count_actions(db, run_id) == 0
+        run = _load_run(db, run_id)
+        assert run.tool_profile == "mock_world"
+        assert run.world_profile == mock_world_profile
     finally:
         db.close()
 

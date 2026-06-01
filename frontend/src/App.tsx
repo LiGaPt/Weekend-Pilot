@@ -12,7 +12,14 @@ import {
   statusLabel,
   type ConversationHistoryEntry,
 } from "./chat/thread";
-import type { DemoProgressSummary, DemoReadProfile, DemoReplanRunRequest, DemoRunSummary } from "./types/demo";
+import { demoScenarioPresets } from "./demoScenarioPresets";
+import type {
+  DemoMockWorldProfile,
+  DemoProgressSummary,
+  DemoReadProfile,
+  DemoReplanRunRequest,
+  DemoRunSummary,
+} from "./types/demo";
 
 const GENERIC_ERROR_MESSAGE = "演示请求失败，请稍后重试。";
 
@@ -37,7 +44,8 @@ const INPUT_ACTION_STATES = new Set<RequestState>(["starting", "clarifying", "re
 
 export default function App() {
   const [userInput, setUserInput] = useState("");
-  const [selectedReadProfile, setSelectedReadProfile] = useState<DemoReadProfile>("mock_world");
+  const selectedReadProfile: DemoReadProfile = "mock_world";
+  const [selectedMockWorldProfile, setSelectedMockWorldProfile] = useState<DemoMockWorldProfile | null>(null);
   const [run, setRun] = useState<DemoRunSummary | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [requestState, setRequestState] = useState<RequestState>("idle");
@@ -140,6 +148,7 @@ export default function App() {
           case_id: "web-demo",
           selected_plan_index: 0,
           read_profile: selectedReadProfile,
+          ...(selectedMockWorldProfile ? { mock_world_profile: selectedMockWorldProfile } : {}),
         },
         {
           onProgress: (event) => {
@@ -226,13 +235,27 @@ export default function App() {
     setLiveStartProgress(null);
     upsertRunEntry(nextRun);
     setRun(nextRun);
-    setSelectedReadProfile(nextRun.read_profile);
     setSelectedPlanId(nextRun.selected_plan_id ?? nextRun.plans[0]?.plan_id ?? null);
     setRequestState(stateFromRun(nextRun));
 
     if (INPUT_ACTION_STATES.has(sourceState)) {
       setUserInput("");
+      if (sourceState === "starting") {
+        setSelectedMockWorldProfile(null);
+      }
     }
+  }
+
+  function handleScenarioPresetClick(profile: DemoMockWorldProfile, prompt: string) {
+    setErrorMessage(null);
+
+    if (selectedMockWorldProfile === profile) {
+      setSelectedMockWorldProfile(null);
+      return;
+    }
+
+    setUserInput(prompt);
+    setSelectedMockWorldProfile(profile);
   }
 
   function appendUserEntry(event: Extract<ConversationHistoryEntry, { kind: "user" }>["event"], text: string) {
@@ -302,6 +325,27 @@ export default function App() {
             <div className="error-banner composer-error" role="alert">
               <AlertCircle size={18} aria-hidden="true" />
               <span>{visibleErrorMessage}</span>
+            </div>
+          ) : null}
+
+          {composerMode === "start" ? (
+            <div className="example-chip-row" data-testid="scenario-selector" aria-label="Mock World 场景入口">
+              {demoScenarioPresets.map((preset) => {
+                const isSelected = selectedMockWorldProfile === preset.mockWorldProfile;
+                return (
+                  <button
+                    key={preset.mockWorldProfile}
+                    type="button"
+                    className={`example-chip${isSelected ? " active" : ""}`}
+                    data-testid={`scenario-chip-${preset.mockWorldProfile}`}
+                    aria-pressed={isSelected}
+                    disabled={isInFlight}
+                    onClick={() => handleScenarioPresetClick(preset.mockWorldProfile, preset.prompt)}
+                  >
+                    {preset.label}
+                  </button>
+                );
+              })}
             </div>
           ) : null}
 

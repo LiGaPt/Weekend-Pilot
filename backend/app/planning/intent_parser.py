@@ -20,6 +20,9 @@ class DeterministicIntentParser:
     _ZH_WIFE = "\u8001\u5a46"
     _ZH_SPOUSE = "\u59bb\u5b50"
     _ZH_HUSBAND = "\u4e08\u592b"
+    _ZH_PARTNER = "\u4f34\u4fa3"
+    _ZH_OTHER_HALF = "\u53e6\u4e00\u534a"
+    _ZH_LOVER = "\u7231\u4eba"
     _ZH_CHILD = "\u5b69\u5b50"
     _ZH_LITTLE_CHILD = "\u5c0f\u5b69"
     _ZH_PARENT_CHILD = "\u4eb2\u5b50"
@@ -53,7 +56,17 @@ class DeterministicIntentParser:
         _ZH_LITTLE_CHILD,
         _ZH_PARENT_CHILD,
     )
-    _SPOUSE_KEYWORDS = ("wife", "husband", _ZH_WIFE, _ZH_SPOUSE, _ZH_HUSBAND)
+    _SPOUSE_KEYWORDS = (
+        "wife",
+        "husband",
+        "partner",
+        _ZH_WIFE,
+        _ZH_SPOUSE,
+        _ZH_HUSBAND,
+        _ZH_PARTNER,
+        _ZH_OTHER_HALF,
+        _ZH_LOVER,
+    )
     _CHILD_KEYWORDS = (
         "child",
         "kid",

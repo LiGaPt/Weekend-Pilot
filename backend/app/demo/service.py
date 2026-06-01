@@ -658,6 +658,8 @@ class DemoWorkflowService:
     def _workflow_profiles_for_start_request(self, request: DemoStartRunRequest) -> tuple[str, str]:
         if request.read_profile == "amap":
             return "amap", "amap_shanghai_live"
+        if request.mock_world_profile is not None:
+            return "mock_world", request.mock_world_profile
         return "mock_world", resolve_mock_world_demo_profile(request.user_input)
 
     def _read_profile_for_tool_profile(self, tool_profile: str) -> str:

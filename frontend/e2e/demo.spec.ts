@@ -25,6 +25,8 @@ const stableHappyPathPrompt =
   "This afternoon I want to go out with my wife and child for a few hours. Not too far. My child is 5, and my wife is trying to eat lighter.";
 const friendsGroupPrompt =
   "This afternoon I want to hang out with friends nearby for a few hours. Start with an outdoor walk and chatting, then find a casual dinner place that's good for sharing. Not too far.";
+const friendsScenarioChipPrompt =
+  "今天下午想和朋友在附近聚会几个小时，先安排户外散步聊天，再找一家适合分享的轻松晚餐，不要太远。";
 const stableClarificationReply =
   "We are leaving around 2pm this afternoon from Xuhui with my wife and 5-year-old child for about 4 hours. Keep it nearby if possible, but going a bit farther is okay if it keeps the plan relaxed. Please start with an indoor child-friendly activity and then a light dinner.";
 const explicitHappyPathClarificationReply =
@@ -431,6 +433,37 @@ test.describe("desktop web demo", () => {
     await page.getByTestId("confirm-button").click();
 
     await expect(page.getByTestId("assistant-result-card")).toBeVisible({ timeout: 60_000 });
+  });
+
+  test("scenario preset selector sends the explicit mock world profile", async ({ page }) => {
+    const streamBodies: Array<Record<string, unknown>> = [];
+
+    await page.route(/\/demo\/runs\/stream$/, async (route, request) => {
+      if (request.method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+
+      streamBodies.push((request.postDataJSON() as Record<string, unknown>) ?? {});
+      await route.fallback();
+    });
+
+    await page.goto("/");
+    await page.getByTestId("scenario-chip-friends_gathering").click();
+    await expect(page.getByTestId("main-composer-input")).toHaveValue(friendsScenarioChipPrompt);
+    await expect(page.getByTestId("scenario-chip-friends_gathering")).toHaveAttribute("aria-pressed", "true");
+
+    await page.getByTestId("start-button").click();
+
+    await expect.poll(() => streamBodies.length, { timeout: 60_000 }).toBe(1);
+    expect(streamBodies[0]).toMatchObject({
+      user_input: friendsScenarioChipPrompt,
+      read_profile: "mock_world",
+      mock_world_profile: "friends_gathering",
+    });
+
+    await continueToAwaitingConfirmation(page, "v1", friendsScenarioChipPrompt);
+    await expect(page.getByTestId("scenario-selector")).toHaveCount(0);
   });
 
   test("continues a vague request through the clarification flow", async ({ page }) => {

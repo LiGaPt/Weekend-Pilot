@@ -147,6 +147,7 @@ describe("demo API client", () => {
       case_id: "web-demo",
       selected_plan_index: 0,
       read_profile: "amap",
+      mock_world_profile: "family_afternoon",
     });
 
     expect(fetch).toHaveBeenCalledWith(
@@ -161,6 +162,7 @@ describe("demo API client", () => {
           case_id: "web-demo",
           selected_plan_index: 0,
           read_profile: "amap",
+          mock_world_profile: "family_afternoon",
         }),
       }),
     );
@@ -217,6 +219,7 @@ describe("demo API client", () => {
         case_id: "web-demo",
         selected_plan_index: 0,
         read_profile: "mock_world",
+        mock_world_profile: "friends_gathering",
       },
       {
         onProgress: (event) => {
@@ -237,6 +240,7 @@ describe("demo API client", () => {
           case_id: "web-demo",
           selected_plan_index: 0,
           read_profile: "mock_world",
+          mock_world_profile: "friends_gathering",
         }),
       }),
     );
@@ -267,18 +271,41 @@ describe("demo API client", () => {
       case_id: "web-demo",
       selected_plan_index: 0,
       read_profile: "mock_world",
+      mock_world_profile: "friends_gathering",
     });
 
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(fetch).toHaveBeenNthCalledWith(
       1,
       "http://127.0.0.1:8000/demo/runs/stream",
-      expect.objectContaining({ method: "POST" }),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          user_input: "Family afternoon",
+          external_user_id: "web-demo-user",
+          display_name: "Web Demo User",
+          case_id: "web-demo",
+          selected_plan_index: 0,
+          read_profile: "mock_world",
+          mock_world_profile: "friends_gathering",
+        }),
+      }),
     );
     expect(fetch).toHaveBeenNthCalledWith(
       2,
       "http://127.0.0.1:8000/demo/runs",
-      expect.objectContaining({ method: "POST" }),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          user_input: "Family afternoon",
+          external_user_id: "web-demo-user",
+          display_name: "Web Demo User",
+          case_id: "web-demo",
+          selected_plan_index: 0,
+          read_profile: "mock_world",
+          mock_world_profile: "friends_gathering",
+        }),
+      }),
     );
     expect(result).toEqual(fallbackSummary);
   });
@@ -303,18 +330,41 @@ describe("demo API client", () => {
       case_id: "web-demo",
       selected_plan_index: 0,
       read_profile: "mock_world",
+      mock_world_profile: "friends_gathering",
     });
 
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(fetch).toHaveBeenNthCalledWith(
       1,
       "http://127.0.0.1:8000/demo/runs/stream",
-      expect.objectContaining({ method: "POST" }),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          user_input: "Family afternoon",
+          external_user_id: "web-demo-user",
+          display_name: "Web Demo User",
+          case_id: "web-demo",
+          selected_plan_index: 0,
+          read_profile: "mock_world",
+          mock_world_profile: "friends_gathering",
+        }),
+      }),
     );
     expect(fetch).toHaveBeenNthCalledWith(
       2,
       "http://127.0.0.1:8000/demo/runs",
-      expect.objectContaining({ method: "POST" }),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          user_input: "Family afternoon",
+          external_user_id: "web-demo-user",
+          display_name: "Web Demo User",
+          case_id: "web-demo",
+          selected_plan_index: 0,
+          read_profile: "mock_world",
+          mock_world_profile: "friends_gathering",
+        }),
+      }),
     );
     expect(result).toEqual(fallbackSummary);
   });
