@@ -7,7 +7,7 @@ import type {
   DemoRunSummary,
   DemoStartRunRequest,
 } from "../types/demo";
-import { API_BASE_URL, FrontendApiError } from "../shared/http";
+import { API_BASE_URL, FrontendApiError, type FrontendApiErrorKind } from "../shared/http";
 import { readSseStream } from "./sse";
 
 const INVALID_STREAM_MESSAGE = "\u6f14\u793a\u670d\u52a1\u8fd4\u56de\u4e86\u65e0\u6548\u7684\u5b9e\u65f6\u8fdb\u5ea6\u54cd\u5e94\u3002";
@@ -29,6 +29,27 @@ export async function startRunStream(
   input: DemoStartRunRequest,
   handlers: DemoStartRunStreamHandlers = {},
 ): Promise<DemoRunSummary> {
+  let sawProgress = false;
+
+  try {
+    return await startRunStreamRequest(input, {
+      onProgress: (event) => {
+        sawProgress = true;
+        handlers.onProgress?.(event);
+      },
+    });
+  } catch (error) {
+    if (shouldFallbackToSyncStart(error, sawProgress)) {
+      return startRun(input);
+    }
+    throw error;
+  }
+}
+
+async function startRunStreamRequest(
+  input: DemoStartRunRequest,
+  handlers: DemoStartRunStreamHandlers,
+): Promise<DemoRunSummary> {
   const response = await fetchResponse("/demo/runs/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -36,7 +57,7 @@ export async function startRunStream(
   });
 
   if (!response.body) {
-    throw new FrontendApiError(INVALID_STREAM_MESSAGE, effectiveStreamStatus(response.status));
+    throw new FrontendApiError(INVALID_STREAM_MESSAGE, effectiveStreamStatus(response.status), "stream_protocol");
   }
 
   for await (const frame of readSseStream(response.body)) {
@@ -53,7 +74,7 @@ export async function startRunStream(
       if (isSummaryEvent(payload)) {
         return payload.summary;
       }
-      throw new FrontendApiError(INVALID_STREAM_MESSAGE, effectiveStreamStatus(response.status));
+      throw new FrontendApiError(INVALID_STREAM_MESSAGE, effectiveStreamStatus(response.status), "stream_protocol");
     }
 
     if (frame.event === "error") {
@@ -62,13 +83,18 @@ export async function startRunStream(
         throw new FrontendApiError(
           localizedResponseMessage(payload.message, effectiveStreamStatus(response.status)),
           effectiveStreamStatus(response.status),
+          "stream_event",
         );
       }
-      throw new FrontendApiError(INVALID_STREAM_MESSAGE, effectiveStreamStatus(response.status));
+      throw new FrontendApiError(INVALID_STREAM_MESSAGE, effectiveStreamStatus(response.status), "stream_protocol");
     }
   }
 
-  throw new FrontendApiError(GENERIC_STREAM_FAILURE_MESSAGE, effectiveStreamStatus(response.status));
+  throw new FrontendApiError(
+    GENERIC_STREAM_FAILURE_MESSAGE,
+    effectiveStreamStatus(response.status),
+    "stream_protocol",
+  );
 }
 
 export async function getRun(runId: string): Promise<DemoRunSummary> {
@@ -123,11 +149,11 @@ async function fetchResponse(path: string, init?: RequestInit): Promise<Response
   try {
     response = init ? await fetch(url, init) : await fetch(url);
   } catch (error) {
-    throw new FrontendApiError(connectionMessage(error), 0);
+    throw new FrontendApiError(connectionMessage(error), 0, "connection");
   }
 
   if (!response.ok) {
-    throw new FrontendApiError(await responseMessage(response), response.status);
+    throw new FrontendApiError(await responseMessage(response), response.status, "http");
   }
 
   return response;
@@ -161,8 +187,24 @@ function parseStreamEvent(payload: string): unknown {
   try {
     return JSON.parse(payload) as unknown;
   } catch {
-    throw new FrontendApiError(INVALID_STREAM_MESSAGE, 500);
+    throw new FrontendApiError(INVALID_STREAM_MESSAGE, 500, "stream_protocol");
   }
+}
+
+function shouldFallbackToSyncStart(error: unknown, sawProgress: boolean): boolean {
+  if (!(error instanceof FrontendApiError) || sawProgress) {
+    return false;
+  }
+
+  if (error.kind === "connection" || error.kind === "stream_protocol") {
+    return true;
+  }
+
+  if (error.kind !== "http") {
+    return false;
+  }
+
+  return error.status === 404 || error.status === 405 || error.status >= 500;
 }
 
 function localizedResponseMessage(message: string, status: number): string {

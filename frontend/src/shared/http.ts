@@ -1,10 +1,14 @@
+export type FrontendApiErrorKind = "connection" | "http" | "stream_protocol" | "stream_event";
+
 export class FrontendApiError extends Error {
   status: number;
+  kind: FrontendApiErrorKind;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, kind: FrontendApiErrorKind = "http") {
     super(message);
     this.name = "DemoApiError";
     this.status = status;
+    this.kind = kind;
   }
 }
 
