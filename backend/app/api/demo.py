@@ -5,6 +5,7 @@ from typing import TypeVar
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from redis import Redis
 from sqlalchemy.orm import Session
 
@@ -65,6 +66,20 @@ def start_demo_run(
 ) -> DemoRunSummary:
     service = _build_service(db, redis_client, settings)
     return _call(db, lambda: service.start_run(request))
+
+
+@router.post("/demo/runs/stream")
+def start_demo_run_stream(
+    request: DemoStartRunRequest,
+    db: Session = Depends(get_db),
+    redis_client: Redis = Depends(get_redis_client),
+    settings: Settings = Depends(get_settings),
+) -> StreamingResponse:
+    service = _build_service(db, redis_client, settings)
+    return StreamingResponse(
+        service.start_run_stream(request),
+        media_type="text/event-stream",
+    )
 
 
 @router.get("/demo/runs/{run_id}", response_model=DemoRunSummary)

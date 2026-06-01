@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from backend.app.demo.schemas import (
@@ -82,14 +82,37 @@ def build_demo_progress_summary(
     execution_status: str | None = None,
     feedback_status: str | None = None,
 ) -> DemoProgressSummary:
-    node_history = _string_list(_demo_value(run, "initial_node_history"))
-    continuation_history = _string_list(_demo_value(run, "continuation_history"))
-    search_stages, search_counts = _search_progress_evidence(tool_events or [])
-    stage_history = _stage_history(node_history, search_stages)
-    current_stage = _current_stage(
+    return build_demo_progress_summary_from_evidence(
         run.status,
-        node_history,
-        continuation_history,
+        _string_list(_demo_value(run, "initial_node_history")),
+        _string_list(_demo_value(run, "continuation_history")),
+        tool_events,
+        plan_count=plan_count,
+        action_count=action_count,
+        execution_status=execution_status,
+        feedback_status=feedback_status,
+    )
+
+
+def build_demo_progress_summary_from_evidence(
+    run_status: str,
+    node_history: Sequence[str] | None,
+    continuation_history: Sequence[str] | None,
+    tool_events: Sequence[ToolEvent] | None,
+    *,
+    plan_count: int | None = None,
+    action_count: int | None = None,
+    execution_status: str | None = None,
+    feedback_status: str | None = None,
+) -> DemoProgressSummary:
+    normalized_node_history = _string_list(node_history)
+    normalized_continuation_history = _string_list(continuation_history)
+    search_stages, search_counts = _search_progress_evidence(tool_events or [])
+    stage_history = _stage_history(normalized_node_history, search_stages)
+    current_stage = _current_stage(
+        run_status,
+        normalized_node_history,
+        normalized_continuation_history,
         stage_history,
         execution_status=execution_status,
         feedback_status=feedback_status,
@@ -102,11 +125,29 @@ def build_demo_progress_summary(
         stage_history=stage_history,
         steps=_build_steps(
             stage_history,
-            run_status=run.status,
+            run_status=run_status,
             search_counts=search_counts,
             plan_count=plan_count,
             action_count=action_count,
         ),
+    )
+
+
+def build_live_demo_progress_summary(
+    state: Mapping[str, Any],
+    tool_events: Sequence[ToolEvent] | None,
+    *,
+    persisted_plan_count: int | None = None,
+) -> DemoProgressSummary:
+    return build_demo_progress_summary_from_evidence(
+        _text_or_default(state.get("status"), "running"),
+        _string_list(state.get("node_history")),
+        [],
+        tool_events,
+        plan_count=_live_plan_count(state, persisted_plan_count),
+        action_count=_int_or_none(state.get("action_count")),
+        execution_status=_text_or_none(state.get("execution_status")),
+        feedback_status=_text_or_none(state.get("feedback_status")),
     )
 
 
@@ -117,6 +158,11 @@ def _stage_history(
     history: list[DemoProgressStage] = []
     inserted_search = False
     for node_name in node_history:
+        if node_name in {"execute_searches", "populate_candidate_blackboard"}:
+            if search_stages:
+                _extend_unique(history, search_stages)
+                inserted_search = True
+            continue
         stage = _NODE_STAGE_MAP.get(node_name)
         if stage is None:
             continue
@@ -293,9 +339,53 @@ def _demo_value(run: AgentRun, key: str) -> Any:
 
 
 def _string_list(value: Any) -> list[str]:
-    if not isinstance(value, list):
+    if not isinstance(value, (list, tuple)):
         return []
     return [item for item in value if isinstance(item, str)]
+
+
+def _live_plan_count(
+    state: Mapping[str, Any],
+    persisted_plan_count: int | None,
+) -> int | None:
+    if persisted_plan_count is not None and persisted_plan_count > 0:
+        return persisted_plan_count
+    if persisted_plan_count == 0:
+        draft_count = _draft_count(state.get("itinerary_drafts"))
+        return draft_count if draft_count > 0 else 0
+    persisted_from_state = _persisted_plan_count_from_state(state.get("persisted_plans"))
+    if persisted_from_state > 0:
+        return persisted_from_state
+    draft_count = _draft_count(state.get("itinerary_drafts"))
+    return draft_count if draft_count > 0 else None
+
+
+def _persisted_plan_count_from_state(value: Any) -> int:
+    if not isinstance(value, list):
+        return 0
+    return len(value)
+
+
+def _draft_count(value: Any) -> int:
+    if isinstance(value, Mapping):
+        drafts = value.get("drafts")
+    else:
+        drafts = getattr(value, "drafts", None)
+    if not isinstance(drafts, list):
+        return 0
+    return len(drafts)
+
+
+def _int_or_none(value: Any) -> int | None:
+    return value if isinstance(value, int) else None
+
+
+def _text_or_none(value: Any) -> str | None:
+    return value if isinstance(value, str) else None
+
+
+def _text_or_default(value: Any, default: str) -> str:
+    return value if isinstance(value, str) else default
 
 
 def _extend_unique(items: list[DemoProgressStage], values: Iterable[DemoProgressStage]) -> None:

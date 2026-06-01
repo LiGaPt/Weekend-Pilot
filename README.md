@@ -465,6 +465,8 @@ python -m alembic upgrade head
 uvicorn backend.app.main:app --reload
 ```
 
+Update: the initial planning start path now also supports `POST /demo/runs/stream` as an additive SSE transport. It accepts the same request body as `POST /demo/runs`, emits `progress` events with the public-safe `DemoProgressSummary`, ends with one `summary` event carrying the full `DemoRunSummary`, and can emit one `error` event with a public-safe message. Clarify, replan, confirm, and decline remain synchronous in this task. This task still does not add polling, WebSockets, reconnect cursors, or background async execution.
+
 Start a run:
 
 ```bash
@@ -472,6 +474,20 @@ curl -X POST http://127.0.0.1:8000/demo/runs \
   -H "Content-Type: application/json" \
   -d "{\"user_input\":\"今天下午想和爱人、5岁的孩子出门玩几个小时，别离家太远。孩子要适合亲子活动，爱人最近想吃清淡一点，帮我安排一下。\"}"
 ```
+
+Stream the same initial planning run with SSE:
+
+```bash
+curl -N -X POST http://127.0.0.1:8000/demo/runs/stream \
+  -H "Content-Type: application/json" \
+  -d "{\"user_input\":\"This afternoon I want to go out with my wife and child for a few hours. Not too far. My child is 5, and my wife is trying to eat lighter.\",\"external_user_id\":\"web-demo-user\",\"display_name\":\"Web Demo User\",\"case_id\":\"web-demo\",\"selected_plan_index\":0,\"read_profile\":\"mock_world\"}"
+```
+
+The stream uses only three event names:
+
+- `progress`: current public-safe `DemoProgressSummary`
+- `summary`: final `DemoRunSummary`
+- `error`: public-safe startup/runtime failure message
 
 Start an explicit friends-group Mock World run:
 

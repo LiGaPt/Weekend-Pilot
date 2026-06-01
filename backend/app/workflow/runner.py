@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from copy import deepcopy
 from typing import Any
 from uuid import UUID
@@ -37,11 +38,9 @@ class WeekendPilotWorkflowRunner:
             return unsupported
 
         try:
-            dependencies = self.dependencies.model_copy(
-                update={
-                    "tool_profile": request.tool_profile,
-                    "world_profile": request.world_profile,
-                }
+            dependencies = self._scoped_dependencies(
+                tool_profile=request.tool_profile,
+                world_profile=request.world_profile,
             )
             nodes = WeekendPilotWorkflowNodes(dependencies)
             graph = build_weekend_pilot_graph(nodes)
@@ -59,6 +58,51 @@ class WeekendPilotWorkflowRunner:
                     "exception_type": type(exc).__name__,
                 },
             )
+
+    def stream(
+        self,
+        request: WeekendPilotWorkflowRequest,
+    ) -> Iterator[WeekendPilotWorkflowState | dict[str, Any]]:
+        unsupported = self._unsupported_profile_result(request)
+        initial_state = self._initial_state(request)
+        if unsupported is not None:
+            yield self._stream_error_state(initial_state, unsupported.error_json or {})
+            return
+
+        last_state: WeekendPilotWorkflowState | dict[str, Any] = initial_state
+        try:
+            dependencies = self._scoped_dependencies(
+                tool_profile=request.tool_profile,
+                world_profile=request.world_profile,
+            )
+            nodes = WeekendPilotWorkflowNodes(dependencies)
+            graph = build_weekend_pilot_graph(nodes)
+            for state in graph.stream(initial_state, stream_mode="values"):
+                last_state = state
+                yield state
+        except Exception as exc:
+            yield self._stream_error_state(
+                last_state,
+                {
+                    "error_type": "workflow_exception",
+                    "message": str(exc),
+                    "exception_type": type(exc).__name__,
+                },
+            )
+
+    def result_from_stream_state(
+        self,
+        state: WeekendPilotWorkflowState | dict[str, Any],
+    ) -> WeekendPilotWorkflowResult:
+        if state.get("status") == "error":
+            return self._to_result(state)
+        scoped_dependencies = self._scoped_dependencies(
+            tool_profile=self._text_or_none(state.get("tool_profile")),
+            world_profile=self._text_or_none(state.get("world_profile")),
+        )
+        nodes = WeekendPilotWorkflowNodes(scoped_dependencies)
+        final_state = self._record_observability(nodes, state)
+        return self._to_result(final_state)
 
     def _unsupported_profile_result(
         self,
@@ -93,6 +137,19 @@ class WeekendPilotWorkflowRunner:
                 "auto_confirm": request.auto_confirm,
             },
         )
+
+    def _scoped_dependencies(
+        self,
+        *,
+        tool_profile: str | None,
+        world_profile: str | None,
+    ) -> WeekendPilotWorkflowDependencies:
+        update: dict[str, Any] = {}
+        if tool_profile is not None:
+            update["tool_profile"] = tool_profile
+        if world_profile is not None:
+            update["world_profile"] = world_profile
+        return self.dependencies.model_copy(update=update)
 
     def _initial_state(self, request: WeekendPilotWorkflowRequest) -> WeekendPilotWorkflowState:
         return WeekendPilotWorkflowState(
@@ -240,4 +297,15 @@ class WeekendPilotWorkflowRunner:
             "observability_status": (
                 "recorded" if observability.local_buffer_written else observability.status
             ),
+        }
+
+    def _stream_error_state(
+        self,
+        state: WeekendPilotWorkflowState | dict[str, Any],
+        error_json: dict[str, Any],
+    ) -> dict[str, Any]:
+        return {
+            **state,
+            "status": "error",
+            "error_json": error_json,
         }

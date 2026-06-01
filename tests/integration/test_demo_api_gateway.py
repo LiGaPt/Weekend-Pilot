@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -336,6 +337,110 @@ def _assert_action_manifest_confirmed(plan: dict[str, object]) -> None:
         assert "idempotency_key" not in action
         assert "user_confirmed" not in action
         _assert_no_forbidden_keys(action["payload_preview"])
+
+
+def _read_sse_events(response) -> list[tuple[str, dict[str, object]]]:
+    events: list[tuple[str, dict[str, object]]] = []
+    current_event: str | None = None
+    current_data: list[str] = []
+    for raw_line in response.iter_lines():
+        line = raw_line.decode("utf-8") if isinstance(raw_line, bytes) else raw_line
+        if line == "":
+            if current_event is not None:
+                events.append((current_event, json.loads("".join(current_data))))
+            current_event = None
+            current_data = []
+            continue
+        if line.startswith("event: "):
+            current_event = line[len("event: ") :]
+            continue
+        if line.startswith("data: "):
+            current_data.append(line[len("data: ") :])
+    return events
+
+
+def test_demo_run_stream_happy_path_emits_progress_then_final_summary(client) -> None:
+    test_client, case_ids, external_user_ids = client
+
+    with test_client.stream("POST", "/demo/runs/stream", json=_start_payload(case_ids, external_user_ids)) as response:
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/event-stream")
+        events = _read_sse_events(response)
+
+    progress_events = [payload for event_name, payload in events if event_name == "progress"]
+    assert progress_events
+    assert progress_events[0]["progress"]["current_stage"] == "understanding_request"
+    for previous, current in zip(progress_events, progress_events[1:]):
+        assert previous["progress"] != current["progress"]
+
+    assert events[-1][0] == "summary"
+    assert [event_name for event_name, _ in events].count("summary") == 1
+    summary = events[-1][1]["summary"]
+    _assert_no_forbidden_keys(summary)
+    _assert_public_run_redaction(summary)
+    assert summary["status"] == "awaiting_confirmation"
+    _assert_progress(
+        summary,
+        current_stage="ready_for_confirmation",
+        stage_history=READY_PROGRESS_HISTORY,
+    )
+
+    run_id = summary["run_id"]
+    status_response = test_client.get(f"/demo/runs/{run_id}")
+
+    assert status_response.status_code == 200
+    assert status_response.json() == summary
+
+
+def test_demo_run_stream_clarification_path_ends_with_summary(client) -> None:
+    test_client, case_ids, external_user_ids = client
+    payload = _start_payload(case_ids, external_user_ids, user_input=VAGUE_USER_INPUT)
+
+    with test_client.stream("POST", "/demo/runs/stream", json=payload) as response:
+        assert response.status_code == 200
+        events = _read_sse_events(response)
+
+    assert any(event_name == "progress" for event_name, _ in events)
+    assert events[-1][0] == "summary"
+    summary = events[-1][1]["summary"]
+    _assert_no_forbidden_keys(summary)
+    assert summary["status"] == "awaiting_clarification"
+    assert summary["clarification"] is not None
+    assert summary["plan_version"]["version_label"] == "v1"
+    _assert_progress(
+        summary,
+        current_stage="planning_queries",
+        stage_history=["understanding_request", "planning_queries"],
+    )
+
+
+def test_demo_run_stream_amap_configuration_error_emits_error_event(
+    client,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    test_client, case_ids, external_user_ids = client
+    payload = _start_payload(case_ids, external_user_ids)
+    payload["read_profile"] = "amap"
+
+    def _raise_missing_config():
+        raise AMapConfigurationError("AMAP API key is not configured.")
+
+    monkeypatch.setattr("backend.app.workflow.nodes.build_amap_registry", _raise_missing_config)
+
+    with test_client.stream("POST", "/demo/runs/stream", json=payload) as response:
+        assert response.status_code == 200
+        events = _read_sse_events(response)
+
+    assert events == [
+        (
+            "error",
+            {
+                "event_index": 1,
+                "run_id": None,
+                "message": "AMAP read path is not configured for this environment.",
+            },
+        )
+    ]
 
 
 def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:

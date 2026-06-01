@@ -209,3 +209,20 @@ class DemoRunSummary(BaseModel):
     feedback_status: str | None = None
     error: dict[str, Any] | None = None
     clarification: DemoClarificationSummary | None = None
+
+
+class DemoRunStreamProgressEvent(BaseModel):
+    event_index: int = Field(ge=1)
+    run_id: UUID
+    progress: DemoProgressSummary
+
+
+class DemoRunStreamSummaryEvent(BaseModel):
+    event_index: int = Field(ge=1)
+    summary: DemoRunSummary
+
+
+class DemoRunStreamErrorEvent(BaseModel):
+    event_index: int = Field(ge=1)
+    run_id: UUID | None = None
+    message: str
