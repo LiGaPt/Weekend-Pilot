@@ -5,6 +5,7 @@ import type {
   DemoClarificationSummary,
   DemoExecutionActionResultSummary,
   DemoPlanPreview,
+  DemoProgressSummary,
   DemoProgressStepSummary,
   DemoReadProfile,
   DemoRunSummary,
@@ -140,7 +141,7 @@ type ProjectConversationThreadOptions = {
   entries: ConversationHistoryEntry[];
   activeRunId?: string | null;
   selectedPlanId?: string | null;
-  pendingAction?: PendingConversationAction | null;
+  pendingAction?: PendingConversationAction | AssistantProgressCardItem | null;
 };
 
 const RESULT_RUN_STATUSES = new Set(["completed", "partially_completed", "failed", "skipped", "declined"]);
@@ -266,18 +267,25 @@ export function projectRunItems(run: DemoRunSummary, selectedPlanId?: string | n
 }
 
 function buildProgressItem(run: DemoRunSummary): AssistantProgressCardItem | null {
-  const steps = normalizeProgressSteps(run.progress?.steps);
-  if (!steps.length) {
+  return buildProgressCardItem(run.run_id, run.progress);
+}
+
+export function buildProgressCardItem(
+  runId: string,
+  progress: DemoProgressSummary | null | undefined,
+): AssistantProgressCardItem | null {
+  const steps = normalizeProgressSteps(progress?.steps);
+  if (!steps.length || !progress) {
     return null;
   }
 
   const currentStep = steps[steps.length - 1];
-  const currentSummary = safeText(currentStep.summary) || safeText(run.progress.current_label) || currentStep.label;
+  const currentSummary = safeText(currentStep.summary) || safeText(progress.current_label) || currentStep.label;
 
   return {
-    id: `${run.run_id}-progress`,
+    id: `${runId}-progress`,
     kind: "assistant_progress_card",
-    runId: run.run_id,
+    runId,
     currentStage: currentStep.stage,
     currentLabel: currentStep.label,
     currentSummary,

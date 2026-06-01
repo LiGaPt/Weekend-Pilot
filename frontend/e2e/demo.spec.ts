@@ -44,6 +44,20 @@ async function startRun(page: Page, prompt: string) {
   await page.getByTestId("start-button").click();
 }
 
+async function expectEarlyProgressFeedback(page: Page) {
+  await expect
+    .poll(async () => {
+      if ((await page.getByTestId("progress-stepper-card").count()) > 0) {
+        return "progress-card";
+      }
+      if ((await page.getByTestId("system-progress").count()) > 0) {
+        return "spinner";
+      }
+      return "none";
+    }, { timeout: 60_000 })
+    .toMatch(/spinner|progress-card/);
+}
+
 async function waitForConversationStage(page: Page) {
   await expect
     .poll(async () => {
@@ -308,6 +322,20 @@ function buildMockAwaitingRun(
   };
 }
 
+function buildStartRunStreamBody(summary: Record<string, unknown>) {
+  return [
+    `event: progress\ndata: ${JSON.stringify({
+      event_index: 1,
+      run_id: summary.run_id,
+      progress: summary.progress,
+    })}\n\n`,
+    `event: summary\ndata: ${JSON.stringify({
+      event_index: 2,
+      summary,
+    })}\n\n`,
+  ].join("");
+}
+
 const mockedStartRun = buildMockAwaitingRun("run-1", "plan-1", 1, "v1", null, null);
 const mockedStartRunWithTwoPlans = buildMockTwoPlanAwaitingRun();
 const mockedReplannedRunV2FromPlan2 = buildMockAwaitingRun("run-2", "plan-4", 2, "v2", "run-1", "plan-2");
@@ -326,7 +354,7 @@ test.describe("desktop web demo", () => {
     await startRun(page, stableHappyPathPrompt);
 
     await expect(page.locator("article.thread-row-user").getByText(stableHappyPathPrompt)).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId("system-progress")).toBeVisible({ timeout: 60_000 });
+    await expectEarlyProgressFeedback(page);
 
     await continueToAwaitingConfirmation(page, "v1");
 
@@ -408,7 +436,7 @@ test.describe("desktop web demo", () => {
   test("continues a vague request through the clarification flow", async ({ page }) => {
     await startRun(page, vagueChinesePrompt);
 
-    await expect(page.getByTestId("system-progress")).toBeVisible({ timeout: 60_000 });
+    await expectEarlyProgressFeedback(page);
     const clarificationCard = page.getByTestId("clarification-card").last();
     await expect(clarificationCard).toBeVisible({ timeout: 60_000 });
 
@@ -441,7 +469,7 @@ test.describe("desktop web demo", () => {
   test("sends the selected second plan index when replanning from the customer page", async ({ page }) => {
     const replanBodies: Array<Record<string, unknown>> = [];
 
-    await page.route("**/demo/runs", async (route, request) => {
+    await page.route(/\/demo\/runs\/stream$/, async (route, request) => {
       if (request.method() !== "POST") {
         await route.fallback();
         return;
@@ -449,8 +477,8 @@ test.describe("desktop web demo", () => {
 
       await route.fulfill({
         status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(mockedStartRunWithTwoPlans),
+        contentType: "text/event-stream",
+        body: buildStartRunStreamBody(mockedStartRunWithTwoPlans),
       });
     });
 
@@ -487,7 +515,7 @@ test.describe("desktop web demo", () => {
   });
 
   test("blocks confirmation when the server returns a map read-only preview", async ({ page }) => {
-    await page.route("**/demo/runs", async (route, request) => {
+    await page.route(/\/demo\/runs\/stream$/, async (route, request) => {
       if (request.method() !== "POST") {
         await route.fallback();
         return;
@@ -495,8 +523,8 @@ test.describe("desktop web demo", () => {
 
       await route.fulfill({
         status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(mockedAmapRun),
+        contentType: "text/event-stream",
+        body: buildStartRunStreamBody(mockedAmapRun),
       });
     });
 

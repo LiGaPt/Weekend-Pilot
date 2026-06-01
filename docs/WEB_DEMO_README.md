@@ -18,7 +18,7 @@ The public page now exposes two explicit read paths:
 - `AMap 只读预览`: an explicit local preview path that uses live read tools only, returns reviewed plans, and stops before confirmation
 
 The public demo API now also supports `POST /demo/runs/{run_id}/clarify` for clarification replies and `POST /demo/runs/{run_id}/replan` for follow-up replanning. A vague start request, or a bounded recovery path that needs an explicit user tradeoff, can stop in `awaiting_clarification` with `plans = []`, `selected_plan_id = null`, and a compact `clarification` summary that contains the public follow-up prompt plus the missing supported fields.
-An additive backend stream now also exists at `POST /demo/runs/stream`. It covers only the initial planning start request, reuses the same public-safe progress contract, and fits alongside the existing customer page rather than replacing it. For the default Mock World happy path, that stream now emits ordered search milestones inside the existing `progress` event type: first `searching_activities`, then `searching_dining`, before later stages such as `checking_availability`. The current page can keep its existing request/summary flow while reviewers or later frontend work consume the live stream directly.
+An additive backend stream now also exists at `POST /demo/runs/stream`. It covers only the initial planning start request, reuses the same public-safe progress contract, and is now the transport used by the customer page for the initial start flow. Because this route is a `POST`, the frontend consumes it with `fetch` plus `ReadableStream` SSE parsing rather than browser `EventSource`. For the default Mock World happy path, that stream now emits ordered search milestones inside the existing `progress` event type: first `searching_activities`, then `searching_dining`, before later stages such as `checking_availability`. Clarify, replan, confirm, decline, and run readback remain synchronous in this task.
 Every public `DemoRunSummary` includes a compact `plan_version` object: the initial run starts at `v1`, and each follow-up replan returns a new `run_id` with the next visible version label. Clarification-only turns do not advance that visible version. A source run that ends in `awaiting_clarification` stays at `v1`, and the first clarification continuation that produces real plans also remains at `v1`. The internal conversation session is reused, but that session state remains internal and is still not exposed in `DemoRunSummary`.
 Every public `DemoPlanPreview` now includes `action_manifest`, a stable execution-preview summary with this shape:
 
@@ -207,8 +207,8 @@ For the V1 richer UI closure, use `docs/RICHER_WEB_UI_V1_CHECKLIST.md` as the ca
 1. Open `http://127.0.0.1:5173`.
 2. Either enter an equivalent request into the main composer or click the `亲子半天` example chip to populate it.
 3. Click `开始规划`.
-4. Confirm the conversation stream first shows your user message and an in-chat system progress row.
-5. Confirm the run reaches `awaiting_confirmation`, the transient row disappears, and one persistent progress stepper appears above the plan card.
+4. Confirm the conversation stream first shows your user message and early progress feedback. Depending on timing, this may appear first as the transient in-chat system progress row or directly as the persistent progress stepper card.
+5. Confirm the run reaches `awaiting_confirmation`, any transient row disappears, and one persistent progress stepper appears above the plan card.
 6. Expand the completed-step disclosure and verify public-safe evidence such as `已找到 5 个活动` and `已找到 5 个餐厅`.
 5. Confirm the run reaches `awaiting_confirmation` and the assistant shows `推荐方案摘要`.
 6. Confirm the selected plan first appears as a summary card rather than a fully expanded panel.
@@ -443,7 +443,9 @@ PostgreSQL, Redis, and migrations must already be ready.
 - Planning stops at `awaiting_confirmation` before any write action.
 - Every successful public `DemoRunSummary` includes the additive `progress` snapshot, and refresh/readback preserves the same public-safe stage view after the run completes.
 - `POST /demo/runs/stream` emits one or more `progress` events before the final `summary` event for the normal Mock World start path.
+- The customer page now consumes `POST /demo/runs/stream` for the initial start flow and uses `fetch` stream parsing because the route is `POST`.
 - On the default Mock World happy path, the stream emits ordered search-count milestones inside `progress`: first `searching_activities` with `已找到 5 个活动`, then `searching_dining` with `已找到 5 个餐厅`, before the first `checking_availability` event.
+- Clarify, replan, confirm, decline, and readback remain on their existing synchronous routes in this task.
 - `Mock World` remains the default read path for the public demo and for benchmark-aligned checks.
 - The explicit `AMap 只读预览` path also stops at `awaiting_confirmation`, keeps `action_count = 0`, and never exposes a working confirm action in the UI.
 - Vague start requests can stop at `awaiting_clarification` before any plan is generated.

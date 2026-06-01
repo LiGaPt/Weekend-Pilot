@@ -197,3 +197,20 @@ export type DemoRunSummary = {
   error: Record<string, unknown> | null;
   clarification: DemoClarificationSummary | null;
 };
+
+export type DemoRunStreamProgressEvent = {
+  event_index: number;
+  run_id: string;
+  progress: DemoProgressSummary;
+};
+
+export type DemoRunStreamSummaryEvent = {
+  event_index: number;
+  summary: DemoRunSummary;
+};
+
+export type DemoRunStreamErrorEvent = {
+  event_index: number;
+  run_id: string | null;
+  message: string;
+};

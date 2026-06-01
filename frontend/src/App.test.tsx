@@ -1,12 +1,14 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { clarifyRun, confirmRun, replanRun, startRun } from "./api/demo";
+import { clarifyRun, confirmRun, replanRun, startRun, startRunStream } from "./api/demo";
+import { FrontendApiError } from "./shared/http";
 import type { DemoRunSummary, DemoProgressStage } from "./types/demo";
 
 vi.mock("./api/demo", () => ({
   startRun: vi.fn(),
+  startRunStream: vi.fn(),
   getRun: vi.fn(),
   clarifyRun: vi.fn(),
   confirmRun: vi.fn(),
@@ -340,9 +342,11 @@ function expectThreadOrder(first: HTMLElement | null, second: HTMLElement | null
 describe("App", () => {
   beforeEach(() => {
     vi.mocked(startRun).mockReset();
+    vi.mocked(startRunStream).mockReset();
     vi.mocked(clarifyRun).mockReset();
     vi.mocked(confirmRun).mockReset();
     vi.mocked(replanRun).mockReset();
+    vi.mocked(startRunStream).mockResolvedValue(awaitingRun);
   });
 
   it("renders one bottom composer without project-design copy", () => {
@@ -368,7 +372,12 @@ describe("App", () => {
   it("shows a transient local spinner first, then renders the persistent progress card above the plan", async () => {
     const user = userEvent.setup();
     const deferred = createDeferred<DemoRunSummary>();
-    vi.mocked(startRun).mockReturnValue(deferred.promise);
+    let onProgress: ((event: { event_index: number; run_id: string; progress: ReturnType<typeof buildProgress> }) => void)
+      | undefined;
+    vi.mocked(startRunStream).mockImplementation(async (_input, handlers = {}) => {
+      onProgress = handlers.onProgress;
+      return deferred.promise;
+    });
     render(<App />);
 
     await user.type(screen.getByTestId("main-composer-input"), "Plan a family afternoon");
@@ -376,7 +385,27 @@ describe("App", () => {
 
     expect(screen.getByTestId("system-progress")).toBeInTheDocument();
 
-    deferred.resolve(awaitingRun);
+    await act(async () => {
+      onProgress?.({
+        event_index: 1,
+        run_id: "run-stream-1",
+        progress: buildProgress("searching_activities", [
+          "understanding_request",
+          "planning_queries",
+          "searching_activities",
+        ], {
+          searching_activities: "已找到 5 个活动",
+        }),
+      });
+    });
+
+    expect(await screen.findByTestId("progress-stepper-card")).toBeInTheDocument();
+    expect(screen.queryByTestId("system-progress")).not.toBeInTheDocument();
+    expect(screen.getByText("已找到 5 个活动")).toBeInTheDocument();
+
+    await act(async () => {
+      deferred.resolve(awaitingRun);
+    });
 
     const progressCard = await screen.findByTestId("progress-stepper-card");
     const planHeading = await screen.findByRole("heading", { name: "亲子下午方案" });
@@ -385,9 +414,36 @@ describe("App", () => {
     expect(screen.queryByText("\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8")).not.toBeInTheDocument();
   });
 
+  it("uses the streamed start helper and shows a live progress card before the final summary", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startRunStream).mockImplementation(async (_input, handlers = {}) => {
+      handlers.onProgress?.({
+        event_index: 1,
+        run_id: "run-stream-1",
+        progress: buildProgress("searching_activities", [
+          "understanding_request",
+          "planning_queries",
+          "searching_activities",
+        ], {
+          searching_activities: "\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8",
+        }),
+      });
+      return awaitingRun;
+    });
+    render(<App />);
+
+    await user.type(screen.getByTestId("main-composer-input"), "Plan a family afternoon");
+    await user.click(screen.getByTestId("start-button"));
+
+    expect(startRunStream).toHaveBeenCalledTimes(1);
+    expect(startRun).not.toHaveBeenCalled();
+    expect(await screen.findByTestId("progress-stepper-card")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "亲子下午方案" })).toBeInTheDocument();
+    expect(screen.getAllByTestId("progress-stepper-card")).toHaveLength(1);
+  });
+
   it("keeps the recommended plan summary-first without exposing run metadata", async () => {
     const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingRun);
     render(<App />);
 
     await user.type(screen.getByTestId("main-composer-input"), "Plan a family afternoon");
@@ -409,7 +465,6 @@ describe("App", () => {
 
   it("keeps plan details collapsed until expanded", async () => {
     const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingRun);
     render(<App />);
 
     await user.type(screen.getByTestId("main-composer-input"), "Plan a family afternoon");
@@ -432,7 +487,7 @@ describe("App", () => {
 
   it("renders the clarification flow with a progress card above the clarification card", async () => {
     const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingClarificationRun);
+    vi.mocked(startRunStream).mockResolvedValue(awaitingClarificationRun);
     vi.mocked(clarifyRun).mockResolvedValue(clarifiedRun);
     render(<App />);
 
@@ -457,7 +512,6 @@ describe("App", () => {
 
   it("uses the locally selected plan index when replanning", async () => {
     const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingRun);
     vi.mocked(replanRun).mockResolvedValue(replannedRunV2FromPlan2);
     render(<App />);
 
@@ -481,13 +535,13 @@ describe("App", () => {
 
   it("blocks confirmation when the server returns a map read-only preview", async () => {
     const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingAmapRun);
+    vi.mocked(startRunStream).mockResolvedValue(awaitingAmapRun);
     render(<App />);
 
     await user.type(screen.getByTestId("main-composer-input"), "Preview a lighter afternoon plan");
     await user.click(screen.getByTestId("start-button"));
 
-    expect(startRun).toHaveBeenCalledWith(
+    expect(vi.mocked(startRunStream).mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({
         read_profile: "mock_world",
       }),
@@ -500,7 +554,6 @@ describe("App", () => {
 
   it("keeps the progress card above the result card after confirmation", async () => {
     const user = userEvent.setup();
-    vi.mocked(startRun).mockResolvedValue(awaitingRun);
     vi.mocked(confirmRun).mockResolvedValue(completedRun);
     render(<App />);
 
@@ -518,5 +571,19 @@ describe("App", () => {
     const timeline = await screen.findByTestId("execution-timeline");
     expect(within(timeline).getByText("2026-05-26T14:00:00+08:00")).toBeInTheDocument();
     expect(within(timeline).getByText("轻食餐桌")).toBeInTheDocument();
+  });
+
+  it("shows a localized error banner when the streamed start fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(startRunStream).mockRejectedValue(
+      new FrontendApiError("本地环境未配置地图只读预览所需的密钥。", 500),
+    );
+    render(<App />);
+
+    await user.type(screen.getByTestId("main-composer-input"), "Plan a family afternoon");
+    await user.click(screen.getByTestId("start-button"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("本地环境未配置地图只读预览所需的密钥。");
+    expect(screen.queryByTestId("progress-stepper-card")).not.toBeInTheDocument();
   });
 });

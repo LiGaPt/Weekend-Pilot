@@ -1,8 +1,9 @@
 import { AlertCircle, Loader2, Send } from "lucide-react";
 import { useMemo, useState } from "react";
-import { clarifyRun, confirmRun, declineRun, replanRun, startRun } from "./api/demo";
+import { clarifyRun, confirmRun, declineRun, replanRun, startRunStream } from "./api/demo";
 import { ConversationThread } from "./chat/ConversationThread";
 import {
+  buildProgressCardItem,
   choosePlan,
   isClarificationSummary,
   progressLabelForState,
@@ -10,9 +11,8 @@ import {
   resolveSelectedPlanIndex,
   statusLabel,
   type ConversationHistoryEntry,
-  type PendingConversationAction,
 } from "./chat/thread";
-import type { DemoReadProfile, DemoReplanRunRequest, DemoRunSummary } from "./types/demo";
+import type { DemoProgressSummary, DemoReadProfile, DemoReplanRunRequest, DemoRunSummary } from "./types/demo";
 
 const GENERIC_ERROR_MESSAGE = "演示请求失败，请稍后重试。";
 
@@ -43,6 +43,10 @@ export default function App() {
   const [requestState, setRequestState] = useState<RequestState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [conversationEntries, setConversationEntries] = useState<ConversationHistoryEntry[]>([]);
+  const [liveStartProgress, setLiveStartProgress] = useState<{
+    runId: string;
+    progress: DemoProgressSummary;
+  } | null>(null);
 
   const selectedPlan = useMemo(() => choosePlan(run, selectedPlanId), [run, selectedPlanId]);
   const trimmedInput = userInput.trim();
@@ -71,14 +75,21 @@ export default function App() {
     isAwaitingConfirmation,
   });
 
-  const pendingAction: PendingConversationAction | null = isInFlight
-    ? {
-        id: `pending-${requestState}`,
-        kind: "system_progress",
-        label: progressLabelForState(requestState),
-        status: requestState,
-      }
-    : null;
+  const liveProgressCard = useMemo(
+    () => (liveStartProgress ? buildProgressCardItem(liveStartProgress.runId, liveStartProgress.progress) : null),
+    [liveStartProgress],
+  );
+
+  const pendingAction =
+    liveProgressCard ??
+    (isInFlight
+      ? {
+          id: `pending-${requestState}`,
+          kind: "system_progress",
+          label: progressLabelForState(requestState),
+          status: requestState,
+        }
+      : null);
 
   const threadItems = useMemo(
     () =>
@@ -116,16 +127,36 @@ export default function App() {
 
     appendUserEntry("start", trimmedInput);
 
-    await runAction("starting", () =>
-      startRun({
-        user_input: trimmedInput,
-        external_user_id: buildDemoExternalUserId(),
-        display_name: "网页用户",
-        case_id: "web-demo",
-        selected_plan_index: 0,
-        read_profile: selectedReadProfile,
-      }),
-    );
+    setRequestState("starting");
+    setErrorMessage(null);
+    setLiveStartProgress(null);
+
+    try {
+      const nextRun = await startRunStream(
+        {
+          user_input: trimmedInput,
+          external_user_id: buildDemoExternalUserId(),
+          display_name: "网页用户",
+          case_id: "web-demo",
+          selected_plan_index: 0,
+          read_profile: selectedReadProfile,
+        },
+        {
+          onProgress: (event) => {
+            setLiveStartProgress({
+              runId: event.run_id,
+              progress: event.progress,
+            });
+          },
+        },
+      );
+
+      applyRun(nextRun, "starting");
+    } catch (error) {
+      setLiveStartProgress(null);
+      setRequestState("error");
+      setErrorMessage(errorMessageForDisplay(error));
+    }
   }
 
   async function handleReplan() {
@@ -174,22 +205,33 @@ export default function App() {
   ) {
     setRequestState(nextState);
     setErrorMessage(null);
+    setLiveStartProgress(null);
 
     try {
       const nextRun = await action();
       onSuccess?.(nextRun);
-      upsertRunEntry(nextRun);
-      setRun(nextRun);
-      setSelectedReadProfile(nextRun.read_profile);
-      setSelectedPlanId(nextRun.selected_plan_id ?? nextRun.plans[0]?.plan_id ?? null);
-      setRequestState(stateFromRun(nextRun));
-
-      if (INPUT_ACTION_STATES.has(nextState)) {
-        setUserInput("");
-      }
+      applyRun(nextRun, nextState);
     } catch (error) {
+      setLiveStartProgress(null);
       setRequestState("error");
       setErrorMessage(errorMessageForDisplay(error));
+    }
+  }
+
+  function applyRun(nextRun: DemoRunSummary | null | undefined, sourceState: RequestState) {
+    if (!isDemoRunSummary(nextRun)) {
+      throw new Error("Invalid demo run summary.");
+    }
+
+    setLiveStartProgress(null);
+    upsertRunEntry(nextRun);
+    setRun(nextRun);
+    setSelectedReadProfile(nextRun.read_profile);
+    setSelectedPlanId(nextRun.selected_plan_id ?? nextRun.plans[0]?.plan_id ?? null);
+    setRequestState(stateFromRun(nextRun));
+
+    if (INPUT_ACTION_STATES.has(sourceState)) {
+      setUserInput("");
     }
   }
 
@@ -441,4 +483,16 @@ function buildReplanRequest(reply: string, selectedPlanIndex: number): DemoRepla
     user_input: reply.trim(),
     selected_plan_index: selectedPlanIndex,
   };
+}
+
+function isDemoRunSummary(value: DemoRunSummary | null | undefined): value is DemoRunSummary {
+  return Boolean(
+    value &&
+      typeof value.run_id === "string" &&
+      typeof value.status === "string" &&
+      typeof value.read_profile === "string" &&
+      Array.isArray(value.plans) &&
+      value.plan_version &&
+      typeof value.plan_version.version_label === "string",
+  );
 }
