@@ -453,7 +453,7 @@ Expected response:
 
 ## Web Demo API
 
-The Web demo API starts the official workflow, pauses before write tools, and continues execution only after explicit confirmation. The MVP review path uses Chinese Mock World demo content for the family afternoon scenario.
+The Web demo API starts the official workflow, pauses before write tools, and continues execution only after explicit confirmation. The MVP review path now uses Chinese customer-facing copy across the full six-chip Mock World demo surface rather than only the family afternoon path.
 The customer page at `http://127.0.0.1:5173/` now exposes six fixed Mock World scenario chips for the start path: `亲子`, `朋友`, `单人`, `情侣`, `雨天`, and `预算`. Clicking a chip fills the composer with the canonical prompt for that scenario and sends the corresponding `mock_world_profile` only on the initial start request. The chip does not auto-submit.
 The public customer surface does not expose a first-screen AMap selector in this task. The default customer path stays on `Mock World`. To preview the live read provider locally, send `read_profile="amap"` through the API and keep `AMAP_MAPS_API_KEY` in local `.env`; that AMAP path remains read-only and cannot be confirmed into execution.
 When a start request is still missing key supported constraints, or when bounded recovery needs an explicit user tradeoff, the workflow stops in `awaiting_clarification` instead of fabricating a plan. In that state the public `DemoRunSummary` returns `plans = []`, `selected_plan_id = null`, and a compact `clarification` object with the user-visible follow-up prompt plus the missing supported fields.

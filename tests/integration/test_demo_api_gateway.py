@@ -57,6 +57,38 @@ EXPLICIT_MOCK_WORLD_PRESETS = [
         "今天下午想一个人在附近待几个小时，尽量控制预算，先安排免费或低价活动，再吃一顿便宜简餐，不要太远。",
     ),
 ]
+EXPLICIT_PROFILE_COPY_EXPECTATIONS = {
+    "friends_gathering": {
+        "summary_fragment": "和朋友散步聊天",
+        "reasons": ["已选择适合朋友聚会的活动", "已选择适合分享的用餐", "活动到餐厅路线已验证"],
+        "activity_note": "根据候选详情、营业时间和聚会氛围安排朋友同行活动。",
+        "dining_note": "结合分享型用餐、朋友聚会氛围和桌位信息安排晚餐。",
+    },
+    "solo_afternoon": {
+        "summary_fragment": "一个人轻松逛逛",
+        "reasons": ["已选择适合单人放松的活动", "已选择轻量简餐", "活动到餐厅路线已验证"],
+        "activity_note": "根据候选详情、营业时间和轻松节奏安排单人活动。",
+        "dining_note": "结合简餐偏好、安静程度和桌位信息安排用餐。",
+    },
+    "couple_afternoon": {
+        "summary_fragment": "和伴侣慢慢逛",
+        "reasons": ["已选择适合两人同行的活动", "已选择适合约会节奏的用餐", "活动到餐厅路线已验证"],
+        "activity_note": "根据候选详情、营业时间和两人同行节奏安排活动。",
+        "dining_note": "结合约会氛围、轻食偏好和桌位信息安排晚餐。",
+    },
+    "rainy_day_fallback": {
+        "summary_fragment": "室内避雨活动",
+        "reasons": ["已选择雨天可行的室内活动", "已选择适合雨天的热食简餐", "活动到餐厅路线已验证"],
+        "activity_note": "根据候选详情、营业时间和室内可行性安排雨天活动。",
+        "dining_note": "结合热食偏好、就近便利度和桌位信息安排雨天用餐。",
+    },
+    "budget_lite": {
+        "summary_fragment": "低预算活动",
+        "reasons": ["已选择免费或低价活动", "已选择预算友好的用餐", "活动到餐厅路线已验证"],
+        "activity_note": "根据候选详情、营业时间和价格友好度安排低预算活动。",
+        "dining_note": "结合预算限制、出餐效率和桌位信息安排平价用餐。",
+    },
+}
 FORBIDDEN_RESPONSE_KEYS = {
     "action_id",
     "tool_event_id",
@@ -655,6 +687,13 @@ def test_demo_run_friends_group_start_persists_friends_world_and_confirms_succes
     )
     selected_start_plan = next(plan for plan in start_body["plans"] if plan["selected"])
     _assert_action_manifest_preview(selected_start_plan)
+    expected_copy = EXPLICIT_PROFILE_COPY_EXPECTATIONS.get(mock_world_profile)
+    if expected_copy is not None:
+        assert expected_copy["summary_fragment"] in selected_start_plan["summary"]
+        assert "亲子活动" not in selected_start_plan["summary"]
+        assert selected_start_plan["feasibility"]["reasons"] == expected_copy["reasons"]
+        assert selected_start_plan["timeline"][0]["notes"] == [expected_copy["activity_note"]]
+        assert selected_start_plan["timeline"][2]["notes"] == [expected_copy["dining_note"]]
     run_id = UUID(start_body["run_id"])
 
     db = SessionLocal()

@@ -4,12 +4,15 @@ from copy import deepcopy
 from datetime import datetime
 from uuid import UUID, uuid4
 
+import pytest
+
 from backend.app.planning import (
     Candidate,
     CandidateEnrichmentResult,
     DeterministicItineraryGenerator,
     EnrichedCandidate,
     EnrichmentToolResult,
+    IntentConstraints,
     LocalLifeIntent,
     ParticipantProfile,
     QueryPlan,
@@ -18,18 +21,34 @@ from backend.app.planning import (
 )
 
 
-def _intent(*, start_at: datetime | None = None, end_at: datetime | None = None) -> LocalLifeIntent:
+def _intent(
+    *,
+    raw_text: str = "family afternoon",
+    scenario_type: str = "family",
+    adults: int = 2,
+    children_ages: list[int] | None = None,
+    child_friendly: bool = True,
+    activity_preferences: list[str] | None = None,
+    dining_preferences: list[str] | None = None,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+) -> LocalLifeIntent:
+    resolved_children_ages = [5] if children_ages is None else children_ages
     return LocalLifeIntent(
-        raw_text="family afternoon",
-        participants=ParticipantProfile(adults=2, children_ages=[5]),
+        raw_text=raw_text,
+        scenario_type=scenario_type,  # type: ignore[arg-type]
+        participants=ParticipantProfile(adults=adults, children_ages=resolved_children_ages),
         time_window=TimeWindow(start_at=start_at, end_at=end_at),
+        constraints=IntentConstraints(child_friendly=child_friendly),
+        activity_preferences=activity_preferences or [],
+        dining_preferences=dining_preferences or [],
         parser_version="test-parser",
     )
 
 
-def _plan(*, start_at: datetime | None = None, end_at: datetime | None = None) -> QueryPlan:
+def _plan(**intent_kwargs) -> QueryPlan:
     return QueryPlan(
-        intent=_intent(start_at=start_at, end_at=end_at),
+        intent=_intent(**intent_kwargs),
         provider_profile="mock_world",
         planner_version="test-planner",
     )
@@ -78,6 +97,7 @@ def _activity(
     candidate_id: str = "activity_museum_001",
     *,
     name: str = "徐汇亲子科学馆",
+    tags: list[str] | None = None,
     ticket_available: bool | None = True,
     tool_event_ids: list[UUID] | None = None,
 ) -> EnrichedCandidate:
@@ -95,7 +115,7 @@ def _activity(
         candidate=_candidate(
             candidate_id,
             name=name,
-            tags=["child_friendly", "indoor"],
+            tags=tags or ["child_friendly", "indoor"],
             tool_event_id=candidate_event_id,
         ),
         poi_detail={"poi_id": candidate_id, "name": name},
@@ -116,6 +136,7 @@ def _dining(
     candidate_id: str = "restaurant_light_001",
     *,
     name: str = "绿碗家庭轻食",
+    tags: list[str] | None = None,
     table_available: bool | None = True,
     queue_status: str | None = "open",
     queue_wait_minutes: int | None = 10,
@@ -143,7 +164,7 @@ def _dining(
             candidate_id,
             name=name,
             category="dining",
-            tags=["lighter_options", "child_friendly"],
+            tags=tags or ["lighter_options", "child_friendly"],
         ),
         poi_detail={"poi_id": candidate_id, "name": name},
         opening_hours={"is_open": True},
@@ -425,3 +446,132 @@ def test_generator_does_not_mutate_input_enrichment_result() -> None:
     DeterministicItineraryGenerator().generate(_plan(), enrichment)
 
     assert enrichment.model_dump(mode="json") == before
+
+
+@pytest.mark.parametrize(
+    ("plan_kwargs", "activity", "dining", "expected_summary", "expected_reasons", "expected_activity_note", "expected_dining_note"),
+    [
+        (
+            {
+                "raw_text": "friends nearby this afternoon",
+                "scenario_type": "friends",
+                "adults": 3,
+                "children_ages": [],
+                "child_friendly": False,
+            },
+            _activity("activity_lawn_301", name="苏河边草坪聚会点", tags=["group_friendly", "hangout"]),
+            _dining(
+                "restaurant_yard_301",
+                name="庭院分享餐吧",
+                tags=["casual_dining", "friends_group", "sharing_plates"],
+            ),
+            "和朋友散步聊天",
+            ["已选择适合朋友聚会的活动", "已选择适合分享的用餐", "活动到餐厅路线已验证"],
+            "根据候选详情、营业时间和聚会氛围安排朋友同行活动。",
+            "结合分享型用餐、朋友聚会氛围和桌位信息安排晚餐。",
+        ),
+        (
+            {
+                "raw_text": "solo nearby this afternoon",
+                "scenario_type": "solo",
+                "adults": 1,
+                "children_ages": [],
+                "child_friendly": False,
+            },
+            _activity("activity_gallery_001", name="静安轻展馆", tags=["indoor", "museum", "light_activity"]),
+            _dining("restaurant_light_001", name="静安清淡食堂", tags=["lighter_options", "quiet", "light_meal"]),
+            "一个人轻松逛逛",
+            ["已选择适合单人放松的活动", "已选择轻量简餐", "活动到餐厅路线已验证"],
+            "根据候选详情、营业时间和轻松节奏安排单人活动。",
+            "结合简餐偏好、安静程度和桌位信息安排用餐。",
+        ),
+        (
+            {
+                "raw_text": "和伴侣 citywalk 一下",
+                "scenario_type": "unknown",
+                "adults": 2,
+                "children_ages": [],
+                "child_friendly": False,
+            },
+            _activity("activity_citywalk_201", name="法式街区漫步", tags=["citywalk", "gallery"]),
+            _dining("restaurant_light_201", name="小馆轻食", tags=["date_friendly", "light_meal"]),
+            "和伴侣慢慢逛",
+            ["已选择适合两人同行的活动", "已选择适合约会节奏的用餐", "活动到餐厅路线已验证"],
+            "根据候选详情、营业时间和两人同行节奏安排活动。",
+            "结合约会氛围、轻食偏好和桌位信息安排晚餐。",
+        ),
+        (
+            {
+                "raw_text": "下雨了，想找室内活动",
+                "scenario_type": "friends",
+                "adults": 2,
+                "children_ages": [],
+                "child_friendly": False,
+            },
+            _activity("activity_market_401", name="室内市集", tags=["indoor", "market"]),
+            _dining("restaurant_soup_401", name="热汤简餐屋", tags=["comfort_food", "nearby", "warm_food"]),
+            "室内避雨活动",
+            ["已选择雨天可行的室内活动", "已选择适合雨天的热食简餐", "活动到餐厅路线已验证"],
+            "根据候选详情、营业时间和室内可行性安排雨天活动。",
+            "结合热食偏好、就近便利度和桌位信息安排雨天用餐。",
+        ),
+        (
+            {
+                "raw_text": "预算有限，找便宜点的",
+                "scenario_type": "solo",
+                "adults": 1,
+                "children_ages": [],
+                "child_friendly": False,
+            },
+            _activity("activity_park_501", name="河边免费公园步道", tags=["free_activity", "light_activity"]),
+            _dining("restaurant_bento_501", name="平价便当小馆", tags=["budget_limited", "value_set", "quick_meal"]),
+            "低预算活动",
+            ["已选择免费或低价活动", "已选择预算友好的用餐", "活动到餐厅路线已验证"],
+            "根据候选详情、营业时间和价格友好度安排低预算活动。",
+            "结合预算限制、出餐效率和桌位信息安排平价用餐。",
+        ),
+    ],
+)
+def test_generator_uses_scenario_specific_copy(
+    plan_kwargs,
+    activity,
+    dining,
+    expected_summary,
+    expected_reasons,
+    expected_activity_note,
+    expected_dining_note,
+) -> None:
+    result = DeterministicItineraryGenerator().generate(
+        _plan(**plan_kwargs),
+        _enrichment(activities=[activity], dining=[dining], routes=[_route(origin_candidate_id=activity.candidate.candidate_id, destination_candidate_id=dining.candidate.candidate_id)]),
+    )
+
+    draft = result.drafts[0]
+    assert expected_summary in draft.summary
+    assert draft.feasibility.reasons == expected_reasons
+    assert draft.timeline[0].notes == [expected_activity_note]
+    assert draft.timeline[2].notes == [expected_dining_note]
+    assert "亲子活动" not in draft.summary
+
+
+def test_generator_falls_back_to_generic_copy_for_ambiguous_non_family_cases() -> None:
+    result = DeterministicItineraryGenerator().generate(
+        _plan(
+            raw_text="想在附近安排一下下午活动",
+            scenario_type="unknown",
+            adults=2,
+            children_ages=[],
+            child_friendly=False,
+        ),
+        _enrichment(
+            activities=[_activity("activity_generic", name="附近活动点", tags=["quiet"])],
+            dining=[_dining("restaurant_generic", name="附近餐厅", tags=["casual"])],
+            routes=[_route(origin_candidate_id="activity_generic", destination_candidate_id="restaurant_generic")],
+        ),
+    )
+
+    draft = result.drafts[0]
+    assert draft.summary == "先去附近活动点安排活动，再去附近餐厅用餐，中间步行约12分钟。"
+    assert draft.feasibility.reasons == ["已选择可行活动", "已选择可行用餐", "活动到餐厅路线已验证"]
+    assert draft.timeline[0].notes == ["根据候选详情、营业时间和可用性安排活动。"]
+    assert draft.timeline[2].notes == ["结合用餐偏好和桌位信息安排用餐。"]
