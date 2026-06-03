@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildProgressCardItem, projectConversationThread, resolveSelectedPlanIndex } from "./thread";
+import {
+  actionTargetLabel,
+  buildProgressCardItem,
+  projectConversationThread,
+  resolveSelectedPlanIndex,
+  tagLabel,
+  userFacingText,
+} from "./thread";
 import type { DemoRunSummary, DemoProgressStage } from "../types/demo";
 
 const progressLabels: Record<DemoProgressStage, string> = {
@@ -372,5 +379,77 @@ describe("projectConversationThread", () => {
       throw new Error("Expected the second projected item to be the clarification card.");
     }
     expect(clarificationCard.followUpKind).toBe("clarification");
+  });
+
+  it("localizes visible english names, addresses, and route summaries for non-family fixtures", () => {
+    expect(userFacingText("Patio Queue House")).toBe("露台排队餐屋");
+    expect(userFacingText("Friends Patio Road 11")).toBe("上海市长宁区朋友露台路11号");
+    expect(userFacingText("A usable outdoor link, but slower than the canonical lawn-to-yard pairing.")).toBe(
+      "这条户外步行路线可用，但比首选草坪到庭院餐吧的组合更慢。",
+    );
+    expect(userFacingText("Shared Table Game Loft")).toBe("共享桌游阁楼");
+    expect(userFacingText("Jing'an District Counter Road 10")).toBe("上海市静安区吧台路10号");
+    expect(userFacingText("A straightforward walk from the gallery to a louder dining room farther down the block.")).toBe(
+      "从展馆步行到更热闹的备选餐厅路线直接，但整体氛围不如首选单人晚餐。",
+    );
+    expect(userFacingText("Hotpot Queue Counter")).toBe("火锅排队柜台");
+    expect(userFacingText("A valid covered walk, but slower than the canonical market-to-soup transfer.")).toBe(
+      "这条有遮挡的步行路线可用，但比首选室内市集到热汤店的衔接更慢。",
+    );
+    expect(userFacingText("Value Bistro Express")).toBe("高性价比小馆快线");
+    expect(userFacingText("A valid route, but it is longer than the canonical park-to-bento walk.")).toBe(
+      "这条路线可用，但比首选公园到便当店的步行更长。",
+    );
+  });
+
+  it("localizes newly exposed multi-scenario tags", () => {
+    expect(tagLabel("hangout")).toBe("轻松聚会");
+    expect(tagLabel("sports")).toBe("轻运动");
+    expect(tagLabel("casual_dining")).toBe("轻松用餐");
+    expect(tagLabel("friends_group")).toBe("朋友同行");
+    expect(tagLabel("sharing_plates")).toBe("适合分享");
+    expect(tagLabel("slow_service")).toBe("出餐较慢");
+    expect(tagLabel("couple_friendly")).toBe("适合两人同行");
+    expect(tagLabel("date_friendly")).toBe("适合约会");
+    expect(tagLabel("casual")).toBe("轻松氛围");
+    expect(tagLabel("social")).toBe("适合社交");
+    expect(tagLabel("gallery")).toBe("画廊");
+    expect(tagLabel("light_meal")).toBe("轻食");
+    expect(tagLabel("family_pause")).toBe("适合短暂休息");
+    expect(tagLabel("comfort_food")).toBe("暖胃热食");
+    expect(tagLabel("market")).toBe("市集");
+    expect(tagLabel("nearby")).toBe("就近");
+    expect(tagLabel("warm_food")).toBe("热食");
+    expect(tagLabel("restaurant")).toBe("餐饮");
+    expect(tagLabel("budget_limited")).toBe("预算有限");
+    expect(tagLabel("free_activity")).toBe("免费活动");
+    expect(tagLabel("premium")).toBe("价格偏高");
+    expect(tagLabel("value_set")).toBe("平价套餐");
+  });
+
+  it("does not fall back to raw target ids for newly public multi-scenario plans", () => {
+    const friendsPlan = {
+      ...awaitingRun.plans[0],
+      activity: {
+        candidate_id: "activity_lawn_301",
+        name: "苏河边草坪聚会点",
+        category: "activity",
+        address: "上海市长宁区临空一路88号附近",
+        tags: ["group_friendly", "hangout"],
+      },
+      dining: {
+        candidate_id: "restaurant_yard_301",
+        name: "庭院分享餐吧",
+        category: "dining",
+        address: "上海市长宁区天山西路58号",
+        tags: ["casual_dining", "friends_group"],
+      },
+    };
+
+    expect(actionTargetLabel(friendsPlan, "activity_lawn_301", "book_ticket")).toBe("苏河边草坪聚会点");
+    expect(actionTargetLabel(friendsPlan, "restaurant_yard_301", "reserve_restaurant")).toBe("庭院分享餐吧");
+    expect(actionTargetLabel(friendsPlan, "queue_restaurant_yard_301", "join_queue")).toBe("庭院分享餐吧排队取号");
+    expect(actionTargetLabel(friendsPlan, "activity_arcade_301", "book_ticket")).toBe("苏河边草坪聚会点");
+    expect(actionTargetLabel(friendsPlan, "restaurant_patio_301", "reserve_restaurant")).not.toBe("restaurant_patio_301");
   });
 });

@@ -40,6 +40,50 @@ class DeterministicItineraryGenerator:
     _ACTIVITY_DURATION_MINUTES = 150
     _DEFAULT_TRANSFER_DURATION_MINUTES = 20
     _DINING_DURATION_MINUTES = 90
+    _COPY_TEMPLATES = {
+        "family": {
+            "summary": "先去{activity}做亲子活动，再去{dining}吃清淡晚餐，{route_text}。",
+            "activity_note": "根据候选详情、营业时间和票务信息安排亲子活动。",
+            "dining_note": "结合清淡偏好、亲子友好度和桌位信息安排晚餐。",
+            "reasons": ["已选择亲子活动", "已选择清淡用餐", "活动到餐厅路线已验证"],
+        },
+        "friends": {
+            "summary": "先去{activity}和朋友散步聊天，再去{dining}吃适合分享的轻松晚餐，{route_text}。",
+            "activity_note": "根据候选详情、营业时间和聚会氛围安排朋友同行活动。",
+            "dining_note": "结合分享型用餐、朋友聚会氛围和桌位信息安排晚餐。",
+            "reasons": ["已选择适合朋友聚会的活动", "已选择适合分享的用餐", "活动到餐厅路线已验证"],
+        },
+        "solo": {
+            "summary": "先去{activity}一个人轻松逛逛，再去{dining}吃一顿简餐，{route_text}。",
+            "activity_note": "根据候选详情、营业时间和轻松节奏安排单人活动。",
+            "dining_note": "结合简餐偏好、安静程度和桌位信息安排用餐。",
+            "reasons": ["已选择适合单人放松的活动", "已选择轻量简餐", "活动到餐厅路线已验证"],
+        },
+        "couple": {
+            "summary": "先去{activity}和伴侣慢慢逛，再去{dining}吃一顿轻松晚餐，{route_text}。",
+            "activity_note": "根据候选详情、营业时间和两人同行节奏安排活动。",
+            "dining_note": "结合约会氛围、轻食偏好和桌位信息安排晚餐。",
+            "reasons": ["已选择适合两人同行的活动", "已选择适合约会节奏的用餐", "活动到餐厅路线已验证"],
+        },
+        "rainy": {
+            "summary": "先去{activity}安排室内避雨活动，再去{dining}吃一顿热一点的简餐，{route_text}。",
+            "activity_note": "根据候选详情、营业时间和室内可行性安排雨天活动。",
+            "dining_note": "结合热食偏好、就近便利度和桌位信息安排雨天用餐。",
+            "reasons": ["已选择雨天可行的室内活动", "已选择适合雨天的热食简餐", "活动到餐厅路线已验证"],
+        },
+        "budget": {
+            "summary": "先去{activity}安排低预算活动，再去{dining}吃一顿平价简餐，{route_text}。",
+            "activity_note": "根据候选详情、营业时间和价格友好度安排低预算活动。",
+            "dining_note": "结合预算限制、出餐效率和桌位信息安排平价用餐。",
+            "reasons": ["已选择免费或低价活动", "已选择预算友好的用餐", "活动到餐厅路线已验证"],
+        },
+        "generic": {
+            "summary": "先去{activity}安排活动，再去{dining}用餐，{route_text}。",
+            "activity_note": "根据候选详情、营业时间和可用性安排活动。",
+            "dining_note": "结合用餐偏好和桌位信息安排用餐。",
+            "reasons": ["已选择可行活动", "已选择可行用餐", "活动到餐厅路线已验证"],
+        },
+    }
 
     def __init__(self, max_drafts: int = 3) -> None:
         self._max_drafts = max(0, max_drafts)
@@ -153,7 +197,9 @@ class DeterministicItineraryGenerator:
     ) -> ItineraryDraft:
         draft_id = f"draft_{draft_index}"
         warnings = self._warnings_for_pair(plan, pair)
-        timeline = self._build_timeline(plan, pair, warnings)
+        copy_profile = self._display_copy_profile(plan, pair)
+        copy = self._COPY_TEMPLATES[copy_profile]
+        timeline = self._build_timeline(plan, pair, warnings, copy)
         total_duration = sum(item.duration_minutes for item in timeline)
         proposed_actions = self._build_proposed_actions(plan, pair, draft_id)
         route_ref = self._route_ref(pair.route)
@@ -161,7 +207,7 @@ class DeterministicItineraryGenerator:
         return ItineraryDraft(
             draft_id=draft_id,
             title=f"{pair.activity.candidate.name} + {pair.dining.candidate.name}",
-            summary=self._summary(pair),
+            summary=self._summary(pair, copy),
             activity=self._candidate_ref(pair.activity),
             dining=self._candidate_ref(pair.dining),
             route=route_ref,
@@ -169,7 +215,7 @@ class DeterministicItineraryGenerator:
             proposed_actions=proposed_actions,
             feasibility=FeasibilitySummary(
                 is_feasible=True,
-                reasons=["已选择亲子活动", "已选择清淡用餐", "活动到餐厅路线已验证"],
+                reasons=list(copy["reasons"]),
                 warnings=warnings,
                 total_duration_minutes=total_duration,
                 route_duration_minutes=pair.route.duration_minutes,
@@ -232,6 +278,7 @@ class DeterministicItineraryGenerator:
         plan: QueryPlan,
         pair: _DraftPair,
         warnings: list[str],
+        copy: dict[str, Any],
     ) -> list[TimelineItem]:
         transfer_duration = pair.route.duration_minutes or self._DEFAULT_TRANSFER_DURATION_MINUTES
         base_duration = (
@@ -250,7 +297,7 @@ class DeterministicItineraryGenerator:
                 f"体验{pair.activity.candidate.name}",
                 pair.activity.candidate.candidate_id,
                 self._ACTIVITY_DURATION_MINUTES,
-                ["根据候选详情、营业时间和票务信息安排亲子活动。"],
+                [str(copy["activity_note"])],
             ),
             (
                 "transfer",
@@ -264,7 +311,7 @@ class DeterministicItineraryGenerator:
                 f"在{pair.dining.candidate.name}用餐",
                 pair.dining.candidate.candidate_id,
                 self._DINING_DURATION_MINUTES,
-                ["结合清淡偏好、亲子友好度和桌位信息安排晚餐。"],
+                [str(copy["dining_note"])],
             ),
             (
                 "buffer",
@@ -390,15 +437,49 @@ class DeterministicItineraryGenerator:
             self._append_warning(warnings, "餐厅排队等待较长")
         return warnings
 
-    def _summary(self, pair: _DraftPair) -> str:
+    def _summary(self, pair: _DraftPair, copy: dict[str, Any]) -> str:
         if pair.route.duration_minutes is None:
             route_text = "路线已验证"
         else:
             route_text = f"中间步行约{pair.route.duration_minutes}分钟"
-        return (
-            f"先去{pair.activity.candidate.name}做亲子活动，再去"
-            f"{pair.dining.candidate.name}吃清淡晚餐，{route_text}。"
+        return str(copy["summary"]).format(
+            activity=pair.activity.candidate.name,
+            dining=pair.dining.candidate.name,
+            route_text=route_text,
         )
+
+    def _display_copy_profile(self, plan: QueryPlan, pair: _DraftPair) -> str:
+        intent = plan.intent
+        raw_text = intent.raw_text.lower()
+        activity_tags = {tag.lower() for tag in pair.activity.candidate.tags}
+        dining_tags = {tag.lower() for tag in pair.dining.candidate.tags}
+        pair_tags = activity_tags | dining_tags
+        has_child_signal = bool(intent.participants.children_ages) or intent.constraints.child_friendly
+
+        if has_child_signal:
+            return "family"
+        if any(keyword in raw_text for keyword in ("雨", "下雨", "rain", "rainy")) or pair_tags.intersection(
+            {"comfort_food", "warm_food", "market", "nearby"}
+        ):
+            return "rainy"
+        if any(keyword in raw_text for keyword in ("预算", "便宜", "低价", "免费", "budget", "cheap", "free")) or pair_tags.intersection(
+            {"budget_limited", "free_activity", "value_set"}
+        ):
+            return "budget"
+        if intent.scenario_type == "friends":
+            return "friends"
+        if (
+            not has_child_signal
+            and intent.participants.adults >= 2
+            and (
+                any(keyword in raw_text for keyword in ("伴侣", "爱人", "另一半", "wife", "husband", "partner"))
+                or pair_tags.intersection({"date_friendly", "couple_friendly", "gallery", "citywalk"})
+            )
+        ):
+            return "couple"
+        if intent.scenario_type == "solo" or (not has_child_signal and intent.participants.adults == 1):
+            return "solo"
+        return "generic"
 
     def _activity_is_usable(self, activity: EnrichedCandidate) -> bool:
         ticket = activity.ticket_availability

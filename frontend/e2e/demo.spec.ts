@@ -428,7 +428,13 @@ test.describe("desktop web demo", () => {
 
     await expect(page.getByTestId("confirm-button")).toBeVisible();
     await page.getByRole("button", { name: "\u6d3b\u52a8\u4e0e\u9910\u5385" }).last().click();
-    await expect(page.locator("body")).toContainText(/\u9002\u5408\u670b\u53cb\u805a\u4f1a|group_friendly/);
+    await expect(page.locator("body")).toContainText("\u9002\u5408\u670b\u53cb\u805a\u4f1a");
+    await expect(page.locator("body")).not.toContainText("group_friendly");
+    await expect(page.locator("body")).not.toContainText("Patio Queue House");
+    await expect(page.locator("body")).not.toContainText("Quiet Bistro Corner");
+    await page.getByRole("button", { name: "\u8def\u7ebf\u4e0e\u53ef\u6267\u884c\u6027" }).last().click();
+    await expect(page.locator("body")).not.toContainText("A usable outdoor link");
+    await expect(page.locator("body")).not.toContainText("A valid route to the quieter dinner fallback");
 
     await page.getByTestId("confirm-button").click();
 
