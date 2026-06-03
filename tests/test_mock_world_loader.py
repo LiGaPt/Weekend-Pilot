@@ -13,6 +13,7 @@ SUPPORTED_PROFILES = (
     "friends_gathering",
     "rainy_day_fallback",
     "budget_lite",
+    "elder_afternoon",
 )
 MINIMUM_CATEGORY_COUNTS = {
     "family_afternoon": {"activity": 5, "dining": 5},
@@ -21,6 +22,7 @@ MINIMUM_CATEGORY_COUNTS = {
     "friends_gathering": {"activity": 4, "dining": 4},
     "rainy_day_fallback": {"activity": 4, "dining": 4},
     "budget_lite": {"activity": 4, "dining": 4},
+    "elder_afternoon": {"activity": 4, "dining": 4},
 }
 
 

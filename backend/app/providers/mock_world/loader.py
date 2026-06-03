@@ -14,6 +14,7 @@ SUPPORTED_PROFILES = {
     "friends_gathering": "friends_gathering.json",
     "rainy_day_fallback": "rainy_day_fallback.json",
     "budget_lite": "budget_lite.json",
+    "elder_afternoon": "elder_afternoon.json",
 }
 REQUIRED_TOP_LEVEL_KEYS = {
     "profile",

@@ -20,6 +20,7 @@ FORBIDDEN_REPORT_TEXT = (
 
 EXPECTED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
+    "elder": 1,
     "family": 11,
     "friends": 2,
     "mixed": 3,
@@ -29,13 +30,14 @@ EXPECTED_SCENARIO_BUCKET_COUNTS = {
 EXPECTED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 2,
     "couple_afternoon": 1,
+    "elder_afternoon": 1,
     "family_afternoon": 11,
     "friends_gathering": 2,
     "rainy_day_fallback": 3,
     "solo_afternoon": 2,
 }
 EXPECTED_FAILURE_MODE_COUNTS = {
-    "none": 18,
+    "none": 19,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
@@ -45,6 +47,7 @@ EXPECTED_CONSTRAINT_TAG_COUNTS = {
     "casual_dining": 2,
     "conversation_continuation": 2,
     "date_friendly": 1,
+    "elder_friendly": 1,
     "friends_group": 2,
     "memory_governance": 2,
     "rainy_day": 3,
@@ -63,8 +66,8 @@ def test_benchmark_coverage_gate_runs_all_registered_and_refreshes_latest_alias(
         assert result.release_blocked is False
         assert result.blocking_failures == []
         assert result.run_status == "passed"
-        assert result.case_count == 21
-        assert result.passed_count == 21
+        assert result.case_count == 22
+        assert result.passed_count == 22
         assert result.failed_count == 0
         assert result.error_count == 0
         assert result.overall_score == 1.0
@@ -75,14 +78,14 @@ def test_benchmark_coverage_gate_runs_all_registered_and_refreshes_latest_alias(
         assert result.world_profile_counts == EXPECTED_WORLD_PROFILE_COUNTS
         assert result.failure_mode_counts == EXPECTED_FAILURE_MODE_COUNTS
         assert result.constraint_tag_case_counts == EXPECTED_CONSTRAINT_TAG_COUNTS
-        assert result.share_checks["family_scenario_share"]["observed_ratio"] == 0.5238
-        assert result.share_checks["family_afternoon_world_profile_share"]["observed_ratio"] == 0.5238
-        assert result.share_checks["non_failure_share"]["observed_ratio"] == 0.8571
+        assert result.share_checks["family_scenario_share"]["observed_ratio"] == 0.5
+        assert result.share_checks["family_afternoon_world_profile_share"]["observed_ratio"] == 0.5
+        assert result.share_checks["non_failure_share"]["observed_ratio"] == 0.8636
 
         suite_payload = json.loads(result.suite_report_path.read_text(encoding="utf-8"))
         latest_payload = json.loads(result.latest_report_path.read_text(encoding="utf-8"))
         assert suite_payload["benchmark_summary"]["suite_id"] == "all_registered"
-        assert suite_payload["benchmark_summary"]["case_count"] == 21
+        assert suite_payload["benchmark_summary"]["case_count"] == 22
         assert suite_payload["benchmark_summary"]["matrix_summary"]["scenario_bucket_counts"] == (
             EXPECTED_SCENARIO_BUCKET_COUNTS
         )
@@ -95,7 +98,8 @@ def test_benchmark_coverage_gate_runs_all_registered_and_refreshes_latest_alias(
         assert suite_payload["benchmark_summary"]["outcome_rollup"]["constraint_tag_outcomes"]
         assert suite_payload["coverage_gate_evaluation"]["gate_id"] == "coverage_gate_v1_5"
         assert suite_payload["coverage_gate_evaluation"]["release_blocked"] is False
-        assert suite_payload["coverage_gate_evaluation"]["observed_coverage"]["case_count"] == 21
+        assert suite_payload["coverage_gate_evaluation"]["coverage_thresholds"]["minimum_case_count"] == 22
+        assert suite_payload["coverage_gate_evaluation"]["observed_coverage"]["case_count"] == 22
         assert suite_payload["coverage_gate_evaluation"]["observed_coverage"]["scenario_bucket_counts"] == (
             EXPECTED_SCENARIO_BUCKET_COUNTS
         )

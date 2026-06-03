@@ -31,6 +31,7 @@ REGISTERED_CASE_IDS = [
     "friends_gathering_v1",
     "rainy_day_fallback_v1",
     "budget_lite_v1",
+    "elder_afternoon_v1",
     "family_route_failure_v1",
     "family_route_and_dining_unavailable_v1",
     "rainy_day_ticket_sold_out_v1",
@@ -44,7 +45,7 @@ REGISTERED_CASE_IDS = [
     "budget_indoor_fallback_v1",
 ]
 BASELINE_CASE_IDS = REGISTERED_CASE_IDS[:6]
-EXPANDED_CASE_IDS = REGISTERED_CASE_IDS[6:10]
+EXPANDED_CASE_IDS = REGISTERED_CASE_IDS[6:11]
 RECOVERY_FOCUSED_CASE_IDS = [
     "family_route_failure_v1",
     "family_route_and_dining_unavailable_v1",
@@ -67,7 +68,11 @@ ROBUSTNESS_FOCUSED_CASE_IDS = [
 ]
 DEFAULT_CASE_IDS = BASELINE_CASE_IDS + EXPANDED_CASE_IDS
 RELEASE_GATE_V1_CASE_IDS = [
-    *DEFAULT_CASE_IDS,
+    *BASELINE_CASE_IDS,
+    "couple_afternoon_v1",
+    "friends_gathering_v1",
+    "rainy_day_fallback_v1",
+    "budget_lite_v1",
     "family_route_failure_v1",
     "family_memory_advisory_fill_v1",
     "family_memory_expired_advisory_v1",
@@ -103,32 +108,36 @@ BASELINE_TAG_COUNTS = {
 }
 EXPANDED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
+    "elder": 1,
     "friends": 1,
     "mixed": 1,
     "unknown": 1,
 }
-EXPANDED_LEVEL_COUNTS = {"L2": 4}
-EXPANDED_TOOL_PROFILE_COUNTS = {"mock_world": 4}
+EXPANDED_LEVEL_COUNTS = {"L2": 5}
+EXPANDED_TOOL_PROFILE_COUNTS = {"mock_world": 5}
 EXPANDED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
+    "elder_afternoon": 1,
     "friends_gathering": 1,
     "rainy_day_fallback": 1,
 }
-EXPANDED_FAILURE_MODE_COUNTS = {"none": 4}
+EXPANDED_FAILURE_MODE_COUNTS = {"none": 5}
 EXPANDED_TAG_COUNTS = {
     "budget_limited": 1,
     "casual_dining": 1,
     "citywalk": 1,
     "date_friendly": 1,
+    "elder_friendly": 1,
     "fallback": 1,
     "free_activity": 1,
     "friends_group": 1,
     "indoor_activity": 1,
-    "light_meal": 1,
+    "light_meal": 2,
     "outdoor_activity": 1,
     "quick_meal": 1,
     "rainy_day": 1,
+    "short_walk": 1,
 }
 RECOVERY_SCENARIO_BUCKET_COUNTS = {"family": 2, "mixed": 1}
 RECOVERY_LEVEL_COUNTS = {"L2": 1, "L5": 2}
@@ -152,23 +161,25 @@ RECOVERY_TAG_COUNTS = {
 }
 DEFAULT_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
+    "elder": 1,
     "family": 5,
     "friends": 1,
     "mixed": 1,
     "solo": 1,
     "unknown": 1,
 }
-DEFAULT_LEVEL_COUNTS = {"L1": 3, "L2": 7}
-DEFAULT_TOOL_PROFILE_COUNTS = {"mock_world": 10}
+DEFAULT_LEVEL_COUNTS = {"L1": 3, "L2": 8}
+DEFAULT_TOOL_PROFILE_COUNTS = {"mock_world": 11}
 DEFAULT_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
+    "elder_afternoon": 1,
     "family_afternoon": 5,
     "friends_gathering": 1,
     "rainy_day_fallback": 1,
     "solo_afternoon": 1,
 }
-DEFAULT_FAILURE_MODE_COUNTS = {"none": 10}
+DEFAULT_FAILURE_MODE_COUNTS = {"none": 11}
 DEFAULT_TAG_COUNTS = {
     "addon_optional": 1,
     "baseline": 2,
@@ -177,17 +188,19 @@ DEFAULT_TAG_COUNTS = {
     "child_friendly": 5,
     "citywalk": 2,
     "date_friendly": 1,
+    "elder_friendly": 1,
     "fallback": 1,
     "free_activity": 1,
     "friends_group": 1,
     "indoor_activity": 3,
     "light_activity": 1,
-    "light_meal": 5,
+    "light_meal": 6,
     "memory_override": 1,
     "outdoor_activity": 2,
     "quick_dinner": 1,
     "quick_meal": 1,
     "rainy_day": 1,
+    "short_walk": 1,
 }
 MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS = {"family": 3}
 MEMORY_GOVERNANCE_LEVEL_COUNTS = {"L2": 1, "L3": 2}
@@ -302,24 +315,26 @@ RELEASE_GATE_V1_TAG_COUNTS = {
 }
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
+    "elder": 1,
     "family": 11,
     "friends": 2,
     "mixed": 3,
     "solo": 2,
     "unknown": 2,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 12, "L3": 4, "L5": 2}
-ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 21}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 13, "L3": 4, "L5": 2}
+ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 22}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 2,
     "couple_afternoon": 1,
+    "elder_afternoon": 1,
     "family_afternoon": 11,
     "friends_gathering": 2,
     "rainy_day_fallback": 3,
     "solo_afternoon": 2,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
-    "none": 18,
+    "none": 19,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
@@ -338,6 +353,7 @@ ALL_REGISTERED_TAG_COUNTS = {
     "date_friendly": 1,
     "distractor_selection": 2,
     "dining_unavailable": 1,
+    "elder_friendly": 1,
     "failure_injected": 3,
     "fallback": 1,
     "fallback_selection": 1,
@@ -345,7 +361,7 @@ ALL_REGISTERED_TAG_COUNTS = {
     "friends_group": 2,
     "indoor_activity": 6,
     "light_activity": 2,
-    "light_meal": 10,
+    "light_meal": 11,
     "memory_advisory": 1,
     "memory_expired": 1,
     "memory_governance": 2,
@@ -358,6 +374,7 @@ ALL_REGISTERED_TAG_COUNTS = {
     "replan_turn": 1,
     "robustness_case": 4,
     "route_failure": 2,
+    "short_walk": 1,
     "stable_sorting": 1,
     "ticket_sold_out": 1,
 }
@@ -402,6 +419,11 @@ def test_list_benchmark_suite_ids_for_case_returns_expected_membership() -> None
         "expanded",
         "default",
         "release_gate_v1",
+        "all_registered",
+    ]
+    assert benchmark_suites.list_benchmark_suite_ids_for_case("elder_afternoon_v1") == [
+        "expanded",
+        "default",
         "all_registered",
     ]
     assert benchmark_suites.list_benchmark_suite_ids_for_case("family_route_failure_v1") == [
@@ -482,7 +504,7 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
     _assert_suite_description(
         suite_map["expanded"],
         case_ids=EXPANDED_CASE_IDS,
-        case_count=4,
+        case_count=5,
         scenario_bucket_counts=EXPANDED_SCENARIO_BUCKET_COUNTS,
         level_counts=EXPANDED_LEVEL_COUNTS,
         tool_profile_counts=EXPANDED_TOOL_PROFILE_COUNTS,
@@ -537,7 +559,7 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
     _assert_suite_description(
         suite_map["default"],
         case_ids=DEFAULT_CASE_IDS,
-        case_count=10,
+        case_count=11,
         scenario_bucket_counts=DEFAULT_SCENARIO_BUCKET_COUNTS,
         level_counts=DEFAULT_LEVEL_COUNTS,
         tool_profile_counts=DEFAULT_TOOL_PROFILE_COUNTS,
@@ -559,7 +581,7 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
     _assert_suite_description(
         suite_map["all_registered"],
         case_ids=REGISTERED_CASE_IDS,
-        case_count=21,
+        case_count=22,
         scenario_bucket_counts=ALL_REGISTERED_SCENARIO_BUCKET_COUNTS,
         level_counts=ALL_REGISTERED_LEVEL_COUNTS,
         tool_profile_counts=ALL_REGISTERED_TOOL_PROFILE_COUNTS,

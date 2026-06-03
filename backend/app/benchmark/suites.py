@@ -20,6 +20,7 @@ _EXPANDED_CASE_IDS = [
     "friends_gathering_v1",
     "rainy_day_fallback_v1",
     "budget_lite_v1",
+    "elder_afternoon_v1",
 ]
 _RECOVERY_FOCUSED_CASE_IDS = [
     "family_route_failure_v1",
@@ -43,7 +44,11 @@ _ROBUSTNESS_FOCUSED_CASE_IDS = [
 ]
 _DEFAULT_CASE_IDS = [*_BASELINE_CASE_IDS, *_EXPANDED_CASE_IDS]
 _RELEASE_GATE_V1_CASE_IDS = [
-    *_DEFAULT_CASE_IDS,
+    *_BASELINE_CASE_IDS,
+    "couple_afternoon_v1",
+    "friends_gathering_v1",
+    "rainy_day_fallback_v1",
+    "budget_lite_v1",
     "family_route_failure_v1",
     "family_memory_advisory_fill_v1",
     "family_memory_expired_advisory_v1",
@@ -78,7 +83,7 @@ _SUITE_DEFINITIONS: dict[BenchmarkSuiteId, dict[str, Any]] = {
     },
     "expanded": {
         "title": "Expanded scenario benchmark suite",
-        "description": "Expanded non-failure scenario pack added after the historical baseline.",
+        "description": "Expanded non-failure scenario pack covering couple, friends, rainy-day, budget, and elder scenarios.",
         "case_ids": _EXPANDED_CASE_IDS,
     },
     "recovery_focused": {
@@ -103,7 +108,7 @@ _SUITE_DEFINITIONS: dict[BenchmarkSuiteId, dict[str, Any]] = {
     },
     "default": {
         "title": "Default benchmark suite",
-        "description": "Current ten-case non-failure benchmark suite used by repository examples.",
+        "description": "Current eleven-case non-failure benchmark suite used by repository examples.",
         "case_ids": _DEFAULT_CASE_IDS,
     },
     "release_gate_v1": {
@@ -113,7 +118,7 @@ _SUITE_DEFINITIONS: dict[BenchmarkSuiteId, dict[str, Any]] = {
     },
     "all_registered": {
         "title": "All registered benchmark cases",
-        "description": "Current default, recovery-focused, memory-governance, and continuation cases in canonical repository order.",
+        "description": "Current default, recovery-focused, memory-governance, continuation, and robustness cases in canonical repository order.",
         "case_ids": _ALL_REGISTERED_CASE_IDS,
     },
 }

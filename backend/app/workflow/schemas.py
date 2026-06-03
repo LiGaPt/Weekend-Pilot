@@ -28,6 +28,7 @@ class WeekendPilotWorkflowRequest(BaseModel):
         "friends_gathering",
         "rainy_day_fallback",
         "budget_lite",
+        "elder_afternoon",
         "amap_shanghai_live",
     ] = "family_afternoon"
     failure_profile: str | None = None
