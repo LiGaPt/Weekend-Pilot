@@ -165,16 +165,18 @@ Each benchmark case fixture now requires a structured `taxonomy` block that capt
 The repository now keeps nine canonical named benchmark suites in code:
 
 - `baseline` for the historical six-case family-plus-solo non-failure baseline
-- `expanded` for the added couple, friends-group, rainy-day fallback, and budget-lite scenario pack
+- `expanded` for the added couple, friends-group, rainy-day fallback, budget-lite, and elder-friendly scenario pack
 - `recovery_focused` for the explicit three-case failure-injection recovery pack: the legacy route failure case plus two composite chaos cases
 - `memory_governance` for the focused three-case suite that proves explicit user input beats memory, advisory memory helps vague requests, and expired high-confidence memory is downgraded but still visible
 - `conversation_continuations` for the focused two-case multi-turn clarification and replan/version suite
 - `robustness_focused` for the focused four-case Mock World robustness pack covering noisy candidate selection, deterministic fallback, and stable ordering evidence
-- `default` for the ten-case non-failure union of `baseline + expanded`
+- `default` for the eleven-case non-failure union of `baseline + expanded`
 - `release_gate_v1` for the blocking 15-case LocalLife-Bench `L1-L3` V1 release standard
-- `all_registered` for the full 21-case registered fixture inventory
+- `all_registered` for the full 22-case registered fixture inventory
 
-The legacy `failures` suite name remains loadable as a compatibility alias to `recovery_focused`, and `load_failure_benchmark_cases()` now resolves to that canonical recovery-focused suite. The `default` suite remains the historical single-turn ten-case suite, and `release_gate_v1` remains the unchanged blocking 15-case suite. Continuation benchmarking in this v0 task is intentionally limited to non-failure `Mock World` cases, and it uses the demo conversation service only to drive clarification/replan chains before writing benchmark reports. Replay stable comparison now also includes `failure_chain_signature`, which mirrors the ordered injected-effect chain from `failure_chain_summary.injected_effects`. Suite descriptions still derive their `matrix_summary` from the existing case taxonomy so expansion stays reviewable.
+The expanded non-failure pack now includes `elder_afternoon_v1`, which runs the deterministic `elder_afternoon` Mock World profile for a gentle short-walk, light-meal afternoon.
+
+The legacy `failures` suite name remains loadable as a compatibility alias to `recovery_focused`, and `load_failure_benchmark_cases()` now resolves to that canonical recovery-focused suite. The `default` suite now remains the historical single-turn eleven-case suite, and `release_gate_v1` remains the unchanged blocking 15-case suite. Continuation benchmarking in this v0 task is intentionally limited to non-failure `Mock World` cases, and it uses the demo conversation service only to drive clarification/replan chains before writing benchmark reports. Replay stable comparison now also includes `failure_chain_signature`, which mirrors the ordered injected-effect chain from `failure_chain_summary.injected_effects`. Suite descriptions still derive their `matrix_summary` from the existing case taxonomy so expansion stays reviewable.
 
 ```bash
 docker compose up -d postgres redis
@@ -256,10 +258,11 @@ The coverage gate reuses a fresh `run_formal_verification(...)` execution and th
 - `run_status == "passed"`
 - `failed_count == 0`
 - `error_count == 0`
-- `case_count >= 21`
+- `case_count >= 22`
 - `matrix_summary.tool_profile_counts == {"mock_world": case_count}`
 - `scenario_bucket_counts` minimums:
   - `couple >= 1`
+  - `elder >= 1`
   - `family >= 5`
   - `friends >= 2`
   - `mixed >= 3`
@@ -269,6 +272,7 @@ The coverage gate reuses a fresh `run_formal_verification(...)` execution and th
 - `world_profile_counts` minimums:
   - `budget_lite >= 2`
   - `couple_afternoon >= 1`
+  - `elder_afternoon >= 1`
   - `family_afternoon >= 5`
   - `friends_gathering >= 2`
   - `rainy_day_fallback >= 3`
@@ -284,6 +288,7 @@ The coverage gate reuses a fresh `run_formal_verification(...)` execution and th
   - `casual_dining >= 2`
   - `conversation_continuation >= 2`
   - `date_friendly >= 1`
+  - `elder_friendly >= 1`
   - `friends_group >= 2`
   - `memory_governance >= 2`
   - `rainy_day >= 3`
@@ -293,7 +298,7 @@ Each unique `suite-all_registered-run-report.json` is enriched with an additive 
 
 ## Formal Verification
 
-The repository now includes a broader one-click formal verification runner for the canonical `all_registered` benchmark suite. `all_registered` remains the full registered fixture inventory, including the two current `L5` composite chaos cases that are intentionally outside the blocking `release_gate_v1` boundary. Run it from the repo root:
+The repository now includes a broader one-click formal verification runner for the canonical `all_registered` benchmark suite. `all_registered` remains the full 22-case registered fixture inventory, including the two current `L5` composite chaos cases that are intentionally outside the blocking `release_gate_v1` boundary. Run it from the repo root:
 
 ```bash
 python scripts/run_formal_verification.py

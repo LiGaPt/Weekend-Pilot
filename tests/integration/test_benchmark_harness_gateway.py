@@ -40,6 +40,7 @@ EXPANDED_CASE_IDS = {
     "friends_gathering_v1",
     "rainy_day_fallback_v1",
     "budget_lite_v1",
+    "elder_afternoon_v1",
 }
 RECOVERY_CASE_IDS = {
     "family_route_failure_v1",
@@ -148,9 +149,14 @@ DEFAULT_CASE_IDS = {
     "friends_gathering_v1",
     "rainy_day_fallback_v1",
     "budget_lite_v1",
+    "elder_afternoon_v1",
 }
 RELEASE_GATE_V1_CASE_IDS = {
-    *DEFAULT_CASE_IDS,
+    *BASELINE_CASE_IDS,
+    "couple_afternoon_v1",
+    "friends_gathering_v1",
+    "rainy_day_fallback_v1",
+    "budget_lite_v1",
     "family_route_failure_v1",
     "family_memory_advisory_fill_v1",
     "family_memory_expired_advisory_v1",
@@ -159,17 +165,19 @@ RELEASE_GATE_V1_CASE_IDS = {
 }
 DEFAULT_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
+    "elder": 1,
     "family": 5,
     "friends": 1,
     "mixed": 1,
     "solo": 1,
     "unknown": 1,
 }
-DEFAULT_LEVEL_COUNTS = {"L1": 3, "L2": 7}
-DEFAULT_TOOL_PROFILE_COUNTS = {"mock_world": 10}
+DEFAULT_LEVEL_COUNTS = {"L1": 3, "L2": 8}
+DEFAULT_TOOL_PROFILE_COUNTS = {"mock_world": 11}
 DEFAULT_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
+    "elder_afternoon": 1,
     "family_afternoon": 5,
     "friends_gathering": 1,
     "rainy_day_fallback": 1,
@@ -193,7 +201,7 @@ RELEASE_GATE_V1_WORLD_PROFILE_COUNTS = {
     "rainy_day_fallback": 1,
     "solo_afternoon": 2,
 }
-DEFAULT_FAILURE_MODE_COUNTS = {"none": 10}
+DEFAULT_FAILURE_MODE_COUNTS = {"none": 11}
 RELEASE_GATE_V1_FAILURE_MODE_COUNTS = {"none": 14, "route_unavailable": 1}
 MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS = {"family": 3}
 MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS = {"none": 3}
@@ -249,25 +257,28 @@ BASELINE_CONSTRAINT_TAG_COUNTS = {
 }
 EXPANDED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
+    "elder": 1,
     "friends": 1,
     "mixed": 1,
     "unknown": 1,
 }
-EXPANDED_FAILURE_MODE_COUNTS = {"none": 4}
-EXPANDED_TOOL_PROFILE_COUNTS = {"mock_world": 4}
+EXPANDED_FAILURE_MODE_COUNTS = {"none": 5}
+EXPANDED_TOOL_PROFILE_COUNTS = {"mock_world": 5}
 EXPANDED_CONSTRAINT_TAG_COUNTS = {
     "budget_limited": 1,
     "casual_dining": 1,
     "citywalk": 1,
     "date_friendly": 1,
+    "elder_friendly": 1,
     "fallback": 1,
     "free_activity": 1,
     "friends_group": 1,
     "indoor_activity": 1,
-    "light_meal": 1,
+    "light_meal": 2,
     "outdoor_activity": 1,
     "quick_meal": 1,
     "rainy_day": 1,
+    "short_walk": 1,
 }
 RECOVERY_SCENARIO_BUCKET_COUNTS = {"family": 2, "mixed": 1}
 RECOVERY_FAILURE_MODE_COUNTS = {
@@ -293,17 +304,19 @@ DEFAULT_TAG_COUNTS = {
     "child_friendly": 5,
     "citywalk": 2,
     "date_friendly": 1,
+    "elder_friendly": 1,
     "fallback": 1,
     "free_activity": 1,
     "friends_group": 1,
     "indoor_activity": 3,
     "light_activity": 1,
-    "light_meal": 5,
+    "light_meal": 6,
     "memory_override": 1,
     "outdoor_activity": 2,
     "quick_dinner": 1,
     "quick_meal": 1,
     "rainy_day": 1,
+    "short_walk": 1,
 }
 RELEASE_GATE_V1_TAG_COUNTS = {
     "addon_optional": 1,
@@ -367,38 +380,42 @@ DEFAULT_CONSTRAINT_TAG_COUNTS = {
     "child_friendly": 5,
     "citywalk": 2,
     "date_friendly": 1,
+    "elder_friendly": 1,
     "fallback": 1,
     "free_activity": 1,
     "friends_group": 1,
     "indoor_activity": 3,
     "light_activity": 1,
-    "light_meal": 5,
+    "light_meal": 6,
     "memory_override": 1,
     "outdoor_activity": 2,
     "quick_dinner": 1,
     "quick_meal": 1,
     "rainy_day": 1,
+    "short_walk": 1,
 }
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
+    "elder": 1,
     "family": 11,
     "friends": 2,
     "mixed": 3,
     "solo": 2,
     "unknown": 2,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 12, "L3": 4, "L5": 2}
-ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 21}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 13, "L3": 4, "L5": 2}
+ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 22}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 2,
     "couple_afternoon": 1,
+    "elder_afternoon": 1,
     "family_afternoon": 11,
     "friends_gathering": 2,
     "rainy_day_fallback": 3,
     "solo_afternoon": 2,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
-    "none": 18,
+    "none": 19,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
@@ -417,6 +434,7 @@ ALL_REGISTERED_TAG_COUNTS = {
     "date_friendly": 1,
     "distractor_selection": 2,
     "dining_unavailable": 1,
+    "elder_friendly": 1,
     "failure_injected": 3,
     "fallback": 1,
     "fallback_selection": 1,
@@ -424,7 +442,7 @@ ALL_REGISTERED_TAG_COUNTS = {
     "friends_group": 2,
     "indoor_activity": 6,
     "light_activity": 2,
-    "light_meal": 10,
+    "light_meal": 11,
     "memory_advisory": 1,
     "memory_expired": 1,
     "memory_governance": 2,
@@ -437,6 +455,7 @@ ALL_REGISTERED_TAG_COUNTS = {
     "replan_turn": 1,
     "robustness_case": 4,
     "route_failure": 2,
+    "short_walk": 1,
     "stable_sorting": 1,
     "ticket_sold_out": 1,
 }
@@ -453,13 +472,14 @@ ALL_REGISTERED_CONSTRAINT_TAG_COUNTS = {
     "date_friendly": 1,
     "distractor_selection": 2,
     "dining_unavailable": 1,
+    "elder_friendly": 1,
     "fallback": 1,
     "fallback_selection": 1,
     "free_activity": 1,
     "friends_group": 2,
     "indoor_activity": 6,
     "light_activity": 2,
-    "light_meal": 10,
+    "light_meal": 11,
     "memory_advisory": 1,
     "memory_expired": 1,
     "memory_governance": 2,
@@ -471,6 +491,7 @@ ALL_REGISTERED_CONSTRAINT_TAG_COUNTS = {
     "rainy_day": 3,
     "replan_turn": 1,
     "robustness_case": 4,
+    "short_walk": 1,
     "stable_sorting": 1,
     "ticket_sold_out": 1,
 }
@@ -635,6 +656,45 @@ def test_benchmark_harness_runs_solo_afternoon_case(
     assert len(artifact_summary["score_summaries"]) == len(result.scores)
     assert artifact_summary["score_summaries"][0]["name"] == result.scores[0].name
     assert "details" not in artifact_summary["score_summaries"][0]
+
+
+def test_benchmark_harness_runs_elder_afternoon_case(
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    case = load_benchmark_case("elder_afternoon_v1")
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    result = harness.run_case(case)
+
+    assert result.status == "passed"
+    assert result.workflow_status == "completed"
+    assert result.run_summary is not None
+    assert result.run_summary.world_profile == "elder_afternoon"
+    assert result.taxonomy is not None
+    assert result.taxonomy.scenario_bucket == "elder"
+    assert result.report_path is not None
+
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    assert run.world_profile == "elder_afternoon"
+    assert run.case_id == "elder_afternoon_v1"
+    assert run.metadata_json["benchmark"]["taxonomy"]["scenario_bucket"] == "elder"
+    assert run.metadata_json["benchmark"]["artifact_summary"]["workflow_status"] == "completed"
+
+    report_payload = json.loads(Path(result.report_path).read_text(encoding="utf-8"))
+    assert report_payload["case_id"] == "elder_afternoon_v1"
+    assert report_payload["taxonomy"]["scenario_bucket"] == "elder"
+    assert report_payload["run_summary"]["world_profile"] == "elder_afternoon"
 
 
 def test_benchmark_harness_records_memory_policy_for_override_case(
@@ -973,7 +1033,7 @@ def test_benchmark_harness_runs_family_replan_version_continuation_case(
         (
             "expanded",
             EXPANDED_CASE_IDS,
-            4,
+            5,
             EXPANDED_TOOL_PROFILE_COUNTS,
             EXPANDED_SCENARIO_BUCKET_COUNTS,
             EXPANDED_FAILURE_MODE_COUNTS,
@@ -1245,9 +1305,9 @@ def test_benchmark_harness_runs_default_mock_world_suite(
     report = harness.run_suite("default")
 
     assert {result.case_id for result in report.case_results} == DEFAULT_CASE_IDS
-    assert len(report.case_results) == 10
+    assert len(report.case_results) == 11
     assert report.run_status == "passed"
-    assert report.passed_count == 10
+    assert report.passed_count == 11
     assert report.failed_count == 0
     assert report.error_count == 0
     assert report.report_path is not None
@@ -1255,7 +1315,7 @@ def test_benchmark_harness_runs_default_mock_world_suite(
     assert report.benchmark_summary is not None
     assert report.benchmark_summary.suite_id == "default"
     assert report.benchmark_summary.run_status == "passed"
-    assert report.benchmark_summary.case_count == 10
+    assert report.benchmark_summary.case_count == 11
     assert report.benchmark_summary.matrix_summary is not None
     assert report.benchmark_summary.matrix_summary.scenario_bucket_counts == DEFAULT_SCENARIO_BUCKET_COUNTS
     assert report.benchmark_summary.matrix_summary.level_counts == DEFAULT_LEVEL_COUNTS
@@ -1336,8 +1396,8 @@ def test_benchmark_harness_runs_default_mock_world_suite(
         DEFAULT_FAILURE_MODE_COUNTS,
     )
     assert suite_payload["benchmark_timing_summary"]["schema_version"] == "benchmark_timing_summary_v1"
-    assert suite_payload["benchmark_timing_summary"]["case_count"] == 10
-    assert suite_payload["benchmark_timing_summary"]["overall_total_duration_ms"]["sample_count"] == 10
+    assert suite_payload["benchmark_timing_summary"]["case_count"] == 11
+    assert suite_payload["benchmark_timing_summary"]["overall_total_duration_ms"]["sample_count"] == 11
     assert suite_payload["benchmark_timing_summary"]["stages"]
     serialized_suite = json.dumps(suite_payload, sort_keys=True)
     for forbidden in FORBIDDEN_REPORT_TEXT:
@@ -1361,9 +1421,9 @@ def test_benchmark_harness_runs_all_registered_suite(
 
     report = harness.run_suite("all_registered")
 
-    assert len(report.case_results) == 21
+    assert len(report.case_results) == 22
     assert report.run_status == "passed"
-    assert report.passed_count == 21
+    assert report.passed_count == 22
     assert report.failed_count == 0
     assert report.error_count == 0
     assert report.report_path is not None

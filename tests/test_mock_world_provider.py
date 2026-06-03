@@ -47,6 +47,12 @@ PROFILE_ACTIVITY_ORDER = {
         "activity_designmall_501",
         "activity_gallery_501",
     ],
+    "elder_afternoon": [
+        "activity_gardenhall_601",
+        "activity_teahouse_601",
+        "activity_gallery_601",
+        "activity_riverside_601",
+    ],
 }
 PROFILE_DINING_ORDER = {
     "family_afternoon": [
@@ -85,6 +91,12 @@ PROFILE_DINING_ORDER = {
         "restaurant_cafe_501",
         "restaurant_bistro_501",
         "restaurant_noodle_501",
+    ],
+    "elder_afternoon": [
+        "restaurant_soup_601",
+        "restaurant_light_601",
+        "restaurant_teahouse_601",
+        "restaurant_noodle_601",
     ],
 }
 

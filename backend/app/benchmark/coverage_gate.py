@@ -24,10 +24,11 @@ LATEST_REPORT_FILENAME = f"latest-{COVERAGE_GATE_ID}-run-report.json"
 DEFAULT_MAX_SCENARIO_SHARE = 0.6
 DEFAULT_MAX_WORLD_PROFILE_SHARE = 0.6
 DEFAULT_MAX_NON_FAILURE_SHARE = 0.9
-MINIMUM_CASE_COUNT = 21
+MINIMUM_CASE_COUNT = 22
 SCHEMA_VERSION = "weekendpilot_coverage_gate_evaluation_v1"
 SCENARIO_BUCKET_MINIMUMS = {
     "couple": 1,
+    "elder": 1,
     "family": 5,
     "friends": 2,
     "mixed": 3,
@@ -37,6 +38,7 @@ SCENARIO_BUCKET_MINIMUMS = {
 WORLD_PROFILE_MINIMUMS = {
     "budget_lite": 2,
     "couple_afternoon": 1,
+    "elder_afternoon": 1,
     "family_afternoon": 5,
     "friends_gathering": 2,
     "rainy_day_fallback": 3,
@@ -52,6 +54,7 @@ CONSTRAINT_TAG_MINIMUMS = {
     "casual_dining": 2,
     "conversation_continuation": 2,
     "date_friendly": 1,
+    "elder_friendly": 1,
     "friends_group": 2,
     "memory_governance": 2,
     "rainy_day": 3,

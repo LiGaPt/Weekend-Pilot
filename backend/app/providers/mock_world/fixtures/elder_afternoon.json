@@ -1,0 +1,409 @@
+{
+  "profile": "elder_afternoon",
+  "location": {
+    "city": "上海",
+    "area": "长宁"
+  },
+  "pois": [
+    {
+      "poi_id": "activity_gardenhall_601",
+      "name": "静园花厅休息馆",
+      "category": "activity",
+      "address": "上海市长宁区定西路188号",
+      "location": {
+        "lat": 31.2164,
+        "lng": 121.4238
+      },
+      "tags": [
+        "child_friendly",
+        "indoor",
+        "quiet",
+        "light_activity",
+        "family_pause"
+      ],
+      "description": "安静的室内花厅，座位多、节奏慢，适合作为下午的第一个停留点，先坐下休息再慢慢逛。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "13:00",
+            "end": "18:00"
+          }
+        ],
+        "last_entry": "17:20"
+      },
+      "sort_order": 10
+    },
+    {
+      "poi_id": "activity_teahouse_601",
+      "name": "听雨茶叙小馆",
+      "category": "activity",
+      "address": "上海市长宁区昭化路72号",
+      "location": {
+        "lat": 31.2149,
+        "lng": 121.4216
+      },
+      "tags": [
+        "child_friendly",
+        "indoor",
+        "quiet",
+        "light_activity",
+        "family_pause"
+      ],
+      "description": "有靠背座位和安静角落的室内茶叙空间，适合走得不多、想边坐边聊的下午安排。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "13:30",
+            "end": "18:30"
+          }
+        ],
+        "last_entry": "17:45"
+      },
+      "sort_order": 15
+    },
+    {
+      "poi_id": "activity_gallery_601",
+      "name": "社区影像小展廊",
+      "category": "activity",
+      "address": "上海市长宁区安化路96号",
+      "location": {
+        "lat": 31.2136,
+        "lng": 121.4251
+      },
+      "tags": [
+        "child_friendly",
+        "indoor",
+        "quiet",
+        "gallery"
+      ],
+      "description": "体量不大的社区展廊，适合慢慢看一圈，但步行衔接比主路线稍远。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "14:00",
+            "end": "18:00"
+          }
+        ],
+        "last_entry": "17:20"
+      },
+      "sort_order": 20
+    },
+    {
+      "poi_id": "activity_riverside_601",
+      "name": "河畔平缓步道",
+      "category": "activity",
+      "address": "上海市长宁区凯旋路近河滨段",
+      "location": {
+        "lat": 31.2115,
+        "lng": 121.4279
+      },
+      "tags": [
+        "child_friendly",
+        "outdoor",
+        "quiet",
+        "light_activity"
+      ],
+      "description": "平缓、节奏慢的河边步道，适合天气稳时短距离走走，但更适合作为备选而不是首选。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "00:00",
+            "end": "23:59"
+          }
+        ],
+        "last_entry": null
+      },
+      "sort_order": 25
+    },
+    {
+      "poi_id": "restaurant_soup_601",
+      "name": "清汤小食堂",
+      "category": "dining",
+      "address": "上海市长宁区定西路212号",
+      "location": {
+        "lat": 31.2158,
+        "lng": 121.4253
+      },
+      "tags": [
+        "child_friendly",
+        "lighter_options",
+        "light_meal",
+        "quiet",
+        "comfort_food"
+      ],
+      "description": "主打清汤、软饭和清淡小菜，适合早点坐下吃一顿偏轻的晚餐，也方便同行长辈慢慢用餐。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:00",
+            "end": "20:30"
+          }
+        ],
+        "last_entry": "19:50"
+      },
+      "sort_order": 30
+    },
+    {
+      "poi_id": "restaurant_light_601",
+      "name": "浅味轻食厨房",
+      "category": "dining",
+      "address": "上海市长宁区昭化路108号",
+      "location": {
+        "lat": 31.2141,
+        "lng": 121.4235
+      },
+      "tags": [
+        "child_friendly",
+        "lighter_options",
+        "light_meal",
+        "quiet"
+      ],
+      "description": "有暖沙拉、炖菜和清淡主食的轻食厨房，适合作为安静的近距离备选晚餐。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:30",
+            "end": "20:30"
+          }
+        ],
+        "last_entry": "19:45"
+      },
+      "sort_order": 35
+    },
+    {
+      "poi_id": "restaurant_teahouse_601",
+      "name": "茶点慢食馆",
+      "category": "dining",
+      "address": "上海市长宁区安化路120号",
+      "location": {
+        "lat": 31.2133,
+        "lng": 121.4241
+      },
+      "tags": [
+        "child_friendly",
+        "lighter_options",
+        "quiet",
+        "casual_dining"
+      ],
+      "description": "有蒸点和热茶的慢食馆，环境安静，但正餐选择比主路线少一些。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:00",
+            "end": "20:00"
+          }
+        ],
+        "last_entry": "19:20"
+      },
+      "sort_order": 38
+    },
+    {
+      "poi_id": "restaurant_noodle_601",
+      "name": "软汤面小馆",
+      "category": "dining",
+      "address": "上海市长宁区凯旋路140号",
+      "location": {
+        "lat": 31.2121,
+        "lng": 121.4266
+      },
+      "tags": [
+        "child_friendly",
+        "quick_meal",
+        "comfort_food",
+        "quiet"
+      ],
+      "description": "上餐快、汤面温和的晚餐备选，距离不远，但环境没有主路线安静。",
+      "opening_hours": {
+        "is_open": true,
+        "windows": [
+          {
+            "start": "11:00",
+            "end": "21:00"
+          }
+        ],
+        "last_entry": "20:20"
+      },
+      "sort_order": 40
+    }
+  ],
+  "routes": [
+    {
+      "origin_id": "activity_gardenhall_601",
+      "destination_id": "restaurant_soup_601",
+      "mode": "walking",
+      "distance_meters": 280,
+      "duration_minutes": 5,
+      "summary": "从花厅出来走平缓街段即可到达，步行很短，适合轻松衔接晚餐。"
+    },
+    {
+      "origin_id": "activity_gardenhall_601",
+      "destination_id": "restaurant_light_601",
+      "mode": "walking",
+      "distance_meters": 360,
+      "duration_minutes": 6,
+      "summary": "沿安静街区慢慢步行即可到达，路程不长。"
+    },
+    {
+      "origin_id": "activity_teahouse_601",
+      "destination_id": "restaurant_soup_601",
+      "mode": "walking",
+      "distance_meters": 320,
+      "duration_minutes": 5,
+      "summary": "茶叙结束后步行几分钟就能到，适合作为低步行量衔接。"
+    },
+    {
+      "origin_id": "activity_gallery_601",
+      "destination_id": "restaurant_soup_601",
+      "mode": "walking",
+      "distance_meters": 430,
+      "duration_minutes": 7,
+      "summary": "从展廊步行到清汤馆距离适中，但比主路线稍长。"
+    },
+    {
+      "origin_id": "activity_riverside_601",
+      "destination_id": "restaurant_soup_601",
+      "mode": "walking",
+      "distance_meters": 560,
+      "duration_minutes": 9,
+      "summary": "河边步道到餐厅可达，但明显长于室内优先路线。"
+    }
+  ],
+  "weather": {
+    "location": "长宁",
+    "date": "2026-05-16",
+    "condition": "多云",
+    "temperature_c": 24,
+    "precipitation_chance": 0.18,
+    "advisory": "天气平稳，适合以室内停留为主、步行距离较短的下午安排。"
+  },
+  "queues": {
+    "queue_restaurant_soup_601": {
+      "queue_id": "queue_restaurant_soup_601",
+      "poi_id": "restaurant_soup_601",
+      "status": "open",
+      "wait_minutes": 6,
+      "parties_ahead": 1
+    },
+    "queue_restaurant_light_601": {
+      "queue_id": "queue_restaurant_light_601",
+      "poi_id": "restaurant_light_601",
+      "status": "open",
+      "wait_minutes": 10,
+      "parties_ahead": 2
+    },
+    "queue_restaurant_teahouse_601": {
+      "queue_id": "queue_restaurant_teahouse_601",
+      "poi_id": "restaurant_teahouse_601",
+      "status": "open",
+      "wait_minutes": 14,
+      "parties_ahead": 3
+    },
+    "queue_restaurant_noodle_601": {
+      "queue_id": "queue_restaurant_noodle_601",
+      "poi_id": "restaurant_noodle_601",
+      "status": "open",
+      "wait_minutes": 8,
+      "parties_ahead": 2
+    }
+  },
+  "table_availability": {
+    "restaurant_soup_601": {
+      "restaurant_id": "restaurant_soup_601",
+      "available": true,
+      "time_slots": [
+        "17:00",
+        "17:30",
+        "18:00"
+      ],
+      "max_party_size": 4,
+      "notes": "有安静卡座，适合三位同行者早点用餐。"
+    },
+    "restaurant_light_601": {
+      "restaurant_id": "restaurant_light_601",
+      "available": true,
+      "time_slots": [
+        "17:30",
+        "18:00",
+        "18:30"
+      ],
+      "max_party_size": 4,
+      "notes": "靠里的安静桌位可用，步行衔接也不长。"
+    },
+    "restaurant_teahouse_601": {
+      "restaurant_id": "restaurant_teahouse_601",
+      "available": true,
+      "time_slots": [
+        "17:00",
+        "17:45",
+        "18:15"
+      ],
+      "max_party_size": 4,
+      "notes": "可慢慢坐，但正餐搭配不如主路线完整。"
+    },
+    "restaurant_noodle_601": {
+      "restaurant_id": "restaurant_noodle_601",
+      "available": true,
+      "time_slots": [
+        "17:15",
+        "17:45",
+        "18:15"
+      ],
+      "max_party_size": 4,
+      "notes": "上餐快，但环境略嘈杂于主路线。"
+    }
+  },
+  "ticket_availability": {
+    "activity_gardenhall_601": {
+      "poi_id": "activity_gardenhall_601",
+      "available": true,
+      "time_slots": [
+        "14:00",
+        "15:00",
+        "16:00"
+      ],
+      "remaining": 20,
+      "price_cents": 2600
+    },
+    "activity_teahouse_601": {
+      "poi_id": "activity_teahouse_601",
+      "available": true,
+      "time_slots": [
+        "14:30",
+        "15:30",
+        "16:30"
+      ],
+      "remaining": 18,
+      "price_cents": 1800
+    },
+    "activity_gallery_601": {
+      "poi_id": "activity_gallery_601",
+      "available": true,
+      "time_slots": [
+        "14:00",
+        "15:00",
+        "16:00"
+      ],
+      "remaining": 12,
+      "price_cents": 2200
+    },
+    "activity_riverside_601": {
+      "poi_id": "activity_riverside_601",
+      "available": true,
+      "time_slots": [
+        "14:00",
+        "15:00",
+        "16:00"
+      ],
+      "remaining": 99,
+      "price_cents": 0
+    }
+  },
+  "addons": []
+}

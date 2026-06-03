@@ -402,6 +402,25 @@ def test_supported_solo_profile_is_not_rejected_by_runner() -> None:
     assert runner._unsupported_profile_result(request) is None
 
 
+def test_workflow_request_accepts_supported_elder_profile_value() -> None:
+    request = WeekendPilotWorkflowRequest(
+        user_input="Plan an elder-friendly afternoon nearby.",
+        world_profile="elder_afternoon",
+    )
+
+    assert request.world_profile == "elder_afternoon"
+
+
+def test_supported_elder_profile_is_not_rejected_by_runner() -> None:
+    runner = WeekendPilotWorkflowRunner(cast(WeekendPilotWorkflowDependencies, object()))
+    request = WeekendPilotWorkflowRequest(
+        user_input="Plan an elder-friendly afternoon nearby.",
+        world_profile="elder_afternoon",
+    )
+
+    assert runner._unsupported_profile_result(request) is None
+
+
 def test_workflow_request_accepts_supported_amap_preview_profile() -> None:
     request = WeekendPilotWorkflowRequest(
         user_input="Preview a Shanghai family afternoon.",

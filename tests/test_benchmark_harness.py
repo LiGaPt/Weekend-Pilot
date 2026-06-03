@@ -90,6 +90,7 @@ DEFAULT_CASE_IDS = (
     "friends_gathering_v1",
     "rainy_day_fallback_v1",
     "budget_lite_v1",
+    "elder_afternoon_v1",
 )
 FAILURE_CASE_IDS = (
     "family_route_failure_v1",
@@ -213,23 +214,25 @@ REQUIRED_CASE_TOOL_NAMES = {
 }
 DEFAULT_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
+    "elder": 1,
     "family": 5,
     "friends": 1,
     "mixed": 1,
     "solo": 1,
     "unknown": 1,
 }
-DEFAULT_LEVEL_COUNTS = {"L1": 3, "L2": 7}
-DEFAULT_TOOL_PROFILE_COUNTS = {"mock_world": 10}
+DEFAULT_LEVEL_COUNTS = {"L1": 3, "L2": 8}
+DEFAULT_TOOL_PROFILE_COUNTS = {"mock_world": 11}
 DEFAULT_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
     "couple_afternoon": 1,
+    "elder_afternoon": 1,
     "family_afternoon": 5,
     "friends_gathering": 1,
     "rainy_day_fallback": 1,
     "solo_afternoon": 1,
 }
-DEFAULT_FAILURE_MODE_COUNTS = {"none": 10}
+DEFAULT_FAILURE_MODE_COUNTS = {"none": 11}
 DEFAULT_TAG_COUNTS = {
     "addon_optional": 1,
     "baseline": 2,
@@ -238,17 +241,19 @@ DEFAULT_TAG_COUNTS = {
     "child_friendly": 5,
     "citywalk": 2,
     "date_friendly": 1,
+    "elder_friendly": 1,
     "fallback": 1,
     "free_activity": 1,
     "friends_group": 1,
     "indoor_activity": 3,
     "light_activity": 1,
-    "light_meal": 5,
+    "light_meal": 6,
     "memory_override": 1,
     "outdoor_activity": 2,
     "quick_dinner": 1,
     "quick_meal": 1,
     "rainy_day": 1,
+    "short_walk": 1,
 }
 MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS = {"family": 3}
 MEMORY_GOVERNANCE_LEVEL_COUNTS = {"L2": 1, "L3": 2}
@@ -290,24 +295,26 @@ ROBUSTNESS_TAG_COUNTS = {
 }
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
+    "elder": 1,
     "family": 11,
     "friends": 2,
     "mixed": 3,
     "solo": 2,
     "unknown": 2,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 12, "L3": 4, "L5": 2}
-ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 21}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 13, "L3": 4, "L5": 2}
+ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 22}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 2,
     "couple_afternoon": 1,
+    "elder_afternoon": 1,
     "family_afternoon": 11,
     "friends_gathering": 2,
     "rainy_day_fallback": 3,
     "solo_afternoon": 2,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
-    "none": 18,
+    "none": 19,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
@@ -326,6 +333,7 @@ ALL_REGISTERED_TAG_COUNTS = {
     "date_friendly": 1,
     "distractor_selection": 2,
     "dining_unavailable": 1,
+    "elder_friendly": 1,
     "failure_injected": 3,
     "fallback": 1,
     "fallback_selection": 1,
@@ -333,7 +341,7 @@ ALL_REGISTERED_TAG_COUNTS = {
     "friends_group": 2,
     "indoor_activity": 6,
     "light_activity": 2,
-    "light_meal": 10,
+    "light_meal": 11,
     "memory_advisory": 1,
     "memory_expired": 1,
     "memory_governance": 2,
@@ -346,6 +354,7 @@ ALL_REGISTERED_TAG_COUNTS = {
     "replan_turn": 1,
     "robustness_case": 4,
     "route_failure": 2,
+    "short_walk": 1,
     "stable_sorting": 1,
     "ticket_sold_out": 1,
 }
@@ -409,6 +418,11 @@ EXPECTED_TAXONOMY_BY_CASE = {
         scenario_bucket="unknown",
         level="L2",
         tags=["budget_limited", "free_activity", "quick_meal"],
+    ),
+    "elder_afternoon_v1": _taxonomy_payload(
+        scenario_bucket="elder",
+        level="L2",
+        tags=["elder_friendly", "short_walk", "light_meal"],
     ),
     "family_route_failure_v1": _taxonomy_payload(
         scenario_bucket="family",
@@ -477,7 +491,7 @@ def test_default_fixtures_load_as_ordered_benchmark_cases() -> None:
     cases = load_default_benchmark_cases()
 
     assert [case.case_id for case in cases] == list(DEFAULT_CASE_IDS)
-    assert len(cases) == 10
+    assert len(cases) == 11
     assert all(isinstance(case, BenchmarkCase) for case in cases)
 
 
@@ -640,6 +654,7 @@ def test_default_fixtures_use_supported_mock_world_profiles() -> None:
     assert {case.world_profile for case in cases} == {
         "budget_lite",
         "couple_afternoon",
+        "elder_afternoon",
         "family_afternoon",
         "friends_gathering",
         "rainy_day_fallback",
@@ -650,7 +665,7 @@ def test_default_fixtures_use_supported_mock_world_profiles() -> None:
 def test_default_case_matrix_summary_counts_are_expected() -> None:
     summary = build_case_matrix_summary(load_default_benchmark_cases())
 
-    assert summary.case_count == 10
+    assert summary.case_count == 11
     assert summary.scenario_bucket_counts == DEFAULT_SCENARIO_BUCKET_COUNTS
     assert summary.level_counts == DEFAULT_LEVEL_COUNTS
     assert summary.tool_profile_counts == DEFAULT_TOOL_PROFILE_COUNTS
@@ -686,7 +701,7 @@ def test_robustness_focused_suite_matrix_summary_counts_are_expected() -> None:
 def test_all_registered_case_matrix_summary_counts_are_expected() -> None:
     summary = build_case_matrix_summary(load_benchmark_suite("all_registered"))
 
-    assert summary.case_count == 21
+    assert summary.case_count == 22
     assert summary.scenario_bucket_counts == ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
     assert summary.level_counts == ALL_REGISTERED_LEVEL_COUNTS
     assert summary.tool_profile_counts == ALL_REGISTERED_TOOL_PROFILE_COUNTS
@@ -885,6 +900,13 @@ def test_build_failure_chain_summary_deduplicates_effects_and_marks_bounded() ->
             "unknown",
             ["budget_limited", "free_activity", "quick_meal"],
             "budget_lite_low_cost_route",
+        ),
+        (
+            "elder_afternoon_v1",
+            "elder_afternoon",
+            "elder",
+            ["elder_friendly", "short_walk", "light_meal"],
+            "elder_gentle_afternoon",
         ),
         (
             "family_memory_advisory_fill_v1",
