@@ -10,6 +10,7 @@ from backend.app.planning.enriched_candidates import (
     EnrichedCandidate,
     RouteMatrixEntry,
 )
+from backend.app.planning.query_planner import intent_requests_addon
 from backend.app.planning.itinerary_drafts import (
     FeasibilitySummary,
     ItineraryCandidateRef,
@@ -30,6 +31,14 @@ class _DraftPair:
     route: RouteMatrixEntry
     activity_index: int
     dining_index: int
+
+
+@dataclass(frozen=True)
+class _SelectedAddon:
+    candidate: EnrichedCandidate
+    route: RouteMatrixEntry
+    vendor_id: str
+    sku: str
 
 
 class DeterministicItineraryGenerator:
@@ -201,8 +210,20 @@ class DeterministicItineraryGenerator:
         copy = self._COPY_TEMPLATES[copy_profile]
         timeline = self._build_timeline(plan, pair, warnings, copy)
         total_duration = sum(item.duration_minutes for item in timeline)
-        proposed_actions = self._build_proposed_actions(plan, pair, draft_id)
+        proposed_actions, addon_evidence = self._build_proposed_actions(plan, enrichment, pair, draft_id)
         route_ref = self._route_ref(pair.route)
+        evidence = {
+            "parser_version": plan.intent.parser_version,
+            "planner_version": plan.planner_version,
+            "enricher_version": enrichment.enricher_version,
+            "generator_version": self.generator_version,
+            "activity_candidate_id": pair.activity.candidate.candidate_id,
+            "dining_candidate_id": pair.dining.candidate.candidate_id,
+            "route_tool_event_id": pair.route.tool_event_id,
+            "provider_profile": enrichment.provider_profile,
+        }
+        if addon_evidence is not None:
+            evidence["selected_addon"] = addon_evidence
 
         return ItineraryDraft(
             draft_id=draft_id,
@@ -221,16 +242,7 @@ class DeterministicItineraryGenerator:
                 route_duration_minutes=pair.route.duration_minutes,
                 queue_wait_minutes=self._queue_wait_minutes(pair.dining),
             ),
-            evidence={
-                "parser_version": plan.intent.parser_version,
-                "planner_version": plan.planner_version,
-                "enricher_version": enrichment.enricher_version,
-                "generator_version": self.generator_version,
-                "activity_candidate_id": pair.activity.candidate.candidate_id,
-                "dining_candidate_id": pair.dining.candidate.candidate_id,
-                "route_tool_event_id": pair.route.tool_event_id,
-                "provider_profile": enrichment.provider_profile,
-            },
+            evidence=evidence,
         )
 
     def _candidate_ref(self, enriched: EnrichedCandidate) -> ItineraryCandidateRef:
@@ -348,9 +360,10 @@ class DeterministicItineraryGenerator:
     def _build_proposed_actions(
         self,
         plan: QueryPlan,
+        enrichment: CandidateEnrichmentResult,
         pair: _DraftPair,
         draft_id: str,
-    ) -> list[ProposedAction]:
+    ) -> tuple[list[ProposedAction], dict[str, Any] | None]:
         actions = []
         party_size = self._party_size(plan)
 
@@ -423,7 +436,101 @@ class DeterministicItineraryGenerator:
                 )
             )
 
-        return actions
+        selected_addon = self._select_addon(plan, enrichment, pair)
+        if selected_addon is not None:
+            actions.append(
+                self._action(
+                    draft_id,
+                    len(actions) + 1,
+                    "order_addon",
+                    selected_addon.candidate.candidate.candidate_id,
+                    {
+                        "vendor_id": selected_addon.vendor_id,
+                        "items": [{"sku": selected_addon.sku, "quantity": party_size}],
+                    },
+                    "补给点可顺路到达，确认后可提前下单补水或小食。",
+                )
+            )
+            return actions, {
+                "candidate_id": selected_addon.candidate.candidate.candidate_id,
+                "name": selected_addon.candidate.candidate.name,
+                "route_key": [
+                    selected_addon.route.origin_candidate_id,
+                    selected_addon.route.destination_candidate_id,
+                ],
+                "route_tool_event_id": selected_addon.route.tool_event_id,
+            }
+
+        return actions, None
+
+    def _select_addon(
+        self,
+        plan: QueryPlan,
+        enrichment: CandidateEnrichmentResult,
+        pair: _DraftPair,
+    ) -> _SelectedAddon | None:
+        if not intent_requests_addon(plan.intent):
+            return None
+
+        dining_candidate_id = pair.dining.candidate.candidate_id
+        for addon in enrichment.enriched_other_candidates:
+            if addon.candidate.category != "addon":
+                continue
+            if not self._addon_is_open(addon):
+                continue
+            poi_detail = addon.poi_detail if isinstance(addon.poi_detail, dict) else None
+            if poi_detail is None:
+                continue
+            vendor_id = self._text_or_none(poi_detail.get("vendor_id"))
+            if vendor_id != addon.candidate.candidate_id:
+                continue
+            sku = self._water_sku(poi_detail.get("menu"))
+            if sku is None:
+                continue
+            route = self._find_route(
+                enrichment,
+                dining_candidate_id,
+                addon.candidate.candidate_id,
+            )
+            if route is None:
+                continue
+            return _SelectedAddon(
+                candidate=addon,
+                route=route,
+                vendor_id=vendor_id,
+                sku=sku,
+            )
+        return None
+
+    def _addon_is_open(self, addon: EnrichedCandidate) -> bool:
+        return isinstance(addon.opening_hours, dict) and addon.opening_hours.get("is_open") is True
+
+    def _water_sku(self, menu: Any) -> str | None:
+        if not isinstance(menu, list):
+            return None
+        for item in menu:
+            if not isinstance(item, dict):
+                continue
+            sku = self._text_or_none(item.get("sku"))
+            if sku == "water":
+                return sku
+        return None
+
+    def _find_route(
+        self,
+        enrichment: CandidateEnrichmentResult,
+        origin_candidate_id: str,
+        destination_candidate_id: str,
+    ) -> RouteMatrixEntry | None:
+        for route in enrichment.route_matrix:
+            if route.status not in self._USABLE_ROUTE_STATUSES:
+                continue
+            if route.origin_candidate_id != origin_candidate_id:
+                continue
+            if route.destination_candidate_id != destination_candidate_id:
+                continue
+            return route
+        return None
 
     def _warnings_for_pair(self, plan: QueryPlan, pair: _DraftPair) -> list[str]:
         del plan

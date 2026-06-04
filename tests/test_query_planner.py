@@ -21,6 +21,13 @@ def _family_intent():
     )
 
 
+def _family_addon_intent():
+    return DeterministicIntentParser().parse(
+        "This afternoon I want to go out with my partner and 5-year-old for a few hours. "
+        "Keep it nearby, include a light citywalk feel, and add an easy drink or snack stop if it fits."
+    )
+
+
 def test_mock_world_query_plan_includes_initial_read_calls() -> None:
     plan = DeterministicQueryPlanner().build(_family_intent())
 
@@ -135,3 +142,16 @@ def test_mock_world_query_plan_supports_bounded_recovery_search_expansion() -> N
     assert search_calls[0].payload["tags"] == ["child_friendly"]
     assert "lighter_options" in search_calls[1].payload["tags"]
     assert "child_friendly" in search_calls[1].payload["tags"]
+
+
+def test_mock_world_query_plan_appends_addon_search_for_explicit_addon_request() -> None:
+    plan = DeterministicQueryPlanner().build(_family_addon_intent())
+
+    search_calls = [call for call in plan.initial_tool_calls if call.tool_name == "search_poi"]
+
+    assert len(search_calls) == 3
+    assert [call.payload["category"] for call in search_calls] == ["activity", "dining", "addon"]
+    addon_call = search_calls[2]
+    assert addon_call.provider == "mock_world"
+    assert addon_call.payload["limit"] == 3
+    assert addon_call.payload["query"] in {"drink", "snack", "addon"}

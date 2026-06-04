@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from backend.app.benchmark import load_benchmark_case
 from backend.app.confirmation import HumanConfirmationService
 from backend.app.db.session import SessionLocal
 from backend.app.execution import DeterministicExecutionWorkflow
@@ -179,3 +180,47 @@ def test_feedback_writer_persists_user_safe_feedback_after_mock_world_execution(
     serialized_feedback = str(stored)
     assert "tool_event_id" not in serialized_feedback
     assert "action_id" not in serialized_feedback
+
+
+def test_feedback_writer_uses_readable_addon_label_after_execution(
+    db_session: Session,
+    redis_runtime,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    case = load_benchmark_case("family_citywalk_addon_v1")
+    run = _create_run(db_session)
+    gateway = _build_gateway(db_session, cache, rate_limiter)
+    intent = DeterministicIntentParser().parse(case.user_input)
+    query_plan = DeterministicQueryPlanner().build(intent, provider_profile="mock_world")
+    collection = QueryPlanExecutor(gateway).execute_initial_calls(query_plan, run.run_id)
+    enrichment = CandidateEnricher(gateway, max_other_candidates=1).enrich(query_plan, collection)
+    drafts = DeterministicItineraryGenerator().generate(query_plan, enrichment)
+    review = FinalReviewGate().review(
+        query_plan,
+        enrichment,
+        drafts,
+        pre_confirmation_action_count=_count_rows(db_session, ActionLedger, run.run_id),
+    )
+    persistence = ReviewedPlanPersistenceService(PlanRepository(db_session))
+    persisted = persistence.persist_reviewed_drafts(review, drafts)
+    selected = persistence.select_plan(run.run_id, persisted.persisted_plans[0].plan_id)
+
+    HumanConfirmationService(PlanRepository(db_session)).confirm_plan(
+        run.run_id,
+        selected.plan_id,
+        confirmed_by="user",
+        source="integration-test",
+    )
+    DeterministicExecutionWorkflow(PlanRepository(db_session), gateway).execute_confirmed_plan(
+        run.run_id,
+        selected.plan_id,
+    )
+
+    feedback = DeterministicFeedbackWriter(
+        plans=PlanRepository(db_session),
+        runs=AgentRunRepository(db_session),
+    ).write_execution_feedback(run.run_id, selected.plan_id)
+
+    addon_completed = [item for item in feedback.completed_actions if item.tool_name == "order_addon"]
+    assert len(addon_completed) == 1
+    assert addon_completed[0].target_label == "小水分补给站"

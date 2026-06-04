@@ -145,6 +145,27 @@ def _dining(
     )
 
 
+def _addon(
+    candidate_id: str = "addon_drinks_001",
+    *,
+    menu: list[dict] | None = None,
+) -> EnrichedCandidate:
+    return EnrichedCandidate(
+        candidate=_candidate(
+            candidate_id,
+            category="addon",
+            tags=["drinks", "snacks"],
+        ),
+        poi_detail={
+            "poi_id": candidate_id,
+            "vendor_id": candidate_id,
+            "menu": [{"sku": "water", "price_cents": 600}] if menu is None else menu,
+        },
+        opening_hours={"is_open": True},
+        tool_results=[_tool_result("get_poi_detail", candidate_id)],
+    )
+
+
 def _route(
     origin_candidate_id: str = "activity_museum_001",
     destination_candidate_id: str = "restaurant_light_001",
@@ -171,6 +192,7 @@ def _enrichment(
     run_id: UUID | None = None,
     activities: list[EnrichedCandidate] | None = None,
     dining: list[EnrichedCandidate] | None = None,
+    others: list[EnrichedCandidate] | None = None,
     routes: list[RouteMatrixEntry] | None = None,
     provider_profile: str = "mock_world",
 ) -> CandidateEnrichmentResult:
@@ -179,6 +201,7 @@ def _enrichment(
         provider_profile=provider_profile,
         enriched_activity_candidates=[_activity()] if activities is None else activities,
         enriched_dining_candidates=[_dining()] if dining is None else dining,
+        enriched_other_candidates=[] if others is None else others,
         route_matrix=[_route()] if routes is None else routes,
         enricher_version="test-enricher",
     )
@@ -386,6 +409,85 @@ def test_unknown_action_type_blocks_the_draft() -> None:
     bad_draft = draft.model_copy(update={"proposed_actions": [bad_action]})
 
     result = FinalReviewGate().review(plan, enrichment, _draft_result(enrichment, [bad_draft]))
+
+    assert result.decision == "blocked"
+    assert "actions_reference_draft_objects" in _check_names(result.reviewed_drafts[0].errors)
+
+
+def test_valid_backed_order_addon_action_is_approved() -> None:
+    plan, _, _, draft = _single_draft()
+    enrichment = _enrichment(
+        others=[_addon()],
+        routes=[
+            _route(),
+            _route(
+                origin_candidate_id="restaurant_light_001",
+                destination_candidate_id="addon_drinks_001",
+            ),
+        ],
+    )
+    addon_action = draft.proposed_actions[0].model_copy(
+        update={
+            "action_ref": "draft_1_action_3",
+            "action_type": "order_addon",
+            "target_id": "addon_drinks_001",
+            "payload": {
+                "vendor_id": "addon_drinks_001",
+                "items": [{"sku": "water", "quantity": 3}],
+            },
+            "reason": "补给点可顺路到达，确认后可提前下单补水或小食。",
+        }
+    )
+    addon_draft = draft.model_copy(
+        update={
+            "proposed_actions": [*draft.proposed_actions, addon_action],
+            "evidence": {
+                **draft.evidence,
+                "selected_addon": {
+                    "candidate_id": "addon_drinks_001",
+                    "name": "小水分补给站",
+                    "route_key": ["restaurant_light_001", "addon_drinks_001"],
+                },
+            },
+        }
+    )
+
+    result = FinalReviewGate().review(plan, enrichment, _draft_result(enrichment, [addon_draft]))
+
+    assert result.decision == "approved"
+    assert result.reviewed_drafts[0].decision == "approved"
+
+
+def test_order_addon_with_unbacked_payload_blocks_the_draft() -> None:
+    plan, _, _, draft = _single_draft()
+    enrichment = _enrichment(others=[_addon()])
+    addon_action = draft.proposed_actions[0].model_copy(
+        update={
+            "action_ref": "draft_1_action_3",
+            "action_type": "order_addon",
+            "target_id": "addon_drinks_001",
+            "payload": {
+                "vendor_id": "addon_drinks_001",
+                "items": [],
+            },
+            "reason": "补给点可顺路到达，确认后可提前下单补水或小食。",
+        }
+    )
+    addon_draft = draft.model_copy(
+        update={
+            "proposed_actions": [*draft.proposed_actions, addon_action],
+            "evidence": {
+                **draft.evidence,
+                "selected_addon": {
+                    "candidate_id": "addon_drinks_001",
+                    "name": "小水分补给站",
+                    "route_key": ["restaurant_light_001", "addon_drinks_001"],
+                },
+            },
+        }
+    )
+
+    result = FinalReviewGate().review(plan, enrichment, _draft_result(enrichment, [addon_draft]))
 
     assert result.decision == "blocked"
     assert "actions_reference_draft_objects" in _check_names(result.reviewed_drafts[0].errors)

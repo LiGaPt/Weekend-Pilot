@@ -171,6 +171,16 @@ def test_get_poi_detail_returns_known_poi() -> None:
     assert "lighter_options" in result["poi"]["tags"]
 
 
+def test_get_poi_detail_for_addon_includes_vendor_menu_data() -> None:
+    provider = MockWorldProvider()
+
+    result = provider.invoke("get_poi_detail", {"poi_id": "addon_drinks_001"})
+
+    assert result["poi"]["poi_id"] == "addon_drinks_001"
+    assert result["poi"]["vendor_id"] == "addon_drinks_001"
+    assert [item["sku"] for item in result["poi"]["menu"]] == ["water", "fruit_cup"]
+
+
 def test_check_route_returns_deterministic_distance_and_duration() -> None:
     provider = MockWorldProvider()
 

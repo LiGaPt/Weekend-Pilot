@@ -250,3 +250,35 @@ def test_payload_preview_removes_internal_execution_fields() -> None:
         "poi_id": "activity_museum_001",
         "nested": {},
     }
+
+
+def test_order_addon_manifest_summary_keeps_readable_payload_preview() -> None:
+    summary = summarize_action_manifest(
+        {
+            "draft": {
+                "proposed_actions": [
+                    {
+                        "action_ref": "draft_1_action_3",
+                        "action_type": "order_addon",
+                        "target_id": "addon_drinks_001",
+                        "payload": {
+                            "vendor_id": "addon_drinks_001",
+                            "items": [{"sku": "water", "quantity": 3}],
+                        },
+                        "requires_confirmation": True,
+                        "reason": "Confirm to place the add-on order.",
+                    }
+                ]
+            }
+        },
+        sanitizer=sanitize_demo_payload,
+    )
+
+    assert summary.source == "proposed_actions"
+    assert summary.action_count == 1
+    assert summary.actions[0].action_type == "order_addon"
+    assert summary.actions[0].target_id == "addon_drinks_001"
+    assert summary.actions[0].payload_preview == {
+        "vendor_id": "addon_drinks_001",
+        "items": [{"sku": "water", "quantity": 3}],
+    }

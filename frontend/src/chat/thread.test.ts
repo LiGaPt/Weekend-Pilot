@@ -480,4 +480,10 @@ describe("projectConversationThread", () => {
     expect(actionTargetLabel(friendsPlan, "activity_arcade_301", "book_ticket")).toBe("苏河边草坪聚会点");
     expect(actionTargetLabel(friendsPlan, "restaurant_patio_301", "reserve_restaurant")).not.toBe("restaurant_patio_301");
   });
+
+  it("uses the readable addon target label for order_addon actions", () => {
+    expect(actionTargetLabel(awaitingRun.plans[0], "addon_drinks_001", "order_addon")).toBe(
+      "\u5c0f\u6c34\u5206\u8865\u7ed9\u7ad9",
+    );
+  });
 });

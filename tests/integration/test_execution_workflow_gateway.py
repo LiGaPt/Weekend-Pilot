@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from backend.app.benchmark import load_benchmark_case
 from backend.app.confirmation import HumanConfirmationService
 from backend.app.db.session import SessionLocal
 from backend.app.execution import DeterministicExecutionWorkflow
@@ -172,3 +173,54 @@ def test_execution_workflow_runs_confirmed_mock_world_actions_and_replays(
     assert {item.status for item in replay.action_results} == {"idempotent_replay"}
     assert _count_rows(db_session, ActionLedger, run.run_id) == action_ledger_count_after_first
     assert _count_rows(db_session, ToolEvent, run.run_id) == tool_event_count_after_first + confirmed_action_count
+
+
+def test_execution_workflow_executes_order_addon_and_replays_idempotently(
+    db_session: Session,
+    redis_runtime,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    case = load_benchmark_case("family_citywalk_addon_v1")
+    run = _create_run(db_session)
+    gateway = _build_gateway(db_session, cache, rate_limiter)
+    intent = DeterministicIntentParser().parse(case.user_input)
+    query_plan = DeterministicQueryPlanner().build(intent, provider_profile="mock_world")
+    collection = QueryPlanExecutor(gateway).execute_initial_calls(query_plan, run.run_id)
+    enrichment = CandidateEnricher(gateway, max_other_candidates=1).enrich(query_plan, collection)
+    drafts = DeterministicItineraryGenerator().generate(query_plan, enrichment)
+    review = FinalReviewGate().review(
+        query_plan,
+        enrichment,
+        drafts,
+        pre_confirmation_action_count=_count_rows(db_session, ActionLedger, run.run_id),
+    )
+    persistence = ReviewedPlanPersistenceService(PlanRepository(db_session))
+    persisted = persistence.persist_reviewed_drafts(review, drafts)
+    selected = persistence.select_plan(run.run_id, persisted.persisted_plans[0].plan_id)
+
+    confirmation = HumanConfirmationService(PlanRepository(db_session)).confirm_plan(
+        run.run_id,
+        selected.plan_id,
+        confirmed_by="user",
+        source="integration-test",
+    )
+    assert confirmation.confirmed_actions[-1].tool_name == "order_addon"
+
+    workflow = DeterministicExecutionWorkflow(PlanRepository(db_session), gateway)
+    result = workflow.execute_confirmed_plan(run.run_id, selected.plan_id)
+
+    addon_results = [item for item in result.action_results if item.tool_name == "order_addon"]
+    assert len(addon_results) == 1
+    assert addon_results[0].status == "succeeded"
+    assert addon_results[0].target_id == "addon_drinks_001"
+    assert db_session.scalar(
+        select(func.count()).select_from(ActionLedger).where(
+            ActionLedger.run_id == run.run_id,
+            ActionLedger.action_type == "order_addon",
+        )
+    ) == 1
+
+    replay = workflow.execute_confirmed_plan(run.run_id, selected.plan_id)
+    replay_addon_results = [item for item in replay.action_results if item.tool_name == "order_addon"]
+    assert len(replay_addon_results) == 1
+    assert replay_addon_results[0].status == "idempotent_replay"

@@ -124,6 +124,7 @@ class CandidateEnricher:
                 route_template,
                 activity_candidates,
                 dining_candidates,
+                other_candidates,
                 collection,
                 result,
                 fail_fast,
@@ -199,14 +200,44 @@ class CandidateEnricher:
         template: ToolCallTemplate,
         activity_candidates: list[Candidate],
         dining_candidates: list[Candidate],
+        other_candidates: list[Candidate],
         collection: CandidateCollectionResult,
         result: CandidateEnrichmentResult,
         fail_fast: bool,
         langsmith_trace_id: str | None,
     ) -> None:
-        for activity in activity_candidates:
-            for dining in dining_candidates:
-                payload, missing_input = self._route_payload(template, activity, dining)
+        self._append_route_matrix_pairs(
+            template,
+            activity_candidates,
+            dining_candidates,
+            collection,
+            result,
+            fail_fast,
+            langsmith_trace_id,
+        )
+        self._append_route_matrix_pairs(
+            template,
+            dining_candidates,
+            other_candidates,
+            collection,
+            result,
+            fail_fast,
+            langsmith_trace_id,
+        )
+
+    def _append_route_matrix_pairs(
+        self,
+        template: ToolCallTemplate,
+        origin_candidates: list[Candidate],
+        destination_candidates: list[Candidate],
+        collection: CandidateCollectionResult,
+        result: CandidateEnrichmentResult,
+        fail_fast: bool,
+        langsmith_trace_id: str | None,
+    ) -> None:
+        for origin in origin_candidates:
+            for destination in destination_candidates:
+                payload, missing_input = self._route_payload(template, origin, destination)
                 mode = self._route_mode(payload)
                 if missing_input is not None:
                     local_result = self._missing_input_result(
@@ -214,13 +245,13 @@ class CandidateEnricher:
                         tool_name=template.tool_name,
                         provider=template.provider,
                         missing_input=missing_input,
-                        origin_candidate_id=activity.candidate_id,
-                        destination_candidate_id=dining.candidate_id,
+                        origin_candidate_id=origin.candidate_id,
+                        destination_candidate_id=destination.candidate_id,
                     )
                     result.route_matrix.append(
                         RouteMatrixEntry(
-                            origin_candidate_id=activity.candidate_id,
-                            destination_candidate_id=dining.candidate_id,
+                            origin_candidate_id=origin.candidate_id,
+                            destination_candidate_id=destination.candidate_id,
                             provider=template.provider,
                             mode=mode,
                             status="failed",
@@ -243,15 +274,15 @@ class CandidateEnricher:
                 tool_result = self._tool_result_from_gateway(
                     gateway_result,
                     stage="route_matrix",
-                    origin_candidate_id=activity.candidate_id,
-                    destination_candidate_id=dining.candidate_id,
+                    origin_candidate_id=origin.candidate_id,
+                    destination_candidate_id=destination.candidate_id,
                 )
                 self._record_tool_result(result, tool_result)
                 if gateway_result.status not in self._USABLE_STATUSES:
                     result.route_matrix.append(
                         RouteMatrixEntry(
-                            origin_candidate_id=activity.candidate_id,
-                            destination_candidate_id=dining.candidate_id,
+                            origin_candidate_id=origin.candidate_id,
+                            destination_candidate_id=destination.candidate_id,
                             provider=gateway_result.provider,
                             mode=mode,
                             status=gateway_result.status,
@@ -267,8 +298,8 @@ class CandidateEnricher:
                     error = self._malformed_response_error(template.tool_name, "route")
                     result.route_matrix.append(
                         RouteMatrixEntry(
-                            origin_candidate_id=activity.candidate_id,
-                            destination_candidate_id=dining.candidate_id,
+                            origin_candidate_id=origin.candidate_id,
+                            destination_candidate_id=destination.candidate_id,
                             provider=gateway_result.provider,
                             mode=mode,
                             status="failed",
@@ -282,16 +313,16 @@ class CandidateEnricher:
                         provider=template.provider,
                         error_json=error,
                         response_json=gateway_result.response_json,
-                        origin_candidate_id=activity.candidate_id,
-                        destination_candidate_id=dining.candidate_id,
+                        origin_candidate_id=origin.candidate_id,
+                        destination_candidate_id=destination.candidate_id,
                     )
                     self._record_failed_tool_result(result, local_result, fail_fast)
                     continue
 
                 result.route_matrix.append(
                     RouteMatrixEntry(
-                        origin_candidate_id=activity.candidate_id,
-                        destination_candidate_id=dining.candidate_id,
+                        origin_candidate_id=origin.candidate_id,
+                        destination_candidate_id=destination.candidate_id,
                         provider=gateway_result.provider,
                         mode=str(route.get("mode") or mode),
                         status=gateway_result.status,
@@ -320,14 +351,14 @@ class CandidateEnricher:
     def _route_payload(
         self,
         template: ToolCallTemplate,
-        activity: Candidate,
-        dining: Candidate,
+        origin: Candidate,
+        destination: Candidate,
     ) -> tuple[dict[str, Any], str | None]:
         context = {
-            "origin_id": activity.candidate_id,
-            "destination_id": dining.candidate_id,
-            "origin": activity.location if isinstance(activity.location, str) and activity.location.strip() else _MISSING,
-            "destination": dining.location if isinstance(dining.location, str) and dining.location.strip() else _MISSING,
+            "origin_id": origin.candidate_id,
+            "destination_id": destination.candidate_id,
+            "origin": origin.location if isinstance(origin.location, str) and origin.location.strip() else _MISSING,
+            "destination": destination.location if isinstance(destination.location, str) and destination.location.strip() else _MISSING,
             "mode": "walking",
         }
         return self._resolve_payload(template, context)

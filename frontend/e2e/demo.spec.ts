@@ -31,6 +31,8 @@ const stableClarificationReply =
   "We are leaving around 2pm this afternoon from Xuhui with my wife and 5-year-old child for about 4 hours. Keep it nearby if possible, but going a bit farther is okay if it keeps the plan relaxed. Please start with an indoor child-friendly activity and then a light dinner.";
 const explicitHappyPathClarificationReply =
   "\u4eca\u5929\u4e0b\u534814\u70b9\u5de6\u53f3\u548c\u7231\u4eba\u30015\u5c81\u7684\u5b69\u5b50\u4ece\u5f90\u6c47\u51fa\u53d1\uff0c\u5728\u5bb6\u9644\u8fd1\u73a94\u5c0f\u65f6\uff0c\u5148\u5b89\u6392\u5ba4\u5185\u4eb2\u5b50\u6d3b\u52a8\uff0c\u518d\u53bb\u5403\u4e00\u987f\u6e05\u6de1\u665a\u9910\uff0c\u5168\u7a0b\u522b\u592a\u8fdc\u3002";
+const explicitAddonPrompt =
+  "This afternoon around 2pm I want a light citywalk-style plan with my partner and 5-year-old nearby, then a lighter dinner, and include an easy drink or snack stop if it fits.";
 const vagueChinesePrompt = "\u60f3\u5468\u672b\u51fa\u53bb\u73a9\u4e00\u4e0b\u3002";
 const vagueChineseClarificationReply =
   "\u4eca\u5929\u4e0b\u5348\u4e00\u4e2a\u4eba\u51fa\u95e8\u73a9\u51e0\u4e2a\u5c0f\u65f6\uff0c\u522b\u592a\u8fdc\u3002";
@@ -442,6 +444,23 @@ test.describe("desktop web demo", () => {
     await page.getByTestId("confirm-button").click();
 
     await expect(page.getByTestId("assistant-result-card")).toBeVisible({ timeout: 60_000 });
+  });
+
+  test("order addon path shows preview, confirms, and keeps readable add-on labels", async ({ page }) => {
+    await startPresentableDemoRun(page, explicitAddonPrompt, explicitAddonPrompt);
+
+    await page.getByRole("button", { name: "\u786e\u8ba4\u524d\u52a8\u4f5c" }).last().click();
+    await expect(page.locator("body")).toContainText("\u52a0\u8d2d");
+    await expect(page.locator("body")).toContainText("\u5c0f\u6c34\u5206\u8865\u7ed9\u7ad9");
+    await expect(page.locator("body")).not.toContainText("addon_drinks_001");
+
+    await page.getByTestId("confirm-button").click();
+
+    const resultCard = page.getByTestId("assistant-result-card").last();
+    await expect(resultCard).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId("execution-timeline-toggle").click();
+    await expect(page.getByTestId("execution-timeline")).toContainText("\u52a0\u8d2d");
+    await expect(page.getByTestId("execution-timeline")).toContainText("\u5c0f\u6c34\u5206\u8865\u7ed9\u7ad9");
   });
 
   test("scenario preset selector sends the explicit mock world profile", async ({ page }) => {

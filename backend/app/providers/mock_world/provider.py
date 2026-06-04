@@ -69,7 +69,12 @@ class MockWorldProvider:
 
     def _get_poi_detail(self, payload: dict[str, Any]) -> dict[str, Any]:
         poi_id = _required_text(payload, "poi_id")
-        return {"poi": deepcopy(self._get_poi(poi_id))}
+        poi = deepcopy(self._get_poi(poi_id))
+        addon = self._addons_by_vendor_id.get(poi_id)
+        if addon is not None:
+            poi["vendor_id"] = addon["vendor_id"]
+            poi["menu"] = deepcopy(addon.get("menu", []))
+        return {"poi": poi}
 
     def _check_route(self, payload: dict[str, Any]) -> dict[str, Any]:
         origin_id = _required_text(payload, "origin_id")

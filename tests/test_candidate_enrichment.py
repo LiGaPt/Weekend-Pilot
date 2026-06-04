@@ -262,6 +262,37 @@ def test_other_candidates_are_skipped_by_default() -> None:
     assert gateway.requests == []
 
 
+def test_other_candidates_can_be_enriched_when_limit_is_enabled() -> None:
+    gateway = FakeGateway(
+        [
+            _gateway_result(
+                "get_poi_detail",
+                response_json={
+                    "poi": {
+                        "poi_id": "addon_drinks_001",
+                        "vendor_id": "addon_drinks_001",
+                        "menu": [{"sku": "water", "price_cents": 600}],
+                    }
+                },
+            ),
+            _gateway_result("check_opening_hours", response_json={"opening_hours": {"is_open": True}}),
+        ]
+    )
+
+    result = CandidateEnricher(gateway, max_other_candidates=1).enrich(
+        _plan(enrichment_templates=_candidate_templates()),
+        _collection(other_candidates=[_candidate("addon_drinks_001", category="addon")]),
+    )
+
+    assert [item.candidate.candidate_id for item in result.enriched_other_candidates] == ["addon_drinks_001"]
+    assert result.enriched_other_candidates[0].poi_detail == {
+        "poi_id": "addon_drinks_001",
+        "vendor_id": "addon_drinks_001",
+        "menu": [{"sku": "water", "price_cents": 600}],
+    }
+    assert result.enriched_other_candidates[0].opening_hours == {"is_open": True}
+
+
 def test_mock_world_route_matrix_uses_candidate_ids_for_activity_to_dining_pairs() -> None:
     gateway = FakeGateway(
         [
@@ -292,6 +323,34 @@ def test_mock_world_route_matrix_uses_candidate_ids_for_activity_to_dining_pairs
         {"origin_id": "a1", "destination_id": "d1", "mode": "walking"},
         {"origin_id": "a1", "destination_id": "d2", "mode": "walking"},
     ]
+
+
+def test_route_matrix_includes_dining_to_other_candidates_when_present() -> None:
+    gateway = FakeGateway(
+        [
+            _gateway_result(
+                "check_route",
+                response_json={"route": {"distance_meters": 900, "duration_minutes": 13}},
+            )
+        ]
+    )
+
+    result = CandidateEnricher(gateway, max_other_candidates=1).enrich(
+        _plan(route_templates=[_mock_route_template()]),
+        _collection(
+            dining_candidates=[_candidate("restaurant_light_001", category="dining")],
+            other_candidates=[_candidate("addon_drinks_001", category="addon")],
+        ),
+    )
+
+    assert [(entry.origin_candidate_id, entry.destination_candidate_id) for entry in result.route_matrix] == [
+        ("restaurant_light_001", "addon_drinks_001"),
+    ]
+    assert gateway.requests[0].payload == {
+        "origin_id": "restaurant_light_001",
+        "destination_id": "addon_drinks_001",
+        "mode": "walking",
+    }
 
 
 def test_amap_route_matrix_uses_string_locations_and_normalizes_duration_seconds() -> None:

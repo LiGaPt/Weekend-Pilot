@@ -26,5 +26,10 @@ export default defineConfig({
   build: {
     outDir: "../dist/internal",
     emptyOutDir: false,
+    rollupOptions: {
+      input: {
+        index: fileURLToPath(new URL("./internal/index.html", import.meta.url)),
+      },
+    },
   },
 });

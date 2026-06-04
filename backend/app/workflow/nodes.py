@@ -228,7 +228,7 @@ class WeekendPilotWorkflowNodes:
         )
 
     def pre_flight_check_availability(self, state: WeekendPilotWorkflowState) -> dict[str, Any]:
-        enrichment = CandidateEnricher(self.gateway).enrich(
+        enrichment = CandidateEnricher(self.gateway, max_other_candidates=1).enrich(
             self._required_value(state, "query_plan"),
             self._required_value(state, "candidate_collection"),
             langsmith_trace_id=state.get("trace_id"),
