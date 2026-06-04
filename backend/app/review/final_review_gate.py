@@ -592,6 +592,8 @@ class FinalReviewGate:
                 indexes,
             ):
                 continue
+            if action_type == "send_message" and self._send_message_is_valid(action, draft):
+                continue
             invalid_actions.append(self._action_summary(action))
 
         if invalid_actions:
@@ -821,6 +823,32 @@ class FinalReviewGate:
         if route_key not in indexes["route_keys"]:
             return False
         return True
+
+    def _send_message_is_valid(self, action: Any, draft: ItineraryDraft) -> bool:
+        evidence = self._post_confirmation_message(draft)
+        recipient = self._text_or_none(evidence.get("recipient"))
+        if recipient is None:
+            return False
+
+        target_id = getattr(action, "target_id", None)
+        if target_id != recipient:
+            return False
+
+        payload = getattr(action, "payload", None)
+        if not isinstance(payload, dict):
+            return False
+        if self._text_or_none(payload.get("recipient")) != recipient:
+            return False
+        if self._text_or_none(payload.get("message")) is None:
+            return False
+        return True
+
+    def _post_confirmation_message(self, draft: ItineraryDraft) -> dict[str, Any]:
+        evidence = getattr(draft, "evidence", None)
+        if not isinstance(evidence, dict):
+            return {}
+        message = evidence.get("post_confirmation_message")
+        return message if isinstance(message, dict) else {}
 
     def _actions(self, draft: ItineraryDraft) -> list[Any]:
         actions = getattr(draft, "proposed_actions", None)

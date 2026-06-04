@@ -414,6 +414,133 @@ def test_unknown_action_type_blocks_the_draft() -> None:
     assert "actions_reference_draft_objects" in _check_names(result.reviewed_drafts[0].errors)
 
 
+def test_valid_backed_send_message_action_is_approved() -> None:
+    plan, enrichment, _, draft = _single_draft()
+    message_action = draft.proposed_actions[0].model_copy(
+        update={
+            "action_ref": "draft_1_action_3",
+            "action_type": "send_message",
+            "target_id": "wife",
+            "payload": {
+                "recipient": "wife",
+                "message": "Plan confirmed.",
+            },
+            "reason": "Post-confirmation message.",
+        }
+    )
+    message_draft = draft.model_copy(
+        update={
+            "proposed_actions": [*draft.proposed_actions, message_action],
+            "evidence": {
+                **draft.evidence,
+                "post_confirmation_message": {
+                    "recipient": "wife",
+                    "recipient_label": "\u59bb\u5b50",
+                    "message_preview": "Plan confirmed.",
+                    "trigger_rule": "family_spouse_confirmation_v0",
+                },
+            },
+        }
+    )
+
+    result = FinalReviewGate().review(plan, enrichment, _draft_result(enrichment, [message_draft]))
+
+    assert result.decision == "approved"
+    assert result.reviewed_drafts[0].decision == "approved"
+
+
+def test_send_message_without_backing_evidence_blocks_the_draft() -> None:
+    plan, enrichment, _, draft = _single_draft()
+    message_action = draft.proposed_actions[0].model_copy(
+        update={
+            "action_ref": "draft_1_action_3",
+            "action_type": "send_message",
+            "target_id": "wife",
+            "payload": {
+                "recipient": "wife",
+                "message": "Plan confirmed.",
+            },
+            "reason": "Post-confirmation message.",
+        }
+    )
+    message_draft = draft.model_copy(update={"proposed_actions": [*draft.proposed_actions, message_action]})
+
+    result = FinalReviewGate().review(plan, enrichment, _draft_result(enrichment, [message_draft]))
+
+    assert result.decision == "blocked"
+    assert "actions_reference_draft_objects" in _check_names(result.reviewed_drafts[0].errors)
+
+
+def test_send_message_with_mismatched_recipient_blocks_the_draft() -> None:
+    plan, enrichment, _, draft = _single_draft()
+    message_action = draft.proposed_actions[0].model_copy(
+        update={
+            "action_ref": "draft_1_action_3",
+            "action_type": "send_message",
+            "target_id": "self",
+            "payload": {
+                "recipient": "wife",
+                "message": "Plan confirmed.",
+            },
+            "reason": "Post-confirmation message.",
+        }
+    )
+    message_draft = draft.model_copy(
+        update={
+            "proposed_actions": [*draft.proposed_actions, message_action],
+            "evidence": {
+                **draft.evidence,
+                "post_confirmation_message": {
+                    "recipient": "wife",
+                    "recipient_label": "\u59bb\u5b50",
+                    "message_preview": "Plan confirmed.",
+                    "trigger_rule": "family_spouse_confirmation_v0",
+                },
+            },
+        }
+    )
+
+    result = FinalReviewGate().review(plan, enrichment, _draft_result(enrichment, [message_draft]))
+
+    assert result.decision == "blocked"
+    assert "actions_reference_draft_objects" in _check_names(result.reviewed_drafts[0].errors)
+
+
+def test_send_message_with_empty_message_blocks_the_draft() -> None:
+    plan, enrichment, _, draft = _single_draft()
+    message_action = draft.proposed_actions[0].model_copy(
+        update={
+            "action_ref": "draft_1_action_3",
+            "action_type": "send_message",
+            "target_id": "wife",
+            "payload": {
+                "recipient": "wife",
+                "message": "",
+            },
+            "reason": "Post-confirmation message.",
+        }
+    )
+    message_draft = draft.model_copy(
+        update={
+            "proposed_actions": [*draft.proposed_actions, message_action],
+            "evidence": {
+                **draft.evidence,
+                "post_confirmation_message": {
+                    "recipient": "wife",
+                    "recipient_label": "\u59bb\u5b50",
+                    "message_preview": "Plan confirmed.",
+                    "trigger_rule": "family_spouse_confirmation_v0",
+                },
+            },
+        }
+    )
+
+    result = FinalReviewGate().review(plan, enrichment, _draft_result(enrichment, [message_draft]))
+
+    assert result.decision == "blocked"
+    assert "actions_reference_draft_objects" in _check_names(result.reviewed_drafts[0].errors)
+
+
 def test_valid_backed_order_addon_action_is_approved() -> None:
     plan, _, _, draft = _single_draft()
     enrichment = _enrichment(

@@ -240,6 +240,46 @@ def test_addon_feedback_uses_readable_target_label_from_selected_addon_evidence(
     assert result.completed_actions[0].message == "已为小水分补给站完成加购点单。"
 
 
+def test_send_message_feedback_uses_readable_recipient_label_from_message_evidence(db_session: Session) -> None:
+    run = _create_run(db_session)
+    plan_json = _reviewed_plan_json(
+        run.run_id,
+        action_results=[
+            _action_result(
+                tool_name="send_message",
+                target_id="wife",
+            )
+        ],
+    )
+    plan_json["draft"]["proposed_actions"] = [
+        {
+            "action_ref": "draft_1_action_1",
+            "action_type": "send_message",
+            "target_id": "wife",
+            "payload": {
+                "recipient": "wife",
+                "message": "Plan confirmed.",
+            },
+            "requires_confirmation": True,
+            "reason": "Post-confirmation message.",
+        }
+    ]
+    plan_json["draft"]["evidence"] = {
+        "post_confirmation_message": {
+            "recipient": "wife",
+            "recipient_label": "\u59bb\u5b50",
+            "message_preview": "Plan confirmed.",
+            "trigger_rule": "family_spouse_confirmation_v0",
+        }
+    }
+    plan = _create_executed_plan(db_session, run_id=run.run_id, plan_json=plan_json)
+
+    result = _write_feedback(db_session, run.run_id, plan.plan_id)
+
+    assert result.completed_actions[0].target_label == "\u59bb\u5b50"
+    assert result.completed_actions[0].message == "\u5df2\u4e3a\u59bb\u5b50\u5b8c\u6210\u53d1\u9001\u6d88\u606f\u3002"
+
+
 def test_partial_execution_groups_completed_replayed_and_failed_actions(db_session: Session) -> None:
     run = _create_run(db_session)
     actions = [

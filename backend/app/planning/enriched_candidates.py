@@ -51,6 +51,7 @@ class RouteMatrixEntry(BaseModel):
 class CandidateEnrichmentResult(BaseModel):
     run_id: UUID
     provider_profile: str
+    world_profile: str | None = None
     enriched_activity_candidates: list[EnrichedCandidate] = Field(default_factory=list)
     enriched_dining_candidates: list[EnrichedCandidate] = Field(default_factory=list)
     enriched_other_candidates: list[EnrichedCandidate] = Field(default_factory=list)

@@ -299,6 +299,11 @@ const TARGET_ID_LABELS: Record<string, string> = {
   restaurant_bistro_501: "高性价比小馆快线",
 };
 
+const MESSAGE_TARGET_LABELS: Record<string, string> = {
+  wife: "妻子",
+  self: "自己",
+};
+
 export function projectConversationThread({
   entries,
   activeRunId,
@@ -900,6 +905,9 @@ export function actionTargetLabel(
       return actionType === "join_queue" ? `${diningName}排队取号` : diningName;
     }
     return "餐厅目标待确认";
+  }
+  if (actionType === "send_message") {
+    return MESSAGE_TARGET_LABELS[normalizedTargetId] || TARGET_ID_LABELS[normalizedTargetId] || "消息目标待确认";
   }
 
   return TARGET_ID_LABELS[normalizedTargetId] || "目标待确认";
