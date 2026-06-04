@@ -124,6 +124,62 @@ const runWithEnglishDemoData: DemoRunSummary = {
   clarification: null,
 };
 
+const completedRunWithFinalArrangement: DemoRunSummary = {
+  ...runWithEnglishDemoData,
+  status: "completed",
+  action_count: 2,
+  execution_status: "succeeded",
+  feedback_status: "written",
+  plans: [
+    {
+      ...runWithEnglishDemoData.plans[0],
+      status: "executed",
+      timeline: [
+        {
+          sequence: 1,
+          title: "亲子活动",
+          start_label: "14:00",
+          end_label: "16:00",
+          duration_minutes: 120,
+        },
+      ],
+      confirmation: { status: "confirmed", confirmed_by: "web-demo-user", action_count: 2 },
+      execution: {
+        status: "succeeded",
+        started_at: "2026-05-26T14:00:00+08:00",
+        finished_at: "2026-05-26T14:02:00+08:00",
+        succeeded_count: 2,
+        failed_count: 0,
+        action_results: [
+          {
+            action_ref: "draft_1_action_1",
+            execution_order: 1,
+            tool_name: "reserve_restaurant",
+            target_id: "restaurant_garden_001",
+            status: "succeeded",
+          },
+          {
+            action_ref: "draft_1_action_2",
+            execution_order: 2,
+            tool_name: "send_message",
+            target_id: "family-chat",
+            status: "succeeded",
+          },
+        ],
+      },
+      feedback: {
+        status: "written",
+        headline: "安排已完成",
+        message: "订座和后续消息都已完成。",
+        final_arrangement_message: "搞定了，下午 2 点出发，先去徐汇亲子科学馆，再到花园家庭轻食餐室；订座和后续消息都已安排好",
+        completed_actions: [{ action_type: "reserve_restaurant", status: "completed" }],
+        failed_actions: [],
+        next_steps: ["14:00 前稍早出发。"],
+      },
+    },
+  ],
+};
+
 function buildMultiScenarioRun(
   runId: string,
   planId: string,
@@ -248,6 +304,118 @@ describe("ConversationThread", () => {
     expect(within(ticketAction).getByText("徐汇亲子科学馆")).toBeInTheDocument();
     expect(within(reservationAction).getByText("花园家庭轻食餐室")).toBeInTheDocument();
     expect(screen.queryByText(/activity_museum_001|restaurant_garden_001/)).not.toBeInTheDocument();
+  });
+
+  it("renders the final arrangement message and copies it successfully", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    const items = projectConversationThread({
+      entries: [{ id: "run-completed", kind: "run", run: completedRunWithFinalArrangement }],
+      activeRunId: "run-completed",
+      selectedPlanId: "plan-garden",
+    });
+
+    render(
+      <ConversationThread
+        items={items}
+        activeRunId="run-completed"
+        requestState="idle"
+        canConfirm={false}
+        canDecline={false}
+        onSelectPlan={vi.fn()}
+        onConfirm={vi.fn()}
+        onDecline={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("final-arrangement-message")).toHaveTextContent(
+      "搞定了，下午 2 点出发，先去徐汇亲子科学馆，再到花园家庭轻食餐室；订座和后续消息都已安排好",
+    );
+    const copyButton = screen.getByTestId("final-arrangement-copy-button");
+    expect(copyButton).toBeInTheDocument();
+
+    await user.click(copyButton);
+
+    expect(writeText).toHaveBeenCalledWith(
+      "搞定了，下午 2 点出发，先去徐汇亲子科学馆，再到花园家庭轻食餐室；订座和后续消息都已安排好",
+    );
+    expect(screen.getByText("已复制")).toBeInTheDocument();
+  });
+
+  it("shows copy failure feedback and hides the copy button when the final arrangement message is absent", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockRejectedValue(new Error("clipboard denied"));
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    const items = projectConversationThread({
+      entries: [{ id: "run-completed", kind: "run", run: completedRunWithFinalArrangement }],
+      activeRunId: "run-completed",
+      selectedPlanId: "plan-garden",
+    });
+
+    const noFinalMessageItems = projectConversationThread({
+      entries: [
+        {
+          id: "run-completed-no-final",
+          kind: "run",
+          run: {
+            ...completedRunWithFinalArrangement,
+            run_id: "run-completed-no-final",
+            plans: completedRunWithFinalArrangement.plans.map((plan) => ({
+              ...plan,
+              feedback: plan.feedback
+                ? {
+                    ...plan.feedback,
+                    final_arrangement_message: null,
+                  }
+                : plan.feedback,
+            })),
+          },
+        },
+      ],
+      activeRunId: "run-completed-no-final",
+      selectedPlanId: "plan-garden",
+    });
+
+    const { rerender } = render(
+      <ConversationThread
+        items={items}
+        activeRunId="run-completed"
+        requestState="idle"
+        canConfirm={false}
+        canDecline={false}
+        onSelectPlan={vi.fn()}
+        onConfirm={vi.fn()}
+        onDecline={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByTestId("final-arrangement-copy-button"));
+    expect(writeText).toHaveBeenCalled();
+    expect(screen.getByText("复制失败")).toBeInTheDocument();
+
+    rerender(
+      <ConversationThread
+        items={noFinalMessageItems}
+        activeRunId="run-completed-no-final"
+        requestState="idle"
+        canConfirm={false}
+        canDecline={false}
+        onSelectPlan={vi.fn()}
+        onConfirm={vi.fn()}
+        onDecline={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("final-arrangement-copy-button")).not.toBeInTheDocument();
   });
 
   it.each([

@@ -218,9 +218,11 @@ For the V1 richer UI closure, use `docs/RICHER_WEB_UI_V1_CHECKLIST.md` as the ca
 11. Click `确认当前方案`.
 12. Confirm the run reaches `completed`.
 13. Confirm execution and feedback are visible as a later assistant card in the same chat flow.
-14. Confirm the page now renders `执行时间线`, but keeps it collapsed by default.
-15. Expand the execution timeline and confirm the timeline entries are ordered and show step number, action/tool label, target, and status.
-16. Confirm the selected plan now shows `action_manifest.source = confirmed_actions`.
+14. Confirm the result card prominently shows a copyable final arrangement message such as `搞定了，下午 2 点出发...`.
+15. Confirm the result card shows a `复制安排消息` action for that final arrangement message.
+16. Confirm the page now renders `执行时间线`, but keeps it collapsed by default.
+17. Expand the execution timeline and confirm the timeline entries are ordered and show step number, action/tool label, target, and status.
+18. Confirm the selected plan now shows `action_manifest.source = confirmed_actions`.
 
 The automated desktop browser suite now keeps two happy-path starts in scope:
 

@@ -265,6 +265,20 @@ function PlanCard({
 
 function ResultCard({ item }: { item: AssistantResultCardItem }) {
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState<"success" | "error" | null>(null);
+
+  const handleCopy = async () => {
+    if (!item.finalArrangementMessage) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(item.finalArrangementMessage);
+      setCopyFeedback("success");
+    } catch {
+      setCopyFeedback("error");
+    }
+  };
 
   return (
     <article className="thread-row thread-row-assistant">
@@ -276,6 +290,21 @@ function ResultCard({ item }: { item: AssistantResultCardItem }) {
           </div>
           <span className="thread-badge">{item.outcomeLabel}</span>
         </div>
+        {item.finalArrangementMessage ? (
+          <div className="inline-hint-block">
+            <p data-testid="final-arrangement-message">{item.finalArrangementMessage}</p>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={handleCopy}
+              data-testid="final-arrangement-copy-button"
+            >
+              复制安排消息
+            </button>
+            {copyFeedback === "success" ? <span>已复制</span> : null}
+            {copyFeedback === "error" ? <span>复制失败</span> : null}
+          </div>
+        ) : null}
         {item.message ? <p>{item.message}</p> : null}
 
         <DisclosureBlock

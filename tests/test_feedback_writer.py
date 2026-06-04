@@ -96,6 +96,15 @@ def _reviewed_plan_json(
                 "candidate_id": "restaurant_light_001",
                 "name": "绿碗家庭轻食",
             },
+            "timeline": [
+                {
+                    "sequence": 1,
+                    "title": "亲子活动",
+                    "start_label": "14:00",
+                    "end_label": "16:00",
+                    "duration_minutes": 120,
+                }
+            ],
             "proposed_actions": [],
         },
         "reviewed_draft": {
@@ -177,6 +186,7 @@ def test_successful_execution_creates_completed_feedback_and_run_status(db_sessi
     assert result.completed_actions[0].target_label == "徐汇亲子科学馆"
     assert result.completed_actions[0].status == "completed"
     assert result.completed_actions[0].message == "已为徐汇亲子科学馆完成订票。"
+    assert result.final_arrangement_message == "搞定了，下午 2 点出发，先去徐汇亲子科学馆，再到绿碗家庭轻食；订票已处理完成"
     assert result.failed_actions == []
     assert AgentRunRepository(db_session).get_by_id(run.run_id).status == "completed"
 
@@ -187,6 +197,7 @@ def test_successful_execution_creates_completed_feedback_and_run_status(db_sessi
     assert feedback["writer_version"] == "deterministic_feedback_writer_v1"
     assert feedback["status"] == "completed"
     assert feedback["run_status"] == "completed"
+    assert feedback["final_arrangement_message"] == result.final_arrangement_message
     assert feedback["completed_actions"][0]["target_label"] == "徐汇亲子科学馆"
 
 
@@ -235,6 +246,10 @@ def test_partial_execution_groups_completed_replayed_and_failed_actions(db_sessi
     assert result.failed_actions[0].status == "failed"
     assert result.failed_actions[0].target_label == "queue_123"
     assert result.failed_actions[0].error_code == "provider_unavailable"
+    assert (
+        result.final_arrangement_message
+        == "先帮你安排了可完成的部分，下午 2 点出发，先去徐汇亲子科学馆，再到绿碗家庭轻食；订票、订座已完成，排队取号还需要你再确认或处理"
+    )
     assert result.next_steps
     assert AgentRunRepository(db_session).get_by_id(run.run_id).status == "partially_completed"
 
@@ -266,6 +281,11 @@ def test_failed_execution_creates_failed_feedback(db_session: Session) -> None:
     assert [item.status for item in result.failed_actions] == ["blocked", "rate_limited"]
     assert "0项操作已完成" in result.message
     assert "2项需要处理" in result.message
+    assert (
+        result.final_arrangement_message
+        == "这次还没安排成功，下午 2 点出发，先去徐汇亲子科学馆，再到绿碗家庭轻食；订票、订座还没有执行成功，建议先处理这些问题再重试"
+    )
+    assert "搞定了" not in result.final_arrangement_message
     assert AgentRunRepository(db_session).get_by_id(run.run_id).status == "failed"
 
 

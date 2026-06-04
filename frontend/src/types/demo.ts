@@ -116,6 +116,7 @@ export type DemoFeedbackSummary = {
   run_status?: string | null;
   headline?: string | null;
   message?: string | null;
+  final_arrangement_message?: string | null;
   completed_actions?: Record<string, unknown>[];
   failed_actions?: Record<string, unknown>[];
   next_steps?: string[];

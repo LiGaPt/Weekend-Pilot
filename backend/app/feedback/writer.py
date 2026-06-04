@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import UTC, datetime
+import re
 from typing import Any
 from uuid import UUID
 
@@ -92,6 +93,12 @@ class DeterministicFeedbackWriter:
             run_status=feedback_status,
             headline=headline,
             message=message,
+            final_arrangement_message=self._build_final_arrangement_message(
+                plan_json,
+                feedback_status,
+                completed_actions,
+                failed_actions,
+            ),
             completed_actions=completed_actions,
             failed_actions=failed_actions,
             next_steps=list(self._NEXT_STEPS[feedback_status]),
@@ -238,6 +245,120 @@ class DeterministicFeedbackWriter:
         code = error_json.get("code")
         return code if isinstance(code, str) and code else None
 
+    def _build_final_arrangement_message(
+        self,
+        plan_json: dict[str, Any],
+        feedback_status: str,
+        completed_actions: list[FeedbackActionSummary],
+        failed_actions: list[FeedbackActionSummary],
+    ) -> str | None:
+        if feedback_status == "skipped":
+            return None
+
+        draft = plan_json.get("draft")
+        if not isinstance(draft, dict):
+            return None
+
+        activity = draft.get("activity") if isinstance(draft.get("activity"), dict) else {}
+        dining = draft.get("dining") if isinstance(draft.get("dining"), dict) else {}
+        activity_name = self._text(activity.get("name"))
+        dining_name = self._text(dining.get("name"))
+        if activity_name is None and dining_name is None:
+            return None
+
+        opening = {
+            "completed": "搞定了，",
+            "partially_completed": "先帮你安排了可完成的部分，",
+            "failed": "这次还没安排成功，",
+        }.get(feedback_status)
+        if opening is None:
+            return None
+
+        parts: list[str] = [opening]
+        departure = self._departure_clause(plan_json)
+        if departure:
+            parts.append(f"{departure}，")
+
+        plan_parts: list[str] = []
+        if activity_name:
+            plan_parts.append(f"先去{activity_name}")
+        if dining_name:
+            plan_parts.append(f"{'，再到' if plan_parts else '到'}{dining_name}")
+        if plan_parts:
+            parts.append("".join(plan_parts))
+
+        suffix = self._arrangement_suffix(feedback_status, completed_actions, failed_actions)
+        if suffix:
+            parts.append(f"；{suffix}")
+        return "".join(parts)
+
+    def _departure_clause(self, plan_json: dict[str, Any]) -> str | None:
+        draft = plan_json.get("draft")
+        if not isinstance(draft, dict):
+            return None
+        timeline = draft.get("timeline")
+        if not isinstance(timeline, list):
+            return None
+        for item in timeline:
+            if not isinstance(item, dict):
+                continue
+            start_label = self._text(item.get("start_label"))
+            if not start_label:
+                continue
+            normalized = self._normalize_time_label(start_label)
+            if normalized:
+                return f"{normalized}出发"
+        return None
+
+    def _normalize_time_label(self, start_label: str) -> str | None:
+        match = re.search(r"(?<!\d)(\d{1,2}):(\d{2})", start_label)
+        if not match:
+            return None
+        hour = int(match.group(1))
+        minute = int(match.group(2))
+        if minute not in {0, 30}:
+            return None
+        period = "下午" if hour >= 12 else "上午"
+        display_hour = hour if 1 <= hour <= 12 else hour - 12 if hour > 12 else 12
+        if minute == 0:
+            return f"{period} {display_hour} 点"
+        return f"{period} {display_hour} 点半"
+
+    def _arrangement_suffix(
+        self,
+        feedback_status: str,
+        completed_actions: list[FeedbackActionSummary],
+        failed_actions: list[FeedbackActionSummary],
+    ) -> str | None:
+        completed_tools = {action.tool_name for action in completed_actions}
+        if feedback_status == "completed":
+            if {"reserve_restaurant", "send_message"}.issubset(completed_tools):
+                return "订座和后续消息都已安排好"
+            if completed_actions:
+                return f"{'、'.join(self._tool_label(action.tool_name) for action in completed_actions)}已处理完成"
+            return "可以按这个安排直接出发"
+        if feedback_status == "partially_completed":
+            completed_labels = "、".join(self._tool_label(action.tool_name) for action in completed_actions)
+            failed_labels = "、".join(self._tool_label(action.tool_name) for action in failed_actions)
+            if completed_labels and failed_labels:
+                return f"{completed_labels}已完成，{failed_labels}还需要你再确认或处理"
+            if failed_labels:
+                return f"{failed_labels}还需要你再确认或处理"
+            return "剩余步骤还需要再跟进"
+        if feedback_status == "failed":
+            failed_labels = "、".join(self._tool_label(action.tool_name) for action in failed_actions)
+            if failed_labels:
+                return f"{failed_labels}还没有执行成功，建议先处理这些问题再重试"
+            return "建议先检查失败原因后再重试"
+        return None
+
+    def _text(self, value: Any) -> str | None:
+        if isinstance(value, str):
+            value = value.strip()
+            if value:
+                return value
+        return None
+
     def _message(self, headline: str, completed_count: int, failed_count: int) -> str:
         return (
             f"{headline}：{completed_count}项操作已完成，"
@@ -259,6 +380,7 @@ class DeterministicFeedbackWriter:
             "run_status": result.run_status,
             "headline": result.headline,
             "message": result.message,
+            "final_arrangement_message": result.final_arrangement_message,
             "completed_actions": [
                 action.model_dump(mode="json")
                 for action in result.completed_actions

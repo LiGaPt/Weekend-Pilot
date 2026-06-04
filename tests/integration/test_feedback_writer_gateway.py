@@ -171,6 +171,10 @@ def test_feedback_writer_persists_user_safe_feedback_after_mock_world_execution(
     assert stored["status"] == "completed"
     assert stored["run_status"] == "completed"
     assert stored["message"] == feedback.message
+    assert stored["final_arrangement_message"] == feedback.final_arrangement_message
+    assert feedback.final_arrangement_message is not None
+    assert "搞定了" in feedback.final_arrangement_message
+    assert "出发" in feedback.final_arrangement_message
 
     serialized_feedback = str(stored)
     assert "tool_event_id" not in serialized_feedback
