@@ -379,6 +379,9 @@ test.describe("desktop web demo", () => {
     await expectThreadItemOrder(page.getByTestId("progress-stepper-card").last(), resultCard);
     await expectExecutionTimelineCollapsed(resultCard);
     await expectNoForbiddenVisibleText(page);
+    await expect(resultCard.getByTestId("final-arrangement-message")).toContainText("搞定了");
+    await expect(resultCard.getByTestId("final-arrangement-message")).toContainText("出发");
+    await expect(resultCard.getByTestId("final-arrangement-copy-button")).toBeVisible();
 
     await page.getByTestId("execution-timeline-toggle").click();
     await expect(page.getByTestId("execution-timeline")).toBeVisible();

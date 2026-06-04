@@ -40,6 +40,7 @@ class ExecutionFeedbackResult(BaseModel):
     run_status: str
     headline: str
     message: str
+    final_arrangement_message: str | None = None
     completed_actions: list[FeedbackActionSummary] = Field(default_factory=list)
     failed_actions: list[FeedbackActionSummary] = Field(default_factory=list)
     next_steps: list[str] = Field(default_factory=list)

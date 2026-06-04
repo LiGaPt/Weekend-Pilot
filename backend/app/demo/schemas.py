@@ -123,6 +123,7 @@ class DemoFeedbackSummary(BaseModel):
     run_status: str | None = None
     headline: str | None = None
     message: str | None = None
+    final_arrangement_message: str | None = None
     completed_actions: list[dict[str, Any]] = Field(default_factory=list)
     failed_actions: list[dict[str, Any]] = Field(default_factory=list)
     next_steps: list[str] = Field(default_factory=list)

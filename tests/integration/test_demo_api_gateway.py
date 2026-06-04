@@ -620,6 +620,39 @@ def test_demo_run_start_status_confirm_and_idempotent_replay(client) -> None:
     finally:
         db.close()
 
+    confirm_response = test_client.post(
+        f"/demo/runs/{run_id}/confirm",
+        json={"confirmed_by": "web-demo-user"},
+    )
+
+    assert confirm_response.status_code == 200
+    confirm_body = confirm_response.json()
+    _assert_no_forbidden_keys(confirm_body)
+    _assert_public_run_redaction(confirm_body)
+    assert confirm_body["run_id"] == str(run_id)
+    assert confirm_body["status"] == "completed"
+    assert confirm_body["action_count"] > 0
+    _assert_progress(
+        confirm_body,
+        current_stage="executing_confirmed_actions",
+        stage_history=[*READY_PROGRESS_HISTORY, "executing_confirmed_actions"],
+    )
+    selected_confirmed_plan = next(plan for plan in confirm_body["plans"] if plan["selected"])
+    _assert_action_manifest_confirmed(selected_confirmed_plan)
+    feedback = selected_confirmed_plan["feedback"]
+    assert feedback["final_arrangement_message"]
+    assert "搞定了" in feedback["final_arrangement_message"]
+    assert "出发" in feedback["final_arrangement_message"]
+
+    readback_response = test_client.get(f"/demo/runs/{run_id}")
+    assert readback_response.status_code == 200
+    readback_body = readback_response.json()
+    _assert_no_forbidden_keys(readback_body)
+    _assert_public_run_redaction(readback_body)
+    assert readback_body["status"] == "completed"
+    readback_selected_plan = next(plan for plan in readback_body["plans"] if plan["selected"])
+    assert readback_selected_plan["feedback"]["final_arrangement_message"] == feedback["final_arrangement_message"]
+
 
 def test_demo_rate_limits_are_scoped_by_external_user(
     client,
@@ -687,7 +720,7 @@ def test_demo_run_friends_group_start_persists_friends_world_and_confirms_succes
     )
     selected_start_plan = next(plan for plan in start_body["plans"] if plan["selected"])
     _assert_action_manifest_preview(selected_start_plan)
-    expected_copy = EXPLICIT_PROFILE_COPY_EXPECTATIONS.get(mock_world_profile)
+    expected_copy = EXPLICIT_PROFILE_COPY_EXPECTATIONS.get("friends_gathering")
     if expected_copy is not None:
         assert expected_copy["summary_fragment"] in selected_start_plan["summary"]
         assert "亲子活动" not in selected_start_plan["summary"]
@@ -727,6 +760,8 @@ def test_demo_run_friends_group_start_persists_friends_world_and_confirms_succes
     )
     selected_confirmed_plan = next(plan for plan in confirm_body["plans"] if plan["selected"])
     _assert_action_manifest_confirmed(selected_confirmed_plan)
+    assert selected_confirmed_plan["feedback"]["final_arrangement_message"]
+    assert "搞定了" in selected_confirmed_plan["feedback"]["final_arrangement_message"]
 
     db = SessionLocal()
     try:

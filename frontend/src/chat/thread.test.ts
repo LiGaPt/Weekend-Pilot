@@ -265,6 +265,7 @@ const completedRun: DemoRunSummary = {
         status: "written",
         headline: "Plan completed",
         message: "Reservation and follow-up message both completed.",
+        final_arrangement_message: "搞定了，下午 2 点出发，先去Family Science Center，再到Light Table；订座和后续消息都已安排好",
         completed_actions: [{ action_type: "reserve_restaurant", status: "succeeded" }],
         failed_actions: [],
         next_steps: ["Leave a little before 2pm."],
@@ -363,6 +364,33 @@ describe("projectConversationThread", () => {
     expect(resultCard?.timelineCollapsedByDefault).toBe(true);
     expect(resultCard?.executionTimeline.map((step) => step.executionOrder)).toEqual([1, 2]);
     expect(resultCard?.headline).toBe("安排已完成");
+    expect(resultCard?.finalArrangementMessage).toBe("搞定了，下午 2 点出发，先去亲子科学中心，再到轻食餐桌；订座和后续消息都已安排好");
+    expect(resultCard?.message).toBe("订座和后续消息都已完成。");
+  });
+
+  it("falls back to the generic feedback message when no final arrangement message is present", () => {
+    const runWithoutFinalMessage: DemoRunSummary = {
+      ...completedRun,
+      plans: completedRun.plans.map((plan) => ({
+        ...plan,
+        feedback: plan.feedback
+          ? {
+              ...plan.feedback,
+              final_arrangement_message: null,
+            }
+          : plan.feedback,
+      })),
+    };
+
+    const items = projectConversationThread({
+      entries: [{ id: "run-1", kind: "run", run: runWithoutFinalMessage }],
+      activeRunId: "run-1",
+      selectedPlanId: "plan-1",
+    });
+
+    const resultCard = items.find((item) => item.kind === "assistant_result_card");
+    expect(resultCard?.finalArrangementMessage).toBeNull();
+    expect(resultCard?.message).toBe("订座和后续消息都已完成。");
   });
 
   it("renders clarification cards after the progress card in the clarification flow", () => {

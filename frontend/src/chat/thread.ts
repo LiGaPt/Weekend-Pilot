@@ -102,6 +102,7 @@ export type AssistantResultCardItem = {
   planId: string;
   headline: string;
   message: string | null;
+  finalArrangementMessage: string | null;
   outcomeLabel: string;
   executionTimeline: ExecutionTimelineStep[];
   timelineCollapsedByDefault: true;
@@ -502,6 +503,7 @@ function buildResultCardItem(run: DemoRunSummary, plan: DemoPlanPreview): Assist
       userFacingText(plan.confirmation?.reason) ||
       userFacingText(feedback?.message) ||
       (isDeclined ? "已在执行前放弃当前方案。" : null),
+    finalArrangementMessage: userFacingText(feedback?.final_arrangement_message) || null,
     outcomeLabel,
     executionTimeline,
     timelineCollapsedByDefault: true,
