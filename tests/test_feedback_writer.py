@@ -201,6 +201,45 @@ def test_successful_execution_creates_completed_feedback_and_run_status(db_sessi
     assert feedback["completed_actions"][0]["target_label"] == "徐汇亲子科学馆"
 
 
+def test_addon_feedback_uses_readable_target_label_from_selected_addon_evidence(db_session: Session) -> None:
+    run = _create_run(db_session)
+    plan_json = _reviewed_plan_json(
+        run.run_id,
+        action_results=[
+            _action_result(
+                tool_name="order_addon",
+                target_id="addon_drinks_001",
+            )
+        ],
+    )
+    plan_json["draft"]["proposed_actions"] = [
+        {
+            "action_ref": "draft_1_action_1",
+            "action_type": "order_addon",
+            "target_id": "addon_drinks_001",
+            "payload": {
+                "vendor_id": "addon_drinks_001",
+                "items": [{"sku": "water", "quantity": 3}],
+            },
+            "requires_confirmation": True,
+            "reason": "补给点可顺路到达，确认后可提前下单补水或小食。",
+        }
+    ]
+    plan_json["draft"]["evidence"] = {
+        "selected_addon": {
+            "candidate_id": "addon_drinks_001",
+            "name": "小水分补给站",
+            "route_key": ["restaurant_light_001", "addon_drinks_001"],
+        }
+    }
+    plan = _create_executed_plan(db_session, run_id=run.run_id, plan_json=plan_json)
+
+    result = _write_feedback(db_session, run.run_id, plan.plan_id)
+
+    assert result.completed_actions[0].target_label == "小水分补给站"
+    assert result.completed_actions[0].message == "已为小水分补给站完成加购点单。"
+
+
 def test_partial_execution_groups_completed_replayed_and_failed_actions(db_session: Session) -> None:
     run = _create_run(db_session)
     actions = [

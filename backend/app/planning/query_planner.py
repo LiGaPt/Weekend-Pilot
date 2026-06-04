@@ -5,6 +5,41 @@ from backend.app.planning.schemas import LocalLifeIntent, PlannedToolCall, Query
 from backend.app.tool_gateway.registry import WRITE_TOOLS
 
 
+_ADDON_QUERY_RULES = (
+    ("\u996e\u54c1", "drink"),
+    ("\u996e\u6599", "drink"),
+    ("\u8865\u6c34", "drink"),
+    ("water", "drink"),
+    ("drink", "drink"),
+    ("drinks", "drink"),
+    ("beverage", "drink"),
+    ("\u96f6\u98df", "snack"),
+    ("\u5c0f\u98df", "snack"),
+    ("snack", "snack"),
+    ("snacks", "snack"),
+    ("\u86cb\u7cd5", "cake"),
+    ("cake", "cake"),
+    ("\u9c9c\u82b1", "flower"),
+    ("flower", "flower"),
+    ("flowers", "flower"),
+    ("\u8865\u7ed9", "addon"),
+    ("supplies", "addon"),
+    ("supply", "addon"),
+)
+
+
+def resolve_mock_world_addon_query(intent: LocalLifeIntent) -> str | None:
+    raw_text = intent.raw_text.casefold()
+    for keyword, query in _ADDON_QUERY_RULES:
+        if keyword.casefold() in raw_text:
+            return query
+    return None
+
+
+def intent_requests_addon(intent: LocalLifeIntent) -> bool:
+    return resolve_mock_world_addon_query(intent) is not None
+
+
 class DeterministicQueryPlanner:
     planner_version = "deterministic_query_planner_v1"
     _SUPPORTED_PROFILES = {"mock_world", "amap"}
@@ -73,7 +108,7 @@ class DeterministicQueryPlanner:
             if preference not in dining_tags:
                 dining_tags.append(preference)
 
-        return [
+        initial_tool_calls = [
             PlannedToolCall(
                 tool_name="search_poi",
                 provider=provider_profile,
@@ -94,12 +129,30 @@ class DeterministicQueryPlanner:
                     "limit": search_limit,
                 },
             ),
+        ]
+
+        addon_query = resolve_mock_world_addon_query(intent)
+        if addon_query is not None:
+            initial_tool_calls.append(
+                PlannedToolCall(
+                    tool_name="search_poi",
+                    provider=provider_profile,
+                    payload={
+                        "query": addon_query,
+                        "category": "addon",
+                        "limit": 3,
+                    },
+                )
+            )
+
+        initial_tool_calls.append(
             PlannedToolCall(
                 tool_name="check_weather",
                 provider=provider_profile,
                 payload={"location": intent.origin_text or "徐汇"},
-            ),
-        ]
+            )
+        )
+        return initial_tool_calls
 
     def _build_amap_initial_tool_calls(self, intent: LocalLifeIntent, provider_profile: str) -> list[PlannedToolCall]:
         return [

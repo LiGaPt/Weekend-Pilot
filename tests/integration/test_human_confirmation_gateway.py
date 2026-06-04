@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from backend.app.benchmark import load_benchmark_case
 from backend.app.confirmation import HumanConfirmationService
 from backend.app.db.session import SessionLocal
 from backend.app.models.runtime import ActionLedger, Plan, ToolEvent
@@ -168,3 +169,55 @@ def test_human_confirmation_keeps_gateway_path_read_only(
     ) == 1
     assert _count_rows(db_session, ActionLedger, run.run_id) == action_ledger_count_before == 0
     assert _count_rows(db_session, ToolEvent, run.run_id) == tool_event_count_before
+
+
+def test_human_confirmation_preserves_confirmed_order_addon_payload_and_order(
+    db_session: Session,
+    redis_runtime,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    case = load_benchmark_case("family_citywalk_addon_v1")
+    run = _create_run(db_session)
+    gateway = _build_gateway(db_session, cache, rate_limiter)
+    intent = DeterministicIntentParser().parse(case.user_input)
+    plan = DeterministicQueryPlanner().build(intent, provider_profile="mock_world")
+    collection = QueryPlanExecutor(gateway).execute_initial_calls(plan, run.run_id)
+    enrichment = CandidateEnricher(gateway, max_other_candidates=1).enrich(plan, collection)
+    drafts = DeterministicItineraryGenerator().generate(plan, enrichment)
+    review = FinalReviewGate().review(
+        plan,
+        enrichment,
+        drafts,
+        pre_confirmation_action_count=_count_rows(db_session, ActionLedger, run.run_id),
+    )
+    assert review.safe_to_present is True
+
+    persistence = ReviewedPlanPersistenceService(PlanRepository(db_session))
+    persisted = persistence.persist_reviewed_drafts(review, drafts)
+    selected = persistence.select_plan(run.run_id, persisted.persisted_plans[0].plan_id)
+
+    result = HumanConfirmationService(PlanRepository(db_session)).confirm_plan(
+        run.run_id,
+        selected.plan_id,
+        confirmed_by="user",
+        source="integration-test",
+    )
+
+    assert result.status == "confirmed"
+    assert result.confirmed_actions
+    assert result.confirmed_actions[-1].tool_name == "order_addon"
+    assert result.confirmed_actions[-1].target_id == "addon_drinks_001"
+    assert result.confirmed_actions[-1].payload == {
+        "vendor_id": "addon_drinks_001",
+        "items": [{"sku": "water", "quantity": 3}],
+    }
+
+    confirmed_row = PlanRepository(db_session).get_by_id(selected.plan_id)
+    assert confirmed_row is not None
+    stored_actions = confirmed_row.plan_json["confirmed_actions"]
+    assert stored_actions[-1]["tool_name"] == "order_addon"
+    assert stored_actions[-1]["target_id"] == "addon_drinks_001"
+    assert stored_actions[-1]["payload"] == {
+        "vendor_id": "addon_drinks_001",
+        "items": [{"sku": "water", "quantity": 3}],
+    }

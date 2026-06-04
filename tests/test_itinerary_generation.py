@@ -181,6 +181,37 @@ def _dining(
     )
 
 
+def _addon(
+    candidate_id: str = "addon_drinks_001",
+    *,
+    name: str = "小水分补给站",
+    menu: list[dict] | None = None,
+    opening_is_open: bool = True,
+) -> EnrichedCandidate:
+    resolved_menu = [{"sku": "water", "name": "瓶装水", "price_cents": 600}] if menu is None else menu
+    return EnrichedCandidate(
+        candidate=_candidate(
+            candidate_id,
+            name=name,
+            category="addon",
+            tags=["drinks", "snacks", "family"],
+        ),
+        poi_detail={
+            "poi_id": candidate_id,
+            "vendor_id": candidate_id,
+            "menu": resolved_menu,
+        },
+        opening_hours={"is_open": opening_is_open},
+        tool_results=[
+            _tool_result(
+                "get_poi_detail",
+                candidate_id,
+                response_json={"poi": {"poi_id": candidate_id}},
+            )
+        ],
+    )
+
+
 def _route(
     origin_candidate_id: str = "activity_museum_001",
     destination_candidate_id: str = "restaurant_light_001",
@@ -207,6 +238,7 @@ def _enrichment(
     *,
     activities: list[EnrichedCandidate] | None = None,
     dining: list[EnrichedCandidate] | None = None,
+    others: list[EnrichedCandidate] | None = None,
     routes: list[RouteMatrixEntry] | None = None,
 ) -> CandidateEnrichmentResult:
     return CandidateEnrichmentResult(
@@ -214,6 +246,7 @@ def _enrichment(
         provider_profile="mock_world",
         enriched_activity_candidates=[_activity()] if activities is None else activities,
         enriched_dining_candidates=[_dining()] if dining is None else dining,
+        enriched_other_candidates=[] if others is None else others,
         route_matrix=[_route()] if routes is None else routes,
         enricher_version="test-enricher",
     )
@@ -446,6 +479,80 @@ def test_generator_does_not_mutate_input_enrichment_result() -> None:
     DeterministicItineraryGenerator().generate(_plan(), enrichment)
 
     assert enrichment.model_dump(mode="json") == before
+
+
+def test_generator_appends_order_addon_for_explicit_addon_request_when_evidence_is_complete() -> None:
+    addon_route_event_id = uuid4()
+    result = DeterministicItineraryGenerator().generate(
+        _plan(
+            raw_text=(
+                "This afternoon I want a nearby family plan with a light citywalk feel, "
+                "and please add an easy drink stop if it fits."
+            ),
+        ),
+        _enrichment(
+            others=[_addon()],
+            routes=[
+                _route(),
+                _route(
+                    origin_candidate_id="restaurant_light_001",
+                    destination_candidate_id="addon_drinks_001",
+                    duration_minutes=13,
+                    distance_meters=900,
+                    tool_event_id=addon_route_event_id,
+                ),
+            ],
+        ),
+    )
+
+    draft = result.drafts[0]
+    assert [action.action_type for action in draft.proposed_actions] == [
+        "book_ticket",
+        "reserve_restaurant",
+        "order_addon",
+    ]
+    addon_action = draft.proposed_actions[-1]
+    assert addon_action.target_id == "addon_drinks_001"
+    assert addon_action.payload == {
+        "vendor_id": "addon_drinks_001",
+        "items": [{"sku": "water", "quantity": 3}],
+    }
+    assert addon_action.reason == "补给点可顺路到达，确认后可提前下单补水或小食。"
+    assert draft.evidence["selected_addon"]["candidate_id"] == "addon_drinks_001"
+    assert draft.evidence["selected_addon"]["name"] == "小水分补给站"
+    assert draft.evidence["selected_addon"]["route_tool_event_id"] == addon_route_event_id
+
+
+def test_generator_skips_order_addon_when_menu_or_route_evidence_is_missing() -> None:
+    missing_water = DeterministicItineraryGenerator().generate(
+        _plan(raw_text="Please add a drink stop if it fits."),
+        _enrichment(
+            others=[_addon(menu=[{"sku": "fruit_cup", "name": "水果杯", "price_cents": 1800}])],
+            routes=[
+                _route(),
+                _route(
+                    origin_candidate_id="restaurant_light_001",
+                    destination_candidate_id="addon_drinks_001",
+                ),
+            ],
+        ),
+    )
+    missing_route = DeterministicItineraryGenerator().generate(
+        _plan(raw_text="Please add a drink stop if it fits."),
+        _enrichment(
+            others=[_addon()],
+            routes=[_route()],
+        ),
+    )
+
+    assert [action.action_type for action in missing_water.drafts[0].proposed_actions] == [
+        "book_ticket",
+        "reserve_restaurant",
+    ]
+    assert [action.action_type for action in missing_route.drafts[0].proposed_actions] == [
+        "book_ticket",
+        "reserve_restaurant",
+    ]
 
 
 @pytest.mark.parametrize(

@@ -153,6 +153,10 @@ class FinalReviewGate:
             item.candidate.candidate_id: item
             for item in enrichment.enriched_dining_candidates
         }
+        other_by_id = {
+            item.candidate.candidate_id: item
+            for item in enrichment.enriched_other_candidates
+        }
         route_keys = {
             (entry.origin_candidate_id, entry.destination_candidate_id)
             for entry in enrichment.route_matrix
@@ -167,8 +171,15 @@ class FinalReviewGate:
         return {
             "activity_by_id": activity_by_id,
             "dining_by_id": dining_by_id,
+            "other_by_id": other_by_id,
             "activity_ids": set(activity_by_id),
             "dining_ids": set(dining_by_id),
+            "other_ids": set(other_by_id),
+            "addon_ids": {
+                candidate_id
+                for candidate_id, item in other_by_id.items()
+                if item.candidate.category == "addon"
+            },
             "route_keys": route_keys,
             "queue_ids_by_dining_id": queue_ids_by_dining_id,
         }
@@ -562,6 +573,7 @@ class FinalReviewGate:
         draft_queue_id = self._draft_queue_id(draft)
         if draft_queue_id:
             queue_targets.add(draft_queue_id)
+        selected_addon = self._selected_addon(draft)
 
         invalid_actions = []
         for action in actions:
@@ -573,6 +585,13 @@ class FinalReviewGate:
                 continue
             if action_type == "join_queue" and target_id in queue_targets:
                 continue
+            if action_type == "order_addon" and self._order_addon_is_valid(
+                action,
+                dining_id,
+                selected_addon,
+                indexes,
+            ):
+                continue
             invalid_actions.append(self._action_summary(action))
 
         if invalid_actions:
@@ -583,6 +602,7 @@ class FinalReviewGate:
                 details={
                     "activity_id": activity_id,
                     "dining_id": dining_id,
+                    "selected_addon_id": selected_addon.get("candidate_id"),
                     "queue_targets": sorted(target for target in queue_targets if target),
                     "invalid_actions": invalid_actions,
                 },
@@ -594,6 +614,7 @@ class FinalReviewGate:
             details={
                 "activity_id": activity_id,
                 "dining_id": dining_id,
+                "selected_addon_id": selected_addon.get("candidate_id"),
                 "queue_targets": sorted(target for target in queue_targets if target),
                 "action_count": len(actions),
             },
@@ -751,6 +772,56 @@ class FinalReviewGate:
             return queue["queue_id"]
         return None
 
+    def _selected_addon(self, draft: ItineraryDraft) -> dict[str, Any]:
+        evidence = getattr(draft, "evidence", None)
+        if not isinstance(evidence, dict):
+            return {}
+        selected_addon = evidence.get("selected_addon")
+        return selected_addon if isinstance(selected_addon, dict) else {}
+
+    def _order_addon_is_valid(
+        self,
+        action: Any,
+        dining_id: str | None,
+        selected_addon: dict[str, Any],
+        indexes: dict[str, Any],
+    ) -> bool:
+        target_id = getattr(action, "target_id", None)
+        if not isinstance(target_id, str) or not target_id:
+            return False
+        if dining_id is None:
+            return False
+        if target_id not in indexes["addon_ids"]:
+            return False
+        if self._text_or_none(selected_addon.get("candidate_id")) != target_id:
+            return False
+
+        payload = getattr(action, "payload", None)
+        if not isinstance(payload, dict):
+            return False
+        if self._text_or_none(payload.get("vendor_id")) != target_id:
+            return False
+
+        items = payload.get("items")
+        if not isinstance(items, list) or not items:
+            return False
+        for item in items:
+            if not isinstance(item, dict):
+                return False
+            if self._text_or_none(item.get("sku")) is None:
+                return False
+            if self._positive_int(item.get("quantity")) is None:
+                return False
+
+        route_key = self._route_key(selected_addon.get("route_key"))
+        if route_key is None:
+            route_key = (dining_id, target_id)
+        if route_key != (dining_id, target_id):
+            return False
+        if route_key not in indexes["route_keys"]:
+            return False
+        return True
+
     def _actions(self, draft: ItineraryDraft) -> list[Any]:
         actions = getattr(draft, "proposed_actions", None)
         return actions if isinstance(actions, list) else []
@@ -764,6 +835,27 @@ class FinalReviewGate:
     def _candidate_id(self, candidate_ref: Any) -> str | None:
         candidate_id = getattr(candidate_ref, "candidate_id", None)
         return candidate_id if isinstance(candidate_id, str) and candidate_id else None
+
+    def _route_key(self, value: Any) -> tuple[str, str] | None:
+        if not isinstance(value, list) or len(value) != 2:
+            return None
+        origin_id = self._text_or_none(value[0])
+        destination_id = self._text_or_none(value[1])
+        if origin_id is None or destination_id is None:
+            return None
+        return origin_id, destination_id
+
+    def _text_or_none(self, value: Any) -> str | None:
+        if isinstance(value, str) and value:
+            return value
+        return None
+
+    def _positive_int(self, value: Any) -> int | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int) and value > 0:
+            return value
+        return None
 
     def _draft_id(self, draft: ItineraryDraft) -> str:
         draft_id = getattr(draft, "draft_id", None)

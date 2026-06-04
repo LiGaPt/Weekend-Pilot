@@ -210,6 +210,14 @@ class DeterministicFeedbackWriter:
             name = candidate.get("name")
             if isinstance(candidate_id, str) and candidate_id and isinstance(name, str) and name:
                 labels[candidate_id] = name
+        evidence = draft.get("evidence")
+        if isinstance(evidence, dict):
+            selected_addon = evidence.get("selected_addon")
+            if isinstance(selected_addon, dict):
+                candidate_id = selected_addon.get("candidate_id")
+                name = selected_addon.get("name")
+                if isinstance(candidate_id, str) and candidate_id and isinstance(name, str) and name:
+                    labels[candidate_id] = name
         return labels
 
     def _action_message(

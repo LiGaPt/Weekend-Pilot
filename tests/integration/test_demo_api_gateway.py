@@ -820,6 +820,55 @@ def test_demo_run_start_with_explicit_mock_world_profile_persists_selected_world
         db.close()
 
 
+def test_demo_run_addon_preview_and_confirmed_manifest_include_order_addon(client) -> None:
+    test_client, case_ids, external_user_ids = client
+    payload = _start_payload(
+        case_ids,
+        external_user_ids,
+        user_input=(
+            "This afternoon I want a light citywalk-style plan with my partner and 5-year-old, "
+            "not too far from home, and include an easy drink or snack stop if it fits."
+        ),
+    )
+    payload["mock_world_profile"] = "family_afternoon"
+
+    start_response = test_client.post("/demo/runs", json=payload)
+
+    assert start_response.status_code == 200
+    start_body = start_response.json()
+    assert start_body["status"] == "awaiting_confirmation"
+    selected_start_plan = next(plan for plan in start_body["plans"] if plan["selected"])
+    _assert_action_manifest_preview(selected_start_plan)
+    preview_addon_actions = [
+        action for action in selected_start_plan["action_manifest"]["actions"] if action["action_type"] == "order_addon"
+    ]
+    assert len(preview_addon_actions) == 1
+    assert preview_addon_actions[0]["target_id"] == "addon_drinks_001"
+    run_id = UUID(start_body["run_id"])
+
+    confirm_response = test_client.post(
+        f"/demo/runs/{run_id}/confirm",
+        json={"confirmed_by": "web-demo-user"},
+    )
+
+    assert confirm_response.status_code == 200
+    confirm_body = confirm_response.json()
+    assert confirm_body["status"] == "completed"
+    selected_confirmed_plan = next(plan for plan in confirm_body["plans"] if plan["selected"])
+    _assert_action_manifest_confirmed(selected_confirmed_plan)
+    confirmed_addon_actions = [
+        action
+        for action in selected_confirmed_plan["action_manifest"]["actions"]
+        if action["action_type"] == "order_addon"
+    ]
+    assert len(confirmed_addon_actions) == 1
+    assert confirmed_addon_actions[0]["target_id"] == "addon_drinks_001"
+    assert any(
+        item.get("target_label") == "小水分补给站"
+        for item in selected_confirmed_plan["feedback"]["completed_actions"]
+    )
+
+
 def test_demo_run_start_with_amap_reports_safe_configuration_error(
     client,
     monkeypatch: pytest.MonkeyPatch,

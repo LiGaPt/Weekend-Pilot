@@ -180,6 +180,34 @@ const completedRunWithFinalArrangement: DemoRunSummary = {
   ],
 };
 
+const runWithAddonActionManifest: DemoRunSummary = {
+  ...runWithEnglishDemoData,
+  plans: [
+    {
+      ...runWithEnglishDemoData.plans[0],
+      action_manifest: {
+        source: "proposed_actions",
+        action_count: 3,
+        actions: [
+          ...runWithEnglishDemoData.plans[0].action_manifest.actions,
+          {
+            action_ref: "draft_1_action_3",
+            execution_order: 3,
+            action_type: "order_addon",
+            target_id: "addon_drinks_001",
+            payload_preview: {
+              vendor_id: "addon_drinks_001",
+              items: [{ sku: "water", quantity: 3 }],
+            },
+            reason: "Confirm to place the add-on order.",
+          },
+        ],
+      },
+      confirmation: { status: "pending", action_count: 3 },
+    },
+  ],
+};
+
 function buildMultiScenarioRun(
   runId: string,
   planId: string,
@@ -304,6 +332,33 @@ describe("ConversationThread", () => {
     expect(within(ticketAction).getByText("徐汇亲子科学馆")).toBeInTheDocument();
     expect(within(reservationAction).getByText("花园家庭轻食餐室")).toBeInTheDocument();
     expect(screen.queryByText(/activity_museum_001|restaurant_garden_001/)).not.toBeInTheDocument();
+  });
+
+  it("renders order_addon with readable labels in the pre-confirmation action list", async () => {
+    const user = userEvent.setup();
+    const items = projectConversationThread({
+      entries: [{ id: "run-addon", kind: "run", run: runWithAddonActionManifest }],
+      activeRunId: "run-addon",
+      selectedPlanId: "plan-garden",
+    });
+
+    render(
+      <ConversationThread
+        items={items}
+        activeRunId="run-addon"
+        requestState="idle"
+        canConfirm
+        canDecline
+        onSelectPlan={vi.fn()}
+        onConfirm={vi.fn()}
+        onDecline={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "\u786e\u8ba4\u524d\u52a8\u4f5c" }));
+    expect(screen.getByText("\u52a0\u8d2d")).toBeInTheDocument();
+    expect(screen.getByText("\u5c0f\u6c34\u5206\u8865\u7ed9\u7ad9")).toBeInTheDocument();
+    expect(screen.queryByText("addon_drinks_001")).not.toBeInTheDocument();
   });
 
   it("renders the final arrangement message and copies it successfully", async () => {

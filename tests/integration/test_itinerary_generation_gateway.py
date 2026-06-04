@@ -197,3 +197,52 @@ def test_itinerary_generator_builds_mock_world_drafts_without_write_side_effects
     )
     assert tool_event_count_after == tool_event_count_before
     assert action_ledger_count == 0
+
+
+def test_itinerary_generator_adds_order_addon_for_explicit_mock_world_addon_request(
+    db_session: Session,
+    redis_runtime,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    case = load_benchmark_case("family_citywalk_addon_v1")
+    run = create_run(
+        db_session,
+        case_id=case.case_id,
+        world_profile=case.world_profile,
+    )
+    gateway = build_gateway(
+        db_session,
+        cache,
+        rate_limiter,
+        world_profile=case.world_profile,
+    )
+    intent = DeterministicIntentParser().parse(case.user_input)
+    plan = DeterministicQueryPlanner().build(intent, provider_profile=case.tool_profile)
+    collection = QueryPlanExecutor(gateway).execute_initial_calls(plan, run.run_id)
+    enrichment = CandidateEnricher(gateway, max_other_candidates=1).enrich(plan, collection)
+
+    assert [item.candidate.candidate_id for item in enrichment.enriched_other_candidates] == [
+        "addon_drinks_001"
+    ]
+    assert any(
+        entry.origin_candidate_id == "restaurant_light_001"
+        and entry.destination_candidate_id == "addon_drinks_001"
+        and entry.status in {"succeeded", "cached"}
+        for entry in enrichment.route_matrix
+    )
+
+    result = DeterministicItineraryGenerator().generate(plan, enrichment)
+
+    assert result.drafts
+    selected_draft = result.drafts[0]
+    addon_actions = [action for action in selected_draft.proposed_actions if action.action_type == "order_addon"]
+    assert len(addon_actions) == 1
+    addon_action = addon_actions[0]
+    assert addon_action.target_id == "addon_drinks_001"
+    assert addon_action.payload == {
+        "vendor_id": "addon_drinks_001",
+        "items": [{"sku": "water", "quantity": 3}],
+    }
+    assert selected_draft.proposed_actions[-1].action_type == "order_addon"
+    assert selected_draft.evidence["selected_addon"]["candidate_id"] == "addon_drinks_001"
+    assert selected_draft.evidence["selected_addon"]["name"] == "小水分补给站"

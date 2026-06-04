@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 DraftStatus = Literal["draft"]
 TimelineItemType = Literal["activity", "transfer", "dining", "buffer"]
-ProposedActionType = Literal["book_ticket", "reserve_restaurant", "join_queue"]
+ProposedActionType = Literal["book_ticket", "reserve_restaurant", "join_queue", "order_addon"]
 
 
 class ItineraryCandidateRef(BaseModel):
