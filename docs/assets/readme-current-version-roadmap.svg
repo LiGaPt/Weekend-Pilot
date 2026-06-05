@@ -30,14 +30,14 @@
     <filter id="softShadow" x="-20%" y="-20%" width="140%" height="160%">
       <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#7D6751" flood-opacity="0.08"/>
     </filter>
-    <marker id="arrowGreen" markerWidth="14" markerHeight="14" refX="10" refY="7" orient="auto">
-      <path d="M1 1L11 7L1 13" stroke="#5C8C58" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arrowGreen" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M1 1L8 5L1 9" stroke="#5C8C58" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
     </marker>
-    <marker id="arrowBlue" markerWidth="14" markerHeight="14" refX="10" refY="7" orient="auto">
-      <path d="M1 1L11 7L1 13" stroke="#4D819D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arrowBlue" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M1 1L8 5L1 9" stroke="#4D819D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
     </marker>
-    <marker id="arrowGold" markerWidth="14" markerHeight="14" refX="10" refY="7" orient="auto">
-      <path d="M1 1L11 7L1 13" stroke="#AF8B36" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arrowGold" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M1 1L8 5L1 9" stroke="#AF8B36" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
     </marker>
     <style>
       text { font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif; }
@@ -45,9 +45,11 @@
       .subtitle { font-size: 18px; font-weight: 500; fill: #726456; }
       .band-title { font-size: 18px; font-weight: 800; letter-spacing: 1.4px; }
       .band-copy { font-size: 14px; fill: #6E6357; }
-      .card-title { font-size: 24px; font-weight: 800; }
-      .card-copy { font-size: 16px; fill: #584F47; }
-      .mini { font-size: 14px; fill: #6B6257; }
+      .card-title { font-size: 22px; font-weight: 800; }
+      .card-title-sm { font-size: 18px; font-weight: 800; }
+      .card-copy { font-size: 14px; fill: #584F47; }
+      .card-copy-sm { font-size: 13px; fill: #5D544C; }
+      .mini { font-size: 12px; fill: #6B6257; }
       .pill { font-size: 13px; font-weight: 700; letter-spacing: 1px; }
       .num { font-size: 12px; font-weight: 800; letter-spacing: 1px; }
     </style>
@@ -79,45 +81,45 @@
     <rect x="0" y="0" width="1412" height="218" rx="28" fill="#FAF7F0" stroke="#DDD1C2" stroke-width="1.5"/>
     <rect x="18" y="18" width="1376" height="182" rx="22" fill="#FCFFF9" stroke="#DCEAD8"/>
     <text x="34" y="48" class="band-title" fill="#5B8855">TOP LAYER · 公开主链 / Public Demo Narrative</text>
-    <text x="34" y="72" class="band-copy">评委先看到的是 `5173` 对外演示主链：规划、澄清与重规划、人工确认边界，再到执行结果。</text>
+    <text x="34" y="72" class="band-copy">首先展示的是 `5173` 对外演示主链：规划、澄清与重规划、人工确认边界，再到执行结果。</text>
 
     <g filter="url(#softShadow)">
       <rect x="36" y="98" width="232" height="80" rx="22" fill="url(#publicFill)" stroke="#BFD6B7" stroke-width="2"/>
-      <text x="60" y="132" class="card-title" fill="#4F7D49">5173 Public Demo</text>
-      <text x="60" y="158" class="card-copy">公开入口 · Reviewer-facing 首页</text>
+      <text x="152" y="131" text-anchor="middle" class="card-title" fill="#4F7D49">5173 Public Demo</text>
+      <text x="152" y="155" text-anchor="middle" class="card-copy">公开演示入口</text>
     </g>
 
     <g filter="url(#softShadow)">
       <rect x="308" y="88" width="270" height="100" rx="24" fill="url(#publicFill)" stroke="#BFD6B7" stroke-width="2"/>
-      <text x="332" y="126" class="card-title" fill="#4F7D49">Planning Flow</text>
-      <text x="332" y="150" class="card-copy">需求理解 / 候选生成 / itinerary draft</text>
-      <text x="332" y="172" class="mini">system 先产出可审查方案，而不是直接写动作</text>
+      <text x="443" y="124" text-anchor="middle" class="card-title" fill="#4F7D49">Planning Flow</text>
+      <text x="443" y="148" text-anchor="middle" class="card-copy">需求理解 / 候选生成</text>
+      <text x="443" y="168" text-anchor="middle" class="mini">先出可审查方案，再进入确认</text>
     </g>
 
     <g filter="url(#softShadow)">
       <rect x="618" y="88" width="246" height="100" rx="24" fill="url(#publicFill)" stroke="#BFD6B7" stroke-width="2"/>
-      <text x="642" y="126" class="card-title" fill="#4F7D49">clarification / replan</text>
-      <text x="642" y="150" class="card-copy">缺信息先追问，不合适就重新规划</text>
-      <text x="642" y="172" class="mini">让主链对真实用户输入更稳</text>
+      <text x="741" y="124" text-anchor="middle" class="card-title-sm" fill="#4F7D49">clarification / replan</text>
+      <text x="741" y="148" text-anchor="middle" class="card-copy">缺信息先澄清，不合适再重规划</text>
+      <text x="741" y="168" text-anchor="middle" class="mini">让主链对真实输入更稳</text>
     </g>
 
     <g filter="url(#softShadow)">
       <rect x="904" y="88" width="224" height="100" rx="24" fill="url(#publicFill)" stroke="#BFD6B7" stroke-width="2"/>
-      <text x="928" y="126" class="card-title" fill="#4F7D49">Human Boundary</text>
-      <text x="928" y="150" class="card-copy">confirm / decline before write</text>
-      <text x="928" y="172" class="mini">人工确认是当前版本最关键的安全边界</text>
+      <text x="1016" y="124" text-anchor="middle" class="card-title-sm" fill="#4F7D49">Human Boundary</text>
+      <text x="1016" y="148" text-anchor="middle" class="card-copy">confirm / decline</text>
+      <text x="1016" y="168" text-anchor="middle" class="mini">确认前不写动作</text>
     </g>
 
     <g filter="url(#softShadow)">
       <rect x="1168" y="98" width="206" height="80" rx="22" fill="url(#publicFill)" stroke="#BFD6B7" stroke-width="2"/>
-      <text x="1192" y="132" class="card-title" fill="#4F7D49">Execution Result</text>
-      <text x="1192" y="158" class="card-copy">执行摘要 / final message</text>
+      <text x="1271" y="131" text-anchor="middle" class="card-title-sm" fill="#4F7D49">Execution Result</text>
+      <text x="1271" y="155" text-anchor="middle" class="card-copy">最终安排 / 执行摘要</text>
     </g>
 
-    <path d="M268 138H308" stroke="#5C8C58" stroke-width="4" stroke-linecap="round" marker-end="url(#arrowGreen)"/>
-    <path d="M578 138H618" stroke="#5C8C58" stroke-width="4" stroke-linecap="round" marker-end="url(#arrowGreen)"/>
-    <path d="M864 138H904" stroke="#5C8C58" stroke-width="4" stroke-linecap="round" marker-end="url(#arrowGreen)"/>
-    <path d="M1128 138H1168" stroke="#5C8C58" stroke-width="4" stroke-linecap="round" marker-end="url(#arrowGreen)"/>
+    <path d="M272 138H300" stroke="#5C8C58" stroke-width="2.4" stroke-linecap="round" marker-end="url(#arrowGreen)"/>
+    <path d="M580 138H610" stroke="#5C8C58" stroke-width="2.4" stroke-linecap="round" marker-end="url(#arrowGreen)"/>
+    <path d="M866 138H896" stroke="#5C8C58" stroke-width="2.4" stroke-linecap="round" marker-end="url(#arrowGreen)"/>
+    <path d="M1130 138H1160" stroke="#5C8C58" stroke-width="2.4" stroke-linecap="round" marker-end="url(#arrowGreen)"/>
   </g>
 
   <g transform="translate(94 492)">
@@ -127,28 +129,28 @@
 
     <g filter="url(#softShadow)">
       <rect x="34" y="92" width="300" height="56" rx="20" fill="url(#systemFill)" stroke="#BDD7E5" stroke-width="2"/>
-      <text x="58" y="126" class="card-title" fill="#3F718D">Frontend Layer</text>
-      <text x="214" y="126" class="card-copy">5173 / 5174 surfaces</text>
+      <text x="184" y="119" text-anchor="middle" class="card-title-sm" fill="#3F718D">Frontend Layer</text>
+      <text x="184" y="138" text-anchor="middle" class="card-copy-sm">5173 demo / 5174 review</text>
     </g>
     <g filter="url(#softShadow)">
       <rect x="378" y="92" width="300" height="56" rx="20" fill="url(#systemFill)" stroke="#BDD7E5" stroke-width="2"/>
-      <text x="402" y="126" class="card-title" fill="#3F718D">API Layer</text>
-      <text x="514" y="126" class="card-copy">public / internal / stream</text>
+      <text x="528" y="119" text-anchor="middle" class="card-title-sm" fill="#3F718D">API Layer</text>
+      <text x="528" y="138" text-anchor="middle" class="card-copy-sm">public / internal / stream</text>
     </g>
     <g filter="url(#softShadow)">
       <rect x="722" y="92" width="300" height="56" rx="20" fill="url(#systemFill)" stroke="#BDD7E5" stroke-width="2"/>
-      <text x="746" y="126" class="card-title" fill="#3F718D">Workflow Layer</text>
-      <text x="908" y="126" class="card-copy">plan / clarify / confirm / execute</text>
+      <text x="872" y="119" text-anchor="middle" class="card-title-sm" fill="#3F718D">Workflow Layer</text>
+      <text x="872" y="138" text-anchor="middle" class="card-copy-sm">plan / clarify / confirm / execute</text>
     </g>
     <g filter="url(#softShadow)">
       <rect x="1066" y="92" width="312" height="56" rx="20" fill="url(#systemFill)" stroke="#BDD7E5" stroke-width="2"/>
-      <text x="1090" y="126" class="card-title" fill="#3F718D">Gateway Layer</text>
-      <text x="1236" y="126" class="card-copy">bounded tool + provider isolation</text>
+      <text x="1222" y="119" text-anchor="middle" class="card-title-sm" fill="#3F718D">Gateway Layer</text>
+      <text x="1222" y="138" text-anchor="middle" class="card-copy-sm">bounded tools / provider isolation</text>
     </g>
 
-    <path d="M334 120H378" stroke="#4D819D" stroke-width="4" stroke-linecap="round" marker-end="url(#arrowBlue)"/>
-    <path d="M678 120H722" stroke="#4D819D" stroke-width="4" stroke-linecap="round" marker-end="url(#arrowBlue)"/>
-    <path d="M1022 120H1066" stroke="#4D819D" stroke-width="4" stroke-linecap="round" marker-end="url(#arrowBlue)"/>
+    <path d="M338 120H372" stroke="#4D819D" stroke-width="2.2" stroke-linecap="round" marker-end="url(#arrowBlue)"/>
+    <path d="M682 120H716" stroke="#4D819D" stroke-width="2.2" stroke-linecap="round" marker-end="url(#arrowBlue)"/>
+    <path d="M1026 120H1060" stroke="#4D819D" stroke-width="2.2" stroke-linecap="round" marker-end="url(#arrowBlue)"/>
   </g>
 
   <g transform="translate(94 690)">
@@ -158,41 +160,29 @@
 
     <g filter="url(#softShadow)">
       <rect x="34" y="86" width="246" height="34" rx="17" fill="url(#supportFill)" stroke="#D8BE72" stroke-width="1.8"/>
-      <text x="157" y="108" text-anchor="middle" class="card-copy" fill="#7F6115">Mock World</text>
+      <text x="157" y="107" text-anchor="middle" class="card-copy-sm" fill="#7F6115">Mock World</text>
     </g>
     <g filter="url(#softShadow)">
       <rect x="302" y="86" width="286" height="34" rx="17" fill="url(#supportFill)" stroke="#D8BE72" stroke-width="1.8"/>
-      <text x="445" y="108" text-anchor="middle" class="card-copy" fill="#7F6115">AMap read-only preview</text>
+      <text x="445" y="107" text-anchor="middle" class="card-copy-sm" fill="#7F6115">AMap read-only preview</text>
     </g>
     <g filter="url(#softShadow)">
       <rect x="610" y="86" width="224" height="34" rx="17" fill="url(#supportFill)" stroke="#D8BE72" stroke-width="1.8"/>
-      <text x="722" y="108" text-anchor="middle" class="card-copy" fill="#7F6115">Observability</text>
+      <text x="722" y="107" text-anchor="middle" class="card-copy-sm" fill="#7F6115">Observability</text>
     </g>
     <g filter="url(#softShadow)">
       <rect x="856" y="86" width="214" height="34" rx="17" fill="url(#supportFill)" stroke="#D8BE72" stroke-width="1.8"/>
-      <text x="963" y="108" text-anchor="middle" class="card-copy" fill="#7F6115">Benchmark</text>
+      <text x="963" y="107" text-anchor="middle" class="card-copy-sm" fill="#7F6115">Benchmark</text>
     </g>
     <g filter="url(#softShadow)">
       <rect x="1092" y="86" width="286" height="34" rx="17" fill="url(#supportFill)" stroke="#D8BE72" stroke-width="1.8"/>
-      <text x="1235" y="108" text-anchor="middle" class="card-copy" fill="#7F6115">Recovery Review</text>
+      <text x="1235" y="107" text-anchor="middle" class="card-copy-sm" fill="#7F6115">Recovery Review</text>
     </g>
 
-    <path d="M280 103H302" stroke="#AF8B36" stroke-width="3.2" stroke-linecap="round" marker-end="url(#arrowGold)"/>
-    <path d="M588 103H610" stroke="#AF8B36" stroke-width="3.2" stroke-linecap="round" marker-end="url(#arrowGold)"/>
-    <path d="M834 103H856" stroke="#AF8B36" stroke-width="3.2" stroke-linecap="round" marker-end="url(#arrowGold)"/>
-    <path d="M1070 103H1092" stroke="#AF8B36" stroke-width="3.2" stroke-linecap="round" marker-end="url(#arrowGold)"/>
-  </g>
-
-  <g opacity="0.92">
-    <path d="M405 468C405 492 272 492 272 534" stroke="#9EBE96" stroke-width="3" stroke-dasharray="8 10"/>
-    <path d="M754 468C754 492 528 492 528 534" stroke="#9EBE96" stroke-width="3" stroke-dasharray="8 10"/>
-    <path d="M1016 468C1016 492 872 492 872 534" stroke="#9EBE96" stroke-width="3" stroke-dasharray="8 10"/>
-    <path d="M1271 468C1271 492 1222 492 1222 534" stroke="#9EBE96" stroke-width="3" stroke-dasharray="8 10"/>
-
-    <path d="M272 668C272 692 157 692 157 776" stroke="#89A8B7" stroke-width="3" stroke-dasharray="8 10"/>
-    <path d="M528 668C528 692 445 692 445 776" stroke="#89A8B7" stroke-width="3" stroke-dasharray="8 10"/>
-    <path d="M872 668C872 692 722 692 722 776" stroke="#89A8B7" stroke-width="3" stroke-dasharray="8 10"/>
-    <path d="M1222 668C1222 692 1235 692 1235 776" stroke="#89A8B7" stroke-width="3" stroke-dasharray="8 10"/>
+    <path d="M282 103H298" stroke="#AF8B36" stroke-width="2" stroke-linecap="round" marker-end="url(#arrowGold)"/>
+    <path d="M590 103H606" stroke="#AF8B36" stroke-width="2" stroke-linecap="round" marker-end="url(#arrowGold)"/>
+    <path d="M836 103H852" stroke="#AF8B36" stroke-width="2" stroke-linecap="round" marker-end="url(#arrowGold)"/>
+    <path d="M1072 103H1088" stroke="#AF8B36" stroke-width="2" stroke-linecap="round" marker-end="url(#arrowGold)"/>
   </g>
 
   <g transform="translate(118 840)">
