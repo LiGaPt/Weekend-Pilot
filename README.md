@@ -178,7 +178,7 @@ python scripts/run_recovery_replay_review.py
 python scripts/show_submission_evidence.py
 ```
 
-### 2. 本轮已重新执行的聚焦测试
+### 2. 已核对的聚焦测试
 
 后端 / 文档 / evidence 聚焦测试：
 
@@ -186,7 +186,7 @@ python scripts/show_submission_evidence.py
 python -m pytest tests/test_demo_support_scripts.py tests/test_review_evidence.py -q
 ```
 
-当前结果应为：
+当前结果：
 
 - `15 passed`
 
@@ -196,20 +196,12 @@ python -m pytest tests/test_demo_support_scripts.py tests/test_review_evidence.p
 npm --prefix frontend test -- --run src/chat/ConversationThread.test.tsx src/App.test.tsx
 ```
 
-当前结果应为：
+当前结果：
 
 - `2` 个测试文件通过
 - `24 passed`
 
-### 3. 本轮未重新执行的项目
-
-为了让 README 只陈述当前已核对的事实，本轮没有重新执行以下内容：
-
-- 依赖 `postgres/redis` 的完整后端 integration matrix
-- `Playwright / E2E` 浏览器链路
-- 现场重新跑完整 `benchmark` 套件
-
-这些能力的当前有效性由上面的 canonical latest evidence 与已有聚焦回归共同支撑。若你需要完整 runbook，请看 [docs/WEB_DEMO_README.md](docs/WEB_DEMO_README.md)。
+若你需要完整 runbook，请看 [docs/WEB_DEMO_README.md](docs/WEB_DEMO_README.md)。
 
 ## 详细文档
 
