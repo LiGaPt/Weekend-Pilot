@@ -27,11 +27,13 @@ class QueryPlanExecutor:
         run_id: UUID,
         fail_fast: bool = False,
         langsmith_trace_id: str | None = None,
+        world_profile: str | None = None,
     ) -> CandidateCollectionResult:
         self._reject_initial_write_tools(plan)
         collection = CandidateCollectionResult(
             run_id=run_id,
             provider_profile=plan.provider_profile,
+            world_profile=world_profile,
             executor_version=self.executor_version,
         )
 

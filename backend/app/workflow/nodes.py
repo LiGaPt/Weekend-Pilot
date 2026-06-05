@@ -216,6 +216,7 @@ class WeekendPilotWorkflowNodes:
             self._required_value(state, "query_plan"),
             self._required_uuid(state, "run_id"),
             langsmith_trace_id=state.get("trace_id"),
+            world_profile=state.get("world_profile"),
         )
         return self._updates(state, "execute_searches", candidate_collection=collection)
 

@@ -18,6 +18,10 @@ from backend.app.repositories import AgentRunRepository, PlanRepository
 
 class DeterministicFeedbackWriter:
     writer_version = "deterministic_feedback_writer_v1"
+    _MESSAGE_RECIPIENT_LABELS = {
+        "wife": "妻子",
+        "self": "自己",
+    }
 
     _STATUS_MAP = {
         "succeeded": "completed",
@@ -218,6 +222,14 @@ class DeterministicFeedbackWriter:
                 name = selected_addon.get("name")
                 if isinstance(candidate_id, str) and candidate_id and isinstance(name, str) and name:
                     labels[candidate_id] = name
+            post_confirmation_message = evidence.get("post_confirmation_message")
+            if isinstance(post_confirmation_message, dict):
+                recipient = self._text(post_confirmation_message.get("recipient"))
+                recipient_label = self._text(post_confirmation_message.get("recipient_label"))
+                if recipient and recipient_label:
+                    labels[recipient] = recipient_label
+        for recipient, label in self._MESSAGE_RECIPIENT_LABELS.items():
+            labels.setdefault(recipient, label)
         return labels
 
     def _action_message(

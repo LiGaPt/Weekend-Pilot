@@ -33,6 +33,7 @@ class InitialToolExecutionResult(BaseModel):
 class CandidateCollectionResult(BaseModel):
     run_id: UUID
     provider_profile: str
+    world_profile: str | None = None
     activity_candidates: list[Candidate] = Field(default_factory=list)
     dining_candidates: list[Candidate] = Field(default_factory=list)
     other_candidates: list[Candidate] = Field(default_factory=list)

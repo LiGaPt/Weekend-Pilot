@@ -486,4 +486,8 @@ describe("projectConversationThread", () => {
       "\u5c0f\u6c34\u5206\u8865\u7ed9\u7ad9",
     );
   });
+
+  it("uses the readable recipient label for send_message actions", () => {
+    expect(actionTargetLabel(awaitingRun.plans[0], "wife", "send_message")).toBe("\u59bb\u5b50");
+  });
 });

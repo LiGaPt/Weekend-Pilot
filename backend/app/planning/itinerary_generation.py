@@ -49,6 +49,21 @@ class DeterministicItineraryGenerator:
     _ACTIVITY_DURATION_MINUTES = 150
     _DEFAULT_TRANSFER_DURATION_MINUTES = 20
     _DINING_DURATION_MINUTES = 90
+    _ACTION_ORDER = {
+        "reserve_restaurant": 0,
+        "book_ticket": 1,
+        "join_queue": 2,
+        "order_addon": 3,
+        "send_message": 4,
+    }
+    _SPOUSE_MESSAGE_KEYWORDS = ("wife", "\u59bb\u5b50", "\u8001\u5a46", "\u7231\u4eba")
+    _MESSAGE_RECIPIENT = "wife"
+    _MESSAGE_RECIPIENT_LABEL = "\u59bb\u5b50"
+    _MESSAGE_TRIGGER_RULE = "family_spouse_confirmation_v0"
+    _MESSAGE_REASON = (
+        "\u786e\u8ba4\u540e\u4f1a\u628a\u5b89\u6392\u6d88\u606f\u53d1\u7ed9"
+        "\u540c\u884c\u5bb6\u4eba\uff0c\u65b9\u4fbf\u540c\u6b65\u884c\u7a0b\u3002"
+    )
     _COPY_TEMPLATES = {
         "family": {
             "summary": "先去{activity}做亲子活动，再去{dining}吃清淡晚餐，{route_text}。",
@@ -210,7 +225,13 @@ class DeterministicItineraryGenerator:
         copy = self._COPY_TEMPLATES[copy_profile]
         timeline = self._build_timeline(plan, pair, warnings, copy)
         total_duration = sum(item.duration_minutes for item in timeline)
-        proposed_actions, addon_evidence = self._build_proposed_actions(plan, enrichment, pair, draft_id)
+        proposed_actions, action_evidence = self._build_proposed_actions(
+            plan,
+            enrichment,
+            pair,
+            draft_id,
+            timeline,
+        )
         route_ref = self._route_ref(pair.route)
         evidence = {
             "parser_version": plan.intent.parser_version,
@@ -222,8 +243,7 @@ class DeterministicItineraryGenerator:
             "route_tool_event_id": pair.route.tool_event_id,
             "provider_profile": enrichment.provider_profile,
         }
-        if addon_evidence is not None:
-            evidence["selected_addon"] = addon_evidence
+        evidence.update(action_evidence)
 
         return ItineraryDraft(
             draft_id=draft_id,
@@ -363,9 +383,16 @@ class DeterministicItineraryGenerator:
         enrichment: CandidateEnrichmentResult,
         pair: _DraftPair,
         draft_id: str,
-    ) -> tuple[list[ProposedAction], dict[str, Any] | None]:
+        timeline: list[TimelineItem],
+    ) -> tuple[list[ProposedAction], dict[str, Any]]:
         actions = []
+        action_evidence: dict[str, Any] = {}
         party_size = self._party_size(plan)
+
+        reserve_spec: tuple[str, str, dict[str, Any], str] | None = None
+        book_spec: tuple[str, str, dict[str, Any], str] | None = None
+        queue_spec: tuple[str, str, dict[str, Any], str] | None = None
+        addon_spec: tuple[str, str, dict[str, Any], str] | None = None
 
         ticket = pair.activity.ticket_availability
         if isinstance(ticket, dict) and ticket.get("available") is True:
@@ -379,15 +406,11 @@ class DeterministicItineraryGenerator:
             time_slot = self._first_text(ticket.get("time_slots"))
             if time_slot is not None:
                 payload["time_slot"] = time_slot
-            actions.append(
-                self._action(
-                    draft_id,
-                    len(actions) + 1,
-                    "book_ticket",
-                    pair.activity.candidate.candidate_id,
-                    payload,
-                    "票务可用，确认后可提前锁定入场名额。",
-                )
+            book_spec = (
+                "book_ticket",
+                pair.activity.candidate.candidate_id,
+                payload,
+                "\u7968\u52a1\u53ef\u7528\uff0c\u786e\u8ba4\u540e\u53ef\u63d0\u524d\u9501\u5b9a\u5165\u573a\u540d\u989d\u3002",
             )
 
         table = pair.dining.table_availability
@@ -403,15 +426,11 @@ class DeterministicItineraryGenerator:
             time_slot = self._first_text(table.get("time_slots"))
             if time_slot is not None:
                 payload["time_slot"] = time_slot
-            actions.append(
-                self._action(
-                    draft_id,
-                    len(actions) + 1,
-                    "reserve_restaurant",
-                    pair.dining.candidate.candidate_id,
-                    payload,
-                    "餐厅有可订桌位，确认后可提前锁定晚餐座位。",
-                )
+            reserve_spec = (
+                "reserve_restaurant",
+                pair.dining.candidate.candidate_id,
+                payload,
+                "\u9910\u5385\u6709\u53ef\u8ba2\u5ea7\u4f4d\uff0c\u786e\u8ba4\u540e\u53ef\u63d0\u524d\u9501\u5b9a\u665a\u9910\u5ea7\u4f4d\u3002",
             )
             has_reservation_action = True
 
@@ -425,33 +444,25 @@ class DeterministicItineraryGenerator:
             payload = {"party_size": party_size}
             if queue_id is not None:
                 payload["queue_id"] = queue_id
-            actions.append(
-                self._action(
-                    draft_id,
-                    len(actions) + 1,
-                    "join_queue",
-                    queue_id or pair.dining.candidate.candidate_id,
-                    payload,
-                    "当前可排队取号，且没有可用订座操作。",
-                )
+            queue_spec = (
+                "join_queue",
+                queue_id or pair.dining.candidate.candidate_id,
+                payload,
+                "\u5f53\u524d\u53ef\u6392\u961f\u53d6\u53f7\uff0c\u4e14\u6ca1\u6709\u53ef\u7528\u8ba2\u5ea7\u64cd\u4f5c\u3002",
             )
 
         selected_addon = self._select_addon(plan, enrichment, pair)
         if selected_addon is not None:
-            actions.append(
-                self._action(
-                    draft_id,
-                    len(actions) + 1,
-                    "order_addon",
-                    selected_addon.candidate.candidate.candidate_id,
-                    {
-                        "vendor_id": selected_addon.vendor_id,
-                        "items": [{"sku": selected_addon.sku, "quantity": party_size}],
-                    },
-                    "补给点可顺路到达，确认后可提前下单补水或小食。",
-                )
+            addon_spec = (
+                "order_addon",
+                selected_addon.candidate.candidate.candidate_id,
+                {
+                    "vendor_id": selected_addon.vendor_id,
+                    "items": [{"sku": selected_addon.sku, "quantity": party_size}],
+                },
+                "\u8865\u7ed9\u70b9\u53ef\u987a\u8def\u5230\u8fbe\uff0c\u786e\u8ba4\u540e\u53ef\u63d0\u524d\u4e0b\u5355\u8865\u6c34\u6216\u5c0f\u98df\u3002",
             )
-            return actions, {
+            action_evidence["selected_addon"] = {
                 "candidate_id": selected_addon.candidate.candidate.candidate_id,
                 "name": selected_addon.candidate.candidate.name,
                 "route_key": [
@@ -461,7 +472,105 @@ class DeterministicItineraryGenerator:
                 "route_tool_event_id": selected_addon.route.tool_event_id,
             }
 
-        return actions, None
+        ordered_specs = [reserve_spec, book_spec, queue_spec, addon_spec]
+        message = self._build_post_confirmation_message(timeline, pair)
+        if self._should_add_post_confirmation_message(
+            enrichment,
+            plan,
+            has_earlier_write_action=any(spec is not None for spec in ordered_specs),
+            message=message,
+        ):
+            ordered_specs.append(
+                (
+                    "send_message",
+                    self._MESSAGE_RECIPIENT,
+                    {
+                        "recipient": self._MESSAGE_RECIPIENT,
+                        "message": message,
+                    },
+                    self._MESSAGE_REASON,
+                )
+            )
+            action_evidence["post_confirmation_message"] = {
+                "recipient": self._MESSAGE_RECIPIENT,
+                "recipient_label": self._MESSAGE_RECIPIENT_LABEL,
+                "message_preview": message,
+                "trigger_rule": self._MESSAGE_TRIGGER_RULE,
+            }
+
+        for action_index, spec in enumerate((spec for spec in ordered_specs if spec is not None), start=1):
+            action_type, target_id, payload, reason = spec
+            actions.append(
+                self._action(
+                    draft_id,
+                    action_index,
+                    action_type,
+                    target_id,
+                    payload,
+                    reason,
+                )
+            )
+
+        return actions, action_evidence
+
+    def _should_add_post_confirmation_message(
+        self,
+        enrichment: CandidateEnrichmentResult,
+        plan: QueryPlan,
+        *,
+        has_earlier_write_action: bool,
+        message: str | None,
+    ) -> bool:
+        if enrichment.world_profile != "family_afternoon":
+            return False
+        if not has_earlier_write_action:
+            return False
+        normalized_message = self._text_or_none(message)
+        if normalized_message is None:
+            return False
+
+        raw_text = plan.intent.raw_text.casefold()
+        return any(keyword in raw_text for keyword in self._SPOUSE_MESSAGE_KEYWORDS)
+
+    def _build_post_confirmation_message(
+        self,
+        timeline: list[TimelineItem],
+        pair: _DraftPair,
+    ) -> str | None:
+        departure = None
+        for item in timeline:
+            normalized = self._normalize_departure_label(item.start_label)
+            if normalized is not None:
+                departure = normalized
+                break
+
+        activity_name = self._text_or_none(pair.activity.candidate.name)
+        dining_name = self._text_or_none(pair.dining.candidate.name)
+        if activity_name is None or dining_name is None:
+            return None
+
+        prefix = "搞定了，"
+        if departure is not None:
+            prefix = f"{prefix}{departure}出发，"
+        return f"{prefix}先去{activity_name}，再到{dining_name}。"
+
+    def _normalize_departure_label(self, start_label: str | None) -> str | None:
+        if not isinstance(start_label, str):
+            return None
+        parts = start_label.strip().split(":", 1)
+        if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+            return None
+
+        hour = int(parts[0])
+        minute = int(parts[1])
+        if minute not in {0, 30}:
+            return None
+
+        period = "下午" if hour >= 12 else "上午"
+        display_hour = hour if 1 <= hour <= 12 else hour - 12 if hour > 12 else 12
+        if minute == 0:
+            return f"{period} {display_hour} 点"
+        return f"{period} {display_hour} 点半"
 
     def _select_addon(
         self,

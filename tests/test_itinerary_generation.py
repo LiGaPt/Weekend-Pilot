@@ -240,6 +240,7 @@ def _enrichment(
     dining: list[EnrichedCandidate] | None = None,
     others: list[EnrichedCandidate] | None = None,
     routes: list[RouteMatrixEntry] | None = None,
+    world_profile: str | None = None,
 ) -> CandidateEnrichmentResult:
     return CandidateEnrichmentResult(
         run_id=uuid4(),
@@ -248,6 +249,7 @@ def _enrichment(
         enriched_dining_candidates=[_dining()] if dining is None else dining,
         enriched_other_candidates=[] if others is None else others,
         route_matrix=[_route()] if routes is None else routes,
+        world_profile=world_profile,
         enricher_version="test-enricher",
     )
 
@@ -322,11 +324,11 @@ def test_generator_creates_draft_with_refs_timeline_feasibility_and_actions() ->
     assert draft.feasibility.is_feasible is True
     assert draft.feasibility.reasons == ["已选择亲子活动", "已选择清淡用餐", "活动到餐厅路线已验证"]
     assert [action.action_type for action in draft.proposed_actions] == [
-        "book_ticket",
         "reserve_restaurant",
+        "book_ticket",
     ]
-    assert draft.proposed_actions[0].reason == "票务可用，确认后可提前锁定入场名额。"
-    assert draft.proposed_actions[1].reason == "餐厅有可订桌位，确认后可提前锁定晚餐座位。"
+    assert draft.proposed_actions[0].reason == "餐厅有可订座位，确认后可提前锁定晚餐座位。"
+    assert draft.proposed_actions[1].reason == "票务可用，确认后可提前锁定入场名额。"
     assert all(action.requires_confirmation for action in draft.proposed_actions)
     assert "idempotency_key" not in draft.proposed_actions[0].payload
     assert draft.evidence["planner_version"] == "test-planner"
@@ -376,8 +378,8 @@ def test_table_reservation_is_preferred_over_queue_action_when_both_are_availabl
     )
 
     assert [action.action_type for action in result.drafts[0].proposed_actions] == [
-        "book_ticket",
         "reserve_restaurant",
+        "book_ticket",
     ]
 
 
@@ -507,8 +509,8 @@ def test_generator_appends_order_addon_for_explicit_addon_request_when_evidence_
 
     draft = result.drafts[0]
     assert [action.action_type for action in draft.proposed_actions] == [
-        "book_ticket",
         "reserve_restaurant",
+        "book_ticket",
         "order_addon",
     ]
     addon_action = draft.proposed_actions[-1]
@@ -521,6 +523,130 @@ def test_generator_appends_order_addon_for_explicit_addon_request_when_evidence_
     assert draft.evidence["selected_addon"]["candidate_id"] == "addon_drinks_001"
     assert draft.evidence["selected_addon"]["name"] == "小水分补给站"
     assert draft.evidence["selected_addon"]["route_tool_event_id"] == addon_route_event_id
+
+
+def test_generator_adds_send_message_for_family_spouse_path_after_other_write_actions() -> None:
+    result = DeterministicItineraryGenerator().generate(
+        _plan(
+            raw_text=(
+                "This afternoon I want to go out with my wife and child for a few hours. "
+                "Not too far. My child is 5, and my wife is trying to eat lighter. "
+                "Please add an easy drink stop if it fits."
+            ),
+        ),
+        _enrichment(
+            world_profile="family_afternoon",
+            others=[_addon()],
+            routes=[
+                _route(),
+                _route(
+                    origin_candidate_id="restaurant_light_001",
+                    destination_candidate_id="addon_drinks_001",
+                    duration_minutes=13,
+                    distance_meters=900,
+                ),
+            ],
+        ),
+    )
+
+    draft = result.drafts[0]
+    assert [action.action_type for action in draft.proposed_actions] == [
+        "reserve_restaurant",
+        "book_ticket",
+        "order_addon",
+        "send_message",
+    ]
+    send_message = draft.proposed_actions[-1]
+    assert send_message.target_id == "wife"
+    assert send_message.payload["recipient"] == "wife"
+    assert isinstance(send_message.payload["message"], str)
+    assert send_message.payload["message"]
+    assert "\u5f90\u6c47\u4eb2\u5b50\u79d1\u5b66\u9986" in send_message.payload["message"]
+    assert "\u7eff\u7897\u5bb6\u5ead\u8f7b\u98df" in send_message.payload["message"]
+    assert send_message.reason == (
+        "\u786e\u8ba4\u540e\u4f1a\u628a\u5b89\u6392\u6d88\u606f\u53d1\u7ed9"
+        "\u540c\u884c\u5bb6\u4eba\uff0c\u65b9\u4fbf\u540c\u6b65\u884c\u7a0b\u3002"
+    )
+    assert draft.evidence["post_confirmation_message"] == {
+        "recipient": "wife",
+        "recipient_label": "\u59bb\u5b50",
+        "message_preview": send_message.payload["message"],
+        "trigger_rule": "family_spouse_confirmation_v0",
+    }
+
+
+def test_generator_skips_send_message_without_family_world_profile() -> None:
+    result = DeterministicItineraryGenerator().generate(
+        _plan(
+            raw_text=(
+                "This afternoon I want to go out with my wife and child for a few hours. "
+                "Please add an easy drink stop if it fits."
+            ),
+        ),
+        _enrichment(
+            world_profile="friends_gathering",
+            others=[_addon()],
+            routes=[
+                _route(),
+                _route(
+                    origin_candidate_id="restaurant_light_001",
+                    destination_candidate_id="addon_drinks_001",
+                ),
+            ],
+        ),
+    )
+
+    assert [action.action_type for action in result.drafts[0].proposed_actions] == [
+        "reserve_restaurant",
+        "book_ticket",
+        "order_addon",
+    ]
+    assert "post_confirmation_message" not in result.drafts[0].evidence
+
+
+def test_generator_skips_send_message_without_spouse_keyword() -> None:
+    result = DeterministicItineraryGenerator().generate(
+        _plan(
+            raw_text=(
+                "This afternoon I want to go out with my child for a few hours. "
+                "Please add an easy drink stop if it fits."
+            ),
+        ),
+        _enrichment(
+            world_profile="family_afternoon",
+            others=[_addon()],
+            routes=[
+                _route(),
+                _route(
+                    origin_candidate_id="restaurant_light_001",
+                    destination_candidate_id="addon_drinks_001",
+                ),
+            ],
+        ),
+    )
+
+    assert [action.action_type for action in result.drafts[0].proposed_actions] == [
+        "reserve_restaurant",
+        "book_ticket",
+        "order_addon",
+    ]
+    assert "post_confirmation_message" not in result.drafts[0].evidence
+
+
+def test_generator_skips_send_message_when_no_earlier_write_action_exists() -> None:
+    result = DeterministicItineraryGenerator().generate(
+        _plan(
+            raw_text="This afternoon I want to go out with my wife and child for a few hours.",
+        ),
+        _enrichment(
+            world_profile="family_afternoon",
+            activities=[_activity(ticket_available=None)],
+            dining=[_dining(table_available=None, queue_status=None)],
+        ),
+    )
+
+    assert result.drafts[0].proposed_actions == []
+    assert "post_confirmation_message" not in result.drafts[0].evidence
 
 
 def test_generator_skips_order_addon_when_menu_or_route_evidence_is_missing() -> None:
@@ -546,12 +672,12 @@ def test_generator_skips_order_addon_when_menu_or_route_evidence_is_missing() ->
     )
 
     assert [action.action_type for action in missing_water.drafts[0].proposed_actions] == [
-        "book_ticket",
         "reserve_restaurant",
+        "book_ticket",
     ]
     assert [action.action_type for action in missing_route.drafts[0].proposed_actions] == [
-        "book_ticket",
         "reserve_restaurant",
+        "book_ticket",
     ]
 
 

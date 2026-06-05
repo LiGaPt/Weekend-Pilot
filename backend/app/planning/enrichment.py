@@ -74,6 +74,7 @@ class CandidateEnricher:
         result = CandidateEnrichmentResult(
             run_id=collection.run_id,
             provider_profile=plan.provider_profile,
+            world_profile=collection.world_profile,
             enricher_version=self.enricher_version,
         )
         templates_by_tool = {
