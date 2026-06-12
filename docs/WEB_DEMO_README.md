@@ -4,6 +4,35 @@
 
 The Web demo is the primary MVP review path for WeekendPilot. It runs the React/Vite frontend against the FastAPI demo API, defaults to the Mock World provider, pauses before write tools, and continues execution only after explicit confirmation. The visible demo copy across the current six public Mock World scenario chips is localized in Chinese for competition review.
 
+For hackathon submission and recording, use [docs/submission/OVERVIEW.md](./submission/OVERVIEW.md) as the primary package index, then keep this runbook as the detailed operational reference.
+
+Current version scope: `V1.5 baseline / V2 Integrity candidate`. The next `V2 Integrity Edition` work should focus on benchmark completeness, memory governance, observability, and recovery auditability; AMap remains an API-only read-only preview outside the customer UI main path and outside formal benchmark runs.
+
+## Submission / Recording Quick Start
+
+Before recording, warm up the public happy path once and keep the browser tab order fixed as `5173 -> 5174`.
+
+Run these fixed commands from the repo root before you start recording:
+
+```bash
+python scripts/demo_preflight.py
+python scripts/show_submission_evidence.py
+```
+
+If you also want to show the API-only AMap read preview, run:
+
+```bash
+python scripts/demo_amap_preview.py
+```
+
+Recording defaults:
+
+- keep the terminal at the repo root
+- do not record service startup logs
+- open `运行信息` on `5173` when you need to 复制 `run_id`
+- after the public flow, switch to `5174`, paste the copied `run_id`, and show `Trace Summary` plus `Benchmark Artifacts`
+- benchmark breadth should be demonstrated with the prepared evidence summary and the `Benchmark Summary` hero; 不需要现场等待长时间 benchmark 执行
+
 The customer page at `5173` is now chat-first:
 
 - the first screen shows one primary composer plus six fixed Mock World scenario chips: `亲子`, `朋友`, `单人`, `情侣`, `雨天`, and `预算`
