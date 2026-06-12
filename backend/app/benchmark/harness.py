@@ -30,7 +30,7 @@ from backend.app.benchmark.failure_profiles import (
     build_benchmark_failure_injector,
     failure_profile_metadata,
 )
-from backend.app.benchmark.matrix import build_case_matrix_summary
+from backend.app.benchmark.matrix import build_case_matrix_summary, build_case_v2_matrix_summary
 from backend.app.benchmark.rollups import build_benchmark_outcome_rollup
 from backend.app.benchmark.reporting import write_case_report, write_run_report
 from backend.app.benchmark.schemas import (
@@ -40,6 +40,7 @@ from backend.app.benchmark.schemas import (
     BenchmarkRunReport,
     BenchmarkSummary,
     BenchmarkSuiteId,
+    resolve_benchmark_case_v2_taxonomy,
 )
 from backend.app.demo.schemas import (
     DemoClarifyRunRequest,
@@ -105,6 +106,7 @@ class BenchmarkHarness:
                         case_id=case.case_id,
                         status="error",
                         taxonomy=case.taxonomy,
+                        v2_taxonomy=resolve_benchmark_case_v2_taxonomy(case),
                         scores=[],
                         overall_score=0.0,
                         tool_event_count=0,
@@ -122,6 +124,7 @@ class BenchmarkHarness:
                 case_id=case.case_id,
                 status="error",
                 taxonomy=case.taxonomy,
+                v2_taxonomy=resolve_benchmark_case_v2_taxonomy(case),
                 scores=[],
                 overall_score=0.0,
                 tool_event_count=0,
@@ -188,6 +191,7 @@ class BenchmarkHarness:
                 overall_score=overall_score,
                 benchmark_timing_summary=timing_summary,
                 matrix_summary=build_case_matrix_summary(cases),
+                v2_taxonomy_summary=build_case_v2_matrix_summary(cases),
                 outcome_rollup=build_benchmark_outcome_rollup(results),
             ),
         )
@@ -200,6 +204,7 @@ class BenchmarkHarness:
                 case_id=case.case_id,
                 status="error",
                 taxonomy=case.taxonomy,
+                v2_taxonomy=resolve_benchmark_case_v2_taxonomy(case),
                 scores=[],
                 overall_score=0.0,
                 tool_event_count=0,
@@ -251,6 +256,7 @@ class BenchmarkHarness:
                 trace_id=workflow_result.trace_id,
                 run_summary=None,
                 taxonomy=case.taxonomy,
+                v2_taxonomy=resolve_benchmark_case_v2_taxonomy(case),
                 scores=[],
                 overall_score=0.0,
                 tool_event_count=workflow_result.tool_event_count,
@@ -330,6 +336,7 @@ class BenchmarkHarness:
             trace_id=workflow_result.trace_id,
             run_summary=run_summary,
             taxonomy=case.taxonomy,
+            v2_taxonomy=resolve_benchmark_case_v2_taxonomy(case),
             failure_chain_summary=failure_chain_summary,
             scores=scores,
             overall_score=overall,
@@ -353,6 +360,7 @@ class BenchmarkHarness:
                     case_id=case.case_id,
                     status="error",
                     taxonomy=case.taxonomy,
+                    v2_taxonomy=resolve_benchmark_case_v2_taxonomy(case),
                     scores=[],
                     overall_score=0.0,
                     tool_event_count=0,
@@ -366,6 +374,7 @@ class BenchmarkHarness:
                     case_id=case.case_id,
                     status="error",
                     taxonomy=case.taxonomy,
+                    v2_taxonomy=resolve_benchmark_case_v2_taxonomy(case),
                     scores=[],
                     overall_score=0.0,
                     tool_event_count=0,
@@ -379,6 +388,7 @@ class BenchmarkHarness:
                     case_id=case.case_id,
                     status="error",
                     taxonomy=case.taxonomy,
+                    v2_taxonomy=resolve_benchmark_case_v2_taxonomy(case),
                     scores=[],
                     overall_score=0.0,
                     tool_event_count=0,
@@ -579,6 +589,7 @@ class BenchmarkHarness:
             trace_id=self._trace_id_from_metadata(run_metadata),
             run_summary=run_summary,
             taxonomy=case.taxonomy,
+            v2_taxonomy=resolve_benchmark_case_v2_taxonomy(case),
             scores=scores,
             overall_score=overall,
             tool_event_count=len(aggregated_tool_events),
@@ -611,6 +622,7 @@ class BenchmarkHarness:
             trace_id=workflow_result.trace_id,
             run_summary=run_summary,
             taxonomy=case.taxonomy,
+            v2_taxonomy=resolve_benchmark_case_v2_taxonomy(case),
             failure_chain_summary=failure_chain_summary,
             scores=[],
             overall_score=0.0,
@@ -665,6 +677,7 @@ class BenchmarkHarness:
             status="error",
             run_id=run_id,
             taxonomy=case.taxonomy,
+            v2_taxonomy=resolve_benchmark_case_v2_taxonomy(case),
             scores=[],
             overall_score=0.0,
             tool_event_count=0,
@@ -808,6 +821,7 @@ class BenchmarkHarness:
             "benchmark_harness_version": self.harness_version,
             "harness_version": self.harness_version,
             "taxonomy": case.taxonomy.model_dump(mode="json"),
+            "v2_taxonomy": resolve_benchmark_case_v2_taxonomy(case).model_dump(mode="json"),
             "metadata": case.metadata,
             "workflow_backed": True,
         }

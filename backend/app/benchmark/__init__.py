@@ -12,6 +12,8 @@ from backend.app.benchmark.recovery_review import (
 from backend.app.benchmark.schemas import (
     BenchmarkCase,
     BenchmarkCaseResult,
+    BenchmarkCaseV2MatrixSummary,
+    BenchmarkCaseV2Taxonomy,
     BenchmarkSuiteDescription,
     BenchmarkReplayCaseResult,
     BenchmarkReplayMismatch,
@@ -24,6 +26,7 @@ from backend.app.benchmark.schemas import (
     RecoveryReplayReviewResult,
     RecoveryReplayReviewSummary,
     RecoveryReplaySummary,
+    resolve_benchmark_case_v2_taxonomy,
 )
 from backend.app.benchmark.suites import (
     list_benchmark_suites,
@@ -35,6 +38,8 @@ from backend.app.benchmark.suites import (
 __all__ = [
     "BenchmarkCase",
     "BenchmarkCaseResult",
+    "BenchmarkCaseV2MatrixSummary",
+    "BenchmarkCaseV2Taxonomy",
     "BenchmarkHarness",
     "BenchmarkHarnessError",
     "BenchmarkReplayCaseResult",
@@ -57,5 +62,6 @@ __all__ = [
     "load_failure_benchmark_cases",
     "load_registered_benchmark_cases",
     "list_benchmark_suites",
+    "resolve_benchmark_case_v2_taxonomy",
     "run_recovery_replay_review",
 ]
