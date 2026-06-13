@@ -813,6 +813,17 @@ def test_internal_observability_service_returns_benchmark_artifact_summary_when_
                     "tool_event_count": 8,
                     "action_count": 1,
                     "failure_reasons": [],
+                    "memory_policy_summary": {
+                        "policy_version": "memory_query_policy_v1",
+                        "considered_count": 1,
+                        "used_count": 0,
+                        "ignored_count": 0,
+                        "downgraded_count": 1,
+                        "overridden_count": 0,
+                        "primary_influence_count": 0,
+                        "advisory_influence_count": 1,
+                        "no_influence_count": 0,
+                    },
                     "score_summaries": [
                         {
                             "name": "workflow_path",
@@ -841,11 +852,13 @@ def test_internal_observability_service_returns_benchmark_artifact_summary_when_
     assert summary.benchmark_artifact_summary.taxonomy.scenario_bucket == "solo"
     assert summary.benchmark_artifact_summary.benchmark_status == "passed"
     assert summary.benchmark_artifact_summary.overall_score == 0.9583
+    assert summary.benchmark_artifact_summary.memory_policy_summary is not None
+    assert summary.benchmark_artifact_summary.memory_policy_summary.downgraded_count == 1
     assert summary.benchmark_artifact_summary.score_summaries[0].status == "passed"
     assert summary.benchmark_artifact_summary.report_path == "var/benchmarks/solo_afternoon_v1.json"
 
 
-def test_internal_observability_service_returns_partial_benchmark_summary_when_artifact_summary_missing(
+def test_internal_observability_service_falls_back_to_workflow_memory_policy_summary_when_artifact_summary_missing(
     db_session: Session,
 ) -> None:
     case = load_benchmark_case("family_route_failure_v1")
@@ -858,6 +871,23 @@ def test_internal_observability_service_returns_partial_benchmark_summary_when_a
                 "workflow_backed": True,
                 "taxonomy": case.taxonomy.model_dump(mode="json"),
             }
+        }
+        | {
+            "workflow": {
+                "memory_policy": {
+                    "policy_summary": {
+                        "policy_version": "memory_query_policy_v1",
+                        "considered_count": 1,
+                        "used_count": 0,
+                        "ignored_count": 1,
+                        "downgraded_count": 0,
+                        "overridden_count": 0,
+                        "primary_influence_count": 0,
+                        "advisory_influence_count": 0,
+                        "no_influence_count": 1,
+                    }
+                }
+            }
         },
     )
 
@@ -868,12 +898,15 @@ def test_internal_observability_service_returns_partial_benchmark_summary_when_a
     assert summary.benchmark_artifact_summary.registered_suite_ids == [
         "recovery_focused",
         "release_gate_v1",
+        "v2_integrity",
         "all_registered",
     ]
     assert summary.benchmark_artifact_summary.taxonomy is not None
     assert summary.benchmark_artifact_summary.taxonomy.failure_mode == "route_unavailable"
     assert summary.benchmark_artifact_summary.benchmark_status is None
     assert summary.benchmark_artifact_summary.overall_score is None
+    assert summary.benchmark_artifact_summary.memory_policy_summary is not None
+    assert summary.benchmark_artifact_summary.memory_policy_summary.ignored_count == 1
     assert summary.benchmark_artifact_summary.score_summaries == []
     assert summary.benchmark_artifact_summary.report_path is None
 

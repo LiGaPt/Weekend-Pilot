@@ -63,6 +63,7 @@ from backend.app.benchmark.timing import summarize_benchmark_timing
 from backend.app.models.runtime import ActionLedger
 from backend.app.observability.summary import RunSummary, build_run_summary, load_run_summary
 from backend.app.providers.mock_world.loader import SUPPORTED_PROFILES
+from backend.app.planning.memory_query_policy import MemoryPolicyAuditSummary
 from backend.app.repositories import (
     ActionLedgerRepository,
     AgentRunRepository,
@@ -302,6 +303,7 @@ class BenchmarkHarness:
             tool_event_count=len(tool_events),
             action_count=action_count,
         )
+        memory_policy_summary = self._memory_policy_summary_from_metadata(run_metadata)
 
         if workflow_result.status == "error":
             result = self._workflow_error_result(
@@ -351,6 +353,7 @@ class BenchmarkHarness:
             feedback_status=workflow_result.feedback_status or self._metadata_status(feedback),
             observability_status=workflow_result.observability_status,
             workflow_status=workflow_result.status,
+            memory_policy_summary=memory_policy_summary,
             workflow_timing_summary=workflow_result.workflow_timing_summary,
             workflow_node_history=list(workflow_result.node_history),
             agent_roles=self._agent_roles(workflow_result),
@@ -549,6 +552,7 @@ class BenchmarkHarness:
             tool_event_count=len(final_run_tool_events),
             action_count=final_run_action_count,
         )
+        memory_policy_summary = self._memory_policy_summary_from_metadata(run_metadata)
 
         plan_json = selected_plan.plan_json if selected_plan is not None and isinstance(selected_plan.plan_json, dict) else {}
         execution = plan_json.get("execution") if isinstance(plan_json, dict) else None
@@ -603,6 +607,7 @@ class BenchmarkHarness:
             feedback_status=current_summary.feedback_status or self._metadata_status(feedback),
             observability_status=self._observability_status_from_metadata(run_metadata),
             workflow_status=persisted_final_run.status,
+            memory_policy_summary=memory_policy_summary,
             workflow_timing_summary=run_summary.workflow_timing_summary if run_summary is not None else None,
             workflow_node_history=self._workflow_node_history_from_metadata(run_metadata),
             conversation_trace=conversation_trace,
@@ -864,6 +869,11 @@ class BenchmarkHarness:
             "tool_event_count": result.tool_event_count,
             "action_count": result.action_count,
             "failure_reasons": list(result.failure_reasons),
+            "memory_policy_summary": (
+                result.memory_policy_summary.model_dump(mode="json")
+                if result.memory_policy_summary is not None
+                else None
+            ),
             "score_summaries": [
                 {
                     "name": score.name,
@@ -877,6 +887,24 @@ class BenchmarkHarness:
         }
         metadata["benchmark"] = benchmark_metadata
         repositories.runs.update_metadata_json(result.run_id, metadata)
+
+    def _memory_policy_summary_from_metadata(
+        self,
+        metadata: dict[str, Any],
+    ) -> MemoryPolicyAuditSummary | None:
+        workflow = metadata.get("workflow")
+        if not isinstance(workflow, dict):
+            return None
+        memory_policy = workflow.get("memory_policy")
+        if not isinstance(memory_policy, dict):
+            return None
+        policy_summary = memory_policy.get("policy_summary")
+        if not isinstance(policy_summary, dict):
+            return None
+        try:
+            return MemoryPolicyAuditSummary.model_validate(policy_summary)
+        except ValidationError:
+            return None
 
     def _workflow_failure_reason(self, workflow_result: Any) -> str:
         error_json = _value(workflow_result, "error_json")

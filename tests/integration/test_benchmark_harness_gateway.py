@@ -656,6 +656,7 @@ def test_benchmark_harness_runs_solo_afternoon_case(
     assert len(artifact_summary["score_summaries"]) == len(result.scores)
     assert artifact_summary["score_summaries"][0]["name"] == result.scores[0].name
     assert "details" not in artifact_summary["score_summaries"][0]
+    assert artifact_summary.get("memory_policy_summary") is None
 
 
 def test_benchmark_harness_runs_elder_afternoon_case(
@@ -749,6 +750,65 @@ def test_benchmark_harness_records_memory_policy_for_override_case(
         "suppressed_user_override",
         "suppressed_user_override",
     ]
+    assert [entry["key"] for entry in memory_policy["decision_log"]] == [
+        decision["memory_key"] for decision in memory_policy["memory_decisions"]
+    ]
+    assert {
+        entry["key"]: {
+            "status": entry["status"],
+            "decision": entry["decision"],
+            "reason": entry["reason"],
+            "influence_level": entry["influence_level"],
+            "dimension": entry["dimension"],
+            "normalized_value": entry["normalized_value"],
+            "tier": entry["tier"],
+            "expired": entry["expired"],
+        }
+        for entry in memory_policy["decision_log"]
+    } == {
+        "activity_style": {
+            "status": "overridden",
+            "decision": "suppressed_user_override",
+            "reason": "explicit_user_input_present",
+            "influence_level": "none",
+            "dimension": "activity_preferences",
+            "normalized_value": "citywalk",
+            "tier": "advisory",
+            "expired": False,
+        },
+        "spouse_lighter_meals": {
+            "status": "overridden",
+            "decision": "suppressed_user_override",
+            "reason": "explicit_user_input_present",
+            "influence_level": "none",
+            "dimension": "dining_preferences",
+            "normalized_value": "lighter_options",
+            "tier": "trusted",
+            "expired": False,
+        },
+    }
+    assert memory_policy["policy_summary"] == {
+        "policy_version": "memory_query_policy_v1",
+        "considered_count": 2,
+        "used_count": 0,
+        "ignored_count": 0,
+        "downgraded_count": 0,
+        "overridden_count": 2,
+        "primary_influence_count": 0,
+        "advisory_influence_count": 0,
+        "no_influence_count": 2,
+    }
+    assert run.metadata_json["benchmark"]["artifact_summary"]["memory_policy_summary"] == {
+        "policy_version": "memory_query_policy_v1",
+        "considered_count": 2,
+        "used_count": 0,
+        "ignored_count": 0,
+        "downgraded_count": 0,
+        "overridden_count": 2,
+        "primary_influence_count": 0,
+        "advisory_influence_count": 0,
+        "no_influence_count": 2,
+    }
     assert memory_score.passed is True
     assert memory_score.details["observed_dimension_sources"] == {
         "activity_preferences": "user_input",
@@ -805,6 +865,42 @@ def test_benchmark_harness_records_memory_policy_for_advisory_fill_case(
             "outcome": "applied_advisory",
         }
     ]
+    assert memory_policy["decision_log"] == [
+        {
+            "memory_id": memory_policy["decision_log"][0]["memory_id"],
+            "key": "spouse_lighter_meals",
+            "status": "downgraded",
+            "decision": "applied_advisory",
+            "reason": "low_confidence_downgraded_to_advisory",
+            "influence_level": "advisory",
+            "dimension": "dining_preferences",
+            "normalized_value": "lighter_options",
+            "tier": "advisory",
+            "expired": False,
+        }
+    ]
+    assert memory_policy["policy_summary"] == {
+        "policy_version": "memory_query_policy_v1",
+        "considered_count": 1,
+        "used_count": 0,
+        "ignored_count": 0,
+        "downgraded_count": 1,
+        "overridden_count": 0,
+        "primary_influence_count": 0,
+        "advisory_influence_count": 1,
+        "no_influence_count": 0,
+    }
+    assert run.metadata_json["benchmark"]["artifact_summary"]["memory_policy_summary"] == {
+        "policy_version": "memory_query_policy_v1",
+        "considered_count": 1,
+        "used_count": 0,
+        "ignored_count": 0,
+        "downgraded_count": 1,
+        "overridden_count": 0,
+        "primary_influence_count": 0,
+        "advisory_influence_count": 1,
+        "no_influence_count": 0,
+    }
     assert memory_score.passed is True
     assert memory_score.details["observed_dimension_tiers"] == {
         "dining_preferences": "advisory",
@@ -860,6 +956,42 @@ def test_benchmark_harness_records_memory_policy_for_expired_advisory_case(
             "outcome": "applied_advisory",
         }
     ]
+    assert memory_policy["decision_log"] == [
+        {
+            "memory_id": memory_policy["decision_log"][0]["memory_id"],
+            "key": "activity_style",
+            "status": "downgraded",
+            "decision": "applied_advisory",
+            "reason": "expired_memory_downgraded_to_advisory",
+            "influence_level": "advisory",
+            "dimension": "activity_preferences",
+            "normalized_value": "indoor",
+            "tier": "advisory",
+            "expired": True,
+        }
+    ]
+    assert memory_policy["policy_summary"] == {
+        "policy_version": "memory_query_policy_v1",
+        "considered_count": 1,
+        "used_count": 0,
+        "ignored_count": 0,
+        "downgraded_count": 1,
+        "overridden_count": 0,
+        "primary_influence_count": 0,
+        "advisory_influence_count": 1,
+        "no_influence_count": 0,
+    }
+    assert run.metadata_json["benchmark"]["artifact_summary"]["memory_policy_summary"] == {
+        "policy_version": "memory_query_policy_v1",
+        "considered_count": 1,
+        "used_count": 0,
+        "ignored_count": 0,
+        "downgraded_count": 1,
+        "overridden_count": 0,
+        "primary_influence_count": 0,
+        "advisory_influence_count": 1,
+        "no_influence_count": 0,
+    }
     assert memory_score.passed is True
     assert memory_score.details["observed_dimension_tiers"] == {
         "activity_preferences": "advisory",

@@ -33,6 +33,8 @@ MemoryGovernanceOutcome = Literal[
     "unsupported_key",
     "unrecognized_value",
 ]
+MemoryDecisionStatus = Literal["used", "ignored", "downgraded", "overridden"]
+MemoryDecisionInfluenceLevel = Literal["primary", "advisory", "none"]
 
 
 class MemoryGovernanceDimensionOutcome(BaseModel):
@@ -54,6 +56,31 @@ class MemoryGovernanceDecision(BaseModel):
     outcome: MemoryGovernanceOutcome
 
 
+class MemoryDecisionLogEntry(BaseModel):
+    memory_id: str
+    key: str
+    status: MemoryDecisionStatus
+    decision: MemoryGovernanceOutcome
+    reason: str
+    influence_level: MemoryDecisionInfluenceLevel
+    dimension: MemoryGovernanceDimension
+    normalized_value: str | None = None
+    tier: MemoryGovernanceTier
+    expired: bool = False
+
+
+class MemoryPolicyAuditSummary(BaseModel):
+    policy_version: str = _MEMORY_POLICY_VERSION
+    considered_count: int = 0
+    used_count: int = 0
+    ignored_count: int = 0
+    downgraded_count: int = 0
+    overridden_count: int = 0
+    primary_influence_count: int = 0
+    advisory_influence_count: int = 0
+    no_influence_count: int = 0
+
+
 class MemoryQueryPolicySummary(BaseModel):
     policy_version: str = _MEMORY_POLICY_VERSION
     applied_memory_keys: list[str] = Field(default_factory=list)
@@ -66,6 +93,8 @@ class MemoryQueryPolicySummary(BaseModel):
     effective_dining_preferences: list[str] = Field(default_factory=list)
     dimension_outcomes: list[MemoryGovernanceDimensionOutcome] = Field(default_factory=list)
     memory_decisions: list[MemoryGovernanceDecision] = Field(default_factory=list)
+    decision_log: list[MemoryDecisionLogEntry] = Field(default_factory=list)
+    policy_summary: MemoryPolicyAuditSummary = Field(default_factory=MemoryPolicyAuditSummary)
 
 
 def apply_memory_query_policy(
@@ -84,6 +113,7 @@ def apply_memory_query_policy(
     unsupported_memory_keys: list[str] = []
     dimension_outcomes: list[MemoryGovernanceDimensionOutcome] = []
     memory_decisions: list[MemoryGovernanceDecision] = []
+    decision_log: list[MemoryDecisionLogEntry] = []
 
     for memory in active_memories:
         if memory.memory_type != "preference":
@@ -94,7 +124,7 @@ def apply_memory_query_policy(
         if dimension is None:
             _append_unique(unsupported_memory_keys, key)
             memory_decisions.append(
-                MemoryGovernanceDecision(
+                decision := MemoryGovernanceDecision(
                     memory_key=key,
                     dimension=_ACTIVITY_DIMENSION,
                     normalized_value=None,
@@ -104,6 +134,7 @@ def apply_memory_query_policy(
                     outcome="unsupported_key",
                 )
             )
+            decision_log.append(_build_decision_log_entry(memory=memory, decision=decision))
             continue
 
         normalized_value = _normalize_memory_value(memory)
@@ -119,7 +150,7 @@ def apply_memory_query_policy(
 
         if normalized_value is None:
             memory_decisions.append(
-                MemoryGovernanceDecision(
+                decision := MemoryGovernanceDecision(
                     memory_key=key,
                     dimension=dimension,
                     normalized_value=None,
@@ -129,6 +160,7 @@ def apply_memory_query_policy(
                     outcome="unrecognized_value",
                 )
             )
+            decision_log.append(_build_decision_log_entry(memory=memory, decision=decision))
             continue
 
         if _is_user_override_dimension(dimension, signals):
@@ -149,7 +181,7 @@ def apply_memory_query_policy(
                 )
             )
             memory_decisions.append(
-                MemoryGovernanceDecision(
+                decision := MemoryGovernanceDecision(
                     memory_key=key,
                     dimension=dimension,
                     normalized_value=normalized_value,
@@ -159,11 +191,12 @@ def apply_memory_query_policy(
                     outcome="suppressed_user_override",
                 )
             )
+            decision_log.append(_build_decision_log_entry(memory=memory, decision=decision))
             continue
 
         if tier == "weak":
             memory_decisions.append(
-                MemoryGovernanceDecision(
+                decision := MemoryGovernanceDecision(
                     memory_key=key,
                     dimension=dimension,
                     normalized_value=normalized_value,
@@ -173,6 +206,7 @@ def apply_memory_query_policy(
                     outcome="suppressed_weak_signal",
                 )
             )
+            decision_log.append(_build_decision_log_entry(memory=memory, decision=decision))
             continue
 
         effective_values = effective_activity_preferences
@@ -186,7 +220,7 @@ def apply_memory_query_policy(
         if tier == "advisory":
             _append_unique(advisory_memory_keys, key)
         memory_decisions.append(
-            MemoryGovernanceDecision(
+            decision := MemoryGovernanceDecision(
                 memory_key=key,
                 dimension=dimension,
                 normalized_value=normalized_value,
@@ -196,6 +230,7 @@ def apply_memory_query_policy(
                 outcome="applied_trusted" if tier == "trusted" else "applied_advisory",
             )
         )
+        decision_log.append(_build_decision_log_entry(memory=memory, decision=decision))
         dimension_outcomes.append(
             MemoryGovernanceDimensionOutcome(
                 dimension=dimension,
@@ -227,8 +262,68 @@ def apply_memory_query_policy(
             key=lambda item: 0 if item.dimension == _ACTIVITY_DIMENSION else 1,
         ),
         memory_decisions=memory_decisions,
+        decision_log=decision_log,
+        policy_summary=_build_policy_summary(decision_log),
     )
     return effective_intent, summary
+
+
+def _build_decision_log_entry(
+    *,
+    memory: "WorkflowMemoryRecord",
+    decision: MemoryGovernanceDecision,
+) -> MemoryDecisionLogEntry:
+    status, reason, influence_level = _normalize_decision(decision)
+    return MemoryDecisionLogEntry(
+        memory_id=str(memory.memory_id),
+        key=decision.memory_key,
+        status=status,
+        decision=decision.outcome,
+        reason=reason,
+        influence_level=influence_level,
+        dimension=decision.dimension,
+        normalized_value=decision.normalized_value,
+        tier=decision.tier,
+        expired=decision.expired,
+    )
+
+
+def _normalize_decision(
+    decision: MemoryGovernanceDecision,
+) -> tuple[MemoryDecisionStatus, str, MemoryDecisionInfluenceLevel]:
+    if decision.outcome == "applied_trusted":
+        return ("used", "trusted_memory_applied", "primary")
+    if decision.outcome == "applied_advisory":
+        reason = "expired_memory_downgraded_to_advisory" if decision.expired else "low_confidence_downgraded_to_advisory"
+        return ("downgraded", reason, "advisory")
+    if decision.outcome == "suppressed_user_override":
+        return ("overridden", "explicit_user_input_present", "none")
+    if decision.outcome == "suppressed_weak_signal":
+        return ("ignored", "weak_signal_not_applied", "none")
+    if decision.outcome == "unsupported_key":
+        return ("ignored", "unsupported_projected_key", "none")
+    return ("ignored", "unrecognized_supported_value", "none")
+
+
+def _build_policy_summary(decision_log: list[MemoryDecisionLogEntry]) -> MemoryPolicyAuditSummary:
+    summary = MemoryPolicyAuditSummary(considered_count=len(decision_log))
+    for entry in decision_log:
+        if entry.status == "used":
+            summary.used_count += 1
+        elif entry.status == "ignored":
+            summary.ignored_count += 1
+        elif entry.status == "downgraded":
+            summary.downgraded_count += 1
+        elif entry.status == "overridden":
+            summary.overridden_count += 1
+
+        if entry.influence_level == "primary":
+            summary.primary_influence_count += 1
+        elif entry.influence_level == "advisory":
+            summary.advisory_influence_count += 1
+        elif entry.influence_level == "none":
+            summary.no_influence_count += 1
+    return summary
 
 
 def _memory_dimension(key: str) -> MemoryGovernanceDimension | None:
