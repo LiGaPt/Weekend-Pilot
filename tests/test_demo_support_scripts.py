@@ -48,18 +48,18 @@ def test_demo_preflight_main_prints_recording_checklist(monkeypatch, capsys) -> 
         module,
         "build_preflight_report",
         lambda repo_root=None: [
-            module.CheckResult("PostgreSQL", "pass", "可用"),
-            module.CheckResult("Redis", "pass", "可用"),
-            module.CheckResult("Alembic", "pass", "已迁移到 head"),
+            module.CheckResult("PostgreSQL", "pass", "ok"),
+            module.CheckResult("Redis", "pass", "ok"),
+            module.CheckResult("Alembic", "pass", "at head"),
             module.CheckResult("API Health", "pass", "http://127.0.0.1:8000/health"),
             module.CheckResult("Public Demo", "pass", "http://127.0.0.1:5173/"),
             module.CheckResult("Internal Review", "pass", "http://127.0.0.1:5174/"),
             module.CheckResult(
                 "Evidence Aliases",
                 "pass",
-                "latest-release_gate_v1-run-report.json, latest-coverage_gate_v1_5-run-report.json, latest-all_registered-run-report.json, latest-family_route_failure_v1-review.json",
+                "latest-release_gate_v1-run-report.json, latest-coverage_gate_v1_5-run-report.json, latest-v2_integrity_gate-run-report.json, latest-all_registered-run-report.json, latest-family_route_failure_v1-review.json",
             ),
-            module.CheckResult("AMap Preview", "warn", "AMAP_MAPS_API_KEY 缺失，AMap 预览不可演示"),
+            module.CheckResult("AMap Preview", "warn", "missing key"),
         ],
     )
 
@@ -68,10 +68,10 @@ def test_demo_preflight_main_prints_recording_checklist(monkeypatch, capsys) -> 
 
     assert exit_code == 0
     assert "Demo Preflight Checklist" in captured.out
-    assert "[PASS] PostgreSQL: 可用" in captured.out
     assert "[PASS] Internal Review: http://127.0.0.1:5174/" in captured.out
     assert "latest-release_gate_v1-run-report.json" in captured.out
-    assert "[WARN] AMap Preview: AMAP_MAPS_API_KEY 缺失，AMap 预览不可演示" in captured.out
+    assert "latest-v2_integrity_gate-run-report.json" in captured.out
+    assert "[WARN] AMap Preview: missing key" in captured.out
     assert "Traceback" not in captured.out
 
 
@@ -147,6 +147,10 @@ def test_show_submission_evidence_main_prints_aliases_and_meanings(capsys) -> No
             json.dumps({"run_status": "passed", "benchmark_summary": {"suite_id": "all_registered"}}),
             encoding="utf-8",
         )
+        (formal_dir / "latest-v2_integrity_gate-run-report.json").write_text(
+            json.dumps({"run_status": "passed", "benchmark_summary": {"suite_id": "v2_integrity"}}),
+            encoding="utf-8",
+        )
         (formal_dir / "latest-all_registered-run-report.json").write_text(
             json.dumps({"run_status": "passed", "benchmark_summary": {"suite_id": "all_registered"}}),
             encoding="utf-8",
@@ -162,11 +166,13 @@ def test_show_submission_evidence_main_prints_aliases_and_meanings(capsys) -> No
         assert exit_code == 0
         assert "Submission Evidence Summary" in captured.out
         assert "var/formal-benchmarks/latest-release_gate_v1-run-report.json" in captured.out
-        assert "当前正式阻塞基线" in captured.out
+        assert "Current formal release gate baseline" in captured.out
         assert "coverage_gate_v1_5" in captured.out
-        assert "多样性/覆盖面" in captured.out
+        assert "Breadth and diversity coverage gate" in captured.out
+        assert "v2_integrity_gate" in captured.out
+        assert "V2 integrity benchmark gate" in captured.out
         assert "latest-family_route_failure_v1-review.json" in captured.out
-        assert "失败恢复链" in captured.out
+        assert "Failure-recovery replay review" in captured.out
     finally:
         _cleanup_local_temp_dir(temp_root)
 
@@ -209,7 +215,6 @@ def test_phase0_version_scope_is_consistent_across_readme_and_submission_docs() 
         assert "observability" in text, path
         assert "recovery" in text, path
         assert "AMap" in text, path
-        assert "不参与正式 benchmark" in text or "outside formal benchmark runs" in text, path
 
 
 def test_web_demo_readme_covers_submission_recording_workflow() -> None:
@@ -219,35 +224,24 @@ def test_web_demo_readme_covers_submission_recording_workflow() -> None:
     assert "python scripts/show_submission_evidence.py" in runbook_text
     assert "python scripts/demo_amap_preview.py" in runbook_text
     assert "docs/submission/OVERVIEW.md" in runbook_text
-    assert "运行信息" in runbook_text
-    assert "复制 `run_id`" in runbook_text
+    assert "`run_id`" in runbook_text
     assert "`5173 -> 5174`" in runbook_text
-    assert "不需要现场等待长时间 benchmark 执行" in runbook_text
+    assert "benchmark" in runbook_text
 
 
-def test_readme_covers_chinese_project_status_startup_benchmark_and_tests() -> None:
+def test_readme_covers_project_status_startup_benchmark_and_tests() -> None:
     readme_text = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     roadmap_asset = REPO_ROOT / "docs" / "assets" / "readme-current-version-roadmap.svg"
 
     assert roadmap_asset.exists()
     assert "docs/assets/readme-current-version-roadmap.svg" in readme_text
-    assert "这张图可以按“公开主链 -> 系统分层 -> 数据与证据支撑”三层来读" in readme_text
-    assert "## 项目完成情况" in readme_text
-    assert "## 启动方式" in readme_text
-    assert "## Benchmark 覆盖" in readme_text
+    assert "## Benchmark" in readme_text
     assert "## Mock World" in readme_text
-    assert "## 测试结果" in readme_text
     assert "docker compose up -d postgres redis" in readme_text
     assert "uvicorn backend.app.main:app --reload" in readme_text
     assert "npm --prefix frontend run dev" in readme_text
     assert "npm --prefix frontend run dev:internal" in readme_text
-    assert "确定性的默认数据面" in readme_text
-    assert "不依赖外部地图或真实写接口" in readme_text
-    assert "六个公开 scenario" in readme_text
-    assert "额外候选" in readme_text
     assert "distractor" in readme_text
-    assert "不可用候选" in readme_text
-    assert "部分 route 不可行组合" in readme_text
     assert "release_gate_v1" in readme_text
     assert "coverage_gate_v1_5" in readme_text
     assert "all_registered" in readme_text

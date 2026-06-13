@@ -49,7 +49,7 @@ from backend.app.benchmark.schemas import (
     BenchmarkSummary,
     resolve_benchmark_case_v2_taxonomy,
 )
-from backend.app.benchmark.matrix import build_case_matrix_summary
+from backend.app.benchmark.matrix import build_case_integrity_coverage_summary, build_case_matrix_summary
 from backend.app.benchmark.timing import summarize_benchmark_timing
 from backend.app.core.config import Settings
 from backend.app.workflow.timing import WorkflowStageTimingEntry, WorkflowTimingSummary
@@ -2275,6 +2275,18 @@ def test_benchmark_summary_schema_includes_suite_and_outcome_rollup_fields() -> 
     assert "suite_id" in BenchmarkSummary.model_fields
     assert "suite_title" in BenchmarkSummary.model_fields
     assert "outcome_rollup" in BenchmarkSummary.model_fields
+    assert "integrity_coverage_summary" in BenchmarkSummary.model_fields
+
+
+def test_build_case_integrity_coverage_summary_returns_expected_counts_for_v2_integrity_suite() -> None:
+    summary = build_case_integrity_coverage_summary(load_benchmark_suite("v2_integrity"))
+
+    assert summary.case_count == 12
+    assert summary.memory_case_count == 3
+    assert summary.recovery_case_count == 3
+    assert summary.continuation_case_count == 2
+    assert summary.robustness_case_count == 4
+    assert summary.l4_case_count == 1
 
 
 def test_run_cases_includes_additive_outcome_rollup_for_ad_hoc_cases(
@@ -2337,6 +2349,13 @@ def test_run_cases_includes_additive_outcome_rollup_for_ad_hoc_cases(
             "single_turn": 2
         }
         assert report.benchmark_summary.v2_taxonomy_summary.stability_required_counts == {"false": 2}
+        assert report.benchmark_summary.integrity_coverage_summary is not None
+        assert report.benchmark_summary.integrity_coverage_summary.case_count == 2
+        assert report.benchmark_summary.integrity_coverage_summary.memory_case_count == 0
+        assert report.benchmark_summary.integrity_coverage_summary.recovery_case_count == 0
+        assert report.benchmark_summary.integrity_coverage_summary.continuation_case_count == 0
+        assert report.benchmark_summary.integrity_coverage_summary.robustness_case_count == 0
+        assert report.benchmark_summary.integrity_coverage_summary.l4_case_count == 0
         assert report.benchmark_summary.outcome_rollup is not None
         assert report.benchmark_summary.outcome_rollup.scenario_bucket_outcomes["family"].case_count == 1
         assert report.benchmark_summary.outcome_rollup.scenario_bucket_outcomes["family"].passed_count == 1
@@ -2425,6 +2444,13 @@ def test_run_suite_uses_canonical_suite_report_filename_and_normalizes_failures_
     assert report.benchmark_summary.v2_taxonomy_summary.case_count == 1
     assert report.benchmark_summary.v2_taxonomy_summary.failure_mode_counts == {"route_unavailable": 1}
     assert report.benchmark_summary.v2_taxonomy_summary.level_counts == {"L5": 1}
+    assert report.benchmark_summary.integrity_coverage_summary is not None
+    assert report.benchmark_summary.integrity_coverage_summary.case_count == 1
+    assert report.benchmark_summary.integrity_coverage_summary.memory_case_count == 0
+    assert report.benchmark_summary.integrity_coverage_summary.recovery_case_count == 1
+    assert report.benchmark_summary.integrity_coverage_summary.continuation_case_count == 0
+    assert report.benchmark_summary.integrity_coverage_summary.robustness_case_count == 0
+    assert report.benchmark_summary.integrity_coverage_summary.l4_case_count == 0
     assert report.benchmark_summary.outcome_rollup is not None
     assert set(report.benchmark_summary.outcome_rollup.constraint_tag_outcomes) == {
         "child_friendly",
