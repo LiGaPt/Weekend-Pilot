@@ -237,6 +237,16 @@ class BenchmarkCaseV2MatrixSummary(BaseModel):
     stability_required_counts: dict[str, int] = Field(default_factory=dict)
 
 
+class BenchmarkIntegrityCoverageSummary(BaseModel):
+    schema_version: str = "weekendpilot_benchmark_integrity_coverage_v1"
+    case_count: int
+    memory_case_count: int
+    recovery_case_count: int
+    continuation_case_count: int
+    robustness_case_count: int
+    l4_case_count: int
+
+
 class BenchmarkSuiteDescription(BaseModel):
     suite_id: BenchmarkSuiteId
     title: str
@@ -245,6 +255,7 @@ class BenchmarkSuiteDescription(BaseModel):
     case_count: int
     matrix_summary: BenchmarkCaseMatrixSummary
     v2_taxonomy_summary: BenchmarkCaseV2MatrixSummary | None = None
+    integrity_coverage_summary: BenchmarkIntegrityCoverageSummary | None = None
 
 
 class BenchmarkOutcomeBucketStats(BaseModel):
@@ -275,6 +286,7 @@ class BenchmarkSummary(BaseModel):
     benchmark_timing_summary: BenchmarkTimingSummary | None = None
     matrix_summary: BenchmarkCaseMatrixSummary | None = None
     v2_taxonomy_summary: BenchmarkCaseV2MatrixSummary | None = None
+    integrity_coverage_summary: BenchmarkIntegrityCoverageSummary | None = None
     outcome_rollup: BenchmarkOutcomeRollup | None = None
 
 

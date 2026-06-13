@@ -23,22 +23,27 @@ EVIDENCE_ITEMS = (
     EvidenceItem(
         evidence_id="release_gate_v1",
         relative_path=Path("var/formal-benchmarks/latest-release_gate_v1-run-report.json"),
-        proves="当前正式阻塞基线",
+        proves="Current formal release gate baseline",
     ),
     EvidenceItem(
         evidence_id="coverage_gate_v1_5",
         relative_path=Path("var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json"),
-        proves="多样性/覆盖面",
+        proves="Breadth and diversity coverage gate",
+    ),
+    EvidenceItem(
+        evidence_id="v2_integrity_gate",
+        relative_path=Path("var/formal-benchmarks/latest-v2_integrity_gate-run-report.json"),
+        proves="V2 integrity benchmark gate",
     ),
     EvidenceItem(
         evidence_id="formal_verification_all_registered",
         relative_path=Path("var/formal-benchmarks/latest-all_registered-run-report.json"),
-        proves="全量注册 case / formal verification",
+        proves="Full registered-case formal verification",
     ),
     EvidenceItem(
         evidence_id="recovery_review_family_route_failure_v1",
         relative_path=Path("var/recovery-reviews/latest-family_route_failure_v1-review.json"),
-        proves="失败恢复链",
+        proves="Failure-recovery replay review",
     ),
 )
 

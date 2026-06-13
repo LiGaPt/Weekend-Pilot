@@ -30,7 +30,11 @@ from backend.app.benchmark.failure_profiles import (
     build_benchmark_failure_injector,
     failure_profile_metadata,
 )
-from backend.app.benchmark.matrix import build_case_matrix_summary, build_case_v2_matrix_summary
+from backend.app.benchmark.matrix import (
+    build_case_integrity_coverage_summary,
+    build_case_matrix_summary,
+    build_case_v2_matrix_summary,
+)
 from backend.app.benchmark.rollups import build_benchmark_outcome_rollup
 from backend.app.benchmark.reporting import write_case_report, write_run_report
 from backend.app.benchmark.schemas import (
@@ -192,6 +196,7 @@ class BenchmarkHarness:
                 benchmark_timing_summary=timing_summary,
                 matrix_summary=build_case_matrix_summary(cases),
                 v2_taxonomy_summary=build_case_v2_matrix_summary(cases),
+                integrity_coverage_summary=build_case_integrity_coverage_summary(cases),
                 outcome_rollup=build_benchmark_outcome_rollup(results),
             ),
         )

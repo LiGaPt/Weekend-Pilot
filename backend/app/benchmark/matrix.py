@@ -5,6 +5,7 @@ from typing import Sequence
 
 from backend.app.benchmark.schemas import (
     BenchmarkCase,
+    BenchmarkIntegrityCoverageSummary,
     BenchmarkCaseMatrixSummary,
     BenchmarkCaseV2MatrixSummary,
     resolve_benchmark_case_v2_taxonomy,
@@ -65,6 +66,38 @@ def build_case_v2_matrix_summary(cases: Sequence[BenchmarkCase]) -> BenchmarkCas
         memory_mode_counts=_sorted_counts(memory_mode_counts),
         conversation_mode_counts=_sorted_counts(conversation_mode_counts),
         stability_required_counts=_sorted_counts(stability_required_counts),
+    )
+
+
+def build_case_integrity_coverage_summary(
+    cases: Sequence[BenchmarkCase],
+) -> BenchmarkIntegrityCoverageSummary:
+    memory_case_count = 0
+    recovery_case_count = 0
+    continuation_case_count = 0
+    robustness_case_count = 0
+    l4_case_count = 0
+
+    for case in cases:
+        taxonomy = resolve_benchmark_case_v2_taxonomy(case)
+        if taxonomy.memory_mode != "none":
+            memory_case_count += 1
+        if taxonomy.failure_mode != "none":
+            recovery_case_count += 1
+        if taxonomy.conversation_mode != "single_turn":
+            continuation_case_count += 1
+        if "robustness_case" in set(case.taxonomy.tags) or case.expected.robustness is not None:
+            robustness_case_count += 1
+        if taxonomy.level == "L4":
+            l4_case_count += 1
+
+    return BenchmarkIntegrityCoverageSummary(
+        case_count=len(cases),
+        memory_case_count=memory_case_count,
+        recovery_case_count=recovery_case_count,
+        continuation_case_count=continuation_case_count,
+        robustness_case_count=robustness_case_count,
+        l4_case_count=l4_case_count,
     )
 
 

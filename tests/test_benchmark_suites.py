@@ -457,6 +457,14 @@ V2_INTEGRITY_V2_CONVERSATION_MODE_COUNTS = {
     "single_turn": 10,
 }
 V2_INTEGRITY_V2_STABILITY_REQUIRED_COUNTS = {"false": 3, "true": 9}
+V2_INTEGRITY_COVERAGE_COUNTS = {
+    "case_count": 12,
+    "memory_case_count": 3,
+    "recovery_case_count": 3,
+    "continuation_case_count": 2,
+    "robustness_case_count": 4,
+    "l4_case_count": 1,
+}
 
 
 def test_load_registered_benchmark_cases_returns_canonical_case_order() -> None:
@@ -694,6 +702,11 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
         suite_map["v2_integrity"].v2_taxonomy_summary.stability_required_counts
         == V2_INTEGRITY_V2_STABILITY_REQUIRED_COUNTS
     )
+    assert suite_map["v2_integrity"].integrity_coverage_summary is not None
+    assert suite_map["v2_integrity"].integrity_coverage_summary.model_dump(
+        mode="json",
+        exclude={"schema_version"},
+    ) == V2_INTEGRITY_COVERAGE_COUNTS
     _assert_suite_description(
         suite_map["all_registered"],
         case_ids=REGISTERED_CASE_IDS,

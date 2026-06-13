@@ -12,6 +12,7 @@ from backend.app.benchmark.recovery_review import (
 from backend.app.benchmark.schemas import (
     BenchmarkCase,
     BenchmarkCaseResult,
+    BenchmarkIntegrityCoverageSummary,
     BenchmarkCaseV2MatrixSummary,
     BenchmarkCaseV2Taxonomy,
     BenchmarkSuiteDescription,
@@ -38,6 +39,7 @@ from backend.app.benchmark.suites import (
 __all__ = [
     "BenchmarkCase",
     "BenchmarkCaseResult",
+    "BenchmarkIntegrityCoverageSummary",
     "BenchmarkCaseV2MatrixSummary",
     "BenchmarkCaseV2Taxonomy",
     "BenchmarkHarness",

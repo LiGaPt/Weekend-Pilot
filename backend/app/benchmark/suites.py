@@ -3,7 +3,11 @@ from __future__ import annotations
 from typing import Any, cast
 
 from backend.app.benchmark.errors import BenchmarkHarnessError
-from backend.app.benchmark.matrix import build_case_matrix_summary, build_case_v2_matrix_summary
+from backend.app.benchmark.matrix import (
+    build_case_integrity_coverage_summary,
+    build_case_matrix_summary,
+    build_case_v2_matrix_summary,
+)
 from backend.app.benchmark.schemas import BenchmarkCase, BenchmarkSuiteDescription, BenchmarkSuiteId
 
 
@@ -160,6 +164,7 @@ def list_benchmark_suites() -> list[BenchmarkSuiteDescription]:
                 case_count=len(cases),
                 matrix_summary=build_case_matrix_summary(cases),
                 v2_taxonomy_summary=build_case_v2_matrix_summary(cases),
+                integrity_coverage_summary=build_case_integrity_coverage_summary(cases),
             )
         )
     return suites
