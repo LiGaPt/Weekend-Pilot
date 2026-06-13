@@ -169,6 +169,43 @@ def test_run_benchmark_v2_integrity_gate_preserves_latest_alias_on_blocked_run(
         _cleanup_test_dir(output_root)
 
 
+def test_run_benchmark_v2_integrity_gate_can_skip_latest_alias_refresh(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_root = _make_test_dir()
+    fixed_uuid = UUID("cccccccc-1234-5678-1234-567812345678")
+    run_directory = output_root / f"formal-{fixed_uuid}"
+    suite_report_path = run_directory / "suite-v2_integrity-run-report.json"
+    latest_formal_alias = output_root / "latest-all_registered-run-report.json"
+    latest_gate_alias = output_root / "latest-v2_integrity_gate-run-report.json"
+    latest_gate_alias.write_text('{"status":"keep"}', encoding="utf-8")
+
+    monkeypatch.setattr(
+        v2_integrity_gate,
+        "run_formal_verification",
+        lambda **kwargs: _write_formal_result(
+            run_directory=run_directory,
+            suite_report_path=suite_report_path,
+            latest_formal_alias=latest_formal_alias,
+            payload=_build_report_payload(),
+        ),
+    )
+
+    try:
+        result = v2_integrity_gate.run_benchmark_v2_integrity_gate(
+            output_root=output_root,
+            start_services=False,
+            refresh_latest_alias=False,
+        )
+
+        assert result.release_blocked is False
+        assert latest_gate_alias.read_text(encoding="utf-8") == '{"status":"keep"}'
+        enriched_payload = json.loads(suite_report_path.read_text(encoding="utf-8"))
+        assert enriched_payload["v2_integrity_gate_evaluation"]["release_blocked"] is False
+    finally:
+        _cleanup_test_dir(output_root)
+
+
 def test_main_returns_non_zero_when_runner_raises(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

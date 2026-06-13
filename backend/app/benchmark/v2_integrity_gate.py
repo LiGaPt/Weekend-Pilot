@@ -84,6 +84,7 @@ def run_benchmark_v2_integrity_gate(
     output_root: Path | str | None = None,
     *,
     start_services: bool = True,
+    refresh_latest_alias: bool = True,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS,
 ) -> BenchmarkV2IntegrityGateResult:
@@ -108,6 +109,7 @@ def run_benchmark_v2_integrity_gate(
         suite_report_path=suite_result.suite_report_path,
         latest_report_path=latest_report_path,
         trace_buffer_path=suite_result.trace_buffer_path,
+        refresh_latest_alias=refresh_latest_alias,
     )
 
 
@@ -288,6 +290,7 @@ def _finalize_v2_integrity_gate_result(
     suite_report_path: Path,
     latest_report_path: Path,
     trace_buffer_path: Path,
+    refresh_latest_alias: bool,
 ) -> BenchmarkV2IntegrityGateResult:
     summary = getattr(report, "benchmark_summary", None)
     suite_id = getattr(summary, "suite_id", None)
@@ -394,7 +397,7 @@ def _finalize_v2_integrity_gate_result(
     else:
         report_enriched = True
 
-    if not blocking_failures:
+    if refresh_latest_alias and not blocking_failures:
         alias_error = _refresh_latest_alias(suite_report_path, latest_report_path)
         if alias_error is not None:
             blocking_failures.append(alias_error)

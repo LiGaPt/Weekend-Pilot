@@ -22,12 +22,19 @@ from backend.app.benchmark.schemas import (
     BenchmarkReplaySummary,
     BenchmarkRunReport,
     BenchmarkScore,
+    BenchmarkStabilityAttemptSummary,
+    BenchmarkStabilityPassKReport,
+    BenchmarkStabilityWindowSummary,
     RecoveryReplayReviewCheck,
     RecoveryReplayReviewReplaySource,
     RecoveryReplayReviewResult,
     RecoveryReplayReviewSummary,
     RecoveryReplaySummary,
     resolve_benchmark_case_v2_taxonomy,
+)
+from backend.app.benchmark.stability_harness import (
+    BenchmarkStabilityHarnessError,
+    run_benchmark_stability_passk,
 )
 from backend.app.benchmark.suites import (
     list_benchmark_suites,
@@ -57,6 +64,10 @@ __all__ = [
     "RecoveryReplaySummary",
     "BenchmarkRunReport",
     "BenchmarkScore",
+    "BenchmarkStabilityAttemptSummary",
+    "BenchmarkStabilityHarnessError",
+    "BenchmarkStabilityPassKReport",
+    "BenchmarkStabilityWindowSummary",
     "BenchmarkSuiteDescription",
     "load_benchmark_case",
     "load_benchmark_suite",
@@ -65,5 +76,6 @@ __all__ = [
     "load_registered_benchmark_cases",
     "list_benchmark_suites",
     "resolve_benchmark_case_v2_taxonomy",
+    "run_benchmark_stability_passk",
     "run_recovery_replay_review",
 ]
