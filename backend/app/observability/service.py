@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.models.runtime import ActionLedger, AgentRun, Plan, ToolEvent
 from backend.app.observability.redaction import sanitize_trace_payload
+from backend.app.planning.memory_query_policy import MemoryPolicyAuditSummary
 from backend.app.observability.schemas import (
     InternalActionLedgerSummary,
     InternalBenchmarkArtifactSummary,
@@ -260,9 +261,36 @@ class InternalObservabilityService:
             tool_event_count=_int_or_none(raw_artifact, "tool_event_count"),
             action_count=_int_or_none(raw_artifact, "action_count"),
             failure_reasons=_string_list(_mapping_value(raw_artifact, "failure_reasons")),
+            memory_policy_summary=self._memory_policy_summary(metadata, raw_artifact),
             score_summaries=_benchmark_score_summaries(_mapping_value(raw_artifact, "score_summaries")),
             report_path=_string_or_none(raw_artifact, "report_path"),
         )
+
+    def _memory_policy_summary(
+        self,
+        metadata: dict[str, Any],
+        raw_artifact: Any,
+    ) -> MemoryPolicyAuditSummary | None:
+        artifact_summary = _mapping_value(raw_artifact, "memory_policy_summary")
+        if isinstance(artifact_summary, dict):
+            try:
+                return MemoryPolicyAuditSummary.model_validate(artifact_summary)
+            except ValidationError:
+                pass
+
+        workflow = metadata.get("workflow")
+        if not isinstance(workflow, dict):
+            return None
+        memory_policy = workflow.get("memory_policy")
+        if not isinstance(memory_policy, dict):
+            return None
+        policy_summary = memory_policy.get("policy_summary")
+        if not isinstance(policy_summary, dict):
+            return None
+        try:
+            return MemoryPolicyAuditSummary.model_validate(policy_summary)
+        except ValidationError:
+            return None
 
     def _recovery_path_summary(
         self,

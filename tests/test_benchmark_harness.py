@@ -1101,6 +1101,35 @@ def test_benchmark_case_result_exposes_conversation_trace_and_turn_types() -> No
     ]
 
 
+def test_benchmark_case_result_exposes_additive_memory_policy_summary() -> None:
+    result = BenchmarkCaseResult.model_validate(
+        {
+            "case_id": "family_memory_advisory_fill_v1",
+            "status": "passed",
+            "scores": [],
+            "overall_score": 1.0,
+            "tool_event_count": 8,
+            "action_count": 1,
+            "memory_policy_summary": {
+                "policy_version": "memory_query_policy_v1",
+                "considered_count": 1,
+                "used_count": 0,
+                "ignored_count": 0,
+                "downgraded_count": 1,
+                "overridden_count": 0,
+                "primary_influence_count": 0,
+                "advisory_influence_count": 1,
+                "no_influence_count": 0,
+            },
+        }
+    )
+
+    assert result.memory_policy_summary is not None
+    assert result.memory_policy_summary.policy_version == "memory_query_policy_v1"
+    assert result.memory_policy_summary.downgraded_count == 1
+    assert result.memory_policy_summary.advisory_influence_count == 1
+
+
 def test_trajectory_grader_passes_when_required_tools_are_present() -> None:
     case = BenchmarkCase(
         case_id="case",
@@ -2040,6 +2069,41 @@ def test_case_report_writer_includes_taxonomy() -> None:
         assert payload["taxonomy"]["suite"] == "locallife_bench_v1"
         assert payload["taxonomy"]["scenario_bucket"] == "solo"
         assert payload["taxonomy"]["tags"] == ["baseline", "light_activity", "light_meal"]
+    finally:
+        _cleanup_report_dir(report_dir)
+
+
+def test_case_report_writer_includes_memory_policy_summary() -> None:
+    result = BenchmarkCaseResult.model_validate(
+        {
+            "case_id": "family_memory_advisory_fill_v1",
+            "status": "passed",
+            "scores": [],
+            "overall_score": 1.0,
+            "tool_event_count": 8,
+            "action_count": 1,
+            "memory_policy_summary": {
+                "policy_version": "memory_query_policy_v1",
+                "considered_count": 1,
+                "used_count": 0,
+                "ignored_count": 0,
+                "downgraded_count": 1,
+                "overridden_count": 0,
+                "primary_influence_count": 0,
+                "advisory_influence_count": 1,
+                "no_influence_count": 0,
+            },
+        }
+    )
+    report_dir = _unit_report_dir()
+
+    try:
+        report_path = Path(write_case_report(result, report_dir))
+
+        payload = json.loads(report_path.read_text(encoding="utf-8"))
+        assert payload["memory_policy_summary"]["policy_version"] == "memory_query_policy_v1"
+        assert payload["memory_policy_summary"]["downgraded_count"] == 1
+        assert payload["memory_policy_summary"]["advisory_influence_count"] == 1
     finally:
         _cleanup_report_dir(report_dir)
 

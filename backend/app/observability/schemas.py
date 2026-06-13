@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from backend.app.planning.memory_query_policy import MemoryPolicyAuditSummary
 from backend.app.observability.summary import PreviewDiagnostics
 
 
@@ -127,6 +128,7 @@ class InternalBenchmarkArtifactSummary(BaseModel):
     tool_event_count: int | None = None
     action_count: int | None = None
     failure_reasons: list[str] = Field(default_factory=list)
+    memory_policy_summary: MemoryPolicyAuditSummary | None = None
     score_summaries: list[InternalBenchmarkScoreSummary] = Field(default_factory=list)
     report_path: str | None = None
 

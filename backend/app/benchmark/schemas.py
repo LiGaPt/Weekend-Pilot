@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
+from backend.app.planning.memory_query_policy import MemoryPolicyAuditSummary
 from backend.app.observability.summary import RunSummary
 from backend.app.benchmark.timing import BenchmarkTimingSummary
 from backend.app.workflow.timing import WorkflowTimingSummary
@@ -206,6 +207,7 @@ class BenchmarkCaseResult(BaseModel):
     feedback_status: str | None = None
     observability_status: str | None = None
     workflow_status: str | None = None
+    memory_policy_summary: MemoryPolicyAuditSummary | None = None
     workflow_timing_summary: WorkflowTimingSummary | None = None
     workflow_node_history: list[str] = Field(default_factory=list)
     conversation_trace: list[BenchmarkConversationTraceStep] = Field(default_factory=list)
