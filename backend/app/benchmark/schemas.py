@@ -247,6 +247,46 @@ class BenchmarkIntegrityCoverageSummary(BaseModel):
     l4_case_count: int
 
 
+class BenchmarkStabilityAttemptSummary(BaseModel):
+    attempt_index: int
+    status: Literal["passed", "failed", "error"]
+    release_blocked: bool
+    run_status: str
+    overall_score: float
+    suite_report_path: str
+    blocking_failures: list[str] = Field(default_factory=list)
+
+
+class BenchmarkStabilityWindowSummary(BaseModel):
+    window_index: int
+    attempt_indexes: list[int] = Field(default_factory=list)
+    any_success: bool
+    all_success: bool
+    success_count: int
+
+
+class BenchmarkStabilityPassKReport(BaseModel):
+    schema_version: str = "weekendpilot_benchmark_stability_passk_v1"
+    metric_version: str = "passk_v0"
+    suite_id: str
+    gate_id: str
+    requested_run_count: int
+    executed_run_count: int
+    window_size: int
+    window_count: int
+    discarded_tail_run_count: int
+    success_count: int
+    failure_count: int
+    error_count: int
+    success_at_1: float
+    pass_at_4: float
+    pass_pow_4: float
+    attempts: list[BenchmarkStabilityAttemptSummary] = Field(default_factory=list)
+    windows: list[BenchmarkStabilityWindowSummary] = Field(default_factory=list)
+    report_path: str | None = None
+    latest_report_path: str | None = None
+
+
 class BenchmarkSuiteDescription(BaseModel):
     suite_id: BenchmarkSuiteId
     title: str
