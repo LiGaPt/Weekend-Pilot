@@ -47,6 +47,7 @@ from backend.app.benchmark.schemas import (
     BenchmarkScore,
     BenchmarkSuiteDescription,
     BenchmarkSummary,
+    resolve_benchmark_case_v2_taxonomy,
 )
 from backend.app.benchmark.matrix import build_case_matrix_summary
 from backend.app.benchmark.timing import summarize_benchmark_timing
@@ -2328,6 +2329,14 @@ def test_run_cases_includes_additive_outcome_rollup_for_ad_hoc_cases(
         assert report.benchmark_summary is not None
         assert report.benchmark_summary.suite_id is None
         assert report.benchmark_summary.suite_title is None
+        assert report.benchmark_summary.v2_taxonomy_summary is not None
+        assert report.benchmark_summary.v2_taxonomy_summary.case_count == 2
+        assert report.benchmark_summary.v2_taxonomy_summary.level_counts == {"L1": 2}
+        assert report.benchmark_summary.v2_taxonomy_summary.memory_mode_counts == {"none": 2}
+        assert report.benchmark_summary.v2_taxonomy_summary.conversation_mode_counts == {
+            "single_turn": 2
+        }
+        assert report.benchmark_summary.v2_taxonomy_summary.stability_required_counts == {"false": 2}
         assert report.benchmark_summary.outcome_rollup is not None
         assert report.benchmark_summary.outcome_rollup.scenario_bucket_outcomes["family"].case_count == 1
         assert report.benchmark_summary.outcome_rollup.scenario_bucket_outcomes["family"].passed_count == 1
@@ -2412,6 +2421,10 @@ def test_run_suite_uses_canonical_suite_report_filename_and_normalizes_failures_
     assert report.benchmark_summary is not None
     assert report.benchmark_summary.suite_id == "recovery_focused"
     assert report.benchmark_summary.suite_title == "Recovery focused benchmark suite"
+    assert report.benchmark_summary.v2_taxonomy_summary is not None
+    assert report.benchmark_summary.v2_taxonomy_summary.case_count == 1
+    assert report.benchmark_summary.v2_taxonomy_summary.failure_mode_counts == {"route_unavailable": 1}
+    assert report.benchmark_summary.v2_taxonomy_summary.level_counts == {"L5": 1}
     assert report.benchmark_summary.outcome_rollup is not None
     assert set(report.benchmark_summary.outcome_rollup.constraint_tag_outcomes) == {
         "child_friendly",
@@ -2673,6 +2686,7 @@ def test_harness_rejects_non_mock_world_case_before_dispatch(
     assert result.trace_id is None
     assert result.tool_event_count == 0
     assert result.action_count == 0
+    assert result.v2_taxonomy == resolve_benchmark_case_v2_taxonomy(case)
     assert result.failure_reasons == ["Unsupported benchmark tool_profile: amap"]
     assert calls == []
 

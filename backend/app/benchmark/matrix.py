@@ -3,7 +3,12 @@ from __future__ import annotations
 from collections import Counter
 from typing import Sequence
 
-from backend.app.benchmark.schemas import BenchmarkCase, BenchmarkCaseMatrixSummary
+from backend.app.benchmark.schemas import (
+    BenchmarkCase,
+    BenchmarkCaseMatrixSummary,
+    BenchmarkCaseV2MatrixSummary,
+    resolve_benchmark_case_v2_taxonomy,
+)
 
 
 def build_case_matrix_summary(cases: Sequence[BenchmarkCase]) -> BenchmarkCaseMatrixSummary:
@@ -32,6 +37,34 @@ def build_case_matrix_summary(cases: Sequence[BenchmarkCase]) -> BenchmarkCaseMa
         world_profile_counts=_sorted_counts(world_profile_counts),
         failure_mode_counts=_sorted_counts(failure_mode_counts),
         tag_counts=_sorted_counts(tag_counts),
+    )
+
+
+def build_case_v2_matrix_summary(cases: Sequence[BenchmarkCase]) -> BenchmarkCaseV2MatrixSummary:
+    scenario_bucket_counts: Counter[str] = Counter()
+    level_counts: Counter[str] = Counter()
+    failure_mode_counts: Counter[str] = Counter()
+    memory_mode_counts: Counter[str] = Counter()
+    conversation_mode_counts: Counter[str] = Counter()
+    stability_required_counts: Counter[str] = Counter()
+
+    for case in cases:
+        taxonomy = resolve_benchmark_case_v2_taxonomy(case)
+        scenario_bucket_counts[taxonomy.scenario_bucket] += 1
+        level_counts[taxonomy.level] += 1
+        failure_mode_counts[taxonomy.failure_mode] += 1
+        memory_mode_counts[taxonomy.memory_mode] += 1
+        conversation_mode_counts[taxonomy.conversation_mode] += 1
+        stability_required_counts[str(taxonomy.stability_required).lower()] += 1
+
+    return BenchmarkCaseV2MatrixSummary(
+        case_count=len(cases),
+        scenario_bucket_counts=_sorted_counts(scenario_bucket_counts),
+        level_counts=_sorted_counts(level_counts),
+        failure_mode_counts=_sorted_counts(failure_mode_counts),
+        memory_mode_counts=_sorted_counts(memory_mode_counts),
+        conversation_mode_counts=_sorted_counts(conversation_mode_counts),
+        stability_required_counts=_sorted_counts(stability_required_counts),
     )
 
 

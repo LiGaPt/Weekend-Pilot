@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from backend.app.benchmark.errors import BenchmarkHarnessError
-from backend.app.benchmark.matrix import build_case_matrix_summary
+from backend.app.benchmark.matrix import build_case_matrix_summary, build_case_v2_matrix_summary
 from backend.app.benchmark.schemas import BenchmarkCase, BenchmarkSuiteDescription, BenchmarkSuiteId
 
 
@@ -61,6 +61,13 @@ _ALL_REGISTERED_CASE_IDS = [
     *_CONVERSATION_CONTINUATION_CASE_IDS,
     *_ROBUSTNESS_FOCUSED_CASE_IDS,
 ]
+_V2_INTEGRITY_CASE_IDS = [
+    "family_memory_override_v1",
+    *_RECOVERY_FOCUSED_CASE_IDS,
+    *_MEMORY_GOVERNANCE_CASE_IDS[1:],
+    *_CONVERSATION_CONTINUATION_CASE_IDS,
+    *_ROBUSTNESS_FOCUSED_CASE_IDS,
+]
 _ORDERED_SUITE_IDS: tuple[BenchmarkSuiteId, ...] = (
     "baseline",
     "expanded",
@@ -70,6 +77,7 @@ _ORDERED_SUITE_IDS: tuple[BenchmarkSuiteId, ...] = (
     "robustness_focused",
     "default",
     "release_gate_v1",
+    "v2_integrity",
     "all_registered",
 )
 _SUITE_ALIASES: dict[str, BenchmarkSuiteId] = {
@@ -116,6 +124,11 @@ _SUITE_DEFINITIONS: dict[BenchmarkSuiteId, dict[str, Any]] = {
         "description": "Blocking LocalLife-Bench L1-L3 release suite for formal V1 benchmark sign-off.",
         "case_ids": _RELEASE_GATE_V1_CASE_IDS,
     },
+    "v2_integrity": {
+        "title": "V2 integrity benchmark suite",
+        "description": "Additive V2 integrity suite covering memory, recovery, continuation, robustness, and composite integrity stress using the current Mock World inventory.",
+        "case_ids": _V2_INTEGRITY_CASE_IDS,
+    },
     "all_registered": {
         "title": "All registered benchmark cases",
         "description": "Current default, recovery-focused, memory-governance, continuation, and robustness cases in canonical repository order.",
@@ -146,6 +159,7 @@ def list_benchmark_suites() -> list[BenchmarkSuiteDescription]:
                 case_ids=list(definition["case_ids"]),
                 case_count=len(cases),
                 matrix_summary=build_case_matrix_summary(cases),
+                v2_taxonomy_summary=build_case_v2_matrix_summary(cases),
             )
         )
     return suites

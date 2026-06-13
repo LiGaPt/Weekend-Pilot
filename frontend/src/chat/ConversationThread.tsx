@@ -16,6 +16,7 @@ import { ProgressStepperCard } from "./ProgressStepperCard";
 import type { DemoPlanPreview } from "../types/demo";
 import type {
   AssistantClarificationItem,
+  HiddenRunInfo,
   AssistantPlanCardItem,
   AssistantResultCardItem,
   ConversationThreadItem,
@@ -144,6 +145,7 @@ function ClarificationCard({
             </li>
           ))}
         </ul>
+        {isActive ? <RunInfoDisclosure info={item.hiddenRunInfo} /> : null}
         {isActive ? (
           <div className="inline-hint-block">
             <span>在下方输入框补充信息后发送。</span>
@@ -215,6 +217,8 @@ function PlanCard({
           ))}
         </div>
 
+        {isActive ? <RunInfoDisclosure info={item.hiddenRunInfo} /> : null}
+
         {item.readOnlyPreview ? (
           <div className="notice-banner" data-testid="amap-read-only-notice">
             <AlertCircle size={18} aria-hidden="true" />
@@ -260,6 +264,65 @@ function PlanCard({
         ) : null}
       </div>
     </article>
+  );
+}
+
+function RunInfoDisclosure({ info }: { info: HiddenRunInfo }) {
+  const [open, setOpen] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState<"success" | "error" | null>(null);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(info.runId);
+      setCopyFeedback("success");
+    } catch {
+      setCopyFeedback("error");
+    }
+  };
+
+  return (
+    <section className="run-info-block">
+      <button
+        className="detail-disclosure-toggle run-info-toggle"
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        data-testid="run-info-toggle"
+        aria-expanded={open}
+      >
+        <span>运行信息</span>
+        {open ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+      </button>
+      {open ? (
+        <div className="run-info-body">
+          <dl className="compact-list run-info-list">
+            <div>
+              <dt>Run ID</dt>
+              <dd data-testid="run-id-value">{info.runId}</dd>
+            </div>
+            <div>
+              <dt>版本</dt>
+              <dd>{info.versionLabel}</dd>
+            </div>
+            <div>
+              <dt>读取路径</dt>
+              <dd>{info.readProfileLabel}</dd>
+            </div>
+          </dl>
+          <div className="run-info-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={handleCopy}
+              data-testid="run-id-copy-button"
+            >
+              复制 Run ID
+            </button>
+            {copyFeedback === "success" ? <span className="run-info-copy-feedback">已复制</span> : null}
+            {copyFeedback === "error" ? <span className="run-info-copy-feedback">复制失败</span> : null}
+          </div>
+        </div>
+      ) : null}
+    </section>
   );
 }
 

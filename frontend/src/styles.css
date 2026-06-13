@@ -582,6 +582,25 @@ button {
   margin-top: 12px;
 }
 
+.run-info-list {
+  background: #f8fafc;
+  border: 1px solid #e1e8ef;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.run-info-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.run-info-copy-feedback {
+  color: #536171;
+  font-size: 13px;
+}
+
 .chat-thread-empty-state {
   align-content: center;
   color: #233342;

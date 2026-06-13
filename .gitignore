@@ -25,6 +25,8 @@ frontend/blob-report/
 var/
 
 # Local review scratch
+.git-ssh-known-hosts
+*.preview.html
 docs/artifacts/
 docs/TASK_WORKFLOW_PROMPTS.md
 docs/V1_DEVELOPMENT_REPORT.md

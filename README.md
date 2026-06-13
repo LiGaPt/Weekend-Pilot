@@ -6,6 +6,7 @@ WeekendPilot 是一个面向 `2-6` 小时本地生活场景的规划、确认与
 
 | 维度 | 当前状态 |
 | --- | --- |
+| 版本口径 | 当前固定为 `V1.5 baseline / V2 Integrity candidate`；后续 `V2 Integrity Edition` 优先增强 benchmark 完整性、memory governance、observability 与 recovery 可审计性 |
 | 公开主链 | `5173` 公开 demo 已收束为可演示的主链：`planning`、`clarification`、`replan`、`confirm / decline`、`execution` |
 | 技术支撑 | `5174` 内部评审页提供 `Benchmark Summary`、`Trace Summary`、`Benchmark Artifacts` 与 `Recovery Visualization` |
 | 交付边界 | `Mock World`、`benchmark`、`recovery review` 与 `AMap read-only preview` 都已纳入当前版本的说明和验证边界 |
@@ -43,6 +44,7 @@ WeekendPilot 是一个面向 `2-6` 小时本地生活场景的规划、确认与
 
 - `AMap` 不进入 customer UI 主链，只通过脚本和 API 演示
 - `benchmark` 默认使用 `Mock World`，不依赖外部地图或真实写接口
+- `AMap` 仍是 `API-only read-only preview`，不参与正式 benchmark，也不作为 `V2 Integrity Edition` 的主交付依赖
 - 可选 `LLM-backed preview` 不是本次提交主路径
 
 ## Mock World
@@ -54,7 +56,7 @@ WeekendPilot 是一个面向 `2-6` 小时本地生活场景的规划、确认与
 - 这些公开 scenario 背后映射到已注册 world profile，例如 `family_afternoon`、`friends_gathering`、`solo_afternoon`、`couple_afternoon`、`rainy_day_fallback`、`budget_lite`
 - 它不是只包含“最终会被选中的标准答案点位”，而是故意放入额外候选、`distractor`、不可用候选和部分 route 不可行组合，用来验证筛选、fallback、排序稳定性和安全停机
 - `release_gate_v1`、`coverage_gate_v1_5` 和 `all_registered` 当前都固定在 `Mock World`
-- `AMap` 只作为 `API-only` 的 `read-only preview`，不参与当前正式 benchmark，也不进入默认评审主链
+- `AMap` 只作为 `API-only` 的 `read-only preview`，不参与正式 benchmark，也不进入默认评审主链
 
 选择 `Mock World` 的原因不是“模拟一切”，而是把当前作品评审重点放在产品闭环与工程可审计性上：规划逻辑、确认边界、执行链路、版本演化、失败恢复、evidence 产出，都能在本地稳定复现。
 

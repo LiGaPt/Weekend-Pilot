@@ -189,6 +189,29 @@ def test_submission_docs_exist_and_readme_links_to_supporting_docs() -> None:
     assert "docs/V1_5_REVIEW_EVIDENCE.md" in readme_text
 
 
+def test_phase0_version_scope_is_consistent_across_readme_and_submission_docs() -> None:
+    paths = [
+        REPO_ROOT / "README.md",
+        REPO_ROOT / "docs" / "WEB_DEMO_README.md",
+        REPO_ROOT / "docs" / "submission" / "OVERVIEW.md",
+        REPO_ROOT / "docs" / "submission" / "DEMO_SCRIPT.md",
+        REPO_ROOT / "docs" / "submission" / "EVIDENCE_MAP.md",
+        REPO_ROOT / "docs" / "submission" / "FUNCTION_COVERAGE_MAP.md",
+        REPO_ROOT / "docs" / "submission" / "RECORDING_CHECKLIST.md",
+    ]
+
+    for path in paths:
+        text = path.read_text(encoding="utf-8")
+        assert "V1.5 baseline / V2 Integrity candidate" in text, path
+        assert "V2 Integrity Edition" in text, path
+        assert "benchmark" in text, path
+        assert "memory governance" in text, path
+        assert "observability" in text, path
+        assert "recovery" in text, path
+        assert "AMap" in text, path
+        assert "不参与正式 benchmark" in text or "outside formal benchmark runs" in text, path
+
+
 def test_web_demo_readme_covers_submission_recording_workflow() -> None:
     runbook_text = (REPO_ROOT / "docs" / "WEB_DEMO_README.md").read_text(encoding="utf-8")
 

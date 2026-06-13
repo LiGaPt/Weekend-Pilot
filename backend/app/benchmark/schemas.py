@@ -25,6 +25,7 @@ BenchmarkSuiteId = Literal[
     "robustness_focused",
     "default",
     "release_gate_v1",
+    "v2_integrity",
     "all_registered",
 ]
 _LOWER_SNAKE_CASE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -134,6 +135,24 @@ class BenchmarkCaseTaxonomy(BaseModel):
         return value
 
 
+class BenchmarkCaseV2Taxonomy(BaseModel):
+    scenario_bucket: Literal["family", "solo", "friends", "couple", "elder", "mixed", "unknown"]
+    level: Literal["L1", "L2", "L3", "L4", "L5"]
+    failure_mode: str
+    memory_mode: Literal["none", "override_guarded", "advisory_fill", "expired_advisory"]
+    conversation_mode: Literal["single_turn", "clarification", "replan_versioned"]
+    stability_required: bool
+
+    @field_validator("failure_mode")
+    @classmethod
+    def validate_failure_mode(cls, value: str) -> str:
+        if value == "none":
+            return value
+        if _LOWER_SNAKE_CASE_PATTERN.fullmatch(value) is None:
+            raise ValueError("v2 taxonomy failure_mode must use lower_snake_case or 'none'")
+        return value
+
+
 class BenchmarkCase(BaseModel):
     case_id: str
     title: str
@@ -147,6 +166,7 @@ class BenchmarkCase(BaseModel):
     continuations: list[BenchmarkContinuationRequest] = Field(default_factory=list)
     expected: BenchmarkExpectedOutcome
     taxonomy: BenchmarkCaseTaxonomy
+    v2_taxonomy: BenchmarkCaseV2Taxonomy | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -176,6 +196,7 @@ class BenchmarkCaseResult(BaseModel):
     trace_id: str | None = None
     run_summary: RunSummary | None = None
     taxonomy: BenchmarkCaseTaxonomy | None = None
+    v2_taxonomy: BenchmarkCaseV2Taxonomy | None = None
     failure_chain_summary: BenchmarkFailureChainSummary | None = None
     scores: list[BenchmarkScore]
     overall_score: float
@@ -205,6 +226,17 @@ class BenchmarkCaseMatrixSummary(BaseModel):
     tag_counts: dict[str, int] = Field(default_factory=dict)
 
 
+class BenchmarkCaseV2MatrixSummary(BaseModel):
+    schema_version: str = "weekendpilot_benchmark_case_v2_matrix_v1"
+    case_count: int
+    scenario_bucket_counts: dict[str, int] = Field(default_factory=dict)
+    level_counts: dict[str, int] = Field(default_factory=dict)
+    failure_mode_counts: dict[str, int] = Field(default_factory=dict)
+    memory_mode_counts: dict[str, int] = Field(default_factory=dict)
+    conversation_mode_counts: dict[str, int] = Field(default_factory=dict)
+    stability_required_counts: dict[str, int] = Field(default_factory=dict)
+
+
 class BenchmarkSuiteDescription(BaseModel):
     suite_id: BenchmarkSuiteId
     title: str
@@ -212,6 +244,7 @@ class BenchmarkSuiteDescription(BaseModel):
     case_ids: list[str]
     case_count: int
     matrix_summary: BenchmarkCaseMatrixSummary
+    v2_taxonomy_summary: BenchmarkCaseV2MatrixSummary | None = None
 
 
 class BenchmarkOutcomeBucketStats(BaseModel):
@@ -241,6 +274,7 @@ class BenchmarkSummary(BaseModel):
     overall_score: float
     benchmark_timing_summary: BenchmarkTimingSummary | None = None
     matrix_summary: BenchmarkCaseMatrixSummary | None = None
+    v2_taxonomy_summary: BenchmarkCaseV2MatrixSummary | None = None
     outcome_rollup: BenchmarkOutcomeRollup | None = None
 
 
@@ -333,3 +367,55 @@ class RecoveryReplayReviewResult(BaseModel):
     failure_chain_summary: BenchmarkFailureChainSummary | None = None
     replay_summary: RecoveryReplaySummary = Field(default_factory=RecoveryReplaySummary)
     recovery_review: RecoveryReplayReviewSummary | None = None
+
+
+def resolve_benchmark_case_v2_taxonomy(case: BenchmarkCase) -> BenchmarkCaseV2Taxonomy:
+    if case.v2_taxonomy is not None:
+        return case.v2_taxonomy
+
+    tags = set(case.taxonomy.tags)
+    failure_mode = case.taxonomy.failure_mode or "none"
+
+    if "memory_override" in tags:
+        memory_mode = "override_guarded"
+    elif "memory_expired" in tags:
+        memory_mode = "expired_advisory"
+    elif "memory_governance" in tags or "memory_advisory" in tags:
+        memory_mode = "advisory_fill"
+    else:
+        memory_mode = "none"
+
+    if "plan_versioning" in tags or "replan_turn" in tags:
+        conversation_mode = "replan_versioned"
+    elif "clarification_turn" in tags:
+        conversation_mode = "clarification"
+    else:
+        conversation_mode = "single_turn"
+
+    stability_required = bool(
+        {"robustness_case", "conversation_continuation", "route_failure", "composite_failure"} & tags
+        or case.expected.robustness is not None
+        or case.expected.conversation is not None
+        or case.expected.expected_recovery_action is not None
+        or case.failure_profile is not None
+    )
+
+    if failure_mode != "none":
+        level = "L5"
+    elif conversation_mode == "replan_versioned":
+        level = "L4"
+    elif memory_mode in {"advisory_fill", "expired_advisory"} or conversation_mode == "clarification":
+        level = "L3"
+    elif memory_mode == "override_guarded" or stability_required:
+        level = "L2"
+    else:
+        level = case.taxonomy.level
+
+    return BenchmarkCaseV2Taxonomy(
+        scenario_bucket=case.taxonomy.scenario_bucket,
+        level=level,
+        failure_mode=failure_mode,
+        memory_mode=memory_mode,
+        conversation_mode=conversation_mode,
+        stability_required=stability_required,
+    )

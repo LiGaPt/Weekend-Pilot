@@ -526,9 +526,12 @@ describe("App", () => {
     expect(screen.queryByText("室内亲子活动")).not.toBeInTheDocument();
     expect(screen.queryByText("green-table")).not.toBeInTheDocument();
     expect(screen.queryByText("\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("run-id")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("run-info-toggle")).not.toBeInTheDocument();
+    expect(screen.getByTestId("run-info-toggle")).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("run-id-value")).not.toBeInTheDocument();
     expect(screen.queryByText("Mock World")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("run-info-toggle"));
+    expect(screen.getByTestId("run-id-value")).toHaveTextContent("run-1");
 
     await user.click(screen.getByTestId("progress-completed-toggle"));
     expect(screen.getByText("\u5df2\u627e\u5230 5 \u4e2a\u6d3b\u52a8")).toBeInTheDocument();
@@ -603,7 +606,7 @@ describe("App", () => {
     });
 
     expect(await screen.findByText("v2")).toBeInTheDocument();
-    expect(screen.queryByTestId("run-info-toggle")).not.toBeInTheDocument();
+    expect(screen.getByTestId("run-info-toggle")).toHaveAttribute("aria-expanded", "false");
   });
 
   it("blocks confirmation when the server returns a map read-only preview", async () => {

@@ -294,6 +294,48 @@ function buildMultiScenarioRun(
 }
 
 describe("ConversationThread", () => {
+  it("shows active run info behind a collapsed disclosure and copies the run id", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    const items = projectConversationThread({
+      entries: [{ id: "run-localization", kind: "run", run: runWithEnglishDemoData }],
+      activeRunId: "run-localization",
+      selectedPlanId: "plan-garden",
+    });
+
+    render(
+      <ConversationThread
+        items={items}
+        activeRunId="run-localization"
+        requestState="idle"
+        canConfirm
+        canDecline
+        onSelectPlan={vi.fn()}
+        onConfirm={vi.fn()}
+        onDecline={vi.fn()}
+      />,
+    );
+
+    const toggle = screen.getByTestId("run-info-toggle");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("run-id-value")).not.toBeInTheDocument();
+
+    await user.click(toggle);
+
+    expect(screen.getByTestId("run-id-value")).toHaveTextContent("run-localization");
+    expect(screen.getByText("本地演示数据")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("run-id-copy-button"));
+
+    expect(writeText).toHaveBeenCalledWith("run-localization");
+    expect(screen.getByText("已复制")).toBeInTheDocument();
+  });
+
   it("localizes demo fallback names and hides internal action target ids", async () => {
     const user = userEvent.setup();
     const items = projectConversationThread({
