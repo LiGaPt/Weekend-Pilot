@@ -7,6 +7,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Session
 
+from backend.app.memory_lifecycle import normalize_memory_status
 from backend.app.models.runtime import MemoryItem
 
 
@@ -27,6 +28,7 @@ class MemoryItemRepository:
         expires_at: datetime | None,
         status: str,
     ) -> MemoryItem:
+        normalized_status = normalize_memory_status(status)
         memory_item = MemoryItem(
             user_id=user_id,
             memory_type=memory_type,
@@ -37,7 +39,7 @@ class MemoryItemRepository:
             source_run_id=source_run_id,
             source_langsmith_trace_id=source_langsmith_trace_id,
             expires_at=expires_at,
-            status=status,
+            status=normalized_status,
         )
         self.session.add(memory_item)
         self.session.flush()
@@ -64,7 +66,10 @@ class MemoryItemRepository:
             select(MemoryItem)
             .where(
                 MemoryItem.user_id == user_id,
-                MemoryItem.status == "active",
+                or_(
+                    MemoryItem.status == "expired",
+                    MemoryItem.status == "active",
+                ),
             )
             .order_by(MemoryItem.created_at, MemoryItem.memory_id)
         )

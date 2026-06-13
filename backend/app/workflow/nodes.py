@@ -20,6 +20,7 @@ from backend.app.confirmation import HumanConfirmationService
 from backend.app.core.config import get_settings
 from backend.app.execution import DeterministicExecutionWorkflow
 from backend.app.feedback import DeterministicFeedbackWriter
+from backend.app.memory_lifecycle import resolve_memory_lifecycle_state
 from backend.app.models.runtime import ActionLedger
 from backend.app.observability import LocalTraceBuffer, ObservabilityRecorder
 from backend.app.planning import (
@@ -766,6 +767,7 @@ class WeekendPilotWorkflowNodes:
             source_langsmith_trace_id=memory.source_langsmith_trace_id,
             expires_at=memory.expires_at.isoformat() if memory.expires_at else None,
             status=memory.status,
+            lifecycle_state=resolve_memory_lifecycle_state(memory.status, memory.expires_at),
         )
 
     def _candidate_blackboard(self, collection: Any) -> CandidateBlackboard:

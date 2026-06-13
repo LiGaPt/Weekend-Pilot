@@ -168,7 +168,19 @@ def test_memory_item_repository_creates_and_lists_active_memory(db_session: Sess
         expires_at=datetime.now(UTC) - timedelta(days=1),
         status="active",
     )
-    repo.create(
+    explicit_expired = repo.create(
+        user_id=user.user_id,
+        memory_type="preference",
+        key="explicit-expired",
+        value_json={"value": "very old"},
+        text="Explicitly expired memory.",
+        confidence=Decimal("0.7000"),
+        source_run_id=run.run_id,
+        source_langsmith_trace_id="trace-explicit-expired",
+        expires_at=None,
+        status="expired",
+    )
+    archived = repo.create(
         user_id=user.user_id,
         memory_type="preference",
         key="archived",
@@ -180,12 +192,50 @@ def test_memory_item_repository_creates_and_lists_active_memory(db_session: Sess
         expires_at=None,
         status="archived",
     )
+    repo.create(
+        user_id=user.user_id,
+        memory_type="preference",
+        key="candidate",
+        value_json={"value": "candidate"},
+        text="Candidate memory.",
+        confidence=Decimal("0.7000"),
+        source_run_id=run.run_id,
+        source_langsmith_trace_id="trace-candidate",
+        expires_at=None,
+        status="candidate",
+    )
+    repo.create(
+        user_id=user.user_id,
+        memory_type="preference",
+        key="disabled",
+        value_json={"value": "disabled"},
+        text="Disabled memory.",
+        confidence=Decimal("0.7000"),
+        source_run_id=run.run_id,
+        source_langsmith_trace_id="trace-disabled",
+        expires_at=None,
+        status="disabled",
+    )
+    repo.create(
+        user_id=user.user_id,
+        memory_type="preference",
+        key="ignored",
+        value_json={"value": "ignored"},
+        text="Ignored memory.",
+        confidence=Decimal("0.7000"),
+        source_run_id=run.run_id,
+        source_langsmith_trace_id="trace-ignored",
+        expires_at=None,
+        status="ignored",
+    )
 
     assert repo.get_by_id(active.memory_id) is active
+    assert archived.status == "ignored"
     assert repo.list_active_for_user(user.user_id) == [active]
     assert {item.memory_id for item in repo.list_governable_for_user(user.user_id)} == {
         active.memory_id,
         expired.memory_id,
+        explicit_expired.memory_id,
     }
     assert repo.list_active_for_user(uuid4()) == []
     assert repo.list_governable_for_user(uuid4()) == []
