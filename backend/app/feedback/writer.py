@@ -7,13 +7,15 @@ from typing import Any
 from uuid import UUID
 
 from backend.app.feedback.errors import FeedbackWriterError
+from backend.app.feedback.memory_candidates import extract_feedback_memory_candidates
 from backend.app.feedback.schemas import (
     ExecutionFeedbackResult,
     FeedbackActionStatus,
     FeedbackActionSummary,
+    FeedbackMemoryCandidateSummary,
 )
-from backend.app.models.runtime import Plan
-from backend.app.repositories import AgentRunRepository, PlanRepository
+from backend.app.models.runtime import AgentRun, Plan
+from backend.app.repositories import AgentRunRepository, MemoryItemRepository, PlanRepository
 
 
 class DeterministicFeedbackWriter:
@@ -65,6 +67,7 @@ class DeterministicFeedbackWriter:
     ) -> None:
         self.plans = plans
         self.runs = runs
+        self.memory = MemoryItemRepository(plans.session)
 
     def write_execution_feedback(
         self,
@@ -72,7 +75,7 @@ class DeterministicFeedbackWriter:
         plan_id: UUID,
     ) -> ExecutionFeedbackResult:
         plan = self._load_plan(plan_id)
-        self._load_run(run_id)
+        run = self._load_run(run_id)
         if plan.run_id != run_id:
             raise FeedbackWriterError("Plan does not belong to the requested run.")
         if not plan.selected:
@@ -90,6 +93,7 @@ class DeterministicFeedbackWriter:
         ]
         headline = self._HEADLINES[feedback_status]
         message = self._message(headline, len(completed_actions), len(failed_actions))
+        memory_candidate_summary = self._persist_memory_candidates(run, plan_json)
         result = ExecutionFeedbackResult(
             run_id=run_id,
             plan_id=plan_id,
@@ -107,6 +111,7 @@ class DeterministicFeedbackWriter:
             failed_actions=failed_actions,
             next_steps=list(self._NEXT_STEPS[feedback_status]),
             writer_version=self.writer_version,
+            memory_candidate_summary=memory_candidate_summary,
         )
         self._persist_feedback(plan, plan_json, execution, result)
         self._update_run_status(run_id, result.run_status)
@@ -118,9 +123,11 @@ class DeterministicFeedbackWriter:
             raise FeedbackWriterError("Plan does not exist.")
         return plan
 
-    def _load_run(self, run_id: UUID) -> None:
-        if self.runs.get_by_id(run_id) is None:
+    def _load_run(self, run_id: UUID) -> AgentRun:
+        run = self.runs.get_by_id(run_id)
+        if run is None:
             raise FeedbackWriterError("Run does not exist.")
+        return run
 
     def _reviewed_plan_json(self, plan: Plan) -> dict[str, Any]:
         plan_json = plan.plan_json
@@ -411,10 +418,82 @@ class DeterministicFeedbackWriter:
             ],
             "next_steps": list(result.next_steps),
             "generated_at": self._generated_at(execution),
+            "memory_candidate_summary": (
+                result.memory_candidate_summary.model_dump(mode="json")
+                if result.memory_candidate_summary is not None
+                else None
+            ),
         }
         updated = self.plans.update_plan_json(plan.plan_id, updated_json)
         if updated is None:
             raise FeedbackWriterError("Plan disappeared during feedback persistence.")
+
+    def _persist_memory_candidates(
+        self,
+        run: AgentRun,
+        plan_json: dict[str, Any],
+    ) -> FeedbackMemoryCandidateSummary:
+        candidates = extract_feedback_memory_candidates(plan_json)
+        if not candidates:
+            return FeedbackMemoryCandidateSummary(generation_status="not_applicable")
+        if run.user_id is None:
+            return FeedbackMemoryCandidateSummary(generation_status="degraded")
+
+        created_keys: list[str] = []
+        updated_keys: list[str] = []
+        skipped_keys: list[str] = []
+        degraded = False
+
+        for candidate in candidates:
+            try:
+                existing = self.memory.get_by_user_memory_key(
+                    run.user_id,
+                    candidate.memory_type,
+                    candidate.key,
+                )
+                if existing is None:
+                    self.memory.create(
+                        user_id=run.user_id,
+                        memory_type=candidate.memory_type,
+                        key=candidate.key,
+                        value_json=candidate.value_json,
+                        text=candidate.text,
+                        confidence=candidate.confidence,
+                        source_run_id=run.run_id,
+                        source_langsmith_trace_id=None,
+                        expires_at=None,
+                        status=candidate.status,
+                    )
+                    created_keys.append(candidate.key)
+                    continue
+
+                if existing.status != "candidate":
+                    skipped_keys.append(candidate.key)
+                    continue
+
+                updated = self.memory.update(
+                    existing.memory_id,
+                    value_json=candidate.value_json,
+                    text=candidate.text,
+                    confidence=candidate.confidence,
+                    source_run_id=run.run_id,
+                    source_langsmith_trace_id=None,
+                    expires_at=None,
+                    status=candidate.status,
+                )
+                if updated is None:
+                    degraded = True
+                    continue
+                updated_keys.append(candidate.key)
+            except Exception:
+                degraded = True
+
+        return FeedbackMemoryCandidateSummary(
+            generation_status="degraded" if degraded else "completed",
+            created_keys=created_keys,
+            updated_keys=updated_keys,
+            skipped_keys=skipped_keys,
+        )
 
     def _generated_at(self, execution: dict[str, Any]) -> str:
         finished_at = execution.get("finished_at")

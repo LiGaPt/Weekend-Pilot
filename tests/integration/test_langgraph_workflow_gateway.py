@@ -16,7 +16,7 @@ from backend.app.agents import (
     RecoveryDecision,
 )
 from backend.app.db.session import SessionLocal
-from backend.app.models.runtime import ActionLedger, AgentRun, ToolEvent, User
+from backend.app.models.runtime import ActionLedger, AgentRun, MemoryItem, ToolEvent, User
 from backend.app.planning import (
     DeterministicIntentParser,
     DeterministicQueryPlanner,
@@ -287,6 +287,40 @@ def test_workflow_auto_confirm_executes_feedback_and_observability(
     assert run is not None
     assert run.metadata_json["observability"]["trace_id"] == result.trace_id
     _assert_timing_artifacts(result, run, trace_path)
+
+
+def test_workflow_auto_confirm_persists_candidate_memory_without_loading_it_as_governable(
+    db_session: Session,
+    redis_runtime,
+    trace_path: Path,
+) -> None:
+    runner = _build_runner(db_session, redis_runtime, trace_path)
+
+    result = runner.run(
+        WeekendPilotWorkflowRequest(
+            user_input=USER_INPUT,
+            external_user_id=f"workflow-feedback-candidate-{uuid4()}",
+            display_name="Workflow Feedback Candidate Tester",
+            case_id="case-langgraph-feedback-candidate",
+            auto_confirm=True,
+        )
+    )
+
+    assert result.status == "completed"
+    assert result.run_id is not None
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    assert run.user_id is not None
+
+    memory_rows = db_session.scalars(
+        select(MemoryItem)
+        .where(MemoryItem.user_id == run.user_id)
+        .order_by(MemoryItem.key)
+    ).all()
+    assert [memory.key for memory in memory_rows] == ["activity_style", "spouse_lighter_meals"]
+    assert all(memory.status == "candidate" for memory in memory_rows)
+    assert all(memory.text is None for memory in memory_rows)
+    assert MemoryItemRepository(db_session).list_governable_for_user(run.user_id) == []
 
 
 def test_workflow_recovery_stop_safely_records_metadata_without_actions(
