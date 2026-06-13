@@ -36,8 +36,10 @@ def _memory(
     memory_type: str = "preference",
     text: str | None = None,
     expires_at: str | None = None,
+    status: str = "active",
+    lifecycle_state: str | None = None,
 ) -> WorkflowMemoryRecord:
-    return WorkflowMemoryRecord(
+    payload = dict(
         memory_id=uuid4(),
         memory_type=memory_type,
         key=key,
@@ -45,8 +47,11 @@ def _memory(
         text=text,
         confidence=confidence,
         expires_at=expires_at,
-        status="active",
+        status=status,
     )
+    if lifecycle_state is not None:
+        payload["lifecycle_state"] = lifecycle_state
+    return WorkflowMemoryRecord(**payload)
 
 
 def test_memory_query_policy_applies_trusted_dining_preference() -> None:
@@ -195,6 +200,29 @@ def test_memory_query_policy_applies_expired_high_confidence_activity_as_advisor
     ]
     assert summary.policy_summary.downgraded_count == 1
     assert summary.policy_summary.advisory_influence_count == 1
+
+
+def test_memory_query_policy_prefers_explicit_lifecycle_state_for_expired_memory() -> None:
+    from backend.app.planning import apply_memory_query_policy
+
+    memory = _memory(
+        key="activity_style",
+        preference="indoor activities",
+        confidence="1.0",
+        text="The family recently preferred indoor plans.",
+        lifecycle_state="expired",
+    )
+    effective_intent, summary = apply_memory_query_policy(
+        _intent(),
+        IntentParseSignals(),
+        [memory],
+    )
+
+    assert effective_intent.activity_preferences == ["indoor"]
+    assert summary.advisory_memory_keys == ["activity_style"]
+    assert summary.downgraded_expired_keys == ["activity_style"]
+    assert summary.memory_decisions[0].expired is True
+    assert summary.memory_decisions[0].outcome == "applied_advisory"
 
 
 def test_memory_query_policy_suppresses_weak_memory_without_mutating_intent() -> None:

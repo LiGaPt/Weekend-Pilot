@@ -25,6 +25,7 @@ from backend.app.plans.schemas import PersistedPlan
 from backend.app.review.schemas import FinalReviewResult
 from backend.app.workflow.recovery import RecoveryAttempt
 from backend.app.workflow.timing import WorkflowNodeTimingRecord, WorkflowTimingSummary
+from backend.app.memory_lifecycle import MemoryLifecycleState
 
 
 WorkflowStatus = Literal[
@@ -67,6 +68,7 @@ class WorkflowMemoryRecord(BaseModel):
     source_langsmith_trace_id: str | None = None
     expires_at: str | None = None
     status: str
+    lifecycle_state: MemoryLifecycleState | None = None
 
 
 class CandidateBlackboardEntry(BaseModel):

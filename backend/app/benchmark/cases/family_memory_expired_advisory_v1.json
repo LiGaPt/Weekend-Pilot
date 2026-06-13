@@ -17,7 +17,7 @@
       "text": "The family recently preferred indoor plans.",
       "confidence": "1.0",
       "expires_at": "2026-05-01T12:00:00+00:00",
-      "status": "active"
+      "status": "expired"
     }
   ],
   "expected": {

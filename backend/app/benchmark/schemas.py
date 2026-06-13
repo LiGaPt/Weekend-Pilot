@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
+from backend.app.memory_lifecycle import normalize_memory_status
 from backend.app.planning.memory_query_policy import MemoryPolicyAuditSummary
 from backend.app.observability.summary import RunSummary
 from backend.app.benchmark.timing import BenchmarkTimingSummary
@@ -40,6 +41,12 @@ class BenchmarkMemoryItem(BaseModel):
     confidence: Decimal = Decimal("1.0")
     expires_at: datetime | None = None
     status: str = "active"
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        normalize_memory_status(value)
+        return value
 
 
 class BenchmarkMemoryDecisionExpectation(BaseModel):

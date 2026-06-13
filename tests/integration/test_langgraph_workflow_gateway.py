@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
@@ -25,7 +26,7 @@ from backend.app.planning import (
     ItineraryDraftResult,
     ItineraryRouteRef,
 )
-from backend.app.repositories import ConversationSessionRepository, PlanRepository, UserRepository
+from backend.app.repositories import ConversationSessionRepository, MemoryItemRepository, PlanRepository, UserRepository
 from backend.app.review.schemas import FinalReviewResult, ReviewCheck
 from backend.app.runtime import FixedWindowRateLimiter, JsonRedisCache, RedisKeyBuilder, get_redis_client
 from backend.app.tool_gateway import build_default_registry
@@ -810,6 +811,86 @@ def test_workflow_reuses_existing_user_and_session_with_intent_override(
     assert run.user_id == user.user_id
     assert run.session_id == conversation_session.session_id
     assert db_session.scalar(select(func.count()).select_from(User)) == original_user_count
+
+
+def test_workflow_loads_only_governable_memory_lifecycle_states(
+    db_session: Session,
+    redis_runtime,
+    trace_path: Path,
+) -> None:
+    runner = _build_runner(db_session, redis_runtime, trace_path)
+    user = UserRepository(db_session).create(
+        external_id=None,
+        display_name="Workflow Memory Lifecycle Tester",
+    )
+    memory_repo = MemoryItemRepository(db_session)
+    memory_repo.create(
+        user_id=user.user_id,
+        memory_type="preference",
+        key="activity_style",
+        value_json={"preference": "indoor activities"},
+        text="Explicit expired memory.",
+        confidence=Decimal("1.0"),
+        source_run_id=None,
+        source_langsmith_trace_id=None,
+        expires_at=None,
+        status="expired",
+    )
+    memory_repo.create(
+        user_id=user.user_id,
+        memory_type="preference",
+        key="spouse_lighter_meals",
+        value_json={"preference": "lighter meals"},
+        text="Candidate memory should stay out of policy.",
+        confidence=Decimal("1.0"),
+        source_run_id=None,
+        source_langsmith_trace_id=None,
+        expires_at=None,
+        status="candidate",
+    )
+    memory_repo.create(
+        user_id=user.user_id,
+        memory_type="preference",
+        key="activity_style_disabled",
+        value_json={"preference": "outdoor activities"},
+        text="Disabled memory should stay out of policy.",
+        confidence=Decimal("1.0"),
+        source_run_id=None,
+        source_langsmith_trace_id=None,
+        expires_at=None,
+        status="disabled",
+    )
+    memory_repo.create(
+        user_id=user.user_id,
+        memory_type="preference",
+        key="activity_style_ignored",
+        value_json={"preference": "citywalk"},
+        text="Ignored memory should stay out of policy.",
+        confidence=Decimal("1.0"),
+        source_run_id=None,
+        source_langsmith_trace_id=None,
+        expires_at=None,
+        status="ignored",
+    )
+
+    result = runner.run(
+        WeekendPilotWorkflowRequest(
+            user_input="This afternoon please arrange a nearby outing for my partner and our 5-year-old for a few hours, then dinner afterward.",
+            case_id="case-langgraph-memory-lifecycle",
+            auto_confirm=False,
+            existing_user_id=user.user_id,
+        )
+    )
+
+    assert result.status == "awaiting_confirmation"
+    assert result.run_id is not None
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    memory_policy = run.metadata_json["workflow"]["memory_policy"]
+    assert memory_policy["advisory_memory_keys"] == ["activity_style"]
+    assert memory_policy["downgraded_expired_keys"] == ["activity_style"]
+    assert [decision["memory_key"] for decision in memory_policy["memory_decisions"]] == ["activity_style"]
+    assert [entry["key"] for entry in memory_policy["decision_log"]] == ["activity_style"]
 
 
 def test_workflow_amap_preview_reaches_confirmation_without_write_actions(

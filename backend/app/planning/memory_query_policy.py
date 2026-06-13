@@ -139,7 +139,7 @@ def apply_memory_query_policy(
 
         normalized_value = _normalize_memory_value(memory)
         confidence = _parse_confidence(memory.confidence)
-        expired = _is_expired(memory.expires_at, now)
+        expired = _memory_is_expired(memory, now)
         tier = _memory_tier(confidence, expired)
         confidence_text = _string_or_none(memory.confidence)
 
@@ -372,6 +372,15 @@ def _is_expired(value: Any, now: datetime) -> bool:
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=UTC)
     return expires_at <= now
+
+
+def _memory_is_expired(memory: "WorkflowMemoryRecord", now: datetime) -> bool:
+    lifecycle_state = getattr(memory, "lifecycle_state", None)
+    if lifecycle_state == "expired":
+        return True
+    if lifecycle_state == "active":
+        return False
+    return _is_expired(memory.expires_at, now)
 
 
 def _normalize_activity_style(value: Any) -> str | None:

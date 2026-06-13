@@ -544,6 +544,7 @@ def test_memory_governance_fixtures_are_loadable_but_not_default() -> None:
 
     assert expired_case.case_id == "family_memory_expired_advisory_v1"
     assert expired_case.case_id not in default_case_ids
+    assert expired_case.memory_items[0].status == "expired"
     assert expired_case.memory_items[0].expires_at is not None
     assert expired_case.expected.memory_governance is not None
     assert expired_case.expected.memory_governance.expected_dimension_sources == {
