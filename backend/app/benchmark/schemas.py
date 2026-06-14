@@ -12,6 +12,7 @@ from backend.app.memory_lifecycle import normalize_memory_status
 from backend.app.planning.memory_query_policy import MemoryPolicyAuditSummary
 from backend.app.observability.summary import RunSummary
 from backend.app.benchmark.timing import BenchmarkTimingSummary
+from backend.app.feedback.schemas import FeedbackMemoryCandidateSummary
 from backend.app.workflow.timing import WorkflowTimingSummary
 
 
@@ -54,11 +55,23 @@ class BenchmarkMemoryDecisionExpectation(BaseModel):
     expected_outcome: str
 
 
+class BenchmarkMemoryDecisionLogExpectation(BaseModel):
+    memory_key: str
+    expected_decision: str
+    expected_status: str
+    expected_reason: str
+    expected_influence_level: str
+
+
 class BenchmarkMemoryGovernanceExpectation(BaseModel):
     expected_policy_version: str
     expected_dimension_sources: dict[str, str] = Field(default_factory=dict)
     expected_dimension_tiers: dict[str, str] = Field(default_factory=dict)
     expected_memory_outcomes: list[BenchmarkMemoryDecisionExpectation] = Field(default_factory=list)
+    expected_decision_log: list[BenchmarkMemoryDecisionLogExpectation] = Field(default_factory=list)
+    expected_absent_memory_keys: list[str] = Field(default_factory=list)
+    expected_policy_summary: dict[str, int] | None = None
+    expected_feedback_memory_candidate_summary: FeedbackMemoryCandidateSummary | None = None
 
 
 class BenchmarkContinuationRequest(BaseModel):
@@ -147,7 +160,15 @@ class BenchmarkCaseV2Taxonomy(BaseModel):
     scenario_bucket: Literal["family", "solo", "friends", "couple", "elder", "mixed", "unknown"]
     level: Literal["L1", "L2", "L3", "L4", "L5"]
     failure_mode: str
-    memory_mode: Literal["none", "override_guarded", "advisory_fill", "expired_advisory"]
+    memory_mode: Literal[
+        "none",
+        "override_guarded",
+        "advisory_fill",
+        "expired_advisory",
+        "disabled_ignored",
+        "candidate_not_auto_active",
+        "sensitive_minimization",
+    ]
     conversation_mode: Literal["single_turn", "clarification", "replan_versioned"]
     stability_required: bool
 
@@ -215,6 +236,7 @@ class BenchmarkCaseResult(BaseModel):
     observability_status: str | None = None
     workflow_status: str | None = None
     memory_policy_summary: MemoryPolicyAuditSummary | None = None
+    feedback_memory_candidate_summary: FeedbackMemoryCandidateSummary | None = None
     workflow_timing_summary: WorkflowTimingSummary | None = None
     workflow_node_history: list[str] = Field(default_factory=list)
     conversation_trace: list[BenchmarkConversationTraceStep] = Field(default_factory=list)
@@ -439,6 +461,12 @@ def resolve_benchmark_case_v2_taxonomy(case: BenchmarkCase) -> BenchmarkCaseV2Ta
 
     if "memory_override" in tags:
         memory_mode = "override_guarded"
+    elif "memory_disabled" in tags or "memory_ignored" in tags:
+        memory_mode = "disabled_ignored"
+    elif "sensitive_minimization" in tags:
+        memory_mode = "sensitive_minimization"
+    elif "memory_candidate" in tags:
+        memory_mode = "candidate_not_auto_active"
     elif "memory_expired" in tags:
         memory_mode = "expired_advisory"
     elif "memory_governance" in tags or "memory_advisory" in tags:
@@ -465,7 +493,13 @@ def resolve_benchmark_case_v2_taxonomy(case: BenchmarkCase) -> BenchmarkCaseV2Ta
         level = "L5"
     elif conversation_mode == "replan_versioned":
         level = "L4"
-    elif memory_mode in {"advisory_fill", "expired_advisory"} or conversation_mode == "clarification":
+    elif memory_mode in {
+        "advisory_fill",
+        "expired_advisory",
+        "disabled_ignored",
+        "candidate_not_auto_active",
+        "sensitive_minimization",
+    } or conversation_mode == "clarification":
         level = "L3"
     elif memory_mode == "override_guarded" or stability_required:
         level = "L2"

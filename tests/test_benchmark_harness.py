@@ -102,6 +102,9 @@ MEMORY_GOVERNANCE_CASE_IDS = (
     "family_memory_override_v1",
     "family_memory_advisory_fill_v1",
     "family_memory_expired_advisory_v1",
+    "family_memory_disabled_ignored_v1",
+    "family_memory_candidate_not_auto_active_v1",
+    "family_memory_sensitive_minimization_v1",
 )
 CONTINUATION_CASE_IDS = (
     "solo_clarification_continuation_v1",
@@ -256,19 +259,23 @@ DEFAULT_TAG_COUNTS = {
     "rainy_day": 1,
     "short_walk": 1,
 }
-MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS = {"family": 3}
-MEMORY_GOVERNANCE_LEVEL_COUNTS = {"L2": 1, "L3": 2}
-MEMORY_GOVERNANCE_TOOL_PROFILE_COUNTS = {"mock_world": 3}
-MEMORY_GOVERNANCE_WORLD_PROFILE_COUNTS = {"family_afternoon": 3}
-MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS = {"none": 3}
+MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS = {"family": 6}
+MEMORY_GOVERNANCE_LEVEL_COUNTS = {"L2": 1, "L3": 5}
+MEMORY_GOVERNANCE_TOOL_PROFILE_COUNTS = {"mock_world": 6}
+MEMORY_GOVERNANCE_WORLD_PROFILE_COUNTS = {"family_afternoon": 6}
+MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS = {"none": 6}
 MEMORY_GOVERNANCE_TAG_COUNTS = {
-    "child_friendly": 3,
-    "indoor_activity": 2,
-    "light_meal": 2,
+    "child_friendly": 6,
+    "indoor_activity": 3,
+    "light_meal": 3,
     "memory_advisory": 1,
+    "memory_candidate": 2,
+    "memory_disabled": 1,
     "memory_expired": 1,
-    "memory_governance": 2,
+    "memory_governance": 5,
+    "memory_ignored": 1,
     "memory_override": 1,
+    "sensitive_minimization": 1,
 }
 ROBUSTNESS_SCENARIO_BUCKET_COUNTS = {"family": 1, "friends": 1, "mixed": 1, "unknown": 1}
 ROBUSTNESS_LEVEL_COUNTS = {"L2": 4}
@@ -297,25 +304,25 @@ ROBUSTNESS_TAG_COUNTS = {
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
     "elder": 1,
-    "family": 11,
+    "family": 14,
     "friends": 2,
     "mixed": 3,
     "solo": 2,
     "unknown": 2,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 13, "L3": 4, "L5": 2}
-ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 22}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 13, "L3": 7, "L5": 2}
+ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 25}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 2,
     "couple_afternoon": 1,
     "elder_afternoon": 1,
-    "family_afternoon": 11,
+    "family_afternoon": 14,
     "friends_gathering": 2,
     "rainy_day_fallback": 3,
     "solo_afternoon": 2,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
-    "none": 19,
+    "none": 22,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
@@ -326,7 +333,7 @@ ALL_REGISTERED_TAG_COUNTS = {
     "baseline": 2,
     "budget_limited": 2,
     "casual_dining": 2,
-    "child_friendly": 11,
+    "child_friendly": 14,
     "citywalk": 2,
     "clarification_turn": 1,
     "composite_failure": 2,
@@ -340,12 +347,15 @@ ALL_REGISTERED_TAG_COUNTS = {
     "fallback_selection": 1,
     "free_activity": 1,
     "friends_group": 2,
-    "indoor_activity": 6,
+    "indoor_activity": 7,
     "light_activity": 2,
-    "light_meal": 11,
+    "light_meal": 12,
     "memory_advisory": 1,
+    "memory_candidate": 2,
+    "memory_disabled": 1,
     "memory_expired": 1,
-    "memory_governance": 2,
+    "memory_governance": 5,
+    "memory_ignored": 1,
     "memory_override": 1,
     "outdoor_activity": 3,
     "plan_versioning": 1,
@@ -355,6 +365,7 @@ ALL_REGISTERED_TAG_COUNTS = {
     "replan_turn": 1,
     "robustness_case": 4,
     "route_failure": 2,
+    "sensitive_minimization": 1,
     "short_walk": 1,
     "stable_sorting": 1,
     "ticket_sold_out": 1,
@@ -389,6 +400,28 @@ EXPECTED_TAXONOMY_BY_CASE = {
         scenario_bucket="family",
         level="L3",
         tags=["child_friendly", "indoor_activity", "memory_expired", "memory_governance"],
+    ),
+    "family_memory_disabled_ignored_v1": _taxonomy_payload(
+        scenario_bucket="family",
+        level="L3",
+        tags=["child_friendly", "memory_disabled", "memory_governance", "memory_ignored"],
+    ),
+    "family_memory_candidate_not_auto_active_v1": _taxonomy_payload(
+        scenario_bucket="family",
+        level="L3",
+        tags=["child_friendly", "memory_candidate", "memory_governance"],
+    ),
+    "family_memory_sensitive_minimization_v1": _taxonomy_payload(
+        scenario_bucket="family",
+        level="L3",
+        tags=[
+            "child_friendly",
+            "indoor_activity",
+            "light_meal",
+            "memory_candidate",
+            "memory_governance",
+            "sensitive_minimization",
+        ],
     ),
     "family_citywalk_addon_v1": _taxonomy_payload(
         scenario_bucket="family",
@@ -554,6 +587,27 @@ def test_memory_governance_fixtures_are_loadable_but_not_default() -> None:
         "activity_preferences": "advisory",
     }
 
+    disabled_case = load_benchmark_case("family_memory_disabled_ignored_v1")
+    candidate_case = load_benchmark_case("family_memory_candidate_not_auto_active_v1")
+    sensitive_case = load_benchmark_case("family_memory_sensitive_minimization_v1")
+
+    assert disabled_case.case_id not in default_case_ids
+    assert [item.status for item in disabled_case.memory_items] == ["disabled", "ignored"]
+    assert disabled_case.expected.memory_governance is not None
+    assert disabled_case.expected.memory_governance.expected_absent_memory_keys == [
+        "spouse_lighter_meals",
+        "activity_style",
+    ]
+
+    assert candidate_case.case_id not in default_case_ids
+    assert candidate_case.memory_items[0].status == "candidate"
+    assert candidate_case.expected.memory_governance is not None
+    assert candidate_case.expected.memory_governance.expected_absent_memory_keys == ["activity_style"]
+
+    assert sensitive_case.case_id not in default_case_ids
+    assert sensitive_case.expected.memory_governance is not None
+    assert sensitive_case.expected.memory_governance.expected_feedback_memory_candidate_summary is not None
+
 
 def test_continuation_fixtures_are_loadable_but_not_default() -> None:
     default_case_ids = {case.case_id for case in load_default_benchmark_cases()}
@@ -679,7 +733,7 @@ def test_default_case_matrix_summary_counts_are_expected() -> None:
 def test_memory_governance_suite_matrix_summary_counts_are_expected() -> None:
     summary = build_case_matrix_summary(load_benchmark_suite("memory_governance"))
 
-    assert summary.case_count == 3
+    assert summary.case_count == 6
     assert summary.scenario_bucket_counts == MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS
     assert summary.level_counts == MEMORY_GOVERNANCE_LEVEL_COUNTS
     assert summary.tool_profile_counts == MEMORY_GOVERNANCE_TOOL_PROFILE_COUNTS
@@ -703,7 +757,7 @@ def test_robustness_focused_suite_matrix_summary_counts_are_expected() -> None:
 def test_all_registered_case_matrix_summary_counts_are_expected() -> None:
     summary = build_case_matrix_summary(load_benchmark_suite("all_registered"))
 
-    assert summary.case_count == 22
+    assert summary.case_count == 25
     assert summary.scenario_bucket_counts == ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
     assert summary.level_counts == ALL_REGISTERED_LEVEL_COUNTS
     assert summary.tool_profile_counts == ALL_REGISTERED_TOOL_PROFILE_COUNTS
@@ -1642,6 +1696,25 @@ def test_memory_governance_grader_passes_for_expected_policy_summary() -> None:
                         expected_outcome="applied_advisory",
                     )
                 ],
+                expected_decision_log=[
+                    {
+                        "memory_key": "spouse_lighter_meals",
+                        "expected_decision": "applied_advisory",
+                        "expected_status": "downgraded",
+                        "expected_reason": "low_confidence_downgraded_to_advisory",
+                        "expected_influence_level": "advisory",
+                    }
+                ],
+                expected_policy_summary={
+                    "considered_count": 1,
+                    "used_count": 0,
+                    "ignored_count": 0,
+                    "downgraded_count": 1,
+                    "overridden_count": 0,
+                    "primary_influence_count": 0,
+                    "advisory_influence_count": 1,
+                    "no_influence_count": 0,
+                },
             ),
         ),
     )
@@ -1670,6 +1743,31 @@ def test_memory_governance_grader_passes_for_expected_policy_summary() -> None:
                         "outcome": "applied_advisory",
                     }
                 ],
+                "decision_log": [
+                    {
+                        "memory_id": "00000000-0000-0000-0000-000000000001",
+                        "key": "spouse_lighter_meals",
+                        "status": "downgraded",
+                        "decision": "applied_advisory",
+                        "reason": "low_confidence_downgraded_to_advisory",
+                        "influence_level": "advisory",
+                        "dimension": "dining_preferences",
+                        "normalized_value": "lighter_options",
+                        "tier": "advisory",
+                        "expired": False,
+                    }
+                ],
+                "policy_summary": {
+                    "policy_version": "memory_query_policy_v1",
+                    "considered_count": 1,
+                    "used_count": 0,
+                    "ignored_count": 0,
+                    "downgraded_count": 1,
+                    "overridden_count": 0,
+                    "primary_influence_count": 0,
+                    "advisory_influence_count": 1,
+                    "no_influence_count": 0,
+                },
             }
         }
     }
@@ -1683,6 +1781,8 @@ def test_memory_governance_grader_passes_for_expected_policy_summary() -> None:
     assert score.details["observed_dimension_sources"] == {"dining_preferences": "memory"}
     assert score.details["observed_dimension_tiers"] == {"dining_preferences": "advisory"}
     assert score.details["observed_memory_outcomes"] == {"spouse_lighter_meals": "applied_advisory"}
+    assert score.details["observed_decision_log"]["spouse_lighter_meals"]["status"] == "downgraded"
+    assert score.details["observed_policy_summary"]["downgraded_count"] == 1
 
 
 def test_conversation_path_grader_passes_for_exact_status_version_and_turn_types() -> None:
@@ -2346,8 +2446,8 @@ def test_benchmark_summary_schema_includes_suite_and_outcome_rollup_fields() -> 
 def test_build_case_integrity_coverage_summary_returns_expected_counts_for_v2_integrity_suite() -> None:
     summary = build_case_integrity_coverage_summary(load_benchmark_suite("v2_integrity"))
 
-    assert summary.case_count == 12
-    assert summary.memory_case_count == 3
+    assert summary.case_count == 15
+    assert summary.memory_case_count == 6
     assert summary.recovery_case_count == 3
     assert summary.continuation_case_count == 2
     assert summary.robustness_case_count == 4

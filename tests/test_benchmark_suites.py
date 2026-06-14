@@ -37,6 +37,9 @@ REGISTERED_CASE_IDS = [
     "rainy_day_ticket_sold_out_v1",
     "family_memory_advisory_fill_v1",
     "family_memory_expired_advisory_v1",
+    "family_memory_disabled_ignored_v1",
+    "family_memory_candidate_not_auto_active_v1",
+    "family_memory_sensitive_minimization_v1",
     "solo_clarification_continuation_v1",
     "family_replan_version_continuation_v1",
     "family_distractor_selection_v1",
@@ -55,6 +58,9 @@ MEMORY_GOVERNANCE_CASE_IDS = [
     "family_memory_override_v1",
     "family_memory_advisory_fill_v1",
     "family_memory_expired_advisory_v1",
+    "family_memory_disabled_ignored_v1",
+    "family_memory_candidate_not_auto_active_v1",
+    "family_memory_sensitive_minimization_v1",
 ]
 CONVERSATION_CONTINUATION_CASE_IDS = [
     "solo_clarification_continuation_v1",
@@ -73,6 +79,9 @@ V2_INTEGRITY_CASE_IDS = [
     "rainy_day_ticket_sold_out_v1",
     "family_memory_advisory_fill_v1",
     "family_memory_expired_advisory_v1",
+    "family_memory_disabled_ignored_v1",
+    "family_memory_candidate_not_auto_active_v1",
+    "family_memory_sensitive_minimization_v1",
     "solo_clarification_continuation_v1",
     "family_replan_version_continuation_v1",
     "family_distractor_selection_v1",
@@ -217,19 +226,23 @@ DEFAULT_TAG_COUNTS = {
     "rainy_day": 1,
     "short_walk": 1,
 }
-MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS = {"family": 3}
-MEMORY_GOVERNANCE_LEVEL_COUNTS = {"L2": 1, "L3": 2}
-MEMORY_GOVERNANCE_TOOL_PROFILE_COUNTS = {"mock_world": 3}
-MEMORY_GOVERNANCE_WORLD_PROFILE_COUNTS = {"family_afternoon": 3}
-MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS = {"none": 3}
+MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS = {"family": 6}
+MEMORY_GOVERNANCE_LEVEL_COUNTS = {"L2": 1, "L3": 5}
+MEMORY_GOVERNANCE_TOOL_PROFILE_COUNTS = {"mock_world": 6}
+MEMORY_GOVERNANCE_WORLD_PROFILE_COUNTS = {"family_afternoon": 6}
+MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS = {"none": 6}
 MEMORY_GOVERNANCE_TAG_COUNTS = {
-    "child_friendly": 3,
-    "indoor_activity": 2,
-    "light_meal": 2,
+    "child_friendly": 6,
+    "indoor_activity": 3,
+    "light_meal": 3,
     "memory_advisory": 1,
+    "memory_candidate": 2,
+    "memory_disabled": 1,
     "memory_expired": 1,
-    "memory_governance": 2,
+    "memory_governance": 5,
+    "memory_ignored": 1,
     "memory_override": 1,
+    "sensitive_minimization": 1,
 }
 CONVERSATION_CONTINUATION_SCENARIO_BUCKET_COUNTS = {"family": 1, "solo": 1}
 CONVERSATION_CONTINUATION_LEVEL_COUNTS = {"L3": 2}
@@ -331,25 +344,25 @@ RELEASE_GATE_V1_TAG_COUNTS = {
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
     "elder": 1,
-    "family": 11,
+    "family": 14,
     "friends": 2,
     "mixed": 3,
     "solo": 2,
     "unknown": 2,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 13, "L3": 4, "L5": 2}
-ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 22}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 13, "L3": 7, "L5": 2}
+ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 25}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 2,
     "couple_afternoon": 1,
     "elder_afternoon": 1,
-    "family_afternoon": 11,
+    "family_afternoon": 14,
     "friends_gathering": 2,
     "rainy_day_fallback": 3,
     "solo_afternoon": 2,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
-    "none": 19,
+    "none": 22,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
@@ -360,7 +373,7 @@ ALL_REGISTERED_TAG_COUNTS = {
     "baseline": 2,
     "budget_limited": 2,
     "casual_dining": 2,
-    "child_friendly": 11,
+    "child_friendly": 14,
     "citywalk": 2,
     "clarification_turn": 1,
     "composite_failure": 2,
@@ -374,12 +387,15 @@ ALL_REGISTERED_TAG_COUNTS = {
     "fallback_selection": 1,
     "free_activity": 1,
     "friends_group": 2,
-    "indoor_activity": 6,
+    "indoor_activity": 7,
     "light_activity": 2,
-    "light_meal": 11,
+    "light_meal": 12,
     "memory_advisory": 1,
+    "memory_candidate": 2,
+    "memory_disabled": 1,
     "memory_expired": 1,
-    "memory_governance": 2,
+    "memory_governance": 5,
+    "memory_ignored": 1,
     "memory_override": 1,
     "outdoor_activity": 3,
     "plan_versioning": 1,
@@ -389,28 +405,29 @@ ALL_REGISTERED_TAG_COUNTS = {
     "replan_turn": 1,
     "robustness_case": 4,
     "route_failure": 2,
+    "sensitive_minimization": 1,
     "short_walk": 1,
     "stable_sorting": 1,
     "ticket_sold_out": 1,
 }
 V2_INTEGRITY_SCENARIO_BUCKET_COUNTS = {
-    "family": 7,
+    "family": 10,
     "friends": 1,
     "mixed": 2,
     "solo": 1,
     "unknown": 1,
 }
-V2_INTEGRITY_LEVEL_COUNTS = {"L2": 6, "L3": 4, "L5": 2}
-V2_INTEGRITY_TOOL_PROFILE_COUNTS = {"mock_world": 12}
+V2_INTEGRITY_LEVEL_COUNTS = {"L2": 6, "L3": 7, "L5": 2}
+V2_INTEGRITY_TOOL_PROFILE_COUNTS = {"mock_world": 15}
 V2_INTEGRITY_WORLD_PROFILE_COUNTS = {
     "budget_lite": 1,
-    "family_afternoon": 7,
+    "family_afternoon": 10,
     "friends_gathering": 1,
     "rainy_day_fallback": 2,
     "solo_afternoon": 1,
 }
 V2_INTEGRITY_FAILURE_MODE_COUNTS = {
-    "none": 9,
+    "none": 12,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
@@ -419,7 +436,7 @@ V2_INTEGRITY_TAG_COUNTS = {
     "bad_weather": 1,
     "budget_limited": 1,
     "casual_dining": 1,
-    "child_friendly": 7,
+    "child_friendly": 10,
     "clarification_turn": 1,
     "composite_failure": 2,
     "conversation_continuation": 2,
@@ -428,12 +445,15 @@ V2_INTEGRITY_TAG_COUNTS = {
     "failure_injected": 3,
     "fallback_selection": 1,
     "friends_group": 1,
-    "indoor_activity": 4,
+    "indoor_activity": 5,
     "light_activity": 1,
-    "light_meal": 6,
+    "light_meal": 7,
     "memory_advisory": 1,
+    "memory_candidate": 2,
+    "memory_disabled": 1,
     "memory_expired": 1,
-    "memory_governance": 2,
+    "memory_governance": 5,
+    "memory_ignored": 1,
     "memory_override": 1,
     "outdoor_activity": 1,
     "plan_versioning": 1,
@@ -441,25 +461,29 @@ V2_INTEGRITY_TAG_COUNTS = {
     "replan_turn": 1,
     "robustness_case": 4,
     "route_failure": 2,
+    "sensitive_minimization": 1,
     "stable_sorting": 1,
     "ticket_sold_out": 1,
 }
-V2_INTEGRITY_V2_LEVEL_COUNTS = {"L2": 5, "L3": 3, "L4": 1, "L5": 3}
+V2_INTEGRITY_V2_LEVEL_COUNTS = {"L2": 5, "L3": 6, "L4": 1, "L5": 3}
 V2_INTEGRITY_V2_MEMORY_MODE_COUNTS = {
     "advisory_fill": 1,
+    "candidate_not_auto_active": 1,
+    "disabled_ignored": 1,
     "expired_advisory": 1,
     "none": 9,
     "override_guarded": 1,
+    "sensitive_minimization": 1,
 }
 V2_INTEGRITY_V2_CONVERSATION_MODE_COUNTS = {
     "clarification": 1,
     "replan_versioned": 1,
-    "single_turn": 10,
+    "single_turn": 13,
 }
-V2_INTEGRITY_V2_STABILITY_REQUIRED_COUNTS = {"false": 3, "true": 9}
+V2_INTEGRITY_V2_STABILITY_REQUIRED_COUNTS = {"false": 6, "true": 9}
 V2_INTEGRITY_COVERAGE_COUNTS = {
-    "case_count": 12,
-    "memory_case_count": 3,
+    "case_count": 15,
+    "memory_case_count": 6,
     "recovery_case_count": 3,
     "continuation_case_count": 2,
     "robustness_case_count": 4,
@@ -625,7 +649,7 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
     _assert_suite_description(
         suite_map["memory_governance"],
         case_ids=MEMORY_GOVERNANCE_CASE_IDS,
-        case_count=3,
+        case_count=6,
         scenario_bucket_counts=MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS,
         level_counts=MEMORY_GOVERNANCE_LEVEL_COUNTS,
         tool_profile_counts=MEMORY_GOVERNANCE_TOOL_PROFILE_COUNTS,
@@ -680,7 +704,7 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
     _assert_suite_description(
         suite_map["v2_integrity"],
         case_ids=V2_INTEGRITY_CASE_IDS,
-        case_count=12,
+        case_count=15,
         scenario_bucket_counts=V2_INTEGRITY_SCENARIO_BUCKET_COUNTS,
         level_counts=V2_INTEGRITY_LEVEL_COUNTS,
         tool_profile_counts=V2_INTEGRITY_TOOL_PROFILE_COUNTS,
@@ -710,7 +734,7 @@ def test_list_benchmark_suites_returns_descriptions_in_deterministic_order() -> 
     _assert_suite_description(
         suite_map["all_registered"],
         case_ids=REGISTERED_CASE_IDS,
-        case_count=22,
+        case_count=25,
         scenario_bucket_counts=ALL_REGISTERED_SCENARIO_BUCKET_COUNTS,
         level_counts=ALL_REGISTERED_LEVEL_COUNTS,
         tool_profile_counts=ALL_REGISTERED_TOOL_PROFILE_COUNTS,
@@ -781,6 +805,35 @@ def test_canonical_fixture_and_suite_loading_reject_non_mock_world_provider(
 def test_load_benchmark_suite_rejects_unknown_suite_id() -> None:
     with pytest.raises(BenchmarkHarnessError, match="Unknown benchmark suite ID: missing"):
         load_benchmark_suite("missing")
+
+
+def test_memory_governance_and_integrity_suites_expand_for_v2_memory_cases() -> None:
+    assert [case.case_id for case in load_benchmark_suite("memory_governance")] == [
+        "family_memory_override_v1",
+        "family_memory_advisory_fill_v1",
+        "family_memory_expired_advisory_v1",
+        "family_memory_disabled_ignored_v1",
+        "family_memory_candidate_not_auto_active_v1",
+        "family_memory_sensitive_minimization_v1",
+    ]
+    assert [case.case_id for case in load_benchmark_suite("v2_integrity")] == [
+        "family_memory_override_v1",
+        "family_route_failure_v1",
+        "family_route_and_dining_unavailable_v1",
+        "rainy_day_ticket_sold_out_v1",
+        "family_memory_advisory_fill_v1",
+        "family_memory_expired_advisory_v1",
+        "family_memory_disabled_ignored_v1",
+        "family_memory_candidate_not_auto_active_v1",
+        "family_memory_sensitive_minimization_v1",
+        "solo_clarification_continuation_v1",
+        "family_replan_version_continuation_v1",
+        "family_distractor_selection_v1",
+        "friends_distractor_selection_v1",
+        "rainy_day_stable_sorting_v1",
+        "budget_indoor_fallback_v1",
+    ]
+    assert len(load_benchmark_suite("all_registered")) == 25
 
 
 def test_list_benchmark_suites_rejects_duplicate_case_ids(monkeypatch: pytest.MonkeyPatch) -> None:

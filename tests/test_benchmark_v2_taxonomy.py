@@ -27,6 +27,24 @@ def test_benchmark_case_v2_taxonomy_accepts_expected_values() -> None:
     assert taxonomy.stability_required is True
 
 
+def test_benchmark_case_v2_taxonomy_accepts_new_memory_modes() -> None:
+    for mode in (
+        "disabled_ignored",
+        "candidate_not_auto_active",
+        "sensitive_minimization",
+    ):
+        taxonomy = BenchmarkCaseV2Taxonomy(
+            scenario_bucket="family",
+            level="L3",
+            failure_mode="none",
+            memory_mode=mode,
+            conversation_mode="single_turn",
+            stability_required=False,
+        )
+
+        assert taxonomy.memory_mode == mode
+
+
 def test_benchmark_case_v2_taxonomy_rejects_invalid_failure_mode() -> None:
     try:
         BenchmarkCaseV2Taxonomy(
@@ -48,7 +66,7 @@ def test_all_registered_cases_resolve_non_null_v2_taxonomy() -> None:
 
     resolved = [resolve_benchmark_case_v2_taxonomy(case) for case in cases]
 
-    assert len(resolved) == 22
+    assert len(resolved) == 25
     assert all(isinstance(taxonomy, BenchmarkCaseV2Taxonomy) for taxonomy in resolved)
 
 
@@ -78,6 +96,15 @@ def test_v2_taxonomy_fallback_derives_expected_modes_for_representative_cases() 
         load_benchmark_case("family_distractor_selection_v1")
     ).stability_required is True
     assert resolve_benchmark_case_v2_taxonomy(load_benchmark_case("rainy_day_stable_sorting_v1")).stability_required
+    assert resolve_benchmark_case_v2_taxonomy(
+        load_benchmark_case("family_memory_disabled_ignored_v1")
+    ).memory_mode == "disabled_ignored"
+    assert resolve_benchmark_case_v2_taxonomy(
+        load_benchmark_case("family_memory_candidate_not_auto_active_v1")
+    ).memory_mode == "candidate_not_auto_active"
+    assert resolve_benchmark_case_v2_taxonomy(
+        load_benchmark_case("family_memory_sensitive_minimization_v1")
+    ).memory_mode == "sensitive_minimization"
 
 
 def test_v2_taxonomy_fallback_resolves_existing_l4_style_case() -> None:
@@ -94,6 +121,9 @@ def test_build_case_v2_matrix_summary_returns_expected_counts_for_v2_integrity_m
         "rainy_day_ticket_sold_out_v1",
         "family_memory_advisory_fill_v1",
         "family_memory_expired_advisory_v1",
+        "family_memory_disabled_ignored_v1",
+        "family_memory_candidate_not_auto_active_v1",
+        "family_memory_sensitive_minimization_v1",
         "solo_clarification_continuation_v1",
         "family_replan_version_continuation_v1",
         "family_distractor_selection_v1",
@@ -106,30 +136,33 @@ def test_build_case_v2_matrix_summary_returns_expected_counts_for_v2_integrity_m
     summary = build_case_v2_matrix_summary(cases)
 
     assert isinstance(summary, BenchmarkCaseV2MatrixSummary)
-    assert summary.case_count == 12
+    assert summary.case_count == 15
     assert summary.scenario_bucket_counts == {
-        "family": 7,
+        "family": 10,
         "friends": 1,
         "mixed": 2,
         "solo": 1,
         "unknown": 1,
     }
-    assert summary.level_counts == {"L2": 5, "L3": 3, "L4": 1, "L5": 3}
+    assert summary.level_counts == {"L2": 5, "L3": 6, "L4": 1, "L5": 3}
     assert summary.failure_mode_counts == {
-        "none": 9,
+        "none": 12,
         "route_and_dining_unavailable": 1,
         "route_unavailable": 1,
         "ticket_sold_out_and_bad_weather": 1,
     }
     assert summary.memory_mode_counts == {
         "advisory_fill": 1,
+        "candidate_not_auto_active": 1,
+        "disabled_ignored": 1,
         "expired_advisory": 1,
         "none": 9,
         "override_guarded": 1,
+        "sensitive_minimization": 1,
     }
     assert summary.conversation_mode_counts == {
         "clarification": 1,
         "replan_versioned": 1,
-        "single_turn": 10,
+        "single_turn": 13,
     }
-    assert summary.stability_required_counts == {"false": 3, "true": 9}
+    assert summary.stability_required_counts == {"false": 6, "true": 9}

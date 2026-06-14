@@ -1,0 +1,69 @@
+{
+  "case_id": "family_memory_candidate_not_auto_active_v1",
+  "title": "Candidate family memory does not become governable during the same run",
+  "user_input": "This afternoon please arrange a nearby outing for my partner and our 5-year-old for a few hours.",
+  "agent_version": "agent-v1",
+  "prompt_version": "prompt-v1",
+  "tool_profile": "mock_world",
+  "world_profile": "family_afternoon",
+  "failure_profile": null,
+  "memory_items": [
+    {
+      "memory_type": "preference",
+      "key": "activity_style",
+      "value_json": {
+        "preference": "indoor activities"
+      },
+      "text": "The family recently leaned toward indoor outings.",
+      "confidence": "0.6",
+      "status": "candidate"
+    }
+  ],
+  "expected": {
+    "required_tool_names": [
+      "search_poi",
+      "check_weather",
+      "get_poi_detail",
+      "check_opening_hours",
+      "check_queue",
+      "check_table_availability",
+      "check_ticket_availability",
+      "check_route"
+    ],
+    "min_tool_event_count": 8,
+    "min_action_count": 1,
+    "expected_execution_status": "succeeded",
+    "expected_feedback_status": "completed",
+    "memory_governance": {
+      "expected_policy_version": "memory_query_policy_v1",
+      "expected_memory_outcomes": [],
+      "expected_absent_memory_keys": [
+        "activity_style"
+      ],
+      "expected_policy_summary": {
+        "considered_count": 0,
+        "used_count": 0,
+        "ignored_count": 0,
+        "downgraded_count": 0,
+        "overridden_count": 0,
+        "primary_influence_count": 0,
+        "advisory_influence_count": 0,
+        "no_influence_count": 0
+      }
+    }
+  },
+  "taxonomy": {
+    "suite": "locallife_bench_v1",
+    "scenario_bucket": "family",
+    "level": "L3",
+    "tags": [
+      "child_friendly",
+      "memory_candidate",
+      "memory_governance"
+    ],
+    "failure_mode": null
+  },
+  "metadata": {
+    "focus": "candidate_memory_not_governable"
+  }
+}

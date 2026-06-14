@@ -475,7 +475,11 @@ def grade_recovery_expectation(case: BenchmarkCase, run_metadata: Any) -> Benchm
     )
 
 
-def grade_memory_governance(case: BenchmarkCase, run_metadata: Any) -> BenchmarkScore:
+def grade_memory_governance(
+    case: BenchmarkCase,
+    run_metadata: Any,
+    feedback_memory_candidate_summary: Any | None = None,
+) -> BenchmarkScore:
     expectation = case.expected.memory_governance
     if expectation is None:
         raise ValueError("Memory-governance grading requires case.expected.memory_governance.")
@@ -486,6 +490,8 @@ def grade_memory_governance(case: BenchmarkCase, run_metadata: Any) -> Benchmark
 
     raw_dimension_outcomes = _value(memory_policy, "dimension_outcomes", []) or []
     raw_memory_decisions = _value(memory_policy, "memory_decisions", []) or []
+    raw_decision_log = _value(memory_policy, "decision_log", []) or []
+    raw_policy_summary = _value(memory_policy, "policy_summary", {}) or {}
     observed_dimension_sources = {
         str(_value(outcome, "dimension")): str(_value(outcome, "winner_source"))
         for outcome in raw_dimension_outcomes
@@ -501,6 +507,24 @@ def grade_memory_governance(case: BenchmarkCase, run_metadata: Any) -> Benchmark
         for decision in raw_memory_decisions
         if _value(decision, "memory_key") and _value(decision, "outcome")
     }
+    observed_decision_log = {
+        str(_value(entry, "key")): {
+            "decision": _value(entry, "decision"),
+            "status": _value(entry, "status"),
+            "reason": _value(entry, "reason"),
+            "influence_level": _value(entry, "influence_level"),
+        }
+        for entry in raw_decision_log
+        if _value(entry, "key")
+    }
+    observed_policy_summary = {
+        str(key): int(value)
+        for key, value in raw_policy_summary.items()
+        if key != "policy_version" and isinstance(value, int)
+    }
+    observed_feedback_memory_candidate_summary = _safe_feedback_memory_candidate_summary(
+        feedback_memory_candidate_summary
+    )
 
     failures: list[str] = []
     if observed_policy_version != expectation.expected_policy_version:
@@ -525,6 +549,40 @@ def grade_memory_governance(case: BenchmarkCase, run_metadata: Any) -> Benchmark
             failures.append(
                 f"Memory outcome for {decision.memory_key!r} was {observed_outcome!r}, expected {decision.expected_outcome!r}."
             )
+    for decision in expectation.expected_decision_log:
+        observed_entry = observed_decision_log.get(decision.memory_key)
+        if observed_entry is None:
+            failures.append(f"Decision log for {decision.memory_key!r} was missing.")
+            continue
+        for field_name, expected_value in (
+            ("decision", decision.expected_decision),
+            ("status", decision.expected_status),
+            ("reason", decision.expected_reason),
+            ("influence_level", decision.expected_influence_level),
+        ):
+            observed_value = observed_entry.get(field_name)
+            if observed_value != expected_value:
+                failures.append(
+                    f"Decision log {field_name} for {decision.memory_key!r} was {observed_value!r}, expected {expected_value!r}."
+                )
+    for memory_key in expectation.expected_absent_memory_keys:
+        if memory_key in observed_memory_outcomes:
+            failures.append(f"Expected {memory_key!r} to be absent from memory_decisions.")
+        if memory_key in observed_decision_log:
+            failures.append(f"Expected {memory_key!r} to be absent from decision_log.")
+    if expectation.expected_policy_summary is not None:
+        for key, expected_value in expectation.expected_policy_summary.items():
+            observed_value = observed_policy_summary.get(key)
+            if observed_value != expected_value:
+                failures.append(
+                    f"Policy summary {key!r} was {observed_value!r}, expected {expected_value!r}."
+                )
+    if expectation.expected_feedback_memory_candidate_summary is not None:
+        expected_feedback_summary = expectation.expected_feedback_memory_candidate_summary.model_dump(mode="json")
+        if observed_feedback_memory_candidate_summary != expected_feedback_summary:
+            failures.append(
+                "Observed feedback memory candidate summary did not match expected safe summary."
+            )
 
     passed = not failures
     reason = "Memory governance summary matched expected policy decisions."
@@ -547,6 +605,25 @@ def grade_memory_governance(case: BenchmarkCase, run_metadata: Any) -> Benchmark
                 for decision in expectation.expected_memory_outcomes
             },
             "observed_memory_outcomes": observed_memory_outcomes,
+            "expected_decision_log": {
+                decision.memory_key: {
+                    "decision": decision.expected_decision,
+                    "status": decision.expected_status,
+                    "reason": decision.expected_reason,
+                    "influence_level": decision.expected_influence_level,
+                }
+                for decision in expectation.expected_decision_log
+            },
+            "observed_decision_log": observed_decision_log,
+            "expected_absent_memory_keys": list(expectation.expected_absent_memory_keys),
+            "expected_policy_summary": dict(expectation.expected_policy_summary or {}),
+            "observed_policy_summary": observed_policy_summary,
+            "expected_feedback_memory_candidate_summary": (
+                expectation.expected_feedback_memory_candidate_summary.model_dump(mode="json")
+                if expectation.expected_feedback_memory_candidate_summary is not None
+                else None
+            ),
+            "observed_feedback_memory_candidate_summary": observed_feedback_memory_candidate_summary,
         },
     )
 
@@ -625,6 +702,25 @@ def _first_text(*values: Any) -> str | None:
         if isinstance(value, str) and value:
             return value
     return None
+
+
+def _safe_feedback_memory_candidate_summary(summary: Any | None) -> dict[str, Any] | None:
+    if summary is None:
+        return None
+    allowed_keys = {
+        "schema_version",
+        "generation_status",
+        "created_keys",
+        "updated_keys",
+        "skipped_keys",
+    }
+    if isinstance(summary, dict):
+        payload = summary
+    elif hasattr(summary, "model_dump"):
+        payload = summary.model_dump(mode="json")
+    else:
+        return None
+    return {key: payload.get(key) for key in allowed_keys}
 
 
 def combine_scores(scores: Sequence[BenchmarkScore]) -> tuple[str, float, list[str]]:

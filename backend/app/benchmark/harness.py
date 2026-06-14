@@ -54,6 +54,7 @@ from backend.app.demo.schemas import (
 )
 from backend.app.core.config import Settings
 from backend.app.demo.service import DemoServiceError, DemoStartRunOverride, DemoWorkflowService
+from backend.app.feedback.schemas import FeedbackMemoryCandidateSummary
 from backend.app.benchmark.suites import (
     canonical_benchmark_suite_id,
     list_benchmark_suites,
@@ -317,6 +318,7 @@ class BenchmarkHarness:
         plan_json = selected_plan.plan_json if selected_plan is not None and isinstance(selected_plan.plan_json, dict) else {}
         execution = plan_json.get("execution") if isinstance(plan_json, dict) else None
         feedback = plan_json.get("feedback") if isinstance(plan_json, dict) else None
+        feedback_memory_candidate_summary = self._feedback_memory_candidate_summary_from_payload(feedback)
         scores = [
             grade_workflow_path(workflow_result, case),
             grade_agent_coverage(workflow_result),
@@ -334,7 +336,13 @@ class BenchmarkHarness:
         if case.expected.expected_recovery_action is not None:
             scores.append(grade_recovery_expectation(case, run_metadata))
         if case.expected.memory_governance is not None:
-            scores.append(grade_memory_governance(case, run_metadata))
+            scores.append(
+                grade_memory_governance(
+                    case,
+                    run_metadata,
+                    feedback_memory_candidate_summary=feedback_memory_candidate_summary,
+                )
+            )
         status, overall, failure_reasons = combine_scores(scores)
         result = BenchmarkCaseResult(
             case_id=case.case_id,
@@ -354,6 +362,7 @@ class BenchmarkHarness:
             observability_status=workflow_result.observability_status,
             workflow_status=workflow_result.status,
             memory_policy_summary=memory_policy_summary,
+            feedback_memory_candidate_summary=feedback_memory_candidate_summary,
             workflow_timing_summary=workflow_result.workflow_timing_summary,
             workflow_node_history=list(workflow_result.node_history),
             agent_roles=self._agent_roles(workflow_result),
@@ -557,6 +566,7 @@ class BenchmarkHarness:
         plan_json = selected_plan.plan_json if selected_plan is not None and isinstance(selected_plan.plan_json, dict) else {}
         execution = plan_json.get("execution") if isinstance(plan_json, dict) else None
         feedback = plan_json.get("feedback") if isinstance(plan_json, dict) else None
+        feedback_memory_candidate_summary = self._feedback_memory_candidate_summary_from_payload(feedback)
         workflow_result = {
             "status": persisted_final_run.status,
             "node_history": self._workflow_node_history_from_metadata(run_metadata),
@@ -580,7 +590,13 @@ class BenchmarkHarness:
         if case.expected.expected_recovery_action is not None:
             scores.append(grade_recovery_expectation(case, run_metadata))
         if case.expected.memory_governance is not None:
-            scores.append(grade_memory_governance(case, run_metadata))
+            scores.append(
+                grade_memory_governance(
+                    case,
+                    run_metadata,
+                    feedback_memory_candidate_summary=feedback_memory_candidate_summary,
+                )
+            )
         if case.expected.conversation is not None:
             scores.append(
                 grade_conversation_path(
@@ -608,6 +624,7 @@ class BenchmarkHarness:
             observability_status=self._observability_status_from_metadata(run_metadata),
             workflow_status=persisted_final_run.status,
             memory_policy_summary=memory_policy_summary,
+            feedback_memory_candidate_summary=feedback_memory_candidate_summary,
             workflow_timing_summary=run_summary.workflow_timing_summary if run_summary is not None else None,
             workflow_node_history=self._workflow_node_history_from_metadata(run_metadata),
             conversation_trace=conversation_trace,
@@ -874,6 +891,11 @@ class BenchmarkHarness:
                 if result.memory_policy_summary is not None
                 else None
             ),
+            "feedback_memory_candidate_summary": (
+                result.feedback_memory_candidate_summary.model_dump(mode="json")
+                if result.feedback_memory_candidate_summary is not None
+                else None
+            ),
             "score_summaries": [
                 {
                     "name": score.name,
@@ -903,6 +925,27 @@ class BenchmarkHarness:
             return None
         try:
             return MemoryPolicyAuditSummary.model_validate(policy_summary)
+        except ValidationError:
+            return None
+
+    def _feedback_memory_candidate_summary_from_payload(
+        self,
+        feedback_payload: Any,
+    ) -> FeedbackMemoryCandidateSummary | None:
+        if not isinstance(feedback_payload, dict):
+            return None
+        summary = feedback_payload.get("memory_candidate_summary")
+        if not isinstance(summary, dict):
+            return None
+        safe_summary = {
+            "schema_version": summary.get("schema_version"),
+            "generation_status": summary.get("generation_status"),
+            "created_keys": summary.get("created_keys", []),
+            "updated_keys": summary.get("updated_keys", []),
+            "skipped_keys": summary.get("skipped_keys", []),
+        }
+        try:
+            return FeedbackMemoryCandidateSummary.model_validate(safe_summary)
         except ValidationError:
             return None
 

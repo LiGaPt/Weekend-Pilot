@@ -28,30 +28,33 @@ DEFAULT_TIMEOUT_SECONDS = 60.0
 DEFAULT_POLL_INTERVAL_SECONDS = 1.0
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_OUTPUT_ROOT = REPO_ROOT / "var" / "formal-benchmarks"
-MINIMUM_CASE_COUNT = 12
-MINIMUM_MEMORY_CASE_COUNT = 3
+MINIMUM_CASE_COUNT = 15
+MINIMUM_MEMORY_CASE_COUNT = 6
 MINIMUM_RECOVERY_CASE_COUNT = 3
 MINIMUM_CONTINUATION_CASE_COUNT = 2
 MINIMUM_ROBUSTNESS_CASE_COUNT = 4
 MINIMUM_L4_CASE_COUNT = 1
 EXPECTED_MEMORY_MODE_COUNTS = {
     "advisory_fill": 1,
+    "candidate_not_auto_active": 1,
+    "disabled_ignored": 1,
     "expired_advisory": 1,
     "none": 9,
     "override_guarded": 1,
+    "sensitive_minimization": 1,
 }
 EXPECTED_CONVERSATION_MODE_COUNTS = {
     "clarification": 1,
     "replan_versioned": 1,
-    "single_turn": 10,
+    "single_turn": 13,
 }
 EXPECTED_FAILURE_MODE_COUNTS = {
-    "none": 9,
+    "none": 12,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
 }
-EXPECTED_TOOL_PROFILE_COUNTS = {"mock_world": 12}
+EXPECTED_TOOL_PROFILE_COUNTS = {"mock_world": 15}
 
 
 class BenchmarkV2IntegrityGateError(RuntimeError):
