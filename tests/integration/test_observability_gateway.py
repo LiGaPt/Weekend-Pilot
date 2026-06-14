@@ -20,6 +20,7 @@ from backend.app.feedback import DeterministicFeedbackWriter
 from backend.app.models.runtime import ActionLedger, ToolEvent
 from backend.app.main import create_app
 from backend.app.observability import LocalTraceBuffer, ObservabilityRecorder
+from backend.app.observability import integrity_summary as integrity_summary_module
 from backend.app.planning import (
     CandidateEnricher,
     DeterministicIntentParser,
@@ -105,6 +106,22 @@ def benchmark_paths():
 @pytest.fixture()
 def release_gate_summary_dir():
     directory = Path("var/test-release-gate-summary") / str(uuid4())
+    directory.mkdir(parents=True, exist_ok=False)
+    try:
+        yield directory
+    finally:
+        for path in sorted(directory.rglob("*"), reverse=True):
+            if path.is_file():
+                path.unlink()
+            elif path.is_dir():
+                path.rmdir()
+        if directory.exists():
+            directory.rmdir()
+
+
+@pytest.fixture()
+def integrity_summary_dir():
+    directory = Path("var/test-system-integrity-summary-gateway") / str(uuid4())
     directory.mkdir(parents=True, exist_ok=False)
     try:
         yield directory
@@ -455,6 +472,57 @@ def test_release_gate_benchmark_summary_route_returns_404_when_latest_report_is_
     }
 
 
+def test_system_integrity_summary_route_returns_ready_summary(
+    observability_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    integrity_summary_dir: Path,
+) -> None:
+    _write_integrity_summary_files(integrity_summary_dir)
+    monkeypatch.setattr(
+        integrity_summary_module,
+        "EVIDENCE_PATHS",
+        {
+            key: integrity_summary_dir / relative_path
+            for key, relative_path in integrity_summary_module.EVIDENCE_PATHS.items()
+        },
+    )
+
+    response = observability_client.get("/internal/system/integrity-summary")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert payload["benchmark_summary"]["release_blocked"] is False
+    assert payload["stability_summary"]["pass_pow_4"] == 1.0
+    assert payload["memory_governance_summary"]["memory_case_count"] == 2
+    assert payload["recovery_replay_summary"]["passed_check_count"] == 3
+    assert payload["redaction_summary"]["internal_only"] is True
+    assert any(item["evidence_id"] == "v2_integrity_gate" for item in payload["evidence_paths"])
+
+
+def test_system_integrity_summary_route_returns_degraded_summary_when_stability_missing(
+    observability_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    integrity_summary_dir: Path,
+) -> None:
+    _write_integrity_summary_files(integrity_summary_dir, include_stability=False)
+    monkeypatch.setattr(
+        integrity_summary_module,
+        "EVIDENCE_PATHS",
+        {
+            key: integrity_summary_dir / relative_path
+            for key, relative_path in integrity_summary_module.EVIDENCE_PATHS.items()
+        },
+    )
+
+    response = observability_client.get("/internal/system/integrity-summary")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "degraded"
+    assert payload["stability_summary"]["status"] == "missing"
+
+
 def test_internal_observability_route_returns_benchmark_artifact_summary_for_benchmark_run(
     db_session: Session,
     redis_runtime,
@@ -591,6 +659,197 @@ def _build_release_gate_summary_report() -> dict:
             },
         },
         "report_path": "E:/tmp/suite-release_gate_v1-run-report.json",
+    }
+
+
+def _write_integrity_summary_files(root: Path, *, include_stability: bool = True) -> None:
+    _write_json(root / "var/formal-benchmarks/latest-v2_integrity_gate-run-report.json", _build_v2_gate_report())
+    _write_json(root / "var/formal-benchmarks/latest-all_registered-run-report.json", _build_all_registered_report())
+    if include_stability:
+        _write_json(
+            root / "var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json",
+            _build_stability_report(),
+        )
+    _write_json(
+        root / "var/recovery-reviews/latest-family_route_failure_v1-review.json",
+        _build_recovery_review(),
+    )
+
+
+def _write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _build_v2_gate_report() -> dict:
+    return {
+        "schema_version": "weekendpilot_benchmark_run_v1",
+        "run_status": "passed",
+        "case_results": [],
+        "passed_count": 18,
+        "failed_count": 0,
+        "error_count": 0,
+        "overall_score": 1.0,
+        "benchmark_summary": {
+            "schema_version": "weekendpilot_benchmark_summary_v1",
+            "suite_id": "v2_integrity",
+            "suite_title": "V2 integrity",
+            "run_status": "passed",
+            "case_count": 18,
+            "passed_count": 18,
+            "failed_count": 0,
+            "error_count": 0,
+            "overall_score": 1.0,
+            "benchmark_timing_summary": {
+                "schema_version": "benchmark_timing_summary_v1",
+                "case_count": 18,
+                "overall_total_duration_ms": {
+                    "sample_count": 18,
+                    "min_ms": 320,
+                    "p50_ms": 390,
+                    "p95_ms": 424,
+                    "p99_ms": 424,
+                    "max_ms": 424,
+                    "mean_ms": 388.4,
+                },
+                "stages": [],
+            },
+        },
+        "v2_integrity_gate_evaluation": {
+            "schema_version": "weekendpilot_v2_integrity_gate_evaluation_v1",
+            "gate_id": "v2_integrity_gate",
+            "suite_id": "v2_integrity",
+            "release_blocked": False,
+            "blocking_failures": [],
+            "coverage_thresholds": {},
+            "observed_coverage": {
+                "integrity_coverage_summary": {
+                    "case_count": 18,
+                    "memory_case_count": 6,
+                    "recovery_case_count": 6,
+                    "continuation_case_count": 2,
+                    "robustness_case_count": 4,
+                    "l4_case_count": 2,
+                },
+                "memory_mode_counts": {"none": 12, "override_guarded": 1},
+                "conversation_mode_counts": {"single_turn": 15, "replan_versioned": 2, "clarification": 1},
+                "failure_mode_counts": {"none": 12, "route_unavailable": 1},
+            },
+        },
+    }
+
+
+def _build_stability_report() -> dict:
+    return {
+        "schema_version": "weekendpilot_benchmark_stability_passk_v1",
+        "metric_version": "passk_v0",
+        "suite_id": "v2_integrity",
+        "gate_id": "v2_integrity_gate",
+        "requested_run_count": 4,
+        "executed_run_count": 4,
+        "window_size": 4,
+        "window_count": 1,
+        "discarded_tail_run_count": 0,
+        "success_count": 4,
+        "failure_count": 0,
+        "error_count": 0,
+        "success_at_1": 1.0,
+        "pass_at_4": 1.0,
+        "pass_pow_4": 1.0,
+        "attempts": [],
+        "windows": [],
+    }
+
+
+def _build_all_registered_report() -> dict:
+    return {
+        "schema_version": "weekendpilot_benchmark_run_v1",
+        "run_status": "passed",
+        "case_results": [
+            {
+                "schema_version": "weekendpilot_benchmark_case_result_v1",
+                "case_id": "family_memory_override_v1",
+                "status": "passed",
+                "overall_score": 1.0,
+                "tool_event_count": 5,
+                "action_count": 0,
+                "scores": [
+                    {
+                        "name": "memory_governance",
+                        "score": 1.0,
+                        "passed": True,
+                        "reason": "ok",
+                        "details": {},
+                    }
+                ],
+            },
+            {
+                "schema_version": "weekendpilot_benchmark_case_result_v1",
+                "case_id": "family_memory_advisory_fill_v1",
+                "status": "passed",
+                "overall_score": 1.0,
+                "tool_event_count": 5,
+                "action_count": 0,
+                "scores": [
+                    {
+                        "name": "memory_governance",
+                        "score": 1.0,
+                        "passed": True,
+                        "reason": "ok",
+                        "details": {},
+                    }
+                ],
+            },
+        ],
+        "passed_count": 2,
+        "failed_count": 0,
+        "error_count": 0,
+        "overall_score": 1.0,
+        "benchmark_summary": {
+            "schema_version": "weekendpilot_benchmark_summary_v1",
+            "suite_id": "all_registered",
+            "suite_title": "All registered",
+            "run_status": "passed",
+            "case_count": 2,
+            "passed_count": 2,
+            "failed_count": 0,
+            "error_count": 0,
+            "overall_score": 1.0,
+        },
+    }
+
+
+def _build_recovery_review() -> dict:
+    return {
+        "schema_version": "weekendpilot_recovery_replay_review_v1",
+        "status": "passed",
+        "case_id": "family_route_failure_v1",
+        "run_id": None,
+        "run_directory": "var/recovery-reviews/recovery-review-123",
+        "source_report_path": "var/formal-benchmarks/family-route.json",
+        "replay_report_path": "var/recovery-reviews/replay-family-route.json",
+        "latest_review_path": "var/recovery-reviews/latest-family_route_failure_v1-review.json",
+        "checks": [
+            {"name": "a", "passed": True, "detail": "ok"},
+            {"name": "b", "passed": True, "detail": "ok"},
+            {"name": "c", "passed": True, "detail": "ok"},
+        ],
+        "failure_chain_summary": None,
+        "replay_summary": {
+            "status": "passed",
+            "mismatch_count": 0,
+            "failure_chain_signature": ["route_unavailable"],
+        },
+        "recovery_review": {
+            "benchmark_report_path": "var/formal-benchmarks/family-route.json",
+            "attempt_count": 1,
+            "max_attempts": 2,
+            "recovery_actions": ["stop_safely"],
+            "replay_source": {
+                "case_id": "family_route_failure_v1",
+                "benchmark_report_path": "var/formal-benchmarks/family-route.json",
+            },
+        },
     }
 
 
