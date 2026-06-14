@@ -127,6 +127,22 @@ def _failed_check(check_name: str, *, draft_id: str | None = None) -> ReviewChec
     )
 
 
+def _failed_check_with_details(
+    check_name: str,
+    *,
+    draft_id: str | None = None,
+    details: dict | None = None,
+) -> ReviewCheck:
+    return ReviewCheck(
+        check_name=check_name,
+        status="failed",
+        severity="error",
+        message=f"{check_name} failed",
+        draft_id=draft_id,
+        details=details or {},
+    )
+
+
 def _reviewed_draft(
     draft_id: str,
     *,
@@ -291,6 +307,56 @@ def test_recovery_policy_does_not_repeat_replace_candidate_for_same_pair() -> No
 
     assert decision.recovery_action == "expand_search_radius"
     assert decision.route_to == "generate_queries"
+
+
+def test_recovery_policy_stops_immediately_for_queue_closed_dining_failure() -> None:
+    blocked = _failed_check_with_details(
+        "dining_availability",
+        draft_id="draft_1",
+        details={"availability_status": "queue_closed"},
+    )
+
+    decision = decide_recovery_action(
+        plan=_plan(),
+        review=_review(
+            safe_to_present=False,
+            errors=[blocked],
+            reviewed_drafts=[_reviewed_draft("draft_1", safe_to_present=False, errors=[blocked])],
+        ),
+        drafts=_draft_result([_draft("draft_1", activity_id="activity_1", dining_id="dining_1")]),
+        recovery_context=RecoveryEvaluationContext(),
+    )
+
+    assert decision.recovery_action == "stop_safely"
+    assert decision.retry_budget == 0
+
+
+def test_recovery_policy_stops_after_replace_candidate_when_table_unavailable_persists() -> None:
+    blocked = _failed_check_with_details(
+        "dining_availability",
+        draft_id="draft_2",
+        details={"availability_status": "table_unavailable"},
+    )
+    drafts = _draft_result(
+        [
+            _draft("draft_2", activity_id="activity_2", dining_id="dining_2"),
+            _draft("draft_3", activity_id="activity_3", dining_id="dining_3"),
+        ]
+    )
+
+    decision = decide_recovery_action(
+        plan=_plan(),
+        review=_review(
+            safe_to_present=False,
+            errors=[blocked],
+            reviewed_drafts=[_reviewed_draft("draft_2", safe_to_present=False, errors=[blocked])],
+        ),
+        drafts=drafts,
+        recovery_context=RecoveryEvaluationContext(attempted_actions=["replace_candidate"]),
+    )
+
+    assert decision.recovery_action == "stop_safely"
+    assert decision.retry_budget == 0
 
 
 def test_recovery_clarification_uses_distance_tradeoff_prompt_when_distance_is_present() -> None:

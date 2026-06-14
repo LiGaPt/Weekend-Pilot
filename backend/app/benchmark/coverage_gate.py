@@ -24,7 +24,7 @@ LATEST_REPORT_FILENAME = f"latest-{COVERAGE_GATE_ID}-run-report.json"
 DEFAULT_MAX_SCENARIO_SHARE = 0.6
 DEFAULT_MAX_WORLD_PROFILE_SHARE = 0.6
 DEFAULT_MAX_NON_FAILURE_SHARE = 0.9
-MINIMUM_CASE_COUNT = 22
+MINIMUM_CASE_COUNT = 28
 SCHEMA_VERSION = "weekendpilot_coverage_gate_evaluation_v1"
 SCENARIO_BUCKET_MINIMUMS = {
     "couple": 1,
@@ -48,6 +48,9 @@ FAILURE_MODE_MINIMUMS = {
     "route_unavailable": 1,
     "route_and_dining_unavailable": 1,
     "ticket_sold_out_and_bad_weather": 1,
+    "ticket_sold_out_and_route_unavailable": 1,
+    "queue_closed_and_budget_constraint": 1,
+    "table_unavailable_and_replan_required": 1,
 }
 CONSTRAINT_TAG_MINIMUMS = {
     "budget_limited": 2,

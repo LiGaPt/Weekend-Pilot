@@ -195,6 +195,7 @@ class FinalReviewGate:
             self._check_activity_present(draft, draft_id),
             self._check_dining_present(draft, draft_id),
             self._check_candidate_ids_verified(draft, draft_id, indexes),
+            self._check_dining_availability(draft, draft_id, indexes),
             self._check_route_present(draft, draft_id),
             self._check_route_verified(draft, draft_id, indexes),
             self._check_timeline_duration(plan, draft, draft_id),
@@ -280,6 +281,59 @@ class FinalReviewGate:
             "Draft candidate IDs are backed by enrichment evidence.",
             draft_id=draft_id,
             details={"activity_id": activity_id, "dining_id": dining_id},
+        )
+
+    def _check_dining_availability(
+        self,
+        draft: ItineraryDraft,
+        draft_id: str,
+        indexes: dict[str, Any],
+    ) -> ReviewCheck:
+        dining_id = self._dining_id(draft)
+        dining = indexes["dining_by_id"].get(dining_id)
+        if dining is None:
+            return self._fail(
+                "dining_availability",
+                "Draft dining candidate availability cannot be verified.",
+                draft_id=draft_id,
+                details={"dining_id": dining_id, "availability_status": "missing_evidence"},
+            )
+
+        table = dining.table_availability if isinstance(dining.table_availability, dict) else {}
+        queue = dining.queue if isinstance(dining.queue, dict) else {}
+        table_available = table.get("available")
+        queue_status = queue.get("status")
+        details = {
+            "dining_id": dining_id,
+            "table_available": table_available,
+            "queue_status": queue_status,
+        }
+        if queue_status == "closed" and table_available is False:
+            return self._fail(
+                "dining_availability",
+                "Draft dining candidate is blocked because both table and queue access are unavailable.",
+                draft_id=draft_id,
+                details={**details, "availability_status": "table_and_queue_unavailable"},
+            )
+        if queue_status == "closed":
+            return self._fail(
+                "dining_availability",
+                "Draft dining candidate is blocked because queue access is closed.",
+                draft_id=draft_id,
+                details={**details, "availability_status": "queue_closed"},
+            )
+        if table_available is False:
+            return self._fail(
+                "dining_availability",
+                "Draft dining candidate is blocked because table availability is unavailable.",
+                draft_id=draft_id,
+                details={**details, "availability_status": "table_unavailable"},
+            )
+        return self._pass(
+            "dining_availability",
+            "Draft dining candidate has usable table and queue availability evidence.",
+            draft_id=draft_id,
+            details={**details, "availability_status": "usable"},
         )
 
     def _check_route_present(self, draft: ItineraryDraft, draft_id: str) -> ReviewCheck:

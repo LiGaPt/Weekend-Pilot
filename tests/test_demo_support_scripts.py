@@ -247,7 +247,7 @@ def test_readme_covers_project_status_startup_benchmark_and_tests() -> None:
     assert "all_registered" in readme_text
     assert "latest-family_route_failure_v1-review.json" in readme_text
     assert "`15/15`" in readme_text
-    assert "`22/22`" in readme_text
+    assert "`28/28`" in readme_text
     assert "`3/3`" in readme_text
     assert "show_submission_evidence.py" in readme_text
     assert "python -m pytest tests/test_demo_support_scripts.py tests/test_review_evidence.py -q" in readme_text

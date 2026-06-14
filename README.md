@@ -123,8 +123,9 @@ python scripts/demo_preflight.py
 | --- | --- | --- |
 | `release_gate_v1` | 阻塞式主基线，覆盖 `15` 个 `L1-L3` `Mock World` case，验证主产品路径、确认边界、执行链路与 1 个路由失败 case | `var/formal-benchmarks/latest-release_gate_v1-run-report.json` |
 | `coverage_gate_v1_5` | 基于 `all_registered` 的覆盖率 / 多样性 gate，验证场景广度、tag 覆盖、failure mode 覆盖 | `var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json` |
-| `all_registered` | 全量 `22` 个已注册 case 的 `formal verification`，覆盖 `clarification`、`replan/versioning`、`memory governance`、`robustness`、`recovery-related` case | `var/formal-benchmarks/latest-all_registered-run-report.json` |
+| `all_registered` | 全量 `28` 个已注册 case 的 `formal verification`，覆盖 `clarification`、`replan/versioning`、`memory governance`、`robustness`、`recovery-related` case | `var/formal-benchmarks/latest-all_registered-run-report.json` |
 | `family_route_failure_v1` | 固定失败恢复审查链，验证 benchmark failure path、replay 一致性、observability 链接一致性 | `var/recovery-reviews/latest-family_route_failure_v1-review.json` |
+| `safe_stop_gate_v1` | 聚焦 `recovery_focused` 的安全停机 gate，验证 6 个组合失败 case 都以零写动作、bounded chain、terminal `stop_safely` 收束 | `var/formal-benchmarks/latest-safe_stop_gate_v1-run-report.json` |
 
 按能力看，当前 `benchmark` 已覆盖：
 
@@ -142,8 +143,8 @@ python scripts/demo_preflight.py
 | 检查项 | 当前状态 | 关键细节 |
 | --- | --- | --- |
 | `release_gate_v1` | `passed`，`15/15` 通过，`overall_score=1.0` | `Mock World` 全量通过，层级分布为 `L1=3, L2=8, L3=4`；failure mode 为 `none=14`、`route_unavailable=1`；当前关键时延为 `p50=390ms`、`p95=424ms`、`max=424ms` |
-| `coverage_gate_v1_5` | `passed`，`22/22` 通过，`overall_score=1.0` | 场景桶分布为 `couple=1`、`elder=1`、`family=11`、`friends=2`、`mixed=3`、`solo=2`、`unknown=2`；world profile 分布为 `budget_lite=2`、`couple_afternoon=1`、`elder_afternoon=1`、`family_afternoon=11`、`friends_gathering=2`、`rainy_day_fallback=3`、`solo_afternoon=2` |
-| `all_registered` | `passed`，`22/22` 通过，`overall_score=1.0` | 代表性 tag 覆盖包括 `conversation_continuation=2`、`memory_governance=2`、`robustness_case=4`、`elder_friendly=1`、`friends_group=2`、`rainy_day=3` |
+| `coverage_gate_v1_5` | `passed`，`28/28` 通过，`overall_score=1.0` | 场景桶分布为 `couple=1`、`elder=1`、`family=16`、`friends=2`、`mixed=4`、`solo=2`、`unknown=2`；world profile 分布为 `budget_lite=3`、`couple_afternoon=1`、`elder_afternoon=1`、`family_afternoon=16`、`friends_gathering=2`、`rainy_day_fallback=3`、`solo_afternoon=2` |
+| `all_registered` | `passed`，`28/28` 通过，`overall_score=1.0` | 代表性 tag 覆盖包括 `conversation_continuation=2`、`memory_governance=2`、`robustness_case=4`、`elder_friendly=1`、`friends_group=2`、`rainy_day=3`，并新增组合失败覆盖与 `safe_stop_gate_v1` |
 | `family_route_failure_v1` | `recovery review passed`，`3/3` 检查通过 | 当前失败注入链为 `check_route:route_infeasible:failed`，恢复动作是 `stop_safely`，终态为 `terminal_workflow_status=failed`，说明系统走的是“安全停机而非错误执行” |
 
 如果你只想快速查看当前 evidence 状态，直接运行：
@@ -179,8 +180,9 @@ python scripts/run_recovery_replay_review.py --suite-id recovery_focused
 | 检查项 | 结果 |
 | --- | --- |
 | `release_gate_v1` | `passed`，`15/15` 通过，`failed=0`，`error=0`，`overall_score=1.0` |
-| `coverage_gate_v1_5` | `passed`，`22/22` 通过，`failed=0`，`error=0`，`overall_score=1.0` |
-| `all_registered` | `passed`，`22/22` 通过，`failed=0`，`error=0`，`overall_score=1.0` |
+| `coverage_gate_v1_5` | `passed`，`28/28` 通过，`failed=0`，`error=0`，`overall_score=1.0` |
+| `all_registered` | `passed`，`28/28` 通过，`failed=0`，`error=0`，`overall_score=1.0` |
+| `safe_stop_gate_v1` | `passed`，`6/6` 通过，`failed=0`，`error=0`，全部 recovery case 都是零写动作安全停机 |
 | `family_route_failure_v1` recovery review | `passed`，`3/3` 检查通过 |
 
 对应检查命令：

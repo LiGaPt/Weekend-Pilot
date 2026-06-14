@@ -9,6 +9,9 @@ from backend.app.tool_gateway import StaticToolFailureInjector, ToolFailureInjec
 ROUTE_UNAVAILABLE_PROFILE_ID = "route_unavailable_v0"
 ROUTE_AND_DINING_UNAVAILABLE_PROFILE_ID = "route_and_dining_unavailable_v0"
 TICKET_SOLD_OUT_AND_BAD_WEATHER_PROFILE_ID = "ticket_sold_out_and_bad_weather_v0"
+TICKET_SOLD_OUT_AND_ROUTE_UNAVAILABLE_PROFILE_ID = "ticket_sold_out_and_route_unavailable_v0"
+QUEUE_CLOSED_AND_BUDGET_CONSTRAINT_PROFILE_ID = "queue_closed_and_budget_constraint_v0"
+TABLE_UNAVAILABLE_AND_REPLAN_REQUIRED_PROFILE_ID = "table_unavailable_and_replan_required_v0"
 
 _ROUTE_UNAVAILABLE_RULE = ToolFailureInjectionRule(
     rule_id="route_unavailable_v0.check_route",
@@ -92,10 +95,73 @@ _TICKET_SOLD_OUT_AND_BAD_WEATHER_RULES = [
         },
     ),
 ]
+_TICKET_SOLD_OUT_AND_ROUTE_UNAVAILABLE_RULES = [
+    ToolFailureInjectionRule(
+        rule_id="ticket_sold_out_and_route_unavailable_v0.check_ticket_availability",
+        tool_name="check_ticket_availability",
+        effect_kind="response_override",
+        effect_type="ticket_sold_out",
+        gateway_status="succeeded",
+        response_json_template={
+            "ticket_availability": {
+                "poi_id": "{poi_id}",
+                "available": False,
+                "time_slots": [],
+                "remaining": 0,
+                "price_cents": 0,
+            }
+        },
+    ),
+    ToolFailureInjectionRule(
+        rule_id="ticket_sold_out_and_route_unavailable_v0.check_route",
+        tool_name="check_route",
+        effect_kind="hard_failure",
+        effect_type="route_infeasible",
+        gateway_status="failed",
+    ),
+]
+_QUEUE_CLOSED_AND_BUDGET_CONSTRAINT_RULES = [
+    ToolFailureInjectionRule(
+        rule_id="queue_closed_and_budget_constraint_v0.check_queue",
+        tool_name="check_queue",
+        effect_kind="response_override",
+        effect_type="queue_closed",
+        gateway_status="succeeded",
+        response_json_template={
+            "queue": {
+                "poi_id": "{poi_id}",
+                "status": "closed",
+                "wait_minutes": 120,
+                "parties_ahead": 24,
+            }
+        },
+    ),
+]
+_TABLE_UNAVAILABLE_AND_REPLAN_REQUIRED_RULES = [
+    ToolFailureInjectionRule(
+        rule_id="table_unavailable_and_replan_required_v0.check_table_availability",
+        tool_name="check_table_availability",
+        effect_kind="response_override",
+        effect_type="table_unavailable",
+        gateway_status="succeeded",
+        response_json_template={
+            "table_availability": {
+                "restaurant_id": "{restaurant_id}",
+                "available": False,
+                "time_slots": [],
+                "max_party_size": 0,
+                "notes": "Chaos profile injected unavailable table capacity.",
+            }
+        },
+    ),
+]
 _PROFILE_RULES = {
     ROUTE_UNAVAILABLE_PROFILE_ID: [_ROUTE_UNAVAILABLE_RULE],
     ROUTE_AND_DINING_UNAVAILABLE_PROFILE_ID: _ROUTE_AND_DINING_UNAVAILABLE_RULES,
     TICKET_SOLD_OUT_AND_BAD_WEATHER_PROFILE_ID: _TICKET_SOLD_OUT_AND_BAD_WEATHER_RULES,
+    TICKET_SOLD_OUT_AND_ROUTE_UNAVAILABLE_PROFILE_ID: _TICKET_SOLD_OUT_AND_ROUTE_UNAVAILABLE_RULES,
+    QUEUE_CLOSED_AND_BUDGET_CONSTRAINT_PROFILE_ID: _QUEUE_CLOSED_AND_BUDGET_CONSTRAINT_RULES,
+    TABLE_UNAVAILABLE_AND_REPLAN_REQUIRED_PROFILE_ID: _TABLE_UNAVAILABLE_AND_REPLAN_REQUIRED_RULES,
 }
 
 

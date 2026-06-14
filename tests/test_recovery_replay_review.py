@@ -179,6 +179,20 @@ def test_run_generic_recovery_replay_review_runs_recovery_suite_and_returns_run_
     suite_cases = [
         _recovery_case("family_route_failure_v1", "route_unavailable_v0", "stop_safely", 1),
         _recovery_case("family_route_and_dining_unavailable_v1", "route_and_dining_unavailable_v0", "stop_safely", 3),
+        _recovery_case("rainy_day_ticket_sold_out_v1", "ticket_sold_out_and_bad_weather_v0", "stop_safely", 2),
+        _recovery_case(
+            "family_ticket_sold_out_and_route_unavailable_v1",
+            "ticket_sold_out_and_route_unavailable_v0",
+            "stop_safely",
+            2,
+        ),
+        _recovery_case("budget_queue_closed_constraint_v1", "queue_closed_and_budget_constraint_v0", "stop_safely", 1),
+        _recovery_case(
+            "family_table_unavailable_replan_required_v1",
+            "table_unavailable_and_replan_required_v0",
+            "stop_safely",
+            1,
+        ),
     ]
 
     monkeypatch.setattr(recovery_review, "_bootstrap_runtime", lambda **_: None)
@@ -196,11 +210,28 @@ def test_run_generic_recovery_replay_review_runs_recovery_suite_and_returns_run_
             report_path = self.report_dir / f"{case.case_id}.json"
             report_path.parent.mkdir(parents=True, exist_ok=True)
             report_path.write_text('{"source":"ok"}', encoding="utf-8")
-            injected_effects = ["check_route:route_infeasible:failed"]
-            if case.case_id != "family_route_failure_v1":
-                injected_effects.extend(
-                    ["check_table_availability:no_tables:failed", "check_queue:queue_closed:failed"]
-                )
+            if case.case_id == "family_route_failure_v1":
+                injected_effects = ["check_route:route_infeasible:failed"]
+            elif case.case_id == "budget_queue_closed_constraint_v1":
+                injected_effects = ["check_queue:queue_closed:succeeded"]
+            elif case.case_id == "family_table_unavailable_replan_required_v1":
+                injected_effects = ["check_table_availability:table_unavailable:succeeded"]
+            elif case.case_id == "family_ticket_sold_out_and_route_unavailable_v1":
+                injected_effects = [
+                    "check_ticket_availability:ticket_sold_out:succeeded",
+                    "check_route:route_infeasible:failed",
+                ]
+            elif case.case_id == "rainy_day_ticket_sold_out_v1":
+                injected_effects = [
+                    "check_weather:bad_weather:succeeded",
+                    "check_ticket_availability:ticket_sold_out:succeeded",
+                ]
+            else:
+                injected_effects = [
+                    "check_queue:dining_unavailable:succeeded",
+                    "check_table_availability:dining_unavailable:succeeded",
+                    "check_route:route_infeasible:failed",
+                ]
             return _source_case_result(
                 case_id=case.case_id,
                 run_id=UUID("aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb"),
@@ -218,11 +249,28 @@ def test_run_generic_recovery_replay_review_runs_recovery_suite_and_returns_run_
             replay_report_path = self.replay_report_dir / f"{case_id}-replay.json"
             replay_report_path.parent.mkdir(parents=True, exist_ok=True)
             replay_report_path.write_text('{"replay":"ok"}', encoding="utf-8")
-            failure_chain_signature = ["check_route:route_infeasible:failed"]
-            if case_id != "family_route_failure_v1":
-                failure_chain_signature.extend(
-                    ["check_table_availability:no_tables:failed", "check_queue:queue_closed:failed"]
-                )
+            if case_id == "family_route_failure_v1":
+                failure_chain_signature = ["check_route:route_infeasible:failed"]
+            elif case_id == "budget_queue_closed_constraint_v1":
+                failure_chain_signature = ["check_queue:queue_closed:succeeded"]
+            elif case_id == "family_table_unavailable_replan_required_v1":
+                failure_chain_signature = ["check_table_availability:table_unavailable:succeeded"]
+            elif case_id == "family_ticket_sold_out_and_route_unavailable_v1":
+                failure_chain_signature = [
+                    "check_ticket_availability:ticket_sold_out:succeeded",
+                    "check_route:route_infeasible:failed",
+                ]
+            elif case_id == "rainy_day_ticket_sold_out_v1":
+                failure_chain_signature = [
+                    "check_weather:bad_weather:succeeded",
+                    "check_ticket_availability:ticket_sold_out:succeeded",
+                ]
+            else:
+                failure_chain_signature = [
+                    "check_queue:dining_unavailable:succeeded",
+                    "check_table_availability:dining_unavailable:succeeded",
+                    "check_route:route_infeasible:failed",
+                ]
             return _replay_case_result(
                 case_id=case_id,
                 benchmark_report_path=report_path,
@@ -260,7 +308,7 @@ def test_run_generic_recovery_replay_review_runs_recovery_suite_and_returns_run_
         assert report.selection_mode == "suite"
         assert report.suite_id == "recovery_focused"
         assert report.requested_case_ids == [item.case_id for item in suite_cases]
-        assert len(report.case_results) == 2
+        assert len(report.case_results) == 6
     finally:
         _cleanup_test_dir(output_root)
 

@@ -51,6 +51,24 @@ def decide_recovery_action(
             reason="All current routes are unusable, so deterministic recovery cannot improve the result safely.",
         )
 
+    dining_block = _dining_availability_block(review)
+    if dining_block == "queue_closed":
+        return RecoveryDecision(
+            verdict="failed",
+            error_type=primary_error,
+            recovery_action="stop_safely",
+            retry_budget=0,
+            reason="Queue access is closed, so deterministic recovery should stop before proposing write actions.",
+        )
+    if dining_block in {"table_unavailable", "table_and_queue_unavailable"} and "replace_candidate" in context.attempted_actions:
+        return RecoveryDecision(
+            verdict="failed",
+            error_type=primary_error,
+            recovery_action="stop_safely",
+            retry_budget=0,
+            reason="Dining availability remained blocked after one candidate replacement, so recovery stops safely.",
+        )
+
     if _can_replace_candidate(review, drafts, context):
         return RecoveryDecision(
             verdict="failed",
@@ -176,3 +194,13 @@ def _first_draft_pair(drafts: ItineraryDraftResult) -> tuple[str, str] | None:
         return None
     first_draft = drafts.drafts[0]
     return first_draft.activity.candidate_id, first_draft.dining.candidate_id
+
+
+def _dining_availability_block(review: FinalReviewResult) -> str | None:
+    for error in review.errors:
+        if not isinstance(error, ReviewCheck) or error.check_name != "dining_availability":
+            continue
+        details = error.details if isinstance(error.details, dict) else {}
+        status = details.get("availability_status")
+        return status if isinstance(status, str) and status else None
+    return None
