@@ -4,7 +4,10 @@ import json
 from pathlib import Path
 from uuid import uuid4
 
-from backend.app.benchmark.recovery_review import run_recovery_replay_review
+from backend.app.benchmark.recovery_review import (
+    run_generic_recovery_replay_review,
+    run_recovery_replay_review,
+)
 
 
 FORBIDDEN_REPORT_TEXT = (
@@ -80,6 +83,82 @@ def test_recovery_replay_review_runs_family_route_failure_closure_and_refreshes_
         serialized = json.dumps(payload, sort_keys=True)
         for forbidden in FORBIDDEN_REPORT_TEXT:
             assert forbidden not in serialized
+    finally:
+        _cleanup_test_dir(output_root)
+
+
+def test_recovery_replay_review_runs_selected_non_family_case_and_refreshes_case_alias() -> None:
+    output_root = _make_test_dir()
+
+    try:
+        report = run_generic_recovery_replay_review(
+            case_id="family_route_and_dining_unavailable_v1",
+            output_root=output_root,
+            start_services=False,
+        )
+
+        assert report.status == "passed"
+        assert report.selection_mode == "case"
+        assert report.case_id == "family_route_and_dining_unavailable_v1"
+        assert report.requested_case_ids == ["family_route_and_dining_unavailable_v1"]
+        assert report.passed_count == 1
+        assert report.failed_count == 0
+        assert report.error_count == 0
+        assert len(report.case_results) == 1
+
+        case_result = report.case_results[0]
+        review_artifact_path = Path(case_result.review_artifact_path)
+        latest_alias_path = Path(case_result.latest_review_path)
+        payload = json.loads(review_artifact_path.read_text(encoding="utf-8"))
+
+        assert latest_alias_path.exists()
+        assert latest_alias_path.read_bytes() == review_artifact_path.read_bytes()
+        assert payload["case_id"] == "family_route_and_dining_unavailable_v1"
+        assert payload["status"] == "passed"
+        assert payload["failure_chain_summary"]["profile_id"] == "route_and_dining_unavailable_v0"
+        assert payload["failure_chain_summary"]["recovery_actions"] == ["stop_safely"]
+        assert len(payload["failure_chain_summary"]["injected_effects"]) >= 3
+        assert payload["replay_summary"]["status"] == "passed"
+    finally:
+        _cleanup_test_dir(output_root)
+
+
+def test_recovery_replay_review_runs_recovery_suite_and_writes_run_report() -> None:
+    output_root = _make_test_dir()
+
+    try:
+        report = run_generic_recovery_replay_review(
+            suite_id="recovery_focused",
+            output_root=output_root,
+            start_services=False,
+        )
+
+        run_report_path = Path(report.report_path)
+        payload = json.loads(run_report_path.read_text(encoding="utf-8"))
+
+        assert report.status == "passed"
+        assert report.selection_mode == "suite"
+        assert report.suite_id == "recovery_focused"
+        assert report.requested_case_ids == [
+            "family_route_failure_v1",
+            "family_route_and_dining_unavailable_v1",
+            "rainy_day_ticket_sold_out_v1",
+        ]
+        assert report.passed_count == 3
+        assert report.failed_count == 0
+        assert report.error_count == 0
+        assert len(report.case_results) == 3
+        assert payload["schema_version"] == "weekendpilot_recovery_replay_review_run_v1"
+        assert payload["status"] == "passed"
+        assert payload["selection_mode"] == "suite"
+        assert payload["suite_id"] == "recovery_focused"
+        assert len(payload["case_results"]) == 3
+
+        for item in report.case_results:
+            review_artifact_path = Path(item.review_artifact_path)
+            latest_alias_path = Path(item.latest_review_path)
+            assert review_artifact_path.exists()
+            assert latest_alias_path.exists()
     finally:
         _cleanup_test_dir(output_root)
 

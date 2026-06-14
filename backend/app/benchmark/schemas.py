@@ -452,6 +452,28 @@ class RecoveryReplayReviewResult(BaseModel):
     recovery_review: RecoveryReplayReviewSummary | None = None
 
 
+class RecoveryReplayReviewCaseRunSummary(BaseModel):
+    case_id: str
+    status: RecoveryReplayReviewStatus
+    review_artifact_path: str
+    latest_review_path: str
+
+
+class RecoveryReplayReviewRunReport(BaseModel):
+    schema_version: str = "weekendpilot_recovery_replay_review_run_v1"
+    status: RecoveryReplayReviewStatus
+    selection_mode: Literal["case", "suite"]
+    case_id: str | None = None
+    suite_id: str | None = None
+    requested_case_ids: list[str] = Field(default_factory=list)
+    run_directory: str
+    report_path: str | None = None
+    passed_count: int
+    failed_count: int
+    error_count: int
+    case_results: list[RecoveryReplayReviewCaseRunSummary] = Field(default_factory=list)
+
+
 def resolve_benchmark_case_v2_taxonomy(case: BenchmarkCase) -> BenchmarkCaseV2Taxonomy:
     if case.v2_taxonomy is not None:
         return case.v2_taxonomy
