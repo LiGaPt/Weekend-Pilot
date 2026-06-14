@@ -35,6 +35,9 @@ _MEMORY_GOVERNANCE_CASE_IDS = [
     "family_memory_override_v1",
     "family_memory_advisory_fill_v1",
     "family_memory_expired_advisory_v1",
+    "family_memory_disabled_ignored_v1",
+    "family_memory_candidate_not_auto_active_v1",
+    "family_memory_sensitive_minimization_v1",
 ]
 _CONVERSATION_CONTINUATION_CASE_IDS = [
     "solo_clarification_continuation_v1",

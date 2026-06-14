@@ -51,8 +51,11 @@ MEMORY_GOVERNANCE_CASE_IDS = {
     "family_memory_override_v1",
     "family_memory_advisory_fill_v1",
     "family_memory_expired_advisory_v1",
+    "family_memory_disabled_ignored_v1",
+    "family_memory_candidate_not_auto_active_v1",
+    "family_memory_sensitive_minimization_v1",
 }
-MEMORY_GOVERNANCE_TOOL_PROFILE_COUNTS = {"mock_world": 3}
+MEMORY_GOVERNANCE_TOOL_PROFILE_COUNTS = {"mock_world": 6}
 CONVERSATION_CONTINUATION_CASE_IDS = {
     "solo_clarification_continuation_v1",
     "family_replan_version_continuation_v1",
@@ -203,16 +206,20 @@ RELEASE_GATE_V1_WORLD_PROFILE_COUNTS = {
 }
 DEFAULT_FAILURE_MODE_COUNTS = {"none": 11}
 RELEASE_GATE_V1_FAILURE_MODE_COUNTS = {"none": 14, "route_unavailable": 1}
-MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS = {"family": 3}
-MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS = {"none": 3}
+MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS = {"family": 6}
+MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS = {"none": 6}
 MEMORY_GOVERNANCE_CONSTRAINT_TAG_COUNTS = {
-    "child_friendly": 3,
-    "indoor_activity": 2,
-    "light_meal": 2,
+    "child_friendly": 6,
+    "indoor_activity": 3,
+    "light_meal": 3,
     "memory_advisory": 1,
+    "memory_candidate": 2,
+    "memory_disabled": 1,
     "memory_expired": 1,
-    "memory_governance": 2,
+    "memory_governance": 5,
+    "memory_ignored": 1,
     "memory_override": 1,
+    "sensitive_minimization": 1,
 }
 CONVERSATION_CONTINUATION_SCENARIO_BUCKET_COUNTS = {"family": 1, "solo": 1}
 CONVERSATION_CONTINUATION_FAILURE_MODE_COUNTS = {"none": 2}
@@ -998,6 +1005,131 @@ def test_benchmark_harness_records_memory_policy_for_expired_advisory_case(
     }
 
 
+def test_benchmark_harness_records_memory_policy_for_disabled_ignored_case(
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    case = load_benchmark_case("family_memory_disabled_ignored_v1")
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    result = harness.run_case(case)
+
+    assert result.status == "passed"
+    assert result.run_id is not None
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    memory_score = next(score for score in result.scores if score.name == "memory_governance")
+
+    memory_policy = run.metadata_json["workflow"]["memory_policy"]
+    assert memory_policy["policy_version"] == "memory_query_policy_v1"
+    assert memory_policy["memory_decisions"] == []
+    assert memory_policy["decision_log"] == []
+    assert memory_policy["policy_summary"] == {
+        "policy_version": "memory_query_policy_v1",
+        "considered_count": 0,
+        "used_count": 0,
+        "ignored_count": 0,
+        "downgraded_count": 0,
+        "overridden_count": 0,
+        "primary_influence_count": 0,
+        "advisory_influence_count": 0,
+        "no_influence_count": 0,
+    }
+    assert memory_score.passed is True
+    assert memory_score.details["observed_memory_outcomes"] == {}
+    assert memory_score.details["observed_decision_log"] == {}
+    assert memory_score.details["observed_policy_summary"]["considered_count"] == 0
+
+
+def test_benchmark_harness_records_memory_policy_for_candidate_not_auto_active_case(
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    case = load_benchmark_case("family_memory_candidate_not_auto_active_v1")
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    result = harness.run_case(case)
+
+    assert result.status == "passed"
+    assert result.run_id is not None
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    memory_score = next(score for score in result.scores if score.name == "memory_governance")
+
+    memory_policy = run.metadata_json["workflow"]["memory_policy"]
+    assert memory_policy["policy_version"] == "memory_query_policy_v1"
+    assert memory_policy["memory_decisions"] == []
+    assert memory_policy["decision_log"] == []
+    assert memory_policy["policy_summary"]["considered_count"] == 0
+    assert memory_score.passed is True
+    assert "activity_style" not in memory_score.details["observed_memory_outcomes"]
+    assert "activity_style" not in memory_score.details["observed_decision_log"]
+
+
+def test_benchmark_harness_records_safe_feedback_summary_for_sensitive_minimization_case(
+    db_session: Session,
+    redis_runtime,
+    harness_paths,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    trace_path, report_dir = harness_paths
+    case = load_benchmark_case("family_memory_sensitive_minimization_v1")
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_path,
+    )
+
+    result = harness.run_case(case)
+
+    assert result.status == "passed"
+    assert result.feedback_memory_candidate_summary is not None
+    assert result.feedback_memory_candidate_summary.model_dump(mode="json") == {
+        "schema_version": "feedback_memory_candidates_v0",
+        "generation_status": "completed",
+        "created_keys": ["activity_style", "spouse_lighter_meals"],
+        "updated_keys": [],
+        "skipped_keys": [],
+    }
+    assert set(result.feedback_memory_candidate_summary.model_dump(mode="json")) == {
+        "schema_version",
+        "generation_status",
+        "created_keys",
+        "updated_keys",
+        "skipped_keys",
+    }
+
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    artifact_summary = run.metadata_json["benchmark"]["artifact_summary"]
+    assert artifact_summary["feedback_memory_candidate_summary"] == (
+        result.feedback_memory_candidate_summary.model_dump(mode="json")
+    )
+    serialized = json.dumps(artifact_summary["feedback_memory_candidate_summary"], sort_keys=True)
+    for forbidden in ("address", "phone", "token", "secret", "feedback_text"):
+        assert forbidden not in serialized
+
+
 def test_benchmark_harness_runs_solo_clarification_continuation_case(
     db_session: Session,
     redis_runtime,
@@ -1183,7 +1315,7 @@ def test_benchmark_harness_runs_family_replan_version_continuation_case(
         (
             "memory_governance",
             MEMORY_GOVERNANCE_CASE_IDS,
-            3,
+            6,
             MEMORY_GOVERNANCE_TOOL_PROFILE_COUNTS,
             MEMORY_GOVERNANCE_SCENARIO_BUCKET_COUNTS,
             MEMORY_GOVERNANCE_FAILURE_MODE_COUNTS,
