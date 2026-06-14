@@ -11,7 +11,7 @@ from backend.app.confirmation import HumanConfirmationService
 from backend.app.db.session import SessionLocal
 from backend.app.execution import DeterministicExecutionWorkflow
 from backend.app.feedback import DeterministicFeedbackWriter
-from backend.app.models.runtime import ActionLedger, Plan, ToolEvent
+from backend.app.models.runtime import ActionLedger, MemoryItem, Plan, ToolEvent
 from backend.app.planning import (
     CandidateEnricher,
     DeterministicIntentParser,
@@ -177,9 +177,37 @@ def test_feedback_writer_persists_user_safe_feedback_after_mock_world_execution(
     assert "搞定了" in feedback.final_arrangement_message
     assert "出发" in feedback.final_arrangement_message
 
+    assert feedback.memory_candidate_summary is not None
+    assert feedback.memory_candidate_summary.created_keys == ["activity_style", "spouse_lighter_meals"]
+    assert stored["memory_candidate_summary"] == {
+        "schema_version": "feedback_memory_candidates_v0",
+        "generation_status": "completed",
+        "created_keys": ["activity_style", "spouse_lighter_meals"],
+        "updated_keys": [],
+        "skipped_keys": [],
+    }
+
     serialized_feedback = str(stored)
     assert "tool_event_id" not in serialized_feedback
     assert "action_id" not in serialized_feedback
+    memory_rows = db_session.scalars(
+        select(MemoryItem)
+        .where(MemoryItem.user_id == run.user_id)
+        .order_by(MemoryItem.key)
+    ).all()
+    assert [memory.key for memory in memory_rows] == ["activity_style", "spouse_lighter_meals"]
+    assert all(memory.status == "candidate" for memory in memory_rows)
+    assert all(memory.text is None for memory in memory_rows)
+    assert memory_rows[0].value_json == {
+        "preference": "indoor",
+        "source": "feedback_writer_v0",
+        "evidence": "selected_candidate_tags",
+    }
+    assert memory_rows[1].value_json == {
+        "preference": "lighter_options",
+        "source": "feedback_writer_v0",
+        "evidence": "selected_candidate_tags",
+    }
 
 
 def test_feedback_writer_uses_readable_addon_label_after_execution(

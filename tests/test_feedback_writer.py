@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.session import SessionLocal
 from backend.app.feedback import DeterministicFeedbackWriter, FeedbackWriterError
-from backend.app.models.runtime import Plan
-from backend.app.repositories import AgentRunRepository, PlanRepository, UserRepository
+from backend.app.models.runtime import MemoryItem, Plan
+from backend.app.repositories import AgentRunRepository, MemoryItemRepository, PlanRepository, UserRepository
 
 
 @pytest.fixture()
@@ -90,10 +90,12 @@ def _reviewed_plan_json(
             "summary": "一条已审核的亲子半日方案。",
             "activity": {
                 "candidate_id": "activity_museum_001",
+                "tags": ["child_friendly", "indoor"],
                 "name": "徐汇亲子科学馆",
             },
             "dining": {
                 "candidate_id": "restaurant_light_001",
+                "tags": ["lighter_options", "quiet"],
                 "name": "绿碗家庭轻食",
             },
             "timeline": [
@@ -199,6 +201,34 @@ def test_successful_execution_creates_completed_feedback_and_run_status(db_sessi
     assert feedback["run_status"] == "completed"
     assert feedback["final_arrangement_message"] == result.final_arrangement_message
     assert feedback["completed_actions"][0]["target_label"] == "徐汇亲子科学馆"
+
+
+    assert feedback["memory_candidate_summary"] == {
+        "schema_version": "feedback_memory_candidates_v0",
+        "generation_status": "completed",
+        "created_keys": ["activity_style", "spouse_lighter_meals"],
+        "updated_keys": [],
+        "skipped_keys": [],
+    }
+
+    memories = db_session.scalars(
+        select(MemoryItem)
+        .where(MemoryItem.user_id == run.user_id)
+        .order_by(MemoryItem.key)
+    ).all()
+    assert [memory.key for memory in memories] == ["activity_style", "spouse_lighter_meals"]
+    assert all(memory.status == "candidate" for memory in memories)
+    assert all(memory.text is None for memory in memories)
+    assert memories[0].value_json == {
+        "preference": "indoor",
+        "source": "feedback_writer_v0",
+        "evidence": "selected_candidate_tags",
+    }
+    assert memories[1].value_json == {
+        "preference": "lighter_options",
+        "source": "feedback_writer_v0",
+        "evidence": "selected_candidate_tags",
+    }
 
 
 def test_addon_feedback_uses_readable_target_label_from_selected_addon_evidence(db_session: Session) -> None:
@@ -461,6 +491,73 @@ def test_feedback_payload_does_not_expose_internal_execution_ids_or_debug_data(d
     assert "debug_trace" not in serialized
 
 
+def test_feedback_writer_does_not_overwrite_existing_active_memory(db_session: Session) -> None:
+    run = _create_run(db_session)
+    MemoryItemRepository(db_session).create(
+        user_id=run.user_id,
+        memory_type="preference",
+        key="activity_style",
+        value_json={"preference": "outdoor"},
+        text="Keep existing active memory.",
+        confidence="1.0",
+        source_run_id=None,
+        source_langsmith_trace_id=None,
+        expires_at=None,
+        status="active",
+    )
+    plan = _create_executed_plan(db_session, run_id=run.run_id)
+
+    result = _write_feedback(db_session, run.run_id, plan.plan_id)
+
+    activity_memory = db_session.scalar(
+        select(MemoryItem).where(
+            MemoryItem.user_id == run.user_id,
+            MemoryItem.key == "activity_style",
+        )
+    )
+    assert activity_memory is not None
+    assert activity_memory.status == "active"
+    assert activity_memory.value_json == {"preference": "outdoor"}
+    assert result.memory_candidate_summary is not None
+    assert result.memory_candidate_summary.skipped_keys == ["activity_style"]
+    assert result.memory_candidate_summary.created_keys == ["spouse_lighter_meals"]
+
+
+def test_feedback_writer_updates_existing_candidate_memory_in_place(db_session: Session) -> None:
+    run = _create_run(db_session)
+    existing = MemoryItemRepository(db_session).create(
+        user_id=run.user_id,
+        memory_type="preference",
+        key="activity_style",
+        value_json={"preference": "outdoor"},
+        text="stale text",
+        confidence="0.5000",
+        source_run_id=None,
+        source_langsmith_trace_id="trace-1",
+        expires_at=None,
+        status="candidate",
+    )
+    plan = _create_executed_plan(db_session, run_id=run.run_id)
+
+    result = _write_feedback(db_session, run.run_id, plan.plan_id)
+
+    updated = db_session.get(MemoryItem, existing.memory_id)
+    assert updated is not None
+    assert updated.memory_id == existing.memory_id
+    assert updated.status == "candidate"
+    assert updated.text is None
+    assert updated.value_json == {
+        "preference": "indoor",
+        "source": "feedback_writer_v0",
+        "evidence": "selected_candidate_tags",
+    }
+    assert str(updated.confidence) == "0.6000"
+    assert updated.source_run_id == run.run_id
+    assert updated.source_langsmith_trace_id is None
+    assert result.memory_candidate_summary is not None
+    assert result.memory_candidate_summary.updated_keys == ["activity_style"]
+
+
 def test_rerun_overwrites_existing_feedback_without_creating_rows(db_session: Session) -> None:
     run = _create_run(db_session)
     plan_json = _reviewed_plan_json(run.run_id)
@@ -477,9 +574,25 @@ def test_rerun_overwrites_existing_feedback_without_creating_rows(db_session: Se
     _write_feedback(db_session, run.run_id, plan.plan_id)
     second = _stable_feedback(PlanRepository(db_session).get_by_id(plan.plan_id).plan_json["feedback"])
 
+    first_summary = first.pop("memory_candidate_summary")
+    second_summary = second.pop("memory_candidate_summary")
     assert first == second
     assert first["schema_version"] == "execution_feedback_v1"
     assert first["message"] != "stale feedback"
+    assert first_summary == {
+        "schema_version": "feedback_memory_candidates_v0",
+        "generation_status": "completed",
+        "created_keys": ["activity_style", "spouse_lighter_meals"],
+        "updated_keys": [],
+        "skipped_keys": [],
+    }
+    assert second_summary == {
+        "schema_version": "feedback_memory_candidates_v0",
+        "generation_status": "completed",
+        "created_keys": [],
+        "updated_keys": ["activity_style", "spouse_lighter_meals"],
+        "skipped_keys": [],
+    }
     assert db_session.scalar(select(func.count()).select_from(Plan).where(Plan.run_id == run.run_id)) == rows_before
 
 

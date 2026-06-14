@@ -20,6 +20,7 @@ FeedbackActionStatus = Literal[
     "blocked",
     "rate_limited",
 ]
+FeedbackMemoryCandidateGenerationStatus = Literal["completed", "degraded", "not_applicable"]
 
 
 class FeedbackActionSummary(BaseModel):
@@ -31,6 +32,14 @@ class FeedbackActionSummary(BaseModel):
     status: FeedbackActionStatus
     message: str
     error_code: str | None = None
+
+
+class FeedbackMemoryCandidateSummary(BaseModel):
+    schema_version: str = "feedback_memory_candidates_v0"
+    generation_status: FeedbackMemoryCandidateGenerationStatus
+    created_keys: list[str] = Field(default_factory=list)
+    updated_keys: list[str] = Field(default_factory=list)
+    skipped_keys: list[str] = Field(default_factory=list)
 
 
 class ExecutionFeedbackResult(BaseModel):
@@ -45,3 +54,4 @@ class ExecutionFeedbackResult(BaseModel):
     failed_actions: list[FeedbackActionSummary] = Field(default_factory=list)
     next_steps: list[str] = Field(default_factory=list)
     writer_version: str
+    memory_candidate_summary: FeedbackMemoryCandidateSummary | None = None
