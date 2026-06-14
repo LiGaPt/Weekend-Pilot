@@ -7,6 +7,7 @@ from backend.app.benchmark.harness import BenchmarkHarness
 from backend.app.benchmark.replay import BenchmarkReplayHarness
 from backend.app.benchmark.recovery_review import (
     RecoveryReplayReviewError,
+    run_generic_recovery_replay_review,
     run_recovery_replay_review,
 )
 from backend.app.benchmark.schemas import (
@@ -26,8 +27,10 @@ from backend.app.benchmark.schemas import (
     BenchmarkStabilityPassKReport,
     BenchmarkStabilityWindowSummary,
     RecoveryReplayReviewCheck,
+    RecoveryReplayReviewCaseRunSummary,
     RecoveryReplayReviewReplaySource,
     RecoveryReplayReviewResult,
+    RecoveryReplayReviewRunReport,
     RecoveryReplayReviewSummary,
     RecoveryReplaySummary,
     resolve_benchmark_case_v2_taxonomy,
@@ -57,9 +60,11 @@ __all__ = [
     "BenchmarkReplayRunReport",
     "BenchmarkReplaySummary",
     "RecoveryReplayReviewCheck",
+    "RecoveryReplayReviewCaseRunSummary",
     "RecoveryReplayReviewError",
     "RecoveryReplayReviewReplaySource",
     "RecoveryReplayReviewResult",
+    "RecoveryReplayReviewRunReport",
     "RecoveryReplayReviewSummary",
     "RecoveryReplaySummary",
     "BenchmarkRunReport",
@@ -77,5 +82,6 @@ __all__ = [
     "list_benchmark_suites",
     "resolve_benchmark_case_v2_taxonomy",
     "run_benchmark_stability_passk",
+    "run_generic_recovery_replay_review",
     "run_recovery_replay_review",
 ]

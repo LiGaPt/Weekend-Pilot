@@ -205,6 +205,8 @@ The internal review page now also shows sanitized tool-event and action-ledger d
 
 For the canonical reviewer closure flow, run `python scripts/run_recovery_replay_review.py` from the repo root. It emits the source benchmark `run_id` and the written source benchmark report path for `family_route_failure_v1`, and those two values can be cross-checked directly against this internal observability surface to confirm that `benchmark_artifact_summary.report_path` and `recovery_path_summary.replay_source.benchmark_report_path` both point to the same source report.
 
+Generic recovery replay selectors are now also available for engineering verification: `--case-id <case_id>` runs one recovery-capable case, and `--suite-id recovery_focused` runs the registered recovery suite. Those additive selectors are not a new reviewer UI workflow and do not replace the canonical family default alias used by the current review package.
+
 The internal review surface now also loads `GET /internal/benchmarks/release-gate-v1/summary` on page load and renders a dedicated `Benchmark Summary` panel even before a run ID is entered. That panel is intentionally scoped to the canonical latest alias `var/formal-benchmarks/latest-release_gate_v1-run-report.json`.
 
 Reviewer scan order on `5174` should now be:

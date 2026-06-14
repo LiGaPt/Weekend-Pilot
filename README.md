@@ -161,6 +161,15 @@ python scripts/run_formal_verification.py
 python scripts/run_recovery_replay_review.py
 ```
 
+`python scripts/run_recovery_replay_review.py` 仍然默认跑 reviewer-facing 的 canonical case `family_route_failure_v1`，并刷新 `var/recovery-reviews/latest-family_route_failure_v1-review.json`。
+
+如果你需要做工程侧的泛化 recovery replay 验证，而不是替换 canonical reviewer 口径，可以额外使用：
+
+```bash
+python scripts/run_recovery_replay_review.py --case-id family_route_and_dining_unavailable_v1
+python scripts/run_recovery_replay_review.py --suite-id recovery_focused
+```
+
 ## 测试结果
 
 以下结果基于本地核对，属于当前 README 所引用的最新验证记录。
