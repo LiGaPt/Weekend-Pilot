@@ -1,0 +1,45 @@
+{
+  "case_id": "budget_queue_closed_constraint_v1",
+  "title": "Budget outing queue closed and constraint safe stop",
+  "user_input": "This afternoon I want a budget-friendly outing for a few hours with a quick indoor meal if needed.",
+  "agent_version": "agent-v1",
+  "prompt_version": "prompt-v1",
+  "tool_profile": "mock_world",
+  "world_profile": "budget_lite",
+  "failure_profile": "queue_closed_and_budget_constraint_v0",
+  "memory_items": [],
+  "expected": {
+    "required_tool_names": [
+      "search_poi",
+      "check_weather",
+      "get_poi_detail",
+      "check_opening_hours",
+      "check_queue",
+      "check_table_availability",
+      "check_ticket_availability",
+      "check_route"
+    ],
+    "min_tool_event_count": 8,
+    "min_action_count": 0,
+    "expected_workflow_status": "failed",
+    "expected_execution_status": null,
+    "expected_feedback_status": null,
+    "expected_error_type": "recovery_stopped",
+    "expected_recovery_action": "stop_safely",
+    "min_injected_failure_count": 1
+  },
+  "taxonomy": {
+    "suite": "locallife_bench_v1",
+    "scenario_bucket": "mixed",
+    "level": "L5",
+    "tags": [
+      "budget_limited",
+      "composite_failure",
+      "failure_injected"
+    ],
+    "failure_mode": "queue_closed_and_budget_constraint"
+  },
+  "metadata": {
+    "focus": "budget_queue_closed_constraint_safe_stop"
+  }
+}

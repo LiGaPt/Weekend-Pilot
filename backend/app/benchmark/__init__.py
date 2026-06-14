@@ -10,6 +10,11 @@ from backend.app.benchmark.recovery_review import (
     run_generic_recovery_replay_review,
     run_recovery_replay_review,
 )
+from backend.app.benchmark.safe_stop_gate import (
+    BenchmarkSafeStopGateError,
+    BenchmarkSafeStopGateResult,
+    run_benchmark_safe_stop_gate,
+)
 from backend.app.benchmark.schemas import (
     BenchmarkCase,
     BenchmarkCaseResult,
@@ -67,6 +72,8 @@ __all__ = [
     "RecoveryReplayReviewRunReport",
     "RecoveryReplayReviewSummary",
     "RecoveryReplaySummary",
+    "BenchmarkSafeStopGateError",
+    "BenchmarkSafeStopGateResult",
     "BenchmarkRunReport",
     "BenchmarkScore",
     "BenchmarkStabilityAttemptSummary",
@@ -82,6 +89,7 @@ __all__ = [
     "list_benchmark_suites",
     "resolve_benchmark_case_v2_taxonomy",
     "run_benchmark_stability_passk",
+    "run_benchmark_safe_stop_gate",
     "run_generic_recovery_replay_review",
     "run_recovery_replay_review",
 ]

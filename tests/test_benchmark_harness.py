@@ -97,6 +97,9 @@ FAILURE_CASE_IDS = (
     "family_route_failure_v1",
     "family_route_and_dining_unavailable_v1",
     "rainy_day_ticket_sold_out_v1",
+    "family_ticket_sold_out_and_route_unavailable_v1",
+    "budget_queue_closed_constraint_v1",
+    "family_table_unavailable_replan_required_v1",
 )
 MEMORY_GOVERNANCE_CASE_IDS = (
     "family_memory_override_v1",
@@ -304,45 +307,48 @@ ROBUSTNESS_TAG_COUNTS = {
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
     "elder": 1,
-    "family": 14,
+    "family": 16,
     "friends": 2,
-    "mixed": 3,
+    "mixed": 4,
     "solo": 2,
     "unknown": 2,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 13, "L3": 7, "L5": 2}
-ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 25}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 13, "L3": 7, "L5": 5}
+ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 28}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
-    "budget_lite": 2,
+    "budget_lite": 3,
     "couple_afternoon": 1,
     "elder_afternoon": 1,
-    "family_afternoon": 14,
+    "family_afternoon": 16,
     "friends_gathering": 2,
     "rainy_day_fallback": 3,
     "solo_afternoon": 2,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
     "none": 22,
+    "queue_closed_and_budget_constraint": 1,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
+    "table_unavailable_and_replan_required": 1,
     "ticket_sold_out_and_bad_weather": 1,
+    "ticket_sold_out_and_route_unavailable": 1,
 }
 ALL_REGISTERED_TAG_COUNTS = {
     "addon_optional": 1,
     "bad_weather": 1,
     "baseline": 2,
-    "budget_limited": 2,
+    "budget_limited": 3,
     "casual_dining": 2,
-    "child_friendly": 14,
+    "child_friendly": 16,
     "citywalk": 2,
     "clarification_turn": 1,
-    "composite_failure": 2,
+    "composite_failure": 5,
     "conversation_continuation": 2,
     "date_friendly": 1,
     "distractor_selection": 2,
     "dining_unavailable": 1,
     "elder_friendly": 1,
-    "failure_injected": 3,
+    "failure_injected": 6,
     "fallback": 1,
     "fallback_selection": 1,
     "free_activity": 1,
@@ -362,13 +368,13 @@ ALL_REGISTERED_TAG_COUNTS = {
     "quick_dinner": 1,
     "quick_meal": 1,
     "rainy_day": 3,
-    "replan_turn": 1,
+    "replan_turn": 2,
     "robustness_case": 4,
-    "route_failure": 2,
+    "route_failure": 3,
     "sensitive_minimization": 1,
     "short_walk": 1,
     "stable_sorting": 1,
-    "ticket_sold_out": 1,
+    "ticket_sold_out": 2,
 }
 EXPECTED_TAXONOMY_BY_CASE = {
     "family_afternoon_v1": _taxonomy_payload(
@@ -488,6 +494,30 @@ EXPECTED_TAXONOMY_BY_CASE = {
         ],
         failure_mode="ticket_sold_out_and_bad_weather",
     ),
+    "family_ticket_sold_out_and_route_unavailable_v1": _taxonomy_payload(
+        scenario_bucket="family",
+        level="L5",
+        tags=[
+            "child_friendly",
+            "composite_failure",
+            "failure_injected",
+            "route_failure",
+            "ticket_sold_out",
+        ],
+        failure_mode="ticket_sold_out_and_route_unavailable",
+    ),
+    "budget_queue_closed_constraint_v1": _taxonomy_payload(
+        scenario_bucket="mixed",
+        level="L5",
+        tags=["budget_limited", "composite_failure", "failure_injected"],
+        failure_mode="queue_closed_and_budget_constraint",
+    ),
+    "family_table_unavailable_replan_required_v1": _taxonomy_payload(
+        scenario_bucket="family",
+        level="L5",
+        tags=["child_friendly", "composite_failure", "failure_injected", "replan_turn"],
+        failure_mode="table_unavailable_and_replan_required",
+    ),
     "solo_clarification_continuation_v1": _taxonomy_payload(
         scenario_bucket="solo",
         level="L3",
@@ -555,6 +585,18 @@ def test_failure_fixtures_are_loadable_but_not_default() -> None:
     assert rainy_case.failure_profile == "ticket_sold_out_and_bad_weather_v0"
     assert rainy_case.expected.min_injected_failure_count == 3
     assert rainy_case.expected.expected_recovery_action == "stop_safely"
+
+    family_ticket_case = load_benchmark_case("family_ticket_sold_out_and_route_unavailable_v1")
+    assert family_ticket_case.failure_profile == "ticket_sold_out_and_route_unavailable_v0"
+    assert family_ticket_case.expected.min_injected_failure_count == 2
+
+    budget_queue_case = load_benchmark_case("budget_queue_closed_constraint_v1")
+    assert budget_queue_case.failure_profile == "queue_closed_and_budget_constraint_v0"
+    assert budget_queue_case.expected.min_injected_failure_count == 1
+
+    table_replan_case = load_benchmark_case("family_table_unavailable_replan_required_v1")
+    assert table_replan_case.failure_profile == "table_unavailable_and_replan_required_v0"
+    assert table_replan_case.expected.min_injected_failure_count == 1
 
 
 def test_memory_governance_fixtures_are_loadable_but_not_default() -> None:
@@ -757,7 +799,7 @@ def test_robustness_focused_suite_matrix_summary_counts_are_expected() -> None:
 def test_all_registered_case_matrix_summary_counts_are_expected() -> None:
     summary = build_case_matrix_summary(load_benchmark_suite("all_registered"))
 
-    assert summary.case_count == 25
+    assert summary.case_count == 28
     assert summary.scenario_bucket_counts == ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
     assert summary.level_counts == ALL_REGISTERED_LEVEL_COUNTS
     assert summary.tool_profile_counts == ALL_REGISTERED_TOOL_PROFILE_COUNTS
@@ -2446,10 +2488,10 @@ def test_benchmark_summary_schema_includes_suite_and_outcome_rollup_fields() -> 
 def test_build_case_integrity_coverage_summary_returns_expected_counts_for_v2_integrity_suite() -> None:
     summary = build_case_integrity_coverage_summary(load_benchmark_suite("v2_integrity"))
 
-    assert summary.case_count == 15
+    assert summary.case_count == 18
     assert summary.memory_case_count == 6
-    assert summary.recovery_case_count == 3
-    assert summary.continuation_case_count == 2
+    assert summary.recovery_case_count == 6
+    assert summary.continuation_case_count == 3
     assert summary.robustness_case_count == 4
     assert summary.l4_case_count == 1
 

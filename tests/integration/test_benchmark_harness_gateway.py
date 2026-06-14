@@ -46,6 +46,9 @@ RECOVERY_CASE_IDS = {
     "family_route_failure_v1",
     "family_route_and_dining_unavailable_v1",
     "rainy_day_ticket_sold_out_v1",
+    "family_ticket_sold_out_and_route_unavailable_v1",
+    "budget_queue_closed_constraint_v1",
+    "family_table_unavailable_replan_required_v1",
 }
 MEMORY_GOVERNANCE_CASE_IDS = {
     "family_memory_override_v1",
@@ -287,21 +290,26 @@ EXPANDED_CONSTRAINT_TAG_COUNTS = {
     "rainy_day": 1,
     "short_walk": 1,
 }
-RECOVERY_SCENARIO_BUCKET_COUNTS = {"family": 2, "mixed": 1}
+RECOVERY_SCENARIO_BUCKET_COUNTS = {"family": 4, "mixed": 2}
 RECOVERY_FAILURE_MODE_COUNTS = {
+    "queue_closed_and_budget_constraint": 1,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
+    "table_unavailable_and_replan_required": 1,
     "ticket_sold_out_and_bad_weather": 1,
+    "ticket_sold_out_and_route_unavailable": 1,
 }
-RECOVERY_TOOL_PROFILE_COUNTS = {"mock_world": 3}
+RECOVERY_TOOL_PROFILE_COUNTS = {"mock_world": 6}
 RECOVERY_CONSTRAINT_TAG_COUNTS = {
     "bad_weather": 1,
-    "child_friendly": 2,
-    "composite_failure": 2,
+    "budget_limited": 1,
+    "child_friendly": 4,
+    "composite_failure": 5,
     "dining_unavailable": 1,
     "light_meal": 1,
     "rainy_day": 1,
-    "ticket_sold_out": 1,
+    "replan_turn": 1,
+    "ticket_sold_out": 2,
 }
 DEFAULT_TAG_COUNTS = {
     "addon_optional": 1,
@@ -404,77 +412,84 @@ DEFAULT_CONSTRAINT_TAG_COUNTS = {
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
     "elder": 1,
-    "family": 11,
+    "family": 16,
     "friends": 2,
-    "mixed": 3,
+    "mixed": 4,
     "solo": 2,
     "unknown": 2,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 13, "L3": 4, "L5": 2}
-ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 22}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 13, "L3": 7, "L5": 5}
+ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 28}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
-    "budget_lite": 2,
+    "budget_lite": 3,
     "couple_afternoon": 1,
     "elder_afternoon": 1,
-    "family_afternoon": 11,
+    "family_afternoon": 16,
     "friends_gathering": 2,
     "rainy_day_fallback": 3,
     "solo_afternoon": 2,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
-    "none": 19,
+    "none": 22,
+    "queue_closed_and_budget_constraint": 1,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
+    "table_unavailable_and_replan_required": 1,
     "ticket_sold_out_and_bad_weather": 1,
+    "ticket_sold_out_and_route_unavailable": 1,
 }
 ALL_REGISTERED_TAG_COUNTS = {
     "addon_optional": 1,
     "bad_weather": 1,
     "baseline": 2,
-    "budget_limited": 2,
+    "budget_limited": 3,
     "casual_dining": 2,
-    "child_friendly": 11,
+    "child_friendly": 16,
     "citywalk": 2,
     "clarification_turn": 1,
-    "composite_failure": 2,
+    "composite_failure": 5,
     "conversation_continuation": 2,
     "date_friendly": 1,
     "distractor_selection": 2,
     "dining_unavailable": 1,
     "elder_friendly": 1,
-    "failure_injected": 3,
+    "failure_injected": 6,
     "fallback": 1,
     "fallback_selection": 1,
     "free_activity": 1,
     "friends_group": 2,
-    "indoor_activity": 6,
+    "indoor_activity": 7,
     "light_activity": 2,
-    "light_meal": 11,
+    "light_meal": 12,
     "memory_advisory": 1,
+    "memory_candidate": 2,
+    "memory_disabled": 1,
     "memory_expired": 1,
-    "memory_governance": 2,
+    "memory_governance": 5,
+    "memory_ignored": 1,
     "memory_override": 1,
     "outdoor_activity": 3,
     "plan_versioning": 1,
     "quick_dinner": 1,
     "quick_meal": 1,
     "rainy_day": 3,
-    "replan_turn": 1,
+    "replan_turn": 2,
     "robustness_case": 4,
-    "route_failure": 2,
+    "route_failure": 3,
+    "sensitive_minimization": 1,
     "short_walk": 1,
     "stable_sorting": 1,
-    "ticket_sold_out": 1,
+    "ticket_sold_out": 2,
 }
 ALL_REGISTERED_CONSTRAINT_TAG_COUNTS = {
     "addon_optional": 1,
     "bad_weather": 1,
-    "budget_limited": 2,
+    "budget_limited": 3,
     "casual_dining": 2,
-    "child_friendly": 11,
+    "child_friendly": 16,
     "citywalk": 2,
     "clarification_turn": 1,
-    "composite_failure": 2,
+    "composite_failure": 5,
     "conversation_continuation": 2,
     "date_friendly": 1,
     "distractor_selection": 2,
@@ -484,23 +499,27 @@ ALL_REGISTERED_CONSTRAINT_TAG_COUNTS = {
     "fallback_selection": 1,
     "free_activity": 1,
     "friends_group": 2,
-    "indoor_activity": 6,
+    "indoor_activity": 7,
     "light_activity": 2,
-    "light_meal": 11,
+    "light_meal": 12,
     "memory_advisory": 1,
+    "memory_candidate": 2,
+    "memory_disabled": 1,
     "memory_expired": 1,
-    "memory_governance": 2,
+    "memory_governance": 5,
+    "memory_ignored": 1,
     "memory_override": 1,
     "outdoor_activity": 3,
     "plan_versioning": 1,
     "quick_dinner": 1,
     "quick_meal": 1,
     "rainy_day": 3,
-    "replan_turn": 1,
+    "replan_turn": 2,
     "robustness_case": 4,
+    "sensitive_minimization": 1,
     "short_walk": 1,
     "stable_sorting": 1,
-    "ticket_sold_out": 1,
+    "ticket_sold_out": 2,
 }
 FORBIDDEN_REPORT_TEXT = ("action_id", "tool_event_id", "api_key", "token", "secret", "debug_trace")
 
@@ -663,7 +682,16 @@ def test_benchmark_harness_runs_solo_afternoon_case(
     assert len(artifact_summary["score_summaries"]) == len(result.scores)
     assert artifact_summary["score_summaries"][0]["name"] == result.scores[0].name
     assert "details" not in artifact_summary["score_summaries"][0]
-    assert artifact_summary.get("memory_policy_summary") is None
+    memory_policy_summary = artifact_summary["memory_policy_summary"]
+    assert memory_policy_summary["policy_version"] == "memory_query_policy_v1"
+    assert memory_policy_summary["considered_count"] == 0
+    assert memory_policy_summary["ignored_count"] == 0
+    assert memory_policy_summary["used_count"] == 0
+    assert memory_policy_summary["advisory_influence_count"] == 0
+    assert memory_policy_summary["downgraded_count"] == 0
+    assert memory_policy_summary["overridden_count"] == 0
+    assert memory_policy_summary["no_influence_count"] == 0
+    assert memory_policy_summary["primary_influence_count"] == 0
 
 
 def test_benchmark_harness_runs_elder_afternoon_case(
@@ -1306,7 +1334,7 @@ def test_benchmark_harness_runs_family_replan_version_continuation_case(
         (
             "recovery_focused",
             RECOVERY_CASE_IDS,
-            3,
+            6,
             RECOVERY_TOOL_PROFILE_COUNTS,
             RECOVERY_SCENARIO_BUCKET_COUNTS,
             RECOVERY_FAILURE_MODE_COUNTS,
@@ -1685,9 +1713,9 @@ def test_benchmark_harness_runs_all_registered_suite(
 
     report = harness.run_suite("all_registered")
 
-    assert len(report.case_results) == 22
+    assert len(report.case_results) == 28
     assert report.run_status == "passed"
-    assert report.passed_count == 22
+    assert report.passed_count == 28
     assert report.failed_count == 0
     assert report.error_count == 0
     assert report.report_path is not None
@@ -1757,6 +1785,9 @@ def test_benchmark_harness_runs_route_failure_case_as_expected_safe_stop(
         "family_route_failure_v1",
         "family_route_and_dining_unavailable_v1",
         "rainy_day_ticket_sold_out_v1",
+        "family_ticket_sold_out_and_route_unavailable_v1",
+        "budget_queue_closed_constraint_v1",
+        "family_table_unavailable_replan_required_v1",
     ]
     harness = BenchmarkHarness(
         db_session,
@@ -1821,7 +1852,7 @@ def test_benchmark_harness_runs_route_failure_case_as_expected_safe_stop(
 
 
 @pytest.mark.parametrize(
-    ("case_id", "expected_profile", "expected_effects"),
+    ("case_id", "expected_profile", "expected_effects", "expected_recovery_actions", "expected_attempt_count"),
     [
         (
             "family_route_and_dining_unavailable_v1",
@@ -1831,6 +1862,8 @@ def test_benchmark_harness_runs_route_failure_case_as_expected_safe_stop(
                 "check_table_availability:dining_unavailable:succeeded",
                 "check_route:route_infeasible:failed",
             ],
+            ["stop_safely"],
+            1,
         ),
         (
             "rainy_day_ticket_sold_out_v1",
@@ -1839,6 +1872,32 @@ def test_benchmark_harness_runs_route_failure_case_as_expected_safe_stop(
                 "check_weather:bad_weather:succeeded",
                 "check_ticket_availability:ticket_sold_out:succeeded",
             ],
+            ["stop_safely"],
+            1,
+        ),
+        (
+            "family_ticket_sold_out_and_route_unavailable_v1",
+            "ticket_sold_out_and_route_unavailable_v0",
+            [
+                "check_ticket_availability:ticket_sold_out:succeeded",
+                "check_route:route_infeasible:failed",
+            ],
+            ["stop_safely"],
+            1,
+        ),
+        (
+            "budget_queue_closed_constraint_v1",
+            "queue_closed_and_budget_constraint_v0",
+            ["check_queue:queue_closed:succeeded"],
+            ["stop_safely"],
+            1,
+        ),
+        (
+            "family_table_unavailable_replan_required_v1",
+            "table_unavailable_and_replan_required_v0",
+            ["check_table_availability:table_unavailable:succeeded"],
+            ["replace_candidate", "stop_safely"],
+            2,
         ),
     ],
 )
@@ -1846,6 +1905,8 @@ def test_benchmark_harness_runs_composite_failure_case_as_bounded_safe_stop(
     case_id: str,
     expected_profile: str,
     expected_effects: list[str],
+    expected_recovery_actions: list[str],
+    expected_attempt_count: int,
     db_session: Session,
     redis_runtime,
     harness_paths,
@@ -1869,8 +1930,8 @@ def test_benchmark_harness_runs_composite_failure_case_as_bounded_safe_stop(
     assert result.failure_chain_summary is not None
     assert result.failure_chain_summary.profile_id == expected_profile
     assert result.failure_chain_summary.injected_effects == expected_effects
-    assert result.failure_chain_summary.recovery_actions == ["stop_safely"]
-    assert result.failure_chain_summary.attempt_count == 1
+    assert result.failure_chain_summary.recovery_actions == expected_recovery_actions
+    assert result.failure_chain_summary.attempt_count == expected_attempt_count
     assert result.failure_chain_summary.max_attempts == 2
     assert result.failure_chain_summary.bounded is True
 
@@ -1891,7 +1952,7 @@ def test_benchmark_harness_runs_composite_failure_case_as_bounded_safe_stop(
     report_payload = json.loads(Path(result.report_path).read_text(encoding="utf-8"))
     assert report_payload["failure_chain_summary"]["profile_id"] == expected_profile
     assert report_payload["failure_chain_summary"]["injected_effects"] == expected_effects
-    assert report_payload["failure_chain_summary"]["recovery_actions"] == ["stop_safely"]
+    assert report_payload["failure_chain_summary"]["recovery_actions"] == expected_recovery_actions
 
 
 def _assert_rollup_counts(bucket_map, expected_case_counts: dict[str, int]) -> None:

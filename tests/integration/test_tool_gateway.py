@@ -368,6 +368,107 @@ def test_injected_read_response_override_writes_succeeded_event_without_provider
     assert events[0].error_json["error_type"] == "failure_injected_response"
 
 
+@pytest.mark.parametrize(
+    ("definition_name", "tool_name", "payload", "rule"),
+    [
+        (
+            "check_ticket_availability",
+            "check_ticket_availability",
+            {"poi_id": "activity-7"},
+            ToolFailureInjectionRule(
+                rule_id="ticket_sold_out_and_route_unavailable_v0.check_ticket_availability",
+                tool_name="check_ticket_availability",
+                effect_kind="response_override",
+                effect_type="ticket_sold_out",
+                gateway_status="succeeded",
+                response_json_template={
+                    "ticket_availability": {
+                        "poi_id": "{poi_id}",
+                        "available": False,
+                        "time_slots": [],
+                        "remaining": 0,
+                        "price_cents": 0,
+                    }
+                },
+            ),
+        ),
+        (
+            "check_queue",
+            "check_queue",
+            {"poi_id": "restaurant-9"},
+            ToolFailureInjectionRule(
+                rule_id="queue_closed_and_budget_constraint_v0.check_queue",
+                tool_name="check_queue",
+                effect_kind="response_override",
+                effect_type="queue_closed",
+                gateway_status="succeeded",
+                response_json_template={
+                    "queue": {
+                        "poi_id": "{poi_id}",
+                        "status": "closed",
+                        "wait_minutes": 120,
+                        "parties_ahead": 24,
+                    }
+                },
+            ),
+        ),
+        (
+            "check_table_availability",
+            "check_table_availability",
+            {"restaurant_id": "restaurant-9"},
+            ToolFailureInjectionRule(
+                rule_id="table_unavailable_and_replan_required_v0.check_table_availability",
+                tool_name="check_table_availability",
+                effect_kind="response_override",
+                effect_type="table_unavailable",
+                gateway_status="succeeded",
+                response_json_template={
+                    "table_availability": {
+                        "restaurant_id": "{restaurant_id}",
+                        "available": False,
+                        "time_slots": [],
+                        "max_party_size": 0,
+                        "notes": "Chaos profile injected unavailable table capacity.",
+                    }
+                },
+            ),
+        ),
+    ],
+)
+def test_combination_failure_response_overrides_do_not_call_provider(
+    definition_name: str,
+    tool_name: str,
+    payload: dict[str, Any],
+    rule: ToolFailureInjectionRule,
+    db_session: Session,
+    redis_runtime,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    provider = FakeProvider()
+    injector = StaticToolFailureInjector(profile_id="combination-failure-test", rules=[rule])
+    gateway = build_gateway(
+        db_session,
+        ToolDefinition(name=definition_name, tool_type="read", default_provider="fake"),
+        provider,
+        cache,
+        rate_limiter,
+        failure_injector=injector,
+    )
+    run = create_run(db_session)
+
+    result = gateway.invoke(
+        ToolGatewayRequest(
+            run_id=run.run_id,
+            tool_name=tool_name,
+            payload=payload,
+        )
+    )
+
+    assert result.status == "succeeded"
+    assert result.error_json["error_type"] == "failure_injected_response"
+    assert provider.calls == []
+
+
 def test_write_tool_is_blocked_before_confirmation(db_session: Session, redis_runtime) -> None:
     cache, rate_limiter = redis_runtime
     provider = FakeProvider()

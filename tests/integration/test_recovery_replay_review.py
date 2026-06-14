@@ -143,16 +143,19 @@ def test_recovery_replay_review_runs_recovery_suite_and_writes_run_report() -> N
             "family_route_failure_v1",
             "family_route_and_dining_unavailable_v1",
             "rainy_day_ticket_sold_out_v1",
+            "family_ticket_sold_out_and_route_unavailable_v1",
+            "budget_queue_closed_constraint_v1",
+            "family_table_unavailable_replan_required_v1",
         ]
-        assert report.passed_count == 3
+        assert report.passed_count == 6
         assert report.failed_count == 0
         assert report.error_count == 0
-        assert len(report.case_results) == 3
+        assert len(report.case_results) == 6
         assert payload["schema_version"] == "weekendpilot_recovery_replay_review_run_v1"
         assert payload["status"] == "passed"
         assert payload["selection_mode"] == "suite"
         assert payload["suite_id"] == "recovery_focused"
-        assert len(payload["case_results"]) == 3
+        assert len(payload["case_results"]) == 6
 
         for item in report.case_results:
             review_artifact_path = Path(item.review_artifact_path)

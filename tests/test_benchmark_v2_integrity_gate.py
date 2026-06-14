@@ -11,32 +11,35 @@ import backend.app.benchmark.v2_integrity_gate as v2_integrity_gate
 from backend.app.benchmark.formal_verification import FormalVerificationResult
 
 
-PASSING_TOOL_PROFILE_COUNTS = {"mock_world": 15}
+PASSING_TOOL_PROFILE_COUNTS = {"mock_world": 18}
 PASSING_FAILURE_MODE_COUNTS = {
     "none": 12,
+    "queue_closed_and_budget_constraint": 1,
     "route_and_dining_unavailable": 1,
     "route_unavailable": 1,
+    "table_unavailable_and_replan_required": 1,
     "ticket_sold_out_and_bad_weather": 1,
+    "ticket_sold_out_and_route_unavailable": 1,
 }
 PASSING_MEMORY_MODE_COUNTS = {
     "advisory_fill": 1,
     "candidate_not_auto_active": 1,
     "disabled_ignored": 1,
     "expired_advisory": 1,
-    "none": 9,
+    "none": 12,
     "override_guarded": 1,
     "sensitive_minimization": 1,
 }
 PASSING_CONVERSATION_MODE_COUNTS = {
     "clarification": 1,
-    "replan_versioned": 1,
-    "single_turn": 13,
+    "replan_versioned": 2,
+    "single_turn": 15,
 }
 PASSING_INTEGRITY_COVERAGE = {
-    "case_count": 15,
+    "case_count": 18,
     "memory_case_count": 6,
-    "recovery_case_count": 3,
-    "continuation_case_count": 2,
+    "recovery_case_count": 6,
+    "continuation_case_count": 3,
     "robustness_case_count": 4,
     "l4_case_count": 1,
 }
@@ -84,8 +87,8 @@ def test_run_benchmark_v2_integrity_gate_enriches_unique_report_and_refreshes_la
         assert result.release_blocked is False
         assert result.blocking_failures == []
         assert result.run_status == "passed"
-        assert result.case_count == 15
-        assert result.passed_count == 15
+        assert result.case_count == 18
+        assert result.passed_count == 18
         assert result.failed_count == 0
         assert result.error_count == 0
         assert result.overall_score == 1.0
@@ -104,9 +107,9 @@ def test_run_benchmark_v2_integrity_gate_enriches_unique_report_and_refreshes_la
         assert evaluation["suite_id"] == "v2_integrity"
         assert evaluation["release_blocked"] is False
         assert evaluation["blocking_failures"] == []
-        assert evaluation["coverage_thresholds"]["minimum_case_count"] == 15
+        assert evaluation["coverage_thresholds"]["minimum_case_count"] == 18
         assert evaluation["coverage_thresholds"]["minimum_memory_case_count"] == 6
-        assert evaluation["coverage_thresholds"]["minimum_recovery_case_count"] == 3
+        assert evaluation["coverage_thresholds"]["minimum_recovery_case_count"] == 6
         assert evaluation["coverage_thresholds"]["minimum_continuation_case_count"] == 2
         assert evaluation["coverage_thresholds"]["minimum_robustness_case_count"] == 4
         assert evaluation["coverage_thresholds"]["minimum_l4_case_count"] == 1
@@ -237,8 +240,8 @@ def test_main_prints_success_summary(
         release_blocked=False,
         blocking_failures=[],
         run_status="passed",
-        case_count=15,
-        passed_count=15,
+        case_count=18,
+        passed_count=18,
         failed_count=0,
         error_count=0,
         overall_score=1.0,
@@ -355,18 +358,18 @@ def _build_report_payload(
         integrity_summary.update(integrity_overrides)
     v2_summary = {
         "schema_version": "weekendpilot_benchmark_case_v2_matrix_v1",
-        "case_count": 15,
-        "scenario_bucket_counts": {"family": 9, "friends": 1, "mixed": 2, "solo": 1, "unknown": 2},
-        "level_counts": {"L2": 5, "L3": 6, "L4": 1, "L5": 3},
+        "case_count": 18,
+        "scenario_bucket_counts": {"family": 12, "friends": 1, "mixed": 3, "solo": 1, "unknown": 1},
+        "level_counts": {"L2": 5, "L3": 6, "L4": 1, "L5": 6},
         "failure_mode_counts": PASSING_FAILURE_MODE_COUNTS,
         "memory_mode_counts": PASSING_MEMORY_MODE_COUNTS,
         "conversation_mode_counts": PASSING_CONVERSATION_MODE_COUNTS,
-        "stability_required_counts": {"false": 6, "true": 9},
+        "stability_required_counts": {"false": 6, "true": 12},
     }
     if v2_overrides:
         v2_summary.update(v2_overrides)
 
-    passed_count = 15 - failed_count - error_count
+    passed_count = 18 - failed_count - error_count
     return {
         "schema_version": "weekendpilot_benchmark_run_v1",
         "run_status": run_status,
@@ -381,20 +384,20 @@ def _build_report_payload(
             "suite_id": suite_id,
             "suite_title": "V2 integrity benchmark suite",
             "run_status": run_status,
-            "case_count": 15,
+            "case_count": 18,
             "passed_count": passed_count,
             "failed_count": failed_count,
             "error_count": error_count,
             "overall_score": 1.0,
             "matrix_summary": {
                 "schema_version": "weekendpilot_benchmark_case_matrix_v1",
-                "case_count": 15,
-                "scenario_bucket_counts": {"family": 9, "friends": 1, "mixed": 2, "solo": 1, "unknown": 2},
-                "level_counts": {"L2": 8, "L3": 5, "L5": 2},
+                "case_count": 18,
+                "scenario_bucket_counts": {"family": 12, "friends": 1, "mixed": 3, "solo": 1, "unknown": 1},
+                "level_counts": {"L2": 6, "L3": 7, "L5": 5},
                 "tool_profile_counts": PASSING_TOOL_PROFILE_COUNTS,
                 "world_profile_counts": {
-                    "budget_lite": 1,
-                    "family_afternoon": 9,
+                    "budget_lite": 2,
+                    "family_afternoon": 12,
                     "friends_gathering": 1,
                     "rainy_day_fallback": 2,
                     "solo_afternoon": 1,

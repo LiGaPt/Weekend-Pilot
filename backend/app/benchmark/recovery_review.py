@@ -462,8 +462,11 @@ def _benchmark_failure_path_check(
             failure_reasons.append(
                 f"injected_effects_count={_observed_injected_failure_count(source_result, summary)} expected>={case.expected.min_injected_failure_count}"
             )
-        if list(summary.recovery_actions) != [case.expected.expected_recovery_action]:
-            failure_reasons.append(f"recovery_actions={list(summary.recovery_actions)!r}")
+        observed_recovery_actions = list(summary.recovery_actions)
+        if not observed_recovery_actions:
+            failure_reasons.append("recovery_actions missing")
+        elif observed_recovery_actions[-1] != case.expected.expected_recovery_action:
+            failure_reasons.append(f"recovery_actions={observed_recovery_actions!r}")
         if summary.bounded is not True:
             failure_reasons.append(f"bounded={summary.bounded!r}")
 

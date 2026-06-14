@@ -115,12 +115,13 @@ def _dining(
     *,
     tags: list[str] | None = None,
     table_available: bool = True,
+    queue_status: str = "open",
 ) -> EnrichedCandidate:
     candidate_tags = ["child_friendly", "lighter_options"] if tags is None else tags
     queue = {
         "queue_id": f"queue_{candidate_id}",
         "poi_id": candidate_id,
-        "status": "open",
+        "status": queue_status,
         "wait_minutes": 10,
     }
     return EnrichedCandidate(
@@ -325,6 +326,38 @@ def test_missing_dining_blocks_the_draft() -> None:
 
     assert result.decision == "blocked"
     assert "dining_present" in _check_names(result.reviewed_drafts[0].errors)
+
+
+def test_queue_closed_dining_blocks_the_draft() -> None:
+    plan = _plan()
+    enrichment = _enrichment(dining=[_dining(queue_status="closed")])
+    drafts = _drafts(plan, enrichment)
+
+    result = FinalReviewGate().review(plan, enrichment, drafts)
+
+    assert result.decision == "blocked"
+    blocked_check = next(
+        check
+        for check in result.reviewed_drafts[0].errors
+        if check.check_name == "dining_availability"
+    )
+    assert blocked_check.details["availability_status"] == "queue_closed"
+
+
+def test_table_unavailable_dining_blocks_the_draft_even_when_queue_is_open() -> None:
+    plan = _plan()
+    enrichment = _enrichment(dining=[_dining(table_available=False, queue_status="open")])
+    drafts = _drafts(plan, enrichment)
+
+    result = FinalReviewGate().review(plan, enrichment, drafts)
+
+    assert result.decision == "blocked"
+    blocked_check = next(
+        check
+        for check in result.reviewed_drafts[0].errors
+        if check.check_name == "dining_availability"
+    )
+    assert blocked_check.details["availability_status"] == "table_unavailable"
 
 
 def test_unverified_candidate_id_blocks_the_draft() -> None:
