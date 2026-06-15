@@ -24,6 +24,109 @@ const benchmarkSummary = {
   report_path: "var/formal-benchmarks/latest-release_gate_v1-run-report.json",
 };
 
+const systemIntegritySummary = {
+  schema_version: "weekendpilot_system_integrity_summary_v1",
+  status: "ready",
+  benchmark_summary: {
+    status: "ready",
+    reason: null,
+    suite_id: "v2_integrity",
+    gate_id: "v2_integrity_gate",
+    run_status: "passed",
+    release_blocked: false,
+    case_count: 18,
+    passed_count: 18,
+    failed_count: 0,
+    error_count: 0,
+    overall_score: 1,
+    blocking_failures: [],
+    integrity_coverage_summary: {},
+    memory_mode_counts: {},
+    conversation_mode_counts: {},
+    failure_mode_counts: {},
+    latest_report_path: "var/formal-benchmarks/latest-v2_integrity_gate-run-report.json",
+  },
+  stability_summary: {
+    status: "ready",
+    reason: null,
+    suite_id: "v2_integrity",
+    gate_id: "v2_integrity_gate",
+    metric_version: "passk_v0",
+    requested_run_count: 4,
+    executed_run_count: 4,
+    window_size: 4,
+    window_count: 1,
+    discarded_tail_run_count: 0,
+    success_count: 4,
+    failure_count: 0,
+    error_count: 0,
+    success_at_1: 1,
+    pass_at_4: 1,
+    pass_pow_4: 1,
+    stable_enough: true,
+    has_required_window: true,
+    latest_report_path: "var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json",
+  },
+  memory_governance_summary: {
+    status: "ready",
+    reason: null,
+    source_suite_id: "all_registered",
+    memory_case_count: 2,
+    passed_case_count: 2,
+    failed_case_count: 0,
+    error_case_count: 0,
+    all_memory_cases_passed: true,
+    case_ids: ["family_memory_override_v1", "family_memory_advisory_fill_v1"],
+    failing_case_ids: [],
+    latest_report_path: "var/formal-benchmarks/latest-all_registered-run-report.json",
+  },
+  recovery_replay_summary: {
+    status: "ready",
+    reason: null,
+    case_id: "family_route_failure_v1",
+    review_status: "passed",
+    check_count: 3,
+    passed_check_count: 3,
+    failed_check_count: 0,
+    latest_review_path: "var/recovery-reviews/latest-family_route_failure_v1-review.json",
+    source_report_path: "var/formal-benchmarks/family_route_failure_v1.json",
+    replay_report_path: "var/recovery-reviews/family_route_failure_v1-replay.json",
+    recovery_actions: ["stop_safely"],
+    attempt_count: 1,
+    max_attempts: 2,
+  },
+  timing_summary: {
+    status: "ready",
+    reason: null,
+    benchmark_timing_summary_present: true,
+    benchmark_timing_summary: { p50_ms: 390, p95_ms: 424 },
+    stability_window_size: 4,
+    stability_executed_run_count: 4,
+  },
+  redaction_summary: {
+    internal_only: true,
+    sanitized: true,
+    relative_evidence_paths_only: true,
+    forbidden_key_markers: ["api_key", "token"],
+  },
+  evidence_paths: [
+    {
+      evidence_id: "v2_integrity_gate",
+      path: "var/formal-benchmarks/latest-v2_integrity_gate-run-report.json",
+      exists: true,
+      required_for_summary: true,
+      status: "ready",
+    },
+    {
+      evidence_id: "recovery_review_family_route_failure_v1",
+      path: "var/recovery-reviews/latest-family_route_failure_v1-review.json",
+      exists: true,
+      required_for_summary: true,
+      status: "ready",
+    },
+  ],
+};
+
 const observabilityRun = {
   schema_version: "weekendpilot_internal_observability_run_v1",
   run_id: "run-1",
@@ -155,6 +258,14 @@ test.describe("internal observability surface", () => {
       });
     });
 
+    await page.route("**/internal/system/integrity-summary", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(systemIntegritySummary),
+      });
+    });
+
     await page.route("**/internal/runs/run-1/observability", async (route) => {
       await route.fulfill({
         status: 200,
@@ -167,10 +278,13 @@ test.describe("internal observability surface", () => {
 
     await expect(page.getByRole("heading", { name: "Internal Observability Review" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Benchmark Summary" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "System Integrity Summary" })).toBeVisible();
     await expect(page.getByText(/^Latest Release Gate$/)).toBeVisible();
     await expect(page.getByText("Benchmark release gate v1")).toBeVisible();
     await expect(page.getByText("var/formal-benchmarks/latest-release_gate_v1-run-report.json")).toBeVisible();
     await expect(page.getByRole("button", { name: "Copy latest alias" })).toBeVisible();
+    await expect(page.getByText("var/formal-benchmarks/latest-v2_integrity_gate-run-report.json")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copy v2_integrity_gate path" })).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Run ID" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Load Run" })).toBeVisible();
     await expect(page.getByTestId("start-button")).toHaveCount(0);

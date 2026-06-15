@@ -8,7 +8,7 @@ WeekendPilot 是一个面向 `2-6` 小时本地生活场景的规划、确认与
 | --- | --- |
 | 版本口径 | 当前固定为 `V1.5 baseline / V2 Integrity candidate`；后续 `V2 Integrity Edition` 优先增强 benchmark 完整性、memory governance、observability 与 recovery 可审计性 |
 | 公开主链 | `5173` 公开 demo 已收束为可演示的主链：`planning`、`clarification`、`replan`、`confirm / decline`、`execution` |
-| 技术支撑 | `5174` 内部评审页提供 `Benchmark Summary`、`Trace Summary`、`Benchmark Artifacts` 与 `Recovery Visualization` |
+| 技术支撑 | `5174` 内部评审页提供 `Benchmark Summary`、`System Integrity Summary`、`Trace Summary`、`Benchmark Artifacts` 与 `Recovery Visualization` |
 | 交付边界 | `Mock World`、`benchmark`、`recovery review` 与 `AMap read-only preview` 都已纳入当前版本的说明和验证边界 |
 
 ## 当前版本技术路线图
@@ -23,7 +23,7 @@ WeekendPilot 是一个面向 `2-6` 小时本地生活场景的规划、确认与
 
 - 公开 demo 主链已经可用：`happy path`、`clarification`、`replan`、`decline`、`action manifest`、`execution result`
 - 公开交互页已经固定为 `http://127.0.0.1:5173/`，关键 reviewer-facing 文案为中文
-- 内部评审页已经固定为 `http://127.0.0.1:5174/`，可展示 `Benchmark Summary`、`Trace Summary`、`Benchmark Artifacts`、`Recovery Visualization`
+- 内部评审页已经固定为 `http://127.0.0.1:5174/`，可展示 `Benchmark Summary`、`System Integrity Summary`、`Trace Summary`、`Benchmark Artifacts`、`Recovery Visualization`
 - `AMap` 已接入为 `API-only` 的 `read-only preview`，可规划和查看候选，但确认后写动作会被 `409` 阻断
 - 公开 API / 内部 API 已稳定保留：
   - `POST /demo/runs`

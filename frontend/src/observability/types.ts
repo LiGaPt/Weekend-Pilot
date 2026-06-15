@@ -123,6 +123,117 @@ export type InternalReleaseGateBenchmarkSummary = {
   report_path: string;
 };
 
+export type IntegritySectionStatus = "ready" | "missing" | "invalid" | "partial";
+export type SystemIntegrityStatus = "ready" | "degraded" | "missing_evidence" | "invalid_evidence";
+
+export type SystemIntegrityEvidencePathSummary = {
+  evidence_id: string;
+  path: string;
+  exists: boolean;
+  required_for_summary: boolean;
+  status: IntegritySectionStatus;
+};
+
+export type SystemIntegrityBenchmarkSummary = {
+  status: IntegritySectionStatus;
+  reason: string | null;
+  suite_id: string | null;
+  gate_id: string | null;
+  run_status: string | null;
+  release_blocked: boolean | null;
+  case_count: number | null;
+  passed_count: number | null;
+  failed_count: number | null;
+  error_count: number | null;
+  overall_score: number | null;
+  blocking_failures: string[];
+  integrity_coverage_summary: Record<string, number>;
+  memory_mode_counts: Record<string, number>;
+  conversation_mode_counts: Record<string, number>;
+  failure_mode_counts: Record<string, number>;
+  latest_report_path: string | null;
+};
+
+export type SystemIntegrityStabilitySummary = {
+  status: IntegritySectionStatus;
+  reason: string | null;
+  suite_id: string | null;
+  gate_id: string | null;
+  metric_version: string | null;
+  requested_run_count: number | null;
+  executed_run_count: number | null;
+  window_size: number | null;
+  window_count: number | null;
+  discarded_tail_run_count: number | null;
+  success_count: number | null;
+  failure_count: number | null;
+  error_count: number | null;
+  success_at_1: number | null;
+  pass_at_4: number | null;
+  pass_pow_4: number | null;
+  stable_enough: boolean | null;
+  has_required_window: boolean | null;
+  latest_report_path: string | null;
+};
+
+export type SystemIntegrityMemoryGovernanceSummary = {
+  status: IntegritySectionStatus;
+  reason: string | null;
+  source_suite_id: string | null;
+  memory_case_count: number;
+  passed_case_count: number;
+  failed_case_count: number;
+  error_case_count: number;
+  all_memory_cases_passed: boolean;
+  case_ids: string[];
+  failing_case_ids: string[];
+  latest_report_path: string | null;
+};
+
+export type SystemIntegrityRecoveryReplaySummary = {
+  status: IntegritySectionStatus;
+  reason: string | null;
+  case_id: string | null;
+  review_status: string | null;
+  check_count: number;
+  passed_check_count: number;
+  failed_check_count: number;
+  latest_review_path: string | null;
+  source_report_path: string | null;
+  replay_report_path: string | null;
+  recovery_actions: string[];
+  attempt_count: number | null;
+  max_attempts: number | null;
+};
+
+export type SystemIntegrityTimingSummary = {
+  status: IntegritySectionStatus;
+  reason: string | null;
+  benchmark_timing_summary_present: boolean;
+  benchmark_timing_summary: Record<string, unknown> | null;
+  stability_window_size: number | null;
+  stability_executed_run_count: number | null;
+};
+
+export type SystemIntegrityRedactionSummary = {
+  internal_only: boolean;
+  sanitized: boolean;
+  relative_evidence_paths_only: boolean;
+  forbidden_key_markers: string[];
+};
+
+export type SystemIntegritySummary = {
+  schema_version: string;
+  status: SystemIntegrityStatus;
+  benchmark_summary: SystemIntegrityBenchmarkSummary;
+  stability_summary: SystemIntegrityStabilitySummary;
+  memory_governance_summary: SystemIntegrityMemoryGovernanceSummary;
+  recovery_replay_summary: SystemIntegrityRecoveryReplaySummary;
+  timing_summary: SystemIntegrityTimingSummary;
+  redaction_summary: SystemIntegrityRedactionSummary;
+  evidence_paths: SystemIntegrityEvidencePathSummary[];
+};
+
 export type InternalObservabilityRunSummary = {
   schema_version: string;
   run_id: string;
