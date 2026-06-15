@@ -41,8 +41,10 @@ def test_verify_review_evidence_passes_for_aligned_repo(repo_directory: Path) ->
     assert result.checked_aliases == {
         "release_gate_v1": "var/formal-benchmarks/latest-release_gate_v1-run-report.json",
         "coverage_gate_v1_5": "var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json",
-        "formal_verification": "var/formal-benchmarks/latest-all_registered-run-report.json",
-        "recovery_replay_review": "var/recovery-reviews/latest-family_route_failure_v1-review.json",
+        "v2_integrity_gate": "var/formal-benchmarks/latest-v2_integrity_gate-run-report.json",
+        "v2_integrity_passk": "var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json",
+        "formal_verification_all_registered": "var/formal-benchmarks/latest-all_registered-run-report.json",
+        "recovery_review_family_route_failure_v1": "var/recovery-reviews/latest-family_route_failure_v1-review.json",
     }
 
 
@@ -136,6 +138,95 @@ def test_verify_review_evidence_fails_when_recovery_review_alias_has_wrong_case_
     assert any("family_route_failure_v1" in failure for failure in result.failures)
 
 
+def test_verify_review_evidence_fails_when_v2_gate_alias_has_wrong_suite_id(repo_directory: Path) -> None:
+    _write_repo_fixture(
+        repo_directory,
+        alias_overrides={
+            "v2_gate_suite_id": "all_registered",
+        },
+    )
+
+    result = verify_review_evidence(repo_directory)
+
+    assert result.status == "failed"
+    assert any("latest-v2_integrity_gate-run-report.json" in failure for failure in result.failures)
+    assert any("v2_integrity" in failure for failure in result.failures)
+
+
+def test_verify_review_evidence_fails_when_v2_gate_alias_is_missing_gate_id(repo_directory: Path) -> None:
+    _write_repo_fixture(
+        repo_directory,
+        alias_overrides={
+            "include_v2_gate_evaluation_gate_id": False,
+        },
+    )
+
+    result = verify_review_evidence(repo_directory)
+
+    assert result.status == "failed"
+    assert any("latest-v2_integrity_gate-run-report.json" in failure for failure in result.failures)
+    assert any("v2_integrity_gate_evaluation.gate_id" in failure for failure in result.failures)
+
+
+def test_verify_review_evidence_fails_when_v2_passk_alias_is_missing(repo_directory: Path) -> None:
+    _write_repo_fixture(
+        repo_directory,
+        alias_overrides={
+            "include_v2_passk_alias": False,
+        },
+    )
+
+    result = verify_review_evidence(repo_directory)
+
+    assert result.status == "failed"
+    assert any("latest-v2_integrity-passk-v0-report.json" in failure for failure in result.failures)
+
+
+def test_verify_review_evidence_fails_when_v2_passk_alias_has_wrong_suite_id(repo_directory: Path) -> None:
+    _write_repo_fixture(
+        repo_directory,
+        alias_overrides={
+            "v2_passk_suite_id": "all_registered",
+        },
+    )
+
+    result = verify_review_evidence(repo_directory)
+
+    assert result.status == "failed"
+    assert any("latest-v2_integrity-passk-v0-report.json" in failure for failure in result.failures)
+    assert any("v2_integrity" in failure for failure in result.failures)
+
+
+def test_verify_review_evidence_fails_when_v2_passk_alias_has_wrong_gate_id(repo_directory: Path) -> None:
+    _write_repo_fixture(
+        repo_directory,
+        alias_overrides={
+            "v2_passk_gate_id": "release_gate_v1",
+        },
+    )
+
+    result = verify_review_evidence(repo_directory)
+
+    assert result.status == "failed"
+    assert any("latest-v2_integrity-passk-v0-report.json" in failure for failure in result.failures)
+    assert any("v2_integrity_gate" in failure for failure in result.failures)
+
+
+def test_verify_review_evidence_fails_when_v2_passk_alias_has_wrong_metric_version(repo_directory: Path) -> None:
+    _write_repo_fixture(
+        repo_directory,
+        alias_overrides={
+            "v2_passk_metric_version": "passk_v9",
+        },
+    )
+
+    result = verify_review_evidence(repo_directory)
+
+    assert result.status == "failed"
+    assert any("latest-v2_integrity-passk-v0-report.json" in failure for failure in result.failures)
+    assert any("passk_v0" in failure for failure in result.failures)
+
+
 def test_main_returns_non_zero_and_prints_failures_for_invalid_repo(
     repo_directory: Path,
     capsys: pytest.CaptureFixture[str],
@@ -170,6 +261,7 @@ def _write_repo_fixture(
 
     (repo_root / "docs").mkdir(parents=True, exist_ok=True)
     (repo_root / "var" / "formal-benchmarks").mkdir(parents=True, exist_ok=True)
+    (repo_root / "var" / "formal-benchmarks" / "stability").mkdir(parents=True, exist_ok=True)
     (repo_root / "var" / "recovery-reviews").mkdir(parents=True, exist_ok=True)
 
     readme_lines = [
@@ -288,6 +380,50 @@ def _write_repo_fixture(
         repo_root / "var" / "formal-benchmarks" / "latest-all_registered-run-report.json",
         formal_payload,
     )
+
+    v2_gate_payload = _build_benchmark_report(
+        suite_id=str(alias_overrides.get("v2_gate_suite_id", "v2_integrity")),
+        suite_title="V2 integrity benchmark suite",
+        case_count=18,
+        passed_count=18,
+        report_path="var/formal-benchmarks/v2-gate-placeholder/suite-v2_integrity-run-report.json",
+    )
+    v2_gate_evaluation = {
+        "suite_id": str(alias_overrides.get("v2_gate_evaluation_suite_id", "v2_integrity")),
+        "release_blocked": bool(alias_overrides.get("v2_gate_release_blocked", False)),
+    }
+    if bool(alias_overrides.get("include_v2_gate_evaluation_gate_id", True)):
+        v2_gate_evaluation["gate_id"] = str(alias_overrides.get("v2_gate_evaluation_gate_id", "v2_integrity_gate"))
+    v2_gate_payload["v2_integrity_gate_evaluation"] = v2_gate_evaluation
+    _write_json(
+        repo_root / "var" / "formal-benchmarks" / "latest-v2_integrity_gate-run-report.json",
+        v2_gate_payload,
+    )
+
+    if bool(alias_overrides.get("include_v2_passk_alias", True)):
+        v2_passk_payload = {
+            "schema_version": "weekendpilot_benchmark_stability_passk_v1",
+            "metric_version": str(alias_overrides.get("v2_passk_metric_version", "passk_v0")),
+            "suite_id": str(alias_overrides.get("v2_passk_suite_id", "v2_integrity")),
+            "gate_id": str(alias_overrides.get("v2_passk_gate_id", "v2_integrity_gate")),
+            "requested_run_count": 4,
+            "executed_run_count": 4,
+            "window_size": 4,
+            "window_count": int(alias_overrides.get("v2_passk_window_count", 1)),
+            "discarded_tail_run_count": 0,
+            "success_count": 4,
+            "failure_count": 0,
+            "error_count": 0,
+            "success_at_1": 1.0,
+            "pass_at_4": 1.0,
+            "pass_pow_4": 1.0,
+            "attempts": [],
+            "windows": [],
+        }
+        _write_json(
+            repo_root / "var" / "formal-benchmarks" / "stability" / "latest-v2_integrity-passk-v0-report.json",
+            v2_passk_payload,
+        )
 
     recovery_payload = {
         "schema_version": "weekendpilot_recovery_replay_review_v1",

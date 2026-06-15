@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import ValidationError
 
-from backend.app.benchmark.schemas import BenchmarkRunReport, RecoveryReplayReviewResult
+from backend.app.benchmark.schemas import BenchmarkRunReport, BenchmarkStabilityPassKReport, RecoveryReplayReviewResult
+from backend.app.benchmark.submission_evidence import SUBMISSION_EVIDENCE_CONTRACTS, SubmissionEvidenceContract
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -60,18 +61,6 @@ class ReviewEvidenceVerificationError(RuntimeError):
 
 
 @dataclass(frozen=True)
-class ReviewEvidenceArtifactContract:
-    artifact_id: str
-    command: str
-    relative_path: Path
-    artifact_type: Literal["benchmark", "recovery_review"]
-    expected_suite_id: str | None = None
-    expected_case_id: str | None = None
-    expected_status: str = "passed"
-    required_nested_values: dict[tuple[str, ...], Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
 class ReviewEvidenceVerificationResult:
     status: Literal["passed", "failed"]
     checked_docs: list[str]
@@ -79,49 +68,10 @@ class ReviewEvidenceVerificationResult:
     failures: list[str]
 
 
-ARTIFACT_CONTRACTS = (
-    ReviewEvidenceArtifactContract(
-        artifact_id="release_gate_v1",
-        command="python scripts/run_benchmark_release_gate.py",
-        relative_path=Path("var/formal-benchmarks/latest-release_gate_v1-run-report.json"),
-        artifact_type="benchmark",
-        expected_suite_id="release_gate_v1",
-        required_nested_values={
-            ("release_gate_evaluation", "gate_id"): "release_gate_v1",
-        },
-    ),
-    ReviewEvidenceArtifactContract(
-        artifact_id="coverage_gate_v1_5",
-        command="python scripts/run_benchmark_coverage_gate.py",
-        relative_path=Path("var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json"),
-        artifact_type="benchmark",
-        expected_suite_id="all_registered",
-        required_nested_values={
-            ("coverage_gate_evaluation", "gate_id"): "coverage_gate_v1_5",
-            ("coverage_gate_evaluation", "release_blocked"): False,
-        },
-    ),
-    ReviewEvidenceArtifactContract(
-        artifact_id="formal_verification",
-        command="python scripts/run_formal_verification.py",
-        relative_path=Path("var/formal-benchmarks/latest-all_registered-run-report.json"),
-        artifact_type="benchmark",
-        expected_suite_id="all_registered",
-    ),
-    ReviewEvidenceArtifactContract(
-        artifact_id="recovery_replay_review",
-        command="python scripts/run_recovery_replay_review.py",
-        relative_path=Path("var/recovery-reviews/latest-family_route_failure_v1-review.json"),
-        artifact_type="recovery_review",
-        expected_case_id="family_route_failure_v1",
-    ),
-)
-
-
 def verify_review_evidence(repo_root: Path | str | None = None) -> ReviewEvidenceVerificationResult:
     root = Path(repo_root) if repo_root is not None else REPO_ROOT
     checked_docs = list(OFFICIAL_TRACKED_DOCS)
-    checked_aliases = {contract.artifact_id: contract.relative_path.as_posix() for contract in ARTIFACT_CONTRACTS}
+    checked_aliases = {contract.evidence_id: contract.relative_path.as_posix() for contract in SUBMISSION_EVIDENCE_CONTRACTS}
     failures: list[str] = []
 
     readme_path = root / "README.md"
@@ -146,7 +96,7 @@ def verify_review_evidence(repo_root: Path | str | None = None) -> ReviewEvidenc
     if gitignore_text is not None:
         failures.extend(_missing_gitignore_rule_failures(gitignore_text, gitignore_path, root))
 
-    for contract in ARTIFACT_CONTRACTS:
+    for contract in SUBMISSION_EVIDENCE_CONTRACTS:
         failures.extend(_validate_artifact_contract(root, contract))
 
     status: Literal["passed", "failed"] = "passed" if not failures else "failed"
@@ -246,20 +196,22 @@ def _missing_gitignore_rule_failures(text: str, path: Path, root: Path) -> list[
     return failures
 
 
-def _validate_artifact_contract(root: Path, contract: ReviewEvidenceArtifactContract) -> list[str]:
+def _validate_artifact_contract(root: Path, contract: SubmissionEvidenceContract) -> list[str]:
     try:
         payload = _read_json(root / contract.relative_path, command=contract.command, root=root)
     except ReviewEvidenceVerificationError as exc:
         return [str(exc)]
 
-    if contract.artifact_type == "benchmark":
+    if contract.artifact_kind == "benchmark_run":
         return _validate_benchmark_artifact(root, contract, payload)
-    return _validate_recovery_review_artifact(root, contract, payload)
+    if contract.artifact_kind == "benchmark_stability":
+        return _validate_benchmark_stability_artifact(contract, payload)
+    return _validate_recovery_review_artifact(contract, payload)
 
 
 def _validate_benchmark_artifact(
-    root: Path,
-    contract: ReviewEvidenceArtifactContract,
+    _root: Path,
+    contract: SubmissionEvidenceContract,
     payload: dict[str, Any],
 ) -> list[str]:
     label = contract.relative_path.as_posix()
@@ -310,9 +262,45 @@ def _validate_benchmark_artifact(
     return failures
 
 
+def _validate_benchmark_stability_artifact(contract: SubmissionEvidenceContract, payload: dict[str, Any]) -> list[str]:
+    label = contract.relative_path.as_posix()
+    try:
+        report = BenchmarkStabilityPassKReport.model_validate(payload)
+    except ValidationError as exc:
+        return [_artifact_failure(label, f"invalid benchmark stability schema ({exc.errors()[0]['type']}).", contract.command)]
+
+    failures: list[str] = []
+    if report.suite_id != contract.expected_suite_id:
+        failures.append(
+            _artifact_failure(
+                label,
+                f"expected suite_id={contract.expected_suite_id!r}, got {report.suite_id!r}.",
+                contract.command,
+            )
+        )
+    if report.gate_id != contract.expected_gate_id:
+        failures.append(
+            _artifact_failure(
+                label,
+                f"expected gate_id={contract.expected_gate_id!r}, got {report.gate_id!r}.",
+                contract.command,
+            )
+        )
+    if report.metric_version != contract.expected_metric_version:
+        failures.append(
+            _artifact_failure(
+                label,
+                f"expected metric_version={contract.expected_metric_version!r}, got {report.metric_version!r}.",
+                contract.command,
+            )
+        )
+    if report.window_count < 1:
+        failures.append(_artifact_failure(label, "expected window_count >= 1.", contract.command))
+    return failures
+
+
 def _validate_recovery_review_artifact(
-    root: Path,
-    contract: ReviewEvidenceArtifactContract,
+    contract: SubmissionEvidenceContract,
     payload: dict[str, Any],
 ) -> list[str]:
     label = contract.relative_path.as_posix()

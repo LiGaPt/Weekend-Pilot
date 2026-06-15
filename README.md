@@ -222,3 +222,4 @@ npm --prefix frontend test -- --run src/chat/ConversationThread.test.tsx src/App
 - Web demo 运行手册：[docs/WEB_DEMO_README.md](docs/WEB_DEMO_README.md)
 - 提交与录制总览：[docs/submission/OVERVIEW.md](docs/submission/OVERVIEW.md)
 - reviewer evidence 入口：[docs/V1_5_REVIEW_EVIDENCE.md](docs/V1_5_REVIEW_EVIDENCE.md)
+- 提交前可运行：`python scripts/verify_review_evidence.py`

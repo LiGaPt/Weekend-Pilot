@@ -135,28 +135,74 @@ def test_show_submission_evidence_main_prints_aliases_and_meanings(capsys) -> No
     temp_root = _make_local_temp_dir()
     try:
         formal_dir = temp_root / "var" / "formal-benchmarks"
+        stability_dir = formal_dir / "stability"
         recovery_dir = temp_root / "var" / "recovery-reviews"
         formal_dir.mkdir(parents=True)
+        stability_dir.mkdir(parents=True)
         recovery_dir.mkdir(parents=True)
 
         (formal_dir / "latest-release_gate_v1-run-report.json").write_text(
-            json.dumps({"run_status": "passed", "benchmark_summary": {"suite_id": "release_gate_v1"}}),
+            json.dumps(_build_benchmark_report_payload("release_gate_v1", "Benchmark release gate v1")),
             encoding="utf-8",
         )
+        coverage_payload = _build_benchmark_report_payload("all_registered", "All registered benchmark suite")
+        coverage_payload["coverage_gate_evaluation"] = {
+            "gate_id": "coverage_gate_v1_5",
+            "release_blocked": False,
+        }
         (formal_dir / "latest-coverage_gate_v1_5-run-report.json").write_text(
-            json.dumps({"run_status": "passed", "benchmark_summary": {"suite_id": "all_registered"}}),
+            json.dumps(coverage_payload),
             encoding="utf-8",
         )
+        v2_gate_payload = _build_benchmark_report_payload("v2_integrity", "V2 integrity benchmark suite")
+        v2_gate_payload["v2_integrity_gate_evaluation"] = {
+            "gate_id": "v2_integrity_gate",
+            "suite_id": "v2_integrity",
+            "release_blocked": False,
+        }
         (formal_dir / "latest-v2_integrity_gate-run-report.json").write_text(
-            json.dumps({"run_status": "passed", "benchmark_summary": {"suite_id": "v2_integrity"}}),
+            json.dumps(v2_gate_payload),
+            encoding="utf-8",
+        )
+        (stability_dir / "latest-v2_integrity-passk-v0-report.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": "weekendpilot_benchmark_stability_passk_v1",
+                    "suite_id": "v2_integrity",
+                    "gate_id": "v2_integrity_gate",
+                    "metric_version": "passk_v0",
+                    "requested_run_count": 4,
+                    "executed_run_count": 4,
+                    "window_size": 4,
+                    "window_count": 1,
+                    "discarded_tail_run_count": 0,
+                    "success_count": 4,
+                    "failure_count": 0,
+                    "error_count": 0,
+                    "success_at_1": 1.0,
+                    "pass_at_4": 1.0,
+                    "pass_pow_4": 1.0,
+                    "attempts": [],
+                    "windows": [],
+                }
+            ),
             encoding="utf-8",
         )
         (formal_dir / "latest-all_registered-run-report.json").write_text(
-            json.dumps({"run_status": "passed", "benchmark_summary": {"suite_id": "all_registered"}}),
+            json.dumps(_build_benchmark_report_payload("all_registered", "All registered benchmark suite")),
             encoding="utf-8",
         )
         (recovery_dir / "latest-family_route_failure_v1-review.json").write_text(
-            json.dumps({"status": "passed", "case_id": "family_route_failure_v1"}),
+            json.dumps(
+                {
+                    "schema_version": "weekendpilot_recovery_replay_review_v1",
+                    "status": "passed",
+                    "case_id": "family_route_failure_v1",
+                    "run_directory": "var/recovery-reviews/recovery-review-placeholder",
+                    "latest_review_path": "var/recovery-reviews/latest-family_route_failure_v1-review.json",
+                    "checks": [],
+                }
+            ),
             encoding="utf-8",
         )
 
@@ -171,6 +217,9 @@ def test_show_submission_evidence_main_prints_aliases_and_meanings(capsys) -> No
         assert "Breadth and diversity coverage gate" in captured.out
         assert "v2_integrity_gate" in captured.out
         assert "V2 integrity benchmark gate" in captured.out
+        assert "v2_integrity_passk" in captured.out
+        assert "var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json" in captured.out
+        assert "V2 integrity repeated-run stability metrics" in captured.out
         assert "latest-family_route_failure_v1-review.json" in captured.out
         assert "Failure-recovery replay review" in captured.out
     finally:
@@ -254,3 +303,40 @@ def test_readme_covers_project_status_startup_benchmark_and_tests() -> None:
     assert "npm --prefix frontend test -- --run src/chat/ConversationThread.test.tsx src/App.test.tsx" in readme_text
     assert "`15 passed`" in readme_text
     assert "`24 passed`" in readme_text
+
+
+def _build_benchmark_report_payload(suite_id: str, suite_title: str) -> dict[str, object]:
+    payload = {
+        "schema_version": "weekendpilot_benchmark_run_v1",
+        "run_status": "passed",
+        "case_results": [],
+        "passed_count": 1,
+        "failed_count": 0,
+        "error_count": 0,
+        "overall_score": 1.0,
+        "benchmark_summary": {
+            "schema_version": "weekendpilot_benchmark_summary_v1",
+            "suite_id": suite_id,
+            "suite_title": suite_title,
+            "run_status": "passed",
+            "case_count": 1,
+            "passed_count": 1,
+            "failed_count": 0,
+            "error_count": 0,
+            "overall_score": 1.0,
+            "matrix_summary": {
+                "schema_version": "weekendpilot_benchmark_case_matrix_v1",
+                "case_count": 1,
+                "level_counts": {"L1": 1},
+                "tool_profile_counts": {"mock_world": 1},
+                "failure_mode_counts": {"none": 1},
+                "tag_counts": {"review_evidence": 1},
+            },
+        },
+    }
+    if suite_id == "release_gate_v1":
+        payload["release_gate_evaluation"] = {
+            "gate_id": "release_gate_v1",
+            "release_blocked": False,
+        }
+    return payload
