@@ -998,6 +998,10 @@ dd {
   box-shadow: 0 10px 24px rgb(15 23 42 / 0.06);
 }
 
+.observability-integrity-panel {
+  border-color: #cddfd8;
+}
+
 .observability-benchmark-hero {
   align-items: start;
   background:
@@ -1009,6 +1013,13 @@ dd {
   gap: 18px;
   grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
   padding: 18px;
+}
+
+.observability-integrity-hero {
+  background:
+    linear-gradient(135deg, rgb(239 250 245 / 0.95), rgb(248 250 252 / 1)),
+    #f8fafc;
+  border-color: #d6e9df;
 }
 
 .observability-benchmark-hero-copy {
@@ -1071,6 +1082,12 @@ dd {
 .observability-preview-grid,
 .observability-path-stack {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.observability-integrity-section-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
 .observability-metric-card,

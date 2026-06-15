@@ -2,6 +2,7 @@ import { API_BASE_URL, FrontendApiError } from "../shared/http";
 import type {
   InternalObservabilityRunSummary,
   InternalReleaseGateBenchmarkSummary,
+  SystemIntegritySummary,
 } from "./types";
 
 export async function getObservabilityRun(runId: string): Promise<InternalObservabilityRunSummary> {
@@ -12,6 +13,10 @@ export async function getObservabilityRun(runId: string): Promise<InternalObserv
 
 export async function getLatestReleaseGateBenchmarkSummary(): Promise<InternalReleaseGateBenchmarkSummary> {
   return request<InternalReleaseGateBenchmarkSummary>("/internal/benchmarks/release-gate-v1/summary");
+}
+
+export async function getSystemIntegritySummary(): Promise<SystemIntegritySummary> {
+  return request<SystemIntegritySummary>("/internal/system/integrity-summary");
 }
 
 async function request<T>(path: string): Promise<T> {

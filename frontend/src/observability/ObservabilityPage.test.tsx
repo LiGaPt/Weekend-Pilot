@@ -4,17 +4,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getLatestReleaseGateBenchmarkSummary,
   getObservabilityRun,
+  getSystemIntegritySummary,
 } from "./api";
 import { FrontendApiError } from "../shared/http";
 import { ObservabilityPage } from "./ObservabilityPage";
 import type {
   InternalObservabilityRunSummary,
   InternalReleaseGateBenchmarkSummary,
+  SystemIntegritySummary,
 } from "./types";
 
 vi.mock("./api", () => ({
   getObservabilityRun: vi.fn(),
   getLatestReleaseGateBenchmarkSummary: vi.fn(),
+  getSystemIntegritySummary: vi.fn(),
 }));
 
 const summary: InternalObservabilityRunSummary = {
@@ -159,11 +162,116 @@ const releaseGateSummary: InternalReleaseGateBenchmarkSummary = {
   report_path: "var/formal-benchmarks/latest-release_gate_v1-run-report.json",
 };
 
+const systemIntegritySummary: SystemIntegritySummary = {
+  schema_version: "weekendpilot_system_integrity_summary_v1",
+  status: "ready",
+  benchmark_summary: {
+    status: "ready",
+    reason: null,
+    suite_id: "v2_integrity",
+    gate_id: "v2_integrity_gate",
+    run_status: "passed",
+    release_blocked: false,
+    case_count: 18,
+    passed_count: 18,
+    failed_count: 0,
+    error_count: 0,
+    overall_score: 1,
+    blocking_failures: [],
+    integrity_coverage_summary: {},
+    memory_mode_counts: {},
+    conversation_mode_counts: {},
+    failure_mode_counts: {},
+    latest_report_path: "var/formal-benchmarks/latest-v2_integrity_gate-run-report.json",
+  },
+  stability_summary: {
+    status: "ready",
+    reason: null,
+    suite_id: "v2_integrity",
+    gate_id: "v2_integrity_gate",
+    metric_version: "passk_v0",
+    requested_run_count: 4,
+    executed_run_count: 4,
+    window_size: 4,
+    window_count: 1,
+    discarded_tail_run_count: 0,
+    success_count: 4,
+    failure_count: 0,
+    error_count: 0,
+    success_at_1: 1,
+    pass_at_4: 1,
+    pass_pow_4: 1,
+    stable_enough: true,
+    has_required_window: true,
+    latest_report_path: "var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json",
+  },
+  memory_governance_summary: {
+    status: "ready",
+    reason: null,
+    source_suite_id: "all_registered",
+    memory_case_count: 2,
+    passed_case_count: 2,
+    failed_case_count: 0,
+    error_case_count: 0,
+    all_memory_cases_passed: true,
+    case_ids: ["family_memory_override_v1", "family_memory_advisory_fill_v1"],
+    failing_case_ids: [],
+    latest_report_path: "var/formal-benchmarks/latest-all_registered-run-report.json",
+  },
+  recovery_replay_summary: {
+    status: "ready",
+    reason: null,
+    case_id: "family_route_failure_v1",
+    review_status: "passed",
+    check_count: 3,
+    passed_check_count: 3,
+    failed_check_count: 0,
+    latest_review_path: "var/recovery-reviews/latest-family_route_failure_v1-review.json",
+    source_report_path: "var/formal-benchmarks/family_route_failure_v1.json",
+    replay_report_path: "var/recovery-reviews/family_route_failure_v1-replay.json",
+    recovery_actions: ["stop_safely"],
+    attempt_count: 1,
+    max_attempts: 2,
+  },
+  timing_summary: {
+    status: "ready",
+    reason: null,
+    benchmark_timing_summary_present: true,
+    benchmark_timing_summary: { p50_ms: 390, p95_ms: 424 },
+    stability_window_size: 4,
+    stability_executed_run_count: 4,
+  },
+  redaction_summary: {
+    internal_only: true,
+    sanitized: true,
+    relative_evidence_paths_only: true,
+    forbidden_key_markers: ["api_key", "token"],
+  },
+  evidence_paths: [
+    {
+      evidence_id: "v2_integrity_gate",
+      path: "var/formal-benchmarks/latest-v2_integrity_gate-run-report.json",
+      exists: true,
+      required_for_summary: true,
+      status: "ready",
+    },
+    {
+      evidence_id: "recovery_review_family_route_failure_v1",
+      path: "var/recovery-reviews/latest-family_route_failure_v1-review.json",
+      exists: true,
+      required_for_summary: true,
+      status: "ready",
+    },
+  ],
+};
+
 describe("ObservabilityPage", () => {
   beforeEach(() => {
     vi.mocked(getObservabilityRun).mockReset();
     vi.mocked(getLatestReleaseGateBenchmarkSummary).mockReset();
+    vi.mocked(getSystemIntegritySummary).mockReset();
     vi.mocked(getLatestReleaseGateBenchmarkSummary).mockResolvedValue(releaseGateSummary);
+    vi.mocked(getSystemIntegritySummary).mockResolvedValue(systemIntegritySummary);
   });
 
   it("renders the initial empty state and benchmark summary panel", async () => {
@@ -172,10 +280,51 @@ describe("ObservabilityPage", () => {
     expect(screen.getByRole("heading", { name: "Internal Observability Review" })).toBeInTheDocument();
     expect(screen.getByText("Paste a run ID to inspect the internal workflow summary.")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "Benchmark Summary" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "System Integrity Summary" })).toBeInTheDocument();
     expect(screen.getByText("Latest Release Gate")).toBeInTheDocument();
     expect(screen.getByText("Benchmark release gate v1")).toBeInTheDocument();
     expect(screen.getByText("var/formal-benchmarks/latest-release_gate_v1-run-report.json")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy latest alias" })).toBeInTheDocument();
+    expect(screen.getByText("Pass@k")).toBeInTheDocument();
+    expect(screen.getByText("Memory Governance")).toBeInTheDocument();
+    expect(screen.getByText("Recovery Replay")).toBeInTheDocument();
+    expect(screen.getByText("Evidence Paths")).toBeInTheDocument();
+    expect(screen.getByText("var/formal-benchmarks/latest-v2_integrity_gate-run-report.json")).toBeInTheDocument();
+  });
+
+  it("renders a degraded integrity summary without blocking the panel", async () => {
+    vi.mocked(getSystemIntegritySummary).mockResolvedValue({
+      ...systemIntegritySummary,
+      status: "degraded",
+      stability_summary: {
+        ...systemIntegritySummary.stability_summary,
+        status: "missing",
+        reason: "Latest v2_integrity pass-k report is missing.",
+        success_at_1: null,
+        pass_at_4: null,
+        pass_pow_4: null,
+      },
+    });
+
+    render(<ObservabilityPage />);
+
+    expect(await screen.findByRole("heading", { name: "System Integrity Summary" })).toBeInTheDocument();
+    expect(screen.getByText("degraded")).toBeInTheDocument();
+    expect(screen.getByText("Latest v2_integrity pass-k report is missing.")).toBeInTheDocument();
+  });
+
+  it("shows an integrity-panel-local error when the integrity request fails", async () => {
+    vi.mocked(getSystemIntegritySummary).mockRejectedValue(
+      new FrontendApiError("内部观测请求失败（HTTP 500）。", 500),
+    );
+
+    render(<ObservabilityPage />);
+
+    expect(await screen.findByRole("heading", { name: "Benchmark Summary" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "System Integrity Summary" })).toBeInTheDocument();
+    const alerts = await screen.findAllByRole("alert");
+    expect(alerts.some((alert) => within(alert).queryByText("内部观测请求失败（HTTP 500）。") !== null)).toBe(true);
+    expect(screen.getByText("Benchmark release gate v1")).toBeInTheDocument();
   });
 
   it("validates empty run IDs before loading", async () => {
@@ -218,7 +367,7 @@ describe("ObservabilityPage", () => {
     expect(screen.getByText("Workflow reached the expected path.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Recovery Visualization" })).toBeInTheDocument();
     expect(screen.getByText("Latest Attempt")).toBeInTheDocument();
-    expect(screen.getAllByText("stop_safely")).toHaveLength(2);
+    expect(screen.getAllByText("stop_safely")).toHaveLength(3);
     expect(screen.getByText("Recovery stopped after route failure.")).toBeInTheDocument();
     expect(screen.getByText("family_route_failure_v1")).toBeInTheDocument();
     expect(screen.getByText("var/benchmarks/family_route_failure_v1.json")).toBeInTheDocument();
@@ -238,6 +387,22 @@ describe("ObservabilityPage", () => {
     await user.click(await screen.findByRole("button", { name: "Copy latest alias" }));
 
     expect(writeText).toHaveBeenCalledWith("var/formal-benchmarks/latest-release_gate_v1-run-report.json");
+    expect(screen.getByText("Copied")).toBeInTheDocument();
+  });
+
+  it("copies an integrity evidence path and shows success feedback", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<ObservabilityPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Copy v2_integrity_gate path" }));
+
+    expect(writeText).toHaveBeenCalledWith("var/formal-benchmarks/latest-v2_integrity_gate-run-report.json");
     expect(screen.getByText("Copied")).toBeInTheDocument();
   });
 

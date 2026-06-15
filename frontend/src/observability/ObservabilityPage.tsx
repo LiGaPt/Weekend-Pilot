@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getLatestReleaseGateBenchmarkSummary, getObservabilityRun } from "./api";
+import { getLatestReleaseGateBenchmarkSummary, getObservabilityRun, getSystemIntegritySummary } from "./api";
 import { FrontendApiError } from "../shared/http";
 import type {
   InternalActionLedgerSummary,
@@ -9,10 +9,13 @@ import type {
   InternalReleaseGateBenchmarkSummary,
   InternalToolEventSummary,
   InternalWorkflowTimingSummary,
+  SystemIntegrityEvidencePathSummary,
+  SystemIntegritySummary,
 } from "./types";
 
 const GENERIC_ERROR_MESSAGE = "Internal observability request failed. Please try again.";
 const BENCHMARK_GENERIC_ERROR_MESSAGE = "Internal benchmark summary request failed. Please try again.";
+const INTEGRITY_GENERIC_ERROR_MESSAGE = "Internal system integrity request failed. Please try again.";
 const COPY_FEEDBACK_RESET_MS = 1800;
 
 type CopyFeedbackState = {
@@ -30,6 +33,9 @@ export function ObservabilityPage() {
   const [benchmarkMissingMessage, setBenchmarkMissingMessage] = useState<string | null>(null);
   const [benchmarkErrorMessage, setBenchmarkErrorMessage] = useState<string | null>(null);
   const [isBenchmarkLoading, setIsBenchmarkLoading] = useState(true);
+  const [systemIntegritySummary, setSystemIntegritySummary] = useState<SystemIntegritySummary | null>(null);
+  const [systemIntegrityErrorMessage, setSystemIntegrityErrorMessage] = useState<string | null>(null);
+  const [isSystemIntegrityLoading, setIsSystemIntegrityLoading] = useState(true);
   const [copyFeedback, setCopyFeedback] = useState<CopyFeedbackState>(null);
 
   useEffect(() => {
@@ -67,6 +73,44 @@ export function ObservabilityPage() {
     }
 
     void loadBenchmarkSummary();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSystemIntegritySummary() {
+      setIsSystemIntegrityLoading(true);
+      setSystemIntegritySummary(null);
+      setSystemIntegrityErrorMessage(null);
+
+      try {
+        const next = await getSystemIntegritySummary();
+        if (!active) {
+          return;
+        }
+        setSystemIntegritySummary(next);
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        if (error instanceof FrontendApiError) {
+          setSystemIntegrityErrorMessage(error.message);
+        } else {
+          setSystemIntegrityErrorMessage(INTEGRITY_GENERIC_ERROR_MESSAGE);
+        }
+      } finally {
+        if (active) {
+          setIsSystemIntegrityLoading(false);
+        }
+      }
+    }
+
+    void loadSystemIntegritySummary();
 
     return () => {
       active = false;
@@ -151,6 +195,13 @@ export function ObservabilityPage() {
           isLoading={isBenchmarkLoading}
           onCopyPath={handleCopyPath}
           copyFeedback={getCopyFeedback("latest-release-gate-alias-hero")}
+        />
+        <SystemIntegritySummaryPanel
+          summary={systemIntegritySummary}
+          errorMessage={systemIntegrityErrorMessage}
+          isLoading={isSystemIntegrityLoading}
+          onCopyPath={handleCopyPath}
+          copyFeedbackForKey={getCopyFeedback}
         />
 
         <section className="panel observability-panel">
@@ -281,6 +332,218 @@ function BenchmarkSummaryPanel({
           </div>
         </div>
       ) : null}
+    </section>
+  );
+}
+
+function SystemIntegritySummaryPanel({
+  summary,
+  errorMessage,
+  isLoading,
+  onCopyPath,
+  copyFeedbackForKey,
+}: {
+  summary: SystemIntegritySummary | null;
+  errorMessage: string | null;
+  isLoading: boolean;
+  onCopyPath: (copyKey: string, path: string) => Promise<void>;
+  copyFeedbackForKey: (copyKey: string) => string | null;
+}) {
+  const evidencePaths = summary
+    ? summary.evidence_paths
+        .slice()
+        .sort(
+          (left, right) =>
+            Number(right.required_for_summary) - Number(left.required_for_summary) ||
+            left.evidence_id.localeCompare(right.evidence_id),
+        )
+    : [];
+
+  return (
+    <section className="panel observability-review-section observability-integrity-panel">
+      <div className="section-heading">
+        <h2>System Integrity Summary</h2>
+      </div>
+      <p className="muted reviewer-note">
+        Reviewer-facing snapshot of the current V2 integrity posture and canonical evidence paths.
+      </p>
+
+      {isLoading ? <p className="muted">Loading system integrity summary...</p> : null}
+
+      {!isLoading && errorMessage ? (
+        <div className="error-banner" role="alert">
+          <span>{errorMessage}</span>
+        </div>
+      ) : null}
+
+      {!isLoading && summary ? (
+        <div className="observability-review-stack">
+          <section className="observability-benchmark-hero observability-integrity-hero">
+            <div className="observability-benchmark-hero-copy">
+              <p className="eyebrow">Current Integrity</p>
+              <div className="observability-benchmark-hero-heading">
+                <h3>v2_integrity</h3>
+                <StatusBadge status={summary.status} />
+                <StatusBadge status={summary.benchmark_summary.run_status} />
+              </div>
+              <p className="muted">
+                Release blocked: {summary.benchmark_summary.release_blocked === null ? "N/A" : String(summary.benchmark_summary.release_blocked)}
+              </p>
+            </div>
+            <div className="observability-benchmark-scoreboard">
+              <span className="observability-score-label">Overall Score</span>
+              <strong>
+                {summary.benchmark_summary.overall_score === null ? "N/A" : formatScore(summary.benchmark_summary.overall_score)}
+              </strong>
+            </div>
+          </section>
+
+          <div className="observability-metric-grid">
+            <MetricCard label="Case Count" value={stringOrNA(summary.benchmark_summary.case_count)} />
+            <MetricCard label="Passed" value={stringOrNA(summary.benchmark_summary.passed_count)} />
+            <MetricCard label="Failed" value={stringOrNA(summary.benchmark_summary.failed_count)} />
+            <MetricCard label="Errors" value={stringOrNA(summary.benchmark_summary.error_count)} />
+          </div>
+
+          <div className="observability-integrity-section-grid">
+            <section className="panel">
+              <div className="section-heading">
+                <h3>Pass@k</h3>
+              </div>
+              <dl className="metadata-list observability-list">
+                <MetaItem label="Status" value={summary.stability_summary.status} />
+                <MetaItem label="Success@1" value={stringifyMetric(summary.stability_summary.success_at_1)} />
+                <MetaItem label="Pass@4" value={stringifyMetric(summary.stability_summary.pass_at_4)} />
+                <MetaItem label="Pass^4" value={stringifyMetric(summary.stability_summary.pass_pow_4)} />
+                <MetaItem label="Executed Runs" value={stringOrNA(summary.stability_summary.executed_run_count)} />
+                <MetaItem label="Window Size" value={stringOrNA(summary.stability_summary.window_size)} />
+                <MetaItem label="Window Count" value={stringOrNA(summary.stability_summary.window_count)} />
+                <MetaItem label="Reason" value={summary.stability_summary.reason} />
+              </dl>
+            </section>
+
+            <section className="panel">
+              <div className="section-heading">
+                <h3>Memory Governance</h3>
+              </div>
+              <dl className="metadata-list observability-list">
+                <MetaItem label="Status" value={summary.memory_governance_summary.status} />
+                <MetaItem
+                  label="All Cases Passed"
+                  value={String(summary.memory_governance_summary.all_memory_cases_passed)}
+                />
+                <MetaItem label="Case Count" value={String(summary.memory_governance_summary.memory_case_count)} />
+                <MetaItem label="Passed" value={String(summary.memory_governance_summary.passed_case_count)} />
+                <MetaItem label="Failed" value={String(summary.memory_governance_summary.failed_case_count)} />
+                <MetaItem label="Errors" value={String(summary.memory_governance_summary.error_case_count)} />
+                <MetaItem label="Reason" value={summary.memory_governance_summary.reason} />
+              </dl>
+              {summary.memory_governance_summary.failing_case_ids.length ? (
+                <ul className="observability-chip-list">
+                  {summary.memory_governance_summary.failing_case_ids.map((caseId) => (
+                    <li key={caseId}>{caseId}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+
+            <section className="panel">
+              <div className="section-heading">
+                <h3>Recovery Replay</h3>
+              </div>
+              <dl className="metadata-list observability-list">
+                <MetaItem label="Status" value={summary.recovery_replay_summary.status} />
+                <MetaItem label="Review Status" value={summary.recovery_replay_summary.review_status} />
+                <MetaItem label="Check Count" value={String(summary.recovery_replay_summary.check_count)} />
+                <MetaItem label="Passed Checks" value={String(summary.recovery_replay_summary.passed_check_count)} />
+                <MetaItem label="Failed Checks" value={String(summary.recovery_replay_summary.failed_check_count)} />
+                <MetaItem label="Attempt Count" value={stringOrNA(summary.recovery_replay_summary.attempt_count)} />
+                <MetaItem label="Max Attempts" value={stringOrNA(summary.recovery_replay_summary.max_attempts)} />
+                <MetaItem label="Reason" value={summary.recovery_replay_summary.reason} />
+              </dl>
+              {summary.recovery_replay_summary.recovery_actions.length ? (
+                <ul className="observability-chip-list">
+                  {summary.recovery_replay_summary.recovery_actions.map((action) => (
+                    <li key={action}>{action}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+          </div>
+
+          <section className="panel">
+            <div className="section-heading">
+              <h3>Evidence Paths</h3>
+            </div>
+            {evidencePaths.length ? (
+              <div className="observability-path-stack">
+                {evidencePaths.map((item) => (
+                  <EvidencePathField
+                    key={item.evidence_id}
+                    item={item}
+                    onCopyPath={onCopyPath}
+                    copyFeedback={copyFeedbackForKey(`integrity-${item.evidence_id}`)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="muted">No integrity evidence paths are available.</p>
+            )}
+          </section>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function EvidencePathField({
+  item,
+  onCopyPath,
+  copyFeedback,
+}: {
+  item: SystemIntegrityEvidencePathSummary;
+  onCopyPath: (copyKey: string, path: string) => Promise<void>;
+  copyFeedback: string | null;
+}) {
+  const path = hasTextValue(item.path) ? item.path : null;
+
+  return (
+    <section className="observability-path-field">
+      <div className="observability-path-field-header">
+        <span>{item.evidence_id}</span>
+      </div>
+      <div className="observability-path-field-body">
+        <div className="observability-inline-meta">
+          <span>Status: {item.status}</span>
+          <span>Exists: {String(item.exists)}</span>
+          <span>Required: {String(item.required_for_summary)}</span>
+        </div>
+        <p className="mono observability-path-value">{path ?? "N/A"}</p>
+        {path ? (
+          <div className="observability-copy-row">
+            <button
+              className="secondary-button observability-copy-button"
+              type="button"
+              onClick={() => void onCopyPath(`integrity-${item.evidence_id}`, path)}
+            >
+              {`Copy ${item.evidence_id} path`}
+            </button>
+            {copyFeedback ? (
+              <span
+                role="status"
+                aria-live="polite"
+                className={`observability-copy-feedback ${
+                  copyFeedback === "Copied" ? "observability-copy-feedback-success" : "observability-copy-feedback-error"
+                }`}
+              >
+                {copyFeedback}
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          <p className="muted observability-path-empty">Path not available.</p>
+        )}
+      </div>
     </section>
   );
 }
@@ -1025,6 +1288,14 @@ function formatScore(score: number) {
   }
 
   return score.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function stringifyMetric(value: number | null) {
+  return value === null ? null : formatScore(value);
+}
+
+function stringOrNA(value: number | null) {
+  return value === null ? "N/A" : String(value);
 }
 
 function hasTextValue(value: string | null | undefined): value is string {
