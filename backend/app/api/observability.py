@@ -16,7 +16,9 @@ from backend.app.observability import (
     InternalObservabilityRunNotFoundError,
     InternalObservabilityRunSummary,
     InternalObservabilityService,
+    SystemIntegritySummary,
 )
+from backend.app.observability.integrity_summary import load_system_integrity_summary
 
 
 router = APIRouter()
@@ -58,3 +60,13 @@ def get_internal_run_observability(
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail="Internal observability request failed.") from exc
+
+
+@router.get("/internal/system/integrity-summary", response_model=SystemIntegritySummary)
+def get_system_integrity_summary() -> SystemIntegritySummary:
+    try:
+        return load_system_integrity_summary()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Internal system integrity summary request failed.") from exc

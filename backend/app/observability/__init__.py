@@ -8,6 +8,7 @@ from backend.app.observability.schemas import (
     InternalObservabilitySummary,
     LangSmithPostStatus,
     RunTraceContext,
+    SystemIntegritySummary,
     TraceRecordResult,
 )
 from backend.app.observability.service import (
@@ -26,6 +27,7 @@ __all__ = [
     "ObservabilityError",
     "ObservabilityRecorder",
     "RunTraceContext",
+    "SystemIntegritySummary",
     "TraceRecordResult",
     "sanitize_trace_payload",
 ]
