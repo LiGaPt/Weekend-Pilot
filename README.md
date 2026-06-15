@@ -6,7 +6,7 @@ WeekendPilot 是一个面向 `2-6` 小时本地生活场景的规划、确认与
 
 | 维度 | 当前状态 |
 | --- | --- |
-| 版本口径 | 当前固定为 `V1.5 baseline / V2 Integrity candidate`；后续 `V2 Integrity Edition` 优先增强 benchmark 完整性、memory governance、observability 与 recovery 可审计性 |
+| 版本口径 | 当前提交口径收敛为 `V2 Integrity Edition`；`V1.5 baseline` 作为已完成基线背景保留，当前主打 benchmark 完整性、memory governance、observability 与 recovery 可审计性 |
 | 公开主链 | `5173` 公开 demo 已收束为可演示的主链：`planning`、`clarification`、`replan`、`confirm / decline`、`execution` |
 | 技术支撑 | `5174` 内部评审页提供 `Benchmark Summary`、`System Integrity Summary`、`Trace Summary`、`Benchmark Artifacts` 与 `Recovery Visualization` |
 | 交付边界 | `Mock World`、`benchmark`、`recovery review` 与 `AMap read-only preview` 都已纳入当前版本的说明和验证边界 |
@@ -117,12 +117,14 @@ python scripts/demo_preflight.py
 
 ## Benchmark 覆盖
 
-当前仓库的 `benchmark` 与 evidence 体系分成四个主要入口：
+当前仓库的 `benchmark` 与 evidence 体系分成六个主要入口：
 
 | 入口 | 包含内容 | 当前 canonical evidence |
 | --- | --- | --- |
 | `release_gate_v1` | 阻塞式主基线，覆盖 `15` 个 `L1-L3` `Mock World` case，验证主产品路径、确认边界、执行链路与 1 个路由失败 case | `var/formal-benchmarks/latest-release_gate_v1-run-report.json` |
 | `coverage_gate_v1_5` | 基于 `all_registered` 的覆盖率 / 多样性 gate，验证场景广度、tag 覆盖、failure mode 覆盖 | `var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json` |
+| `v2_integrity_gate` | V2 Integrity Edition 的当前阻塞 gate，汇总完整性矩阵、memory mode、conversation mode 与 failure mode 覆盖 | `var/formal-benchmarks/latest-v2_integrity_gate-run-report.json` |
+| `v2_integrity_passk` | V2 Integrity Edition 的重复运行稳定性指标，覆盖 `Success@1`、`Pass@4`、`Pass^4` | `var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json` |
 | `all_registered` | 全量 `28` 个已注册 case 的 `formal verification`，覆盖 `clarification`、`replan/versioning`、`memory governance`、`robustness`、`recovery-related` case | `var/formal-benchmarks/latest-all_registered-run-report.json` |
 | `family_route_failure_v1` | 固定失败恢复审查链，验证 benchmark failure path、replay 一致性、observability 链接一致性 | `var/recovery-reviews/latest-family_route_failure_v1-review.json` |
 | `safe_stop_gate_v1` | 聚焦 `recovery_focused` 的安全停机 gate，验证 6 个组合失败 case 都以零写动作、bounded chain、terminal `stop_safely` 收束 | `var/formal-benchmarks/latest-safe_stop_gate_v1-run-report.json` |
@@ -144,6 +146,8 @@ python scripts/demo_preflight.py
 | --- | --- | --- |
 | `release_gate_v1` | `passed`，`15/15` 通过，`overall_score=1.0` | `Mock World` 全量通过，层级分布为 `L1=3, L2=8, L3=4`；failure mode 为 `none=14`、`route_unavailable=1`；当前关键时延为 `p50=390ms`、`p95=424ms`、`max=424ms` |
 | `coverage_gate_v1_5` | `passed`，`28/28` 通过，`overall_score=1.0` | 场景桶分布为 `couple=1`、`elder=1`、`family=16`、`friends=2`、`mixed=4`、`solo=2`、`unknown=2`；world profile 分布为 `budget_lite=3`、`couple_afternoon=1`、`elder_afternoon=1`、`family_afternoon=16`、`friends_gathering=2`、`rainy_day_fallback=3`、`solo_afternoon=2` |
+| `v2_integrity_gate` | `passed`，`18/18` 通过，`release_blocked=false` | `5174` 的 `System Integrity Summary` 与 evidence summary 脚本都以它作为当前 V2 完整性 gate 入口 |
+| `v2_integrity_passk` | `passed`，`Success@1=1.0`，`Pass@4=1.0`，`Pass^4=1.0` | 当前 canonical stability alias 为 `var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json`，用于说明 repeated-run stability |
 | `all_registered` | `passed`，`28/28` 通过，`overall_score=1.0` | 代表性 tag 覆盖包括 `conversation_continuation=2`、`memory_governance=2`、`robustness_case=4`、`elder_friendly=1`、`friends_group=2`、`rainy_day=3`，并新增组合失败覆盖与 `safe_stop_gate_v1` |
 | `family_route_failure_v1` | `recovery review passed`，`3/3` 检查通过 | 当前失败注入链为 `check_route:route_infeasible:failed`，恢复动作是 `stop_safely`，终态为 `terminal_workflow_status=failed`，说明系统走的是“安全停机而非错误执行” |
 
@@ -181,6 +185,8 @@ python scripts/run_recovery_replay_review.py --suite-id recovery_focused
 | --- | --- |
 | `release_gate_v1` | `passed`，`15/15` 通过，`failed=0`，`error=0`，`overall_score=1.0` |
 | `coverage_gate_v1_5` | `passed`，`28/28` 通过，`failed=0`，`error=0`，`overall_score=1.0` |
+| `v2_integrity_gate` | `passed`，`18/18` 通过，`failed=0`，`error=0`，`release_blocked=false` |
+| `v2_integrity_passk` | `passed`，`executed_run_count=4`，`Success@1=1.0`，`Pass@4=1.0`，`Pass^4=1.0` |
 | `all_registered` | `passed`，`28/28` 通过，`failed=0`，`error=0`，`overall_score=1.0` |
 | `safe_stop_gate_v1` | `passed`，`6/6` 通过，`failed=0`，`error=0`，全部 recovery case 都是零写动作安全停机 |
 | `family_route_failure_v1` recovery review | `passed`，`3/3` 检查通过 |

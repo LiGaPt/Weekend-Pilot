@@ -2,7 +2,7 @@
 
 这份脚本按 `8-10 分钟` 设计。录制时主线放在 `5173` 公开用户流，证据放在 `5174` 内部评审页和终端脚本。不要现场跑完整 benchmark，用已生成的 canonical evidence 展示稳定性。
 
-版本口径固定为 `V1.5 baseline / V2 Integrity candidate`。口播时可以说明后续 `V2 Integrity Edition` 不把真实地图深度集成作为主线，而是继续增强 benchmark 完整性、memory governance、observability 与 recovery 可审计性；AMap 仍是 API-only read-only preview，不进入 customer UI 主链，不参与正式 benchmark。
+本次提交口径收敛为 `V2 Integrity Edition`。`V1.5 baseline` 只作为已完成基线背景保留；当前主打 benchmark 完整性、memory governance、observability 与 recovery 可审计性。AMap 仍是 API-only read-only preview，不进入 customer UI 主链，不参与正式 benchmark。
 
 ## 演示目标
 
@@ -11,8 +11,8 @@
 - 自然语言输入可以生成活动、餐厅、路线和可执行性完整方案。
 - 确认前只运行读工具，确认后才执行写动作。
 - 支持 clarification、follow-up replan、decline。
-- 内部可审计：trace、tool events、action ledger、benchmark artifacts、recovery visualization。
-- 当前 benchmark evidence：`release_gate_v1 15/15 passed`，`coverage_gate_v1_5 22/22 passed`，`all_registered 22/22 passed`，`overall_score=1.0`。
+- 内部可审计：`Benchmark Summary`、`System Integrity Summary`、trace、tool events、action ledger、benchmark artifacts、recovery visualization。
+- 当前 canonical evidence：`release_gate_v1`、`coverage_gate_v1_5`、`v2_integrity_gate`、`v2_integrity_passk`、`all_registered`、`family_route_failure_v1` recovery review。
 - AMap 是 `API-only read-only preview`，有 key 就演示，没有 key 就跳过；它不参与正式 benchmark。
 
 ## 演示入口与边界
@@ -57,7 +57,7 @@ python scripts/demo_amap_preview.py
 
 口播：
 
-“WeekendPilot 是一个面向周末本地生活的短时规划与执行 Agent。它不是只返回地点推荐，而是把用户一句话需求变成可执行安排：理解需求、搜索候选、检查可用性、生成方案、等待用户确认，然后再执行订座、排队、购票、点单或发送消息等动作。今天我会展示公开用户流、人工确认边界、重规划和澄清能力，以及内部 benchmark 和 recovery 证据。”
+“WeekendPilot 是一个面向周末本地生活的短时规划与执行 Agent。它不是只返回地点推荐，而是把用户一句话需求变成可执行安排：理解需求、搜索候选、检查可用性、生成方案、等待用户确认，然后再执行订座、排队、购票、点单或发送消息等动作。今天我会展示公开用户流、人工确认边界、重规划和澄清能力，以及内部 benchmark、integrity 和 recovery 证据。”
 
 ### 0:35-2:40 公开 happy path
 
@@ -125,14 +125,15 @@ python scripts/demo_amap_preview.py
 
 1. 切到 `5174`。
 2. 先展示顶部 `Benchmark Summary`。
-3. 在 `Load Run` 粘贴刚才 happy path 的 `run_id`。
-4. 点击 `Load Run`。
-5. 展示 `Trace Summary`、`Tool Events`、`Action Ledger`、`Benchmark Artifacts`。
-6. 如果有 recovery run，可展示 `Recovery Visualization`；没有就只说明终端 evidence 会补齐。
+3. 再展示顶部 `System Integrity Summary`。
+4. 在 `Load Run` 粘贴刚才 happy path 的 `run_id`。
+5. 点击 `Load Run`。
+6. 展示 `Trace Summary`、`Tool Events`、`Action Ledger`、`Benchmark Artifacts`。
+7. 如果有 recovery run，可展示 `Recovery Visualization`；没有就只说明终端 evidence 会补齐。
 
 口播：
 
-“现在切到内部评审页。顶部 Benchmark Summary 展示当前 release gate 的 canonical evidence。然后我加载刚才公开页的 `run_id`，这里能看到运行身份、trace、workflow timing、tool events 和 action ledger。公开页对用户隐藏内部细节，但内部页可以审计完整链路。”
+“现在切到内部评审页。先看 `Benchmark Summary`，它展示当前 release gate 的 canonical evidence；再看 `System Integrity Summary`，它把 `v2_integrity`、`Pass@k`、memory governance、recovery replay 和 evidence paths 收束到一个 reviewer-facing 面板里。然后我加载刚才公开页的 `run_id`，这里能看到运行身份、trace、workflow timing、tool events 和 action ledger。公开页对用户隐藏内部细节，但内部页可以审计完整链路。”
 
 ### 7:45-8:45 Evidence Summary
 
@@ -144,7 +145,7 @@ python scripts/show_submission_evidence.py
 
 口播：
 
-“这里我不现场等待完整 benchmark 执行，而是展示已经生成好的 canonical latest evidence。`release_gate_v1` 是当前正式基线，`15/15 passed`；`coverage_gate_v1_5` 和 `all_registered` 覆盖 `22/22` case，证明场景广度和 formal verification；`recovery_review_family_route_failure_v1` 证明失败恢复链。恢复审查里，路线失败时 workflow 是安全失败，并且零写动作。”
+“这里我不现场等待完整 benchmark 执行，而是展示已经生成好的 canonical latest evidence。`release_gate_v1` 是当前正式基线；`coverage_gate_v1_5` 和 `all_registered` 证明场景广度与 formal verification；`v2_integrity_gate` 和 `v2_integrity_passk` 说明当前 `V2 Integrity Edition` 的完整性门槛与 repeated-run stability；`recovery_review_family_route_failure_v1` 证明失败恢复链。恢复审查里，路线失败时 workflow 是安全失败，并且零写动作。”
 
 ### 可选 8:45-9:30 AMap read-only preview
 
@@ -164,19 +165,19 @@ python scripts/demo_amap_preview.py
 
 口播：
 
-“总结一下，WeekendPilot 当前已经具备三层能力：第一，能完成本地生活规划、确认和执行；第二，有明确的人类确认边界、拒绝路径和 AMap 只读约束；第三，有 observability、benchmark 和 recovery evidence 证明系统稳定、可追踪、可审计。这个 demo 展示的是一个可执行闭环，而不是普通推荐列表。”
+“总结一下，WeekendPilot 当前已经具备三层能力：第一，能完成本地生活规划、确认和执行；第二，有明确的人类确认边界、拒绝路径和 AMap 只读约束；第三，有 observability、benchmark、integrity 和 recovery evidence 证明系统稳定、可追踪、可审计。这个 demo 展示的是一个可执行闭环，而不是普通推荐列表。”
 
 ## 录制验收
 
 - `demo_preflight.py` 至少通过 PostgreSQL、Redis、Alembic、API、`5173`、`5174` 和 Evidence Aliases。
 - 公开页至少录到：`happy path`、`确认当前方案`、`执行结果`、`clarification`、`replan v2`、`decline`。
-- 内部页至少录到：`Benchmark Summary`、`Trace Summary`、`Tool Events` 或 `Action Ledger`、`Benchmark Artifacts`。
-- 终端 evidence 至少显示四个 `[OK]`。
+- 内部页至少录到：`Benchmark Summary`、`System Integrity Summary`、`Trace Summary`、`Tool Events` 或 `Action Ledger`、`Benchmark Artifacts`。
+- 终端 evidence 至少显示六个 `[OK]`。
 - 如果 AMap key 缺失，跳过 AMap，不影响主视频。
 
 ## 假设
 
 - 视频目标时长按 `8-10 分钟` 设计。
-- 主评审口径是 `Mock World` 稳定复现，AMap 只是可选只读预览。
+- 主评审口径是 `Mock World` 稳定复现；AMap 只是可选只读预览。
 - 不现场重跑耗时 benchmark，只展示当前 canonical latest evidence。
 - 录制时按现有功能执行，不需要临时修改业务代码。
