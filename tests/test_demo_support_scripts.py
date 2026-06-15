@@ -57,7 +57,7 @@ def test_demo_preflight_main_prints_recording_checklist(monkeypatch, capsys) -> 
             module.CheckResult(
                 "Evidence Aliases",
                 "pass",
-                "latest-release_gate_v1-run-report.json, latest-coverage_gate_v1_5-run-report.json, latest-v2_integrity_gate-run-report.json, latest-all_registered-run-report.json, latest-family_route_failure_v1-review.json",
+                "latest-release_gate_v1-run-report.json, latest-coverage_gate_v1_5-run-report.json, latest-v2_integrity_gate-run-report.json, latest-v2_integrity-passk-v0-report.json, latest-all_registered-run-report.json, latest-family_route_failure_v1-review.json",
             ),
             module.CheckResult("AMap Preview", "warn", "missing key"),
         ],
@@ -71,8 +71,27 @@ def test_demo_preflight_main_prints_recording_checklist(monkeypatch, capsys) -> 
     assert "[PASS] Internal Review: http://127.0.0.1:5174/" in captured.out
     assert "latest-release_gate_v1-run-report.json" in captured.out
     assert "latest-v2_integrity_gate-run-report.json" in captured.out
+    assert "latest-v2_integrity-passk-v0-report.json" in captured.out
     assert "[WARN] AMap Preview: missing key" in captured.out
     assert "Traceback" not in captured.out
+
+
+def test_demo_preflight_alias_check_uses_submission_evidence_contract(temp_path: Path | None = None) -> None:
+    module = _load_script_module("demo_preflight.py", "weekendpilot_demo_preflight_contract")
+    temp_root = _make_local_temp_dir()
+    try:
+        for contract in module.SUBMISSION_EVIDENCE_CONTRACTS:
+            artifact_path = temp_root / contract.relative_path
+            artifact_path.parent.mkdir(parents=True, exist_ok=True)
+            artifact_path.write_text("{}", encoding="utf-8")
+
+        result = module._check_aliases(temp_root)
+
+        assert result.status == "pass"
+        assert "latest-v2_integrity-passk-v0-report.json" in result.detail
+        assert result.detail.count(",") == len(module.SUBMISSION_EVIDENCE_CONTRACTS) - 1
+    finally:
+        _cleanup_local_temp_dir(temp_root)
 
 
 def test_demo_amap_preview_main_skips_cleanly_when_key_is_missing(monkeypatch, capsys) -> None:
