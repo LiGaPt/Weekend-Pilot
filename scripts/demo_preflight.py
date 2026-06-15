@@ -19,15 +19,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from backend.app.core.config import get_settings
+from backend.app.benchmark.submission_evidence import SUBMISSION_EVIDENCE_CONTRACTS
 
 
-FORMAL_ALIAS_PATHS = (
-    Path("var/formal-benchmarks/latest-release_gate_v1-run-report.json"),
-    Path("var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json"),
-    Path("var/formal-benchmarks/latest-v2_integrity_gate-run-report.json"),
-    Path("var/formal-benchmarks/latest-all_registered-run-report.json"),
-    Path("var/recovery-reviews/latest-family_route_failure_v1-review.json"),
-)
+FORMAL_ALIAS_PATHS = tuple(contract.relative_path for contract in SUBMISSION_EVIDENCE_CONTRACTS)
 
 
 @dataclass(frozen=True)
