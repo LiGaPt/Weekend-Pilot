@@ -257,7 +257,6 @@ def test_phase0_version_scope_is_consistent_across_readme_and_submission_docs() 
 
     for path in paths:
         text = path.read_text(encoding="utf-8")
-        assert "V1.5 baseline / V2 Integrity candidate" in text, path
         assert "V2 Integrity Edition" in text, path
         assert "benchmark" in text, path
         assert "memory governance" in text, path
@@ -293,6 +292,8 @@ def test_readme_covers_project_status_startup_benchmark_and_tests() -> None:
     assert "distractor" in readme_text
     assert "release_gate_v1" in readme_text
     assert "coverage_gate_v1_5" in readme_text
+    assert "v2_integrity_gate" in readme_text
+    assert "v2_integrity_passk" in readme_text
     assert "all_registered" in readme_text
     assert "latest-family_route_failure_v1-review.json" in readme_text
     assert "`15/15`" in readme_text
