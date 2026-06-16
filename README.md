@@ -207,7 +207,7 @@ python -m pytest tests/test_demo_support_scripts.py tests/test_review_evidence.p
 
 当前结果：
 
-- `15 passed`
+- `23 passed`
 
 前端聚焦单元测试：
 
