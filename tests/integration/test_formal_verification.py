@@ -27,8 +27,8 @@ def test_formal_verification_runs_all_registered_suite_and_refreshes_latest_alia
 
         assert result.suite_id == "all_registered"
         assert result.run_status == "passed"
-        assert result.case_count == 17
-        assert result.passed_count == 17
+        assert result.case_count == 28
+        assert result.passed_count == 28
         assert result.failed_count == 0
         assert result.error_count == 0
         assert result.overall_score == 1.0
@@ -38,7 +38,7 @@ def test_formal_verification_runs_all_registered_suite_and_refreshes_latest_alia
         assert result.trace_buffer_path.exists()
 
         case_report_paths = [path for path in result.run_directory.glob("*.json") if path.is_file()]
-        assert len(case_report_paths) >= 18
+        assert len(case_report_paths) >= 29
 
         suite_bytes = result.suite_report_path.read_bytes()
         latest_bytes = result.latest_report_path.read_bytes()
@@ -47,14 +47,14 @@ def test_formal_verification_runs_all_registered_suite_and_refreshes_latest_alia
         suite_payload = json.loads(result.suite_report_path.read_text(encoding="utf-8"))
         latest_payload = json.loads(result.latest_report_path.read_text(encoding="utf-8"))
         assert suite_payload["benchmark_summary"]["suite_id"] == "all_registered"
-        assert suite_payload["benchmark_summary"]["case_count"] == 17
-        assert suite_payload["benchmark_summary"]["passed_count"] == 17
+        assert suite_payload["benchmark_summary"]["case_count"] == 28
+        assert suite_payload["benchmark_summary"]["passed_count"] == 28
         assert suite_payload["benchmark_summary"]["failed_count"] == 0
         assert suite_payload["benchmark_summary"]["error_count"] == 0
         assert suite_payload["report_path"] == str(result.suite_report_path)
         assert latest_payload["report_path"] == str(result.suite_report_path)
         assert latest_payload["benchmark_summary"]["suite_id"] == "all_registered"
-        assert latest_payload["benchmark_summary"]["case_count"] == 17
+        assert latest_payload["benchmark_summary"]["case_count"] == 28
 
         serialized_suite = json.dumps(suite_payload, sort_keys=True)
         for forbidden in FORBIDDEN_REPORT_TEXT:

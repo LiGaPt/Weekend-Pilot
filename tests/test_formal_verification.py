@@ -76,8 +76,8 @@ def test_run_formal_verification_creates_unique_run_dir_and_latest_alias(
                 report_path=str(report_path),
                 benchmark_summary=SimpleNamespace(
                     suite_id="all_registered",
-                    case_count=17,
-                    passed_count=17,
+                    case_count=28,
+                    passed_count=28,
                     failed_count=0,
                     error_count=0,
                     overall_score=1.0,
@@ -112,8 +112,8 @@ def test_run_formal_verification_creates_unique_run_dir_and_latest_alias(
 
         assert result.suite_id == "all_registered"
         assert result.run_status == "passed"
-        assert result.case_count == 17
-        assert result.passed_count == 17
+        assert result.case_count == 28
+        assert result.passed_count == 28
         assert result.failed_count == 0
         assert result.error_count == 0
         assert result.overall_score == 1.0
@@ -167,7 +167,7 @@ def test_run_formal_verification_does_not_overwrite_latest_alias_on_failed_suite
                 report_path=str(report_path),
                 benchmark_summary=SimpleNamespace(
                     suite_id="all_registered",
-                    case_count=17,
+                    case_count=28,
                     passed_count=16,
                     failed_count=1,
                     error_count=0,
@@ -220,8 +220,8 @@ def test_main_prints_success_summary(
     result = formal_verification.FormalVerificationResult(
         suite_id="all_registered",
         run_status="passed",
-        case_count=17,
-        passed_count=17,
+        case_count=28,
+        passed_count=28,
         failed_count=0,
         error_count=0,
         overall_score=1.0,

@@ -321,7 +321,7 @@ def test_readme_covers_project_status_startup_benchmark_and_tests() -> None:
     assert "show_submission_evidence.py" in readme_text
     assert "python -m pytest tests/test_demo_support_scripts.py tests/test_review_evidence.py -q" in readme_text
     assert "npm --prefix frontend test -- --run src/chat/ConversationThread.test.tsx src/App.test.tsx" in readme_text
-    assert "`15 passed`" in readme_text
+    assert "`23 passed`" in readme_text
     assert "`24 passed`" in readme_text
 
 
