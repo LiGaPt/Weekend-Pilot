@@ -4,6 +4,7 @@ import { FrontendApiError } from "../shared/http";
 import type {
   InternalActionLedgerSummary,
   InternalBenchmarkArtifactSummary,
+  InternalBenchmarkTimingSummary,
   InternalObservabilityRunSummary,
   InternalRecoveryPathSummary,
   InternalReleaseGateBenchmarkSummary,
@@ -315,6 +316,8 @@ function BenchmarkSummaryPanel({
             <MetricCard label="Errors" value={String(summary.error_count)} />
           </div>
 
+          <BenchmarkTimingSummarySection summary={summary.benchmark_timing_summary_present ? summary.benchmark_timing_summary : null} />
+
           <PathField
             label="Latest Release Gate Alias"
             path={summary.report_path}
@@ -332,6 +335,65 @@ function BenchmarkSummaryPanel({
           </div>
         </div>
       ) : null}
+    </section>
+  );
+}
+
+function BenchmarkTimingSummarySection({
+  summary,
+}: {
+  summary: InternalBenchmarkTimingSummary | null;
+}) {
+  const overall = summary?.overall_total_duration_ms ?? null;
+
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <h3>Timing Percentiles</h3>
+      </div>
+      {summary === null ? (
+        <p className="muted">Suite timing summary is unavailable for this artifact.</p>
+      ) : (
+        <>
+          <div className="observability-metric-grid observability-timing-grid">
+            <MetricCard label="p50" value={formatDurationMs(overall?.p50_ms)} />
+            <MetricCard label="p95" value={formatDurationMs(overall?.p95_ms)} />
+            <MetricCard label="p99" value={formatDurationMs(overall?.p99_ms)} />
+            <MetricCard label="Max" value={formatDurationMs(overall?.max_ms)} />
+          </div>
+
+          {summary.stages.length ? (
+            <table>
+              <thead>
+                <tr>
+                  <th>Stage</th>
+                  <th>Samples</th>
+                  <th>Retry Cases</th>
+                  <th>p50</th>
+                  <th>p95</th>
+                  <th>p99</th>
+                  <th>Max</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.stages.map((stage) => (
+                  <tr key={stage.node_name}>
+                    <td className="mono">{stage.node_name}</td>
+                    <td>{stage.sample_count}</td>
+                    <td>{stage.retry_case_count}</td>
+                    <td>{formatDurationMs(stage.p50_ms)}</td>
+                    <td>{formatDurationMs(stage.p95_ms)}</td>
+                    <td>{formatDurationMs(stage.p99_ms)}</td>
+                    <td>{formatDurationMs(stage.max_ms)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="muted">No per-stage timing rows are available.</p>
+          )}
+        </>
+      )}
     </section>
   );
 }
@@ -1222,6 +1284,13 @@ function stringifyValue(value: unknown) {
     return value;
   }
   return JSON.stringify(value);
+}
+
+function formatDurationMs(value: number | null | undefined) {
+  if (typeof value !== "number") {
+    return "N/A";
+  }
+  return `${value} ms`;
 }
 
 function getSlowestStage(timing: InternalWorkflowTimingSummary | null) {

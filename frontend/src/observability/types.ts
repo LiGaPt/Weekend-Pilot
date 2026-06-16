@@ -109,6 +109,28 @@ export type InternalReleaseGateBenchmarkSummaryMatrix = {
   tag_counts: Record<string, number>;
 };
 
+export type InternalBenchmarkTimingPercentileStats = {
+  sample_count: number;
+  min_ms: number;
+  p50_ms: number;
+  p95_ms: number;
+  p99_ms: number;
+  max_ms: number;
+  mean_ms: number;
+};
+
+export type InternalBenchmarkStageTimingPercentileEntry = InternalBenchmarkTimingPercentileStats & {
+  node_name: string;
+  retry_case_count: number;
+};
+
+export type InternalBenchmarkTimingSummary = {
+  schema_version: string;
+  case_count: number;
+  overall_total_duration_ms: InternalBenchmarkTimingPercentileStats | null;
+  stages: InternalBenchmarkStageTimingPercentileEntry[];
+};
+
 export type InternalReleaseGateBenchmarkSummary = {
   schema_version: string;
   suite_id: string;
@@ -120,6 +142,8 @@ export type InternalReleaseGateBenchmarkSummary = {
   error_count: number;
   overall_score: number;
   matrix_summary: InternalReleaseGateBenchmarkSummaryMatrix;
+  benchmark_timing_summary_present: boolean;
+  benchmark_timing_summary: InternalBenchmarkTimingSummary | null;
   report_path: string;
 };
 

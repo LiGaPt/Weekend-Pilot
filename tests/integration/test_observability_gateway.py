@@ -446,8 +446,55 @@ def test_release_gate_benchmark_summary_route_returns_latest_summary(
                 "memory_override": 1,
             },
         },
+        "benchmark_timing_summary_present": True,
+        "benchmark_timing_summary": {
+            "schema_version": "benchmark_timing_summary_v1",
+            "case_count": 15,
+            "overall_total_duration_ms": {
+                "sample_count": 15,
+                "min_ms": 320,
+                "p50_ms": 390,
+                "p95_ms": 424,
+                "p99_ms": 424,
+                "max_ms": 424,
+                "mean_ms": 387.8,
+            },
+            "stages": [
+                {
+                    "node_name": "pre_flight_check_availability",
+                    "sample_count": 15,
+                    "retry_case_count": 0,
+                    "min_ms": 12,
+                    "p50_ms": 20,
+                    "p95_ms": 36,
+                    "p99_ms": 36,
+                    "max_ms": 36,
+                    "mean_ms": 19.6,
+                }
+            ],
+        },
         "report_path": "var/formal-benchmarks/latest-release_gate_v1-run-report.json",
     }
+
+
+def test_release_gate_benchmark_summary_route_degrades_when_timing_summary_is_missing(
+    observability_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    release_gate_summary_dir: Path,
+) -> None:
+    report_path = release_gate_summary_dir / "latest-release_gate_v1-run-report.json"
+    payload = _build_release_gate_summary_report()
+    payload["benchmark_summary"].pop("benchmark_timing_summary", None)
+    payload.pop("benchmark_timing_summary", None)
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(internal_benchmark_summary, "DEFAULT_LATEST_RELEASE_GATE_REPORT_PATH", report_path)
+
+    response = observability_client.get("/internal/benchmarks/release-gate-v1/summary")
+
+    assert response.status_code == 200
+    degraded_payload = response.json()
+    assert degraded_payload["benchmark_timing_summary_present"] is False
+    assert degraded_payload["benchmark_timing_summary"] is None
 
 
 def test_release_gate_benchmark_summary_route_returns_404_when_latest_report_is_missing(
@@ -644,6 +691,32 @@ def _build_release_gate_summary_report() -> dict:
             "failed_count": 0,
             "error_count": 0,
             "overall_score": 1.0,
+            "benchmark_timing_summary": {
+                "schema_version": "benchmark_timing_summary_v1",
+                "case_count": 15,
+                "overall_total_duration_ms": {
+                    "sample_count": 15,
+                    "min_ms": 320,
+                    "p50_ms": 390,
+                    "p95_ms": 424,
+                    "p99_ms": 424,
+                    "max_ms": 424,
+                    "mean_ms": 387.8,
+                },
+                "stages": [
+                    {
+                        "node_name": "pre_flight_check_availability",
+                        "sample_count": 15,
+                        "retry_case_count": 0,
+                        "min_ms": 12,
+                        "p50_ms": 20,
+                        "p95_ms": 36,
+                        "p99_ms": 36,
+                        "max_ms": 36,
+                        "mean_ms": 19.6,
+                    }
+                ],
+            },
             "matrix_summary": {
                 "schema_version": "weekendpilot_benchmark_case_matrix_v1",
                 "case_count": 15,
@@ -657,6 +730,32 @@ def _build_release_gate_summary_report() -> dict:
                     "memory_override": 1,
                 },
             },
+        },
+        "benchmark_timing_summary": {
+            "schema_version": "benchmark_timing_summary_v1",
+            "case_count": 15,
+            "overall_total_duration_ms": {
+                "sample_count": 15,
+                "min_ms": 320,
+                "p50_ms": 390,
+                "p95_ms": 424,
+                "p99_ms": 424,
+                "max_ms": 424,
+                "mean_ms": 387.8,
+            },
+            "stages": [
+                {
+                    "node_name": "pre_flight_check_availability",
+                    "sample_count": 15,
+                    "retry_case_count": 0,
+                    "min_ms": 12,
+                    "p50_ms": 20,
+                    "p95_ms": 36,
+                    "p99_ms": 36,
+                    "max_ms": 36,
+                    "mean_ms": 19.6,
+                }
+            ],
         },
         "report_path": "E:/tmp/suite-release_gate_v1-run-report.json",
     }

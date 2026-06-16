@@ -159,6 +159,44 @@ const releaseGateSummary: InternalReleaseGateBenchmarkSummary = {
       memory_override: 1,
     },
   },
+  benchmark_timing_summary_present: true,
+  benchmark_timing_summary: {
+    schema_version: "benchmark_timing_summary_v1",
+    case_count: 15,
+    overall_total_duration_ms: {
+      sample_count: 15,
+      min_ms: 320,
+      p50_ms: 390,
+      p95_ms: 424,
+      p99_ms: 424,
+      max_ms: 424,
+      mean_ms: 387.8,
+    },
+    stages: [
+      {
+        node_name: "pre_flight_check_availability",
+        sample_count: 15,
+        retry_case_count: 0,
+        min_ms: 12,
+        p50_ms: 20,
+        p95_ms: 36,
+        p99_ms: 36,
+        max_ms: 36,
+        mean_ms: 19.6,
+      },
+      {
+        node_name: "logical_planner_agent",
+        sample_count: 15,
+        retry_case_count: 1,
+        min_ms: 18,
+        p50_ms: 28,
+        p95_ms: 40,
+        p99_ms: 40,
+        max_ms: 40,
+        mean_ms: 29.4,
+      },
+    ],
+  },
   report_path: "var/formal-benchmarks/latest-release_gate_v1-run-report.json",
 };
 
@@ -283,6 +321,9 @@ describe("ObservabilityPage", () => {
     expect(await screen.findByRole("heading", { name: "System Integrity Summary" })).toBeInTheDocument();
     expect(screen.getByText("Latest Release Gate")).toBeInTheDocument();
     expect(screen.getByText("Benchmark release gate v1")).toBeInTheDocument();
+    expect(screen.getByText("Timing Percentiles")).toBeInTheDocument();
+    expect(screen.getByText("pre_flight_check_availability")).toBeInTheDocument();
+    expect(screen.getByText("logical_planner_agent")).toBeInTheDocument();
     expect(screen.getByText("var/formal-benchmarks/latest-release_gate_v1-run-report.json")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy latest alias" })).toBeInTheDocument();
     expect(screen.getByText("Pass@k")).toBeInTheDocument();
@@ -290,6 +331,19 @@ describe("ObservabilityPage", () => {
     expect(screen.getByText("Recovery Replay")).toBeInTheDocument();
     expect(screen.getByText("Evidence Paths")).toBeInTheDocument();
     expect(screen.getByText("var/formal-benchmarks/latest-v2_integrity_gate-run-report.json")).toBeInTheDocument();
+  });
+
+  it("shows a neutral fallback when release-gate timing summary is unavailable", async () => {
+    vi.mocked(getLatestReleaseGateBenchmarkSummary).mockResolvedValue({
+      ...releaseGateSummary,
+      benchmark_timing_summary_present: false,
+      benchmark_timing_summary: null,
+    });
+
+    render(<ObservabilityPage />);
+
+    expect(await screen.findByRole("heading", { name: "Benchmark Summary" })).toBeInTheDocument();
+    expect(screen.getByText("Suite timing summary is unavailable for this artifact.")).toBeInTheDocument();
   });
 
   it("renders a degraded integrity summary without blocking the panel", async () => {

@@ -30,8 +30,8 @@ Recording defaults:
 - keep the terminal at the repo root
 - do not record service startup logs
 - open `运行信息` on `5173` when you need to 复制 `run_id`
-- after the public flow, switch to `5174`, first scan `Benchmark Summary` and `System Integrity Summary`, then paste the copied `run_id` and show `Trace Summary` plus `Benchmark Artifacts`
-- benchmark breadth should be demonstrated with the prepared evidence summary, the `Benchmark Summary` hero, and the `System Integrity Summary` evidence-path copy actions; 不需要现场等待长时间 benchmark 执行
+- after the public flow, switch to `5174`, first scan `Benchmark Summary` 的 release-gate hero 与 timing percentile，再看 `System Integrity Summary`，然后 paste the copied `run_id` and show `Trace Summary` plus `Benchmark Artifacts`
+- benchmark breadth should be demonstrated with the prepared evidence summary, the `Benchmark Summary` hero plus suite timing percentile rows, and the `System Integrity Summary` evidence-path copy actions; 不需要现场等待长时间 benchmark 执行
 
 The customer page at `5173` is now chat-first:
 
@@ -207,14 +207,14 @@ For the canonical reviewer closure flow, run `python scripts/run_recovery_replay
 
 Generic recovery replay selectors are now also available for engineering verification: `--case-id <case_id>` runs one recovery-capable case, and `--suite-id recovery_focused` runs the registered recovery suite. Those additive selectors are not a new reviewer UI workflow and do not replace the canonical family default alias used by the current review package.
 
-The internal review surface now also loads `GET /internal/benchmarks/release-gate-v1/summary` on page load and renders a dedicated `Benchmark Summary` panel even before a run ID is entered. That panel is intentionally scoped to the canonical latest alias `var/formal-benchmarks/latest-release_gate_v1-run-report.json`.
+The internal review surface now also loads `GET /internal/benchmarks/release-gate-v1/summary` on page load and renders a dedicated `Benchmark Summary` panel even before a run ID is entered. That panel is intentionally scoped to the canonical latest alias `var/formal-benchmarks/latest-release_gate_v1-run-report.json`, and now includes suite-level `p50 / p95 / p99 / max` plus per-stage timing percentile rows when the artifact contains timing summary data.
 
 The same surface now also loads `GET /internal/system/integrity-summary` on page load and renders a dedicated `System Integrity Summary` panel before any run ID is entered. Reviewers can use it to scan the current `v2_integrity` status, `Pass@k`, memory-governance status, recovery replay status, and copy the latest evidence paths directly from the page.
 
 Reviewer scan order on `5174` should now be:
 
 1. Start with the release-gate hero in `Benchmark Summary`.
-2. Check status, overall score, and pass/fail/error counts first.
+2. Check status, overall score, pass/fail/error counts, and the suite timing percentile block first.
 3. Scan `System Integrity Summary` for `v2_integrity`, `Pass@k`, memory, recovery, and the latest evidence paths.
 4. Copy the canonical latest alias or integrity evidence paths directly from the page when you need to cite report locations.
 5. Load a specific `run_id`.

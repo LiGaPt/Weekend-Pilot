@@ -48,6 +48,11 @@ def test_load_latest_release_gate_summary_reads_compact_summary(report_directory
     assert summary.matrix_summary.tool_profile_counts == {"mock_world": 15}
     assert summary.matrix_summary.failure_mode_counts == {"none": 14, "route_unavailable": 1}
     assert summary.matrix_summary.tag_counts["memory_governance"] == 2
+    assert summary.benchmark_timing_summary_present is True
+    assert summary.benchmark_timing_summary is not None
+    assert summary.benchmark_timing_summary.overall_total_duration_ms is not None
+    assert summary.benchmark_timing_summary.overall_total_duration_ms.p95_ms == 424
+    assert summary.benchmark_timing_summary.stages[0].node_name == "pre_flight_check_availability"
     assert summary.report_path == "var/formal-benchmarks/latest-release_gate_v1-run-report.json"
 
 
@@ -74,6 +79,36 @@ def test_load_latest_release_gate_summary_raises_when_benchmark_summary_is_missi
         load_latest_release_gate_summary(report_path)
 
 
+def test_load_latest_release_gate_summary_degrades_when_timing_summary_is_missing(report_directory: Path) -> None:
+    report_path = report_directory / "missing-timing.json"
+    payload = _build_release_gate_report()
+    payload["benchmark_summary"].pop("benchmark_timing_summary", None)
+    payload.pop("benchmark_timing_summary", None)
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    summary = load_latest_release_gate_summary(report_path)
+
+    assert summary.benchmark_timing_summary_present is False
+    assert summary.benchmark_timing_summary is None
+
+
+def test_load_latest_release_gate_summary_degrades_when_timing_summary_is_malformed(report_directory: Path) -> None:
+    report_path = report_directory / "malformed-timing.json"
+    payload = _build_release_gate_report()
+    payload["benchmark_summary"]["benchmark_timing_summary"] = {
+        "schema_version": "benchmark_timing_summary_v1",
+        "case_count": "bad",
+        "overall_total_duration_ms": {"sample_count": 15},
+        "stages": [],
+    }
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    summary = load_latest_release_gate_summary(report_path)
+
+    assert summary.benchmark_timing_summary_present is False
+    assert summary.benchmark_timing_summary is None
+
+
 def _build_release_gate_report() -> dict:
     return {
         "schema_version": "weekendpilot_benchmark_run_v1",
@@ -93,6 +128,32 @@ def _build_release_gate_report() -> dict:
             "failed_count": 0,
             "error_count": 0,
             "overall_score": 1.0,
+            "benchmark_timing_summary": {
+                "schema_version": "benchmark_timing_summary_v1",
+                "case_count": 15,
+                "overall_total_duration_ms": {
+                    "sample_count": 15,
+                    "min_ms": 320,
+                    "p50_ms": 390,
+                    "p95_ms": 424,
+                    "p99_ms": 424,
+                    "max_ms": 424,
+                    "mean_ms": 387.8,
+                },
+                "stages": [
+                    {
+                        "node_name": "pre_flight_check_availability",
+                        "sample_count": 15,
+                        "retry_case_count": 0,
+                        "min_ms": 12,
+                        "p50_ms": 20,
+                        "p95_ms": 36,
+                        "p99_ms": 36,
+                        "max_ms": 36,
+                        "mean_ms": 19.6,
+                    }
+                ],
+            },
             "matrix_summary": {
                 "schema_version": "weekendpilot_benchmark_case_matrix_v1",
                 "case_count": 15,
@@ -106,6 +167,32 @@ def _build_release_gate_report() -> dict:
                     "memory_override": 1,
                 },
             },
+        },
+        "benchmark_timing_summary": {
+            "schema_version": "benchmark_timing_summary_v1",
+            "case_count": 15,
+            "overall_total_duration_ms": {
+                "sample_count": 15,
+                "min_ms": 320,
+                "p50_ms": 390,
+                "p95_ms": 424,
+                "p99_ms": 424,
+                "max_ms": 424,
+                "mean_ms": 387.8,
+            },
+            "stages": [
+                {
+                    "node_name": "pre_flight_check_availability",
+                    "sample_count": 15,
+                    "retry_case_count": 0,
+                    "min_ms": 12,
+                    "p50_ms": 20,
+                    "p95_ms": 36,
+                    "p99_ms": 36,
+                    "max_ms": 36,
+                    "mean_ms": 19.6,
+                }
+            ],
         },
         "report_path": str(tmp_path_placeholder()),
     }

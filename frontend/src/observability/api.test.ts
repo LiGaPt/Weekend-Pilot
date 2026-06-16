@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getObservabilityRun, getSystemIntegritySummary } from "./api";
+import { getLatestReleaseGateBenchmarkSummary, getObservabilityRun, getSystemIntegritySummary } from "./api";
 import { FrontendApiError } from "../shared/http";
-import type { InternalObservabilityRunSummary, SystemIntegritySummary } from "./types";
+import type {
+  InternalObservabilityRunSummary,
+  InternalReleaseGateBenchmarkSummary,
+  SystemIntegritySummary,
+} from "./types";
 
 const summary: InternalObservabilityRunSummary = {
   schema_version: "weekendpilot_internal_observability_run_v1",
@@ -140,6 +144,52 @@ const integritySummary: SystemIntegritySummary = {
   ],
 };
 
+const releaseGateSummary: InternalReleaseGateBenchmarkSummary = {
+  schema_version: "weekendpilot_internal_benchmark_summary_v1",
+  suite_id: "release_gate_v1",
+  suite_title: "Benchmark release gate v1",
+  run_status: "passed",
+  case_count: 15,
+  passed_count: 15,
+  failed_count: 0,
+  error_count: 0,
+  overall_score: 1,
+  matrix_summary: {
+    level_counts: { L1: 3, L2: 8, L3: 4 },
+    tool_profile_counts: { mock_world: 15 },
+    failure_mode_counts: { none: 14, route_unavailable: 1 },
+    tag_counts: { memory_governance: 2 },
+  },
+  benchmark_timing_summary_present: true,
+  benchmark_timing_summary: {
+    schema_version: "benchmark_timing_summary_v1",
+    case_count: 15,
+    overall_total_duration_ms: {
+      sample_count: 15,
+      min_ms: 320,
+      p50_ms: 390,
+      p95_ms: 424,
+      p99_ms: 424,
+      max_ms: 424,
+      mean_ms: 387.8,
+    },
+    stages: [
+      {
+        node_name: "pre_flight_check_availability",
+        sample_count: 15,
+        retry_case_count: 0,
+        min_ms: 12,
+        p50_ms: 20,
+        p95_ms: 36,
+        p99_ms: 36,
+        max_ms: 36,
+        mean_ms: 19.6,
+      },
+    ],
+  },
+  report_path: "var/formal-benchmarks/latest-release_gate_v1-run-report.json",
+};
+
 describe("internal observability API client", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(summary), { status: 200 })));
@@ -161,6 +211,17 @@ describe("internal observability API client", () => {
     await getSystemIntegritySummary();
 
     expect(fetch).toHaveBeenCalledWith("http://127.0.0.1:8000/internal/system/integrity-summary");
+  });
+
+  it("calls the latest release-gate summary endpoint and preserves timing fields", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(releaseGateSummary), { status: 200 })));
+
+    const result = await getLatestReleaseGateBenchmarkSummary();
+
+    expect(fetch).toHaveBeenCalledWith("http://127.0.0.1:8000/internal/benchmarks/release-gate-v1/summary");
+    expect(result.benchmark_timing_summary_present).toBe(true);
+    expect(result.benchmark_timing_summary?.overall_total_duration_ms.p95_ms).toBe(424);
+    expect(result.benchmark_timing_summary?.stages[0].node_name).toBe("pre_flight_check_availability");
   });
 
   it("throws FrontendApiError with a reviewer-readable message for connection failures", async () => {
