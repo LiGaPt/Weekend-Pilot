@@ -68,6 +68,7 @@ EXPECTED_COLUMNS = {
         "memory_type",
         "key",
         "value_json",
+        "metadata_json",
         "text",
         "confidence",
         "source_run_id",

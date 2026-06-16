@@ -241,6 +241,88 @@ def test_memory_item_repository_creates_and_lists_active_memory(db_session: Sess
     assert repo.list_governable_for_user(uuid4()) == []
 
 
+def test_memory_item_repository_list_for_user_returns_all_rows_in_creation_order(db_session: Session) -> None:
+    user = create_user(db_session)
+    run = create_run(db_session, user.user_id)
+    repo = MemoryItemRepository(db_session)
+
+    first = repo.create(
+        user_id=user.user_id,
+        memory_type="preference",
+        key="first",
+        value_json={"preference": "indoor"},
+        text="first",
+        confidence=Decimal("0.9000"),
+        source_run_id=run.run_id,
+        source_langsmith_trace_id=None,
+        expires_at=None,
+        status="active",
+    )
+    second = repo.create(
+        user_id=user.user_id,
+        memory_type="preference",
+        key="second",
+        value_json={"preference": "outdoor"},
+        text="second",
+        confidence=Decimal("0.9000"),
+        source_run_id=run.run_id,
+        source_langsmith_trace_id=None,
+        expires_at=None,
+        status="disabled",
+    )
+
+    rows = repo.list_for_user(user.user_id)
+    expected_rows = sorted([first, second], key=lambda row: (row.created_at, row.memory_id))
+    assert [row.memory_id for row in rows] == [row.memory_id for row in expected_rows]
+    assert [row.status for row in rows] == [row.status for row in expected_rows]
+    assert [row.metadata_json for row in rows] == [{}, {}]
+
+
+def test_memory_item_repository_update_status_and_metadata_persists_governance_audit(db_session: Session) -> None:
+    user = create_user(db_session)
+    run = create_run(db_session, user.user_id)
+    repo = MemoryItemRepository(db_session)
+    memory = repo.create(
+        user_id=user.user_id,
+        memory_type="preference",
+        key="controlled",
+        value_json={"preference": "indoor"},
+        text="controlled",
+        confidence=Decimal("0.9000"),
+        source_run_id=run.run_id,
+        source_langsmith_trace_id=None,
+        expires_at=None,
+        status="active",
+    )
+    original_updated_at = memory.updated_at
+
+    updated = repo.update_status_and_metadata(
+        memory.memory_id,
+        status="disabled",
+        metadata_json={
+            "governance": {
+                "control_events": [
+                    {
+                        "schema_version": "memory_user_control_v0",
+                        "action": "disable",
+                        "from_status": "active",
+                        "to_status": "disabled",
+                        "actor": "user",
+                        "source": "internal_memory_api_v0",
+                        "reason": "user_requested_control",
+                        "acted_at": "2026-06-16T10:15:00+00:00",
+                    }
+                ]
+            }
+        },
+    )
+
+    assert updated is not None
+    assert updated.status == "disabled"
+    assert updated.metadata_json["governance"]["control_events"][0]["action"] == "disable"
+    assert updated.updated_at >= original_updated_at
+
+
 def test_tool_event_repository_creates_gets_and_lists_by_run(db_session: Session) -> None:
     user = create_user(db_session)
     run = create_run(db_session, user.user_id)

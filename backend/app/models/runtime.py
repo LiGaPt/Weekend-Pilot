@@ -112,6 +112,7 @@ class MemoryItem(Base):
     memory_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     key: Mapped[str] = mapped_column(String(255), nullable=False)
     value_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
     confidence: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
     source_run_id: Mapped[uuid.UUID | None] = mapped_column(
