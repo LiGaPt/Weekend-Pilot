@@ -19,9 +19,9 @@ FORBIDDEN_REPORT_TEXT = (
 )
 
 EXPECTED_INTEGRITY_COVERAGE = {
-    "case_count": 18,
+    "case_count": 20,
     "memory_case_count": 6,
-    "recovery_case_count": 6,
+    "recovery_case_count": 8,
     "continuation_case_count": 3,
     "robustness_case_count": 4,
     "l4_case_count": 1,
@@ -39,8 +39,8 @@ def test_benchmark_v2_integrity_gate_runs_suite_and_refreshes_latest_alias() -> 
         assert result.release_blocked is False
         assert result.blocking_failures == []
         assert result.run_status == "passed"
-        assert result.case_count == 18
-        assert result.passed_count == 18
+        assert result.case_count == 20
+        assert result.passed_count == 20
         assert result.failed_count == 0
         assert result.error_count == 0
         assert result.overall_score == 1.0

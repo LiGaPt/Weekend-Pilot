@@ -45,8 +45,10 @@ EXPANDED_CASE_IDS = {
 RECOVERY_CASE_IDS = {
     "family_route_failure_v1",
     "family_route_and_dining_unavailable_v1",
+    "friends_route_and_dining_unavailable_v1",
     "rainy_day_ticket_sold_out_v1",
     "family_ticket_sold_out_and_route_unavailable_v1",
+    "elder_ticket_sold_out_and_route_unavailable_v1",
     "budget_queue_closed_constraint_v1",
     "family_table_unavailable_replan_required_v1",
 }
@@ -290,26 +292,28 @@ EXPANDED_CONSTRAINT_TAG_COUNTS = {
     "rainy_day": 1,
     "short_walk": 1,
 }
-RECOVERY_SCENARIO_BUCKET_COUNTS = {"family": 4, "mixed": 2}
+RECOVERY_SCENARIO_BUCKET_COUNTS = {"elder": 1, "family": 4, "friends": 1, "mixed": 2}
 RECOVERY_FAILURE_MODE_COUNTS = {
     "queue_closed_and_budget_constraint": 1,
-    "route_and_dining_unavailable": 1,
+    "route_and_dining_unavailable": 2,
     "route_unavailable": 1,
     "table_unavailable_and_replan_required": 1,
     "ticket_sold_out_and_bad_weather": 1,
-    "ticket_sold_out_and_route_unavailable": 1,
+    "ticket_sold_out_and_route_unavailable": 2,
 }
-RECOVERY_TOOL_PROFILE_COUNTS = {"mock_world": 6}
+RECOVERY_TOOL_PROFILE_COUNTS = {"mock_world": 8}
 RECOVERY_CONSTRAINT_TAG_COUNTS = {
     "bad_weather": 1,
     "budget_limited": 1,
     "child_friendly": 4,
-    "composite_failure": 5,
-    "dining_unavailable": 1,
+    "composite_failure": 7,
+    "dining_unavailable": 2,
+    "elder_friendly": 1,
+    "friends_group": 1,
     "light_meal": 1,
     "rainy_day": 1,
     "replan_turn": 1,
-    "ticket_sold_out": 2,
+    "ticket_sold_out": 3,
 }
 DEFAULT_TAG_COUNTS = {
     "addon_optional": 1,
@@ -411,32 +415,32 @@ DEFAULT_CONSTRAINT_TAG_COUNTS = {
 }
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
-    "elder": 1,
+    "elder": 2,
     "family": 16,
-    "friends": 2,
+    "friends": 3,
     "mixed": 4,
     "solo": 2,
     "unknown": 2,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 13, "L3": 7, "L5": 5}
-ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 28}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 13, "L3": 7, "L5": 7}
+ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 30}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 3,
     "couple_afternoon": 1,
-    "elder_afternoon": 1,
+    "elder_afternoon": 2,
     "family_afternoon": 16,
-    "friends_gathering": 2,
+    "friends_gathering": 3,
     "rainy_day_fallback": 3,
     "solo_afternoon": 2,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
     "none": 22,
     "queue_closed_and_budget_constraint": 1,
-    "route_and_dining_unavailable": 1,
+    "route_and_dining_unavailable": 2,
     "route_unavailable": 1,
     "table_unavailable_and_replan_required": 1,
     "ticket_sold_out_and_bad_weather": 1,
-    "ticket_sold_out_and_route_unavailable": 1,
+    "ticket_sold_out_and_route_unavailable": 2,
 }
 ALL_REGISTERED_TAG_COUNTS = {
     "addon_optional": 1,
@@ -447,17 +451,17 @@ ALL_REGISTERED_TAG_COUNTS = {
     "child_friendly": 16,
     "citywalk": 2,
     "clarification_turn": 1,
-    "composite_failure": 5,
+    "composite_failure": 7,
     "conversation_continuation": 2,
     "date_friendly": 1,
     "distractor_selection": 2,
-    "dining_unavailable": 1,
-    "elder_friendly": 1,
-    "failure_injected": 6,
+    "dining_unavailable": 2,
+    "elder_friendly": 2,
+    "failure_injected": 8,
     "fallback": 1,
     "fallback_selection": 1,
     "free_activity": 1,
-    "friends_group": 2,
+    "friends_group": 3,
     "indoor_activity": 7,
     "light_activity": 2,
     "light_meal": 12,
@@ -475,11 +479,11 @@ ALL_REGISTERED_TAG_COUNTS = {
     "rainy_day": 3,
     "replan_turn": 2,
     "robustness_case": 4,
-    "route_failure": 3,
+    "route_failure": 5,
     "sensitive_minimization": 1,
     "short_walk": 1,
     "stable_sorting": 1,
-    "ticket_sold_out": 2,
+    "ticket_sold_out": 3,
 }
 ALL_REGISTERED_CONSTRAINT_TAG_COUNTS = {
     "addon_optional": 1,
@@ -489,16 +493,16 @@ ALL_REGISTERED_CONSTRAINT_TAG_COUNTS = {
     "child_friendly": 16,
     "citywalk": 2,
     "clarification_turn": 1,
-    "composite_failure": 5,
+    "composite_failure": 7,
     "conversation_continuation": 2,
     "date_friendly": 1,
     "distractor_selection": 2,
-    "dining_unavailable": 1,
-    "elder_friendly": 1,
+    "dining_unavailable": 2,
+    "elder_friendly": 2,
     "fallback": 1,
     "fallback_selection": 1,
     "free_activity": 1,
-    "friends_group": 2,
+    "friends_group": 3,
     "indoor_activity": 7,
     "light_activity": 2,
     "light_meal": 12,
@@ -519,7 +523,7 @@ ALL_REGISTERED_CONSTRAINT_TAG_COUNTS = {
     "sensitive_minimization": 1,
     "short_walk": 1,
     "stable_sorting": 1,
-    "ticket_sold_out": 2,
+    "ticket_sold_out": 3,
 }
 FORBIDDEN_REPORT_TEXT = ("action_id", "tool_event_id", "api_key", "token", "secret", "debug_trace")
 
@@ -1334,7 +1338,7 @@ def test_benchmark_harness_runs_family_replan_version_continuation_case(
         (
             "recovery_focused",
             RECOVERY_CASE_IDS,
-            6,
+            8,
             RECOVERY_TOOL_PROFILE_COUNTS,
             RECOVERY_SCENARIO_BUCKET_COUNTS,
             RECOVERY_FAILURE_MODE_COUNTS,
@@ -1713,9 +1717,9 @@ def test_benchmark_harness_runs_all_registered_suite(
 
     report = harness.run_suite("all_registered")
 
-    assert len(report.case_results) == 28
+    assert len(report.case_results) == 30
     assert report.run_status == "passed"
-    assert report.passed_count == 28
+    assert report.passed_count == 30
     assert report.failed_count == 0
     assert report.error_count == 0
     assert report.report_path is not None
@@ -1784,8 +1788,10 @@ def test_benchmark_harness_runs_route_failure_case_as_expected_safe_stop(
     assert [item.case_id for item in load_failure_benchmark_cases()] == [
         "family_route_failure_v1",
         "family_route_and_dining_unavailable_v1",
+        "friends_route_and_dining_unavailable_v1",
         "rainy_day_ticket_sold_out_v1",
         "family_ticket_sold_out_and_route_unavailable_v1",
+        "elder_ticket_sold_out_and_route_unavailable_v1",
         "budget_queue_closed_constraint_v1",
         "family_table_unavailable_replan_required_v1",
     ]
@@ -1866,6 +1872,17 @@ def test_benchmark_harness_runs_route_failure_case_as_expected_safe_stop(
             1,
         ),
         (
+            "friends_route_and_dining_unavailable_v1",
+            "route_and_dining_unavailable_v0",
+            [
+                "check_queue:dining_unavailable:succeeded",
+                "check_table_availability:dining_unavailable:succeeded",
+                "check_route:route_infeasible:failed",
+            ],
+            ["stop_safely"],
+            1,
+        ),
+        (
             "rainy_day_ticket_sold_out_v1",
             "ticket_sold_out_and_bad_weather_v0",
             [
@@ -1877,6 +1894,16 @@ def test_benchmark_harness_runs_route_failure_case_as_expected_safe_stop(
         ),
         (
             "family_ticket_sold_out_and_route_unavailable_v1",
+            "ticket_sold_out_and_route_unavailable_v0",
+            [
+                "check_ticket_availability:ticket_sold_out:succeeded",
+                "check_route:route_infeasible:failed",
+            ],
+            ["stop_safely"],
+            1,
+        ),
+        (
+            "elder_ticket_sold_out_and_route_unavailable_v1",
             "ticket_sold_out_and_route_unavailable_v0",
             [
                 "check_ticket_availability:ticket_sold_out:succeeded",

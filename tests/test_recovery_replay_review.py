@@ -179,9 +179,16 @@ def test_run_generic_recovery_replay_review_runs_recovery_suite_and_returns_run_
     suite_cases = [
         _recovery_case("family_route_failure_v1", "route_unavailable_v0", "stop_safely", 1),
         _recovery_case("family_route_and_dining_unavailable_v1", "route_and_dining_unavailable_v0", "stop_safely", 3),
+        _recovery_case("friends_route_and_dining_unavailable_v1", "route_and_dining_unavailable_v0", "stop_safely", 3),
         _recovery_case("rainy_day_ticket_sold_out_v1", "ticket_sold_out_and_bad_weather_v0", "stop_safely", 2),
         _recovery_case(
             "family_ticket_sold_out_and_route_unavailable_v1",
+            "ticket_sold_out_and_route_unavailable_v0",
+            "stop_safely",
+            2,
+        ),
+        _recovery_case(
+            "elder_ticket_sold_out_and_route_unavailable_v1",
             "ticket_sold_out_and_route_unavailable_v0",
             "stop_safely",
             2,
@@ -216,7 +223,10 @@ def test_run_generic_recovery_replay_review_runs_recovery_suite_and_returns_run_
                 injected_effects = ["check_queue:queue_closed:succeeded"]
             elif case.case_id == "family_table_unavailable_replan_required_v1":
                 injected_effects = ["check_table_availability:table_unavailable:succeeded"]
-            elif case.case_id == "family_ticket_sold_out_and_route_unavailable_v1":
+            elif case.case_id in {
+                "family_ticket_sold_out_and_route_unavailable_v1",
+                "elder_ticket_sold_out_and_route_unavailable_v1",
+            }:
                 injected_effects = [
                     "check_ticket_availability:ticket_sold_out:succeeded",
                     "check_route:route_infeasible:failed",
@@ -255,7 +265,10 @@ def test_run_generic_recovery_replay_review_runs_recovery_suite_and_returns_run_
                 failure_chain_signature = ["check_queue:queue_closed:succeeded"]
             elif case_id == "family_table_unavailable_replan_required_v1":
                 failure_chain_signature = ["check_table_availability:table_unavailable:succeeded"]
-            elif case_id == "family_ticket_sold_out_and_route_unavailable_v1":
+            elif case_id in {
+                "family_ticket_sold_out_and_route_unavailable_v1",
+                "elder_ticket_sold_out_and_route_unavailable_v1",
+            }:
                 failure_chain_signature = [
                     "check_ticket_availability:ticket_sold_out:succeeded",
                     "check_route:route_infeasible:failed",
@@ -308,7 +321,7 @@ def test_run_generic_recovery_replay_review_runs_recovery_suite_and_returns_run_
         assert report.selection_mode == "suite"
         assert report.suite_id == "recovery_focused"
         assert report.requested_case_ids == [item.case_id for item in suite_cases]
-        assert len(report.case_results) == 6
+        assert len(report.case_results) == 8
     finally:
         _cleanup_test_dir(output_root)
 

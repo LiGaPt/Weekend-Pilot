@@ -96,8 +96,10 @@ DEFAULT_CASE_IDS = (
 FAILURE_CASE_IDS = (
     "family_route_failure_v1",
     "family_route_and_dining_unavailable_v1",
+    "friends_route_and_dining_unavailable_v1",
     "rainy_day_ticket_sold_out_v1",
     "family_ticket_sold_out_and_route_unavailable_v1",
+    "elder_ticket_sold_out_and_route_unavailable_v1",
     "budget_queue_closed_constraint_v1",
     "family_table_unavailable_replan_required_v1",
 )
@@ -306,32 +308,32 @@ ROBUSTNESS_TAG_COUNTS = {
 }
 ALL_REGISTERED_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
-    "elder": 1,
+    "elder": 2,
     "family": 16,
-    "friends": 2,
+    "friends": 3,
     "mixed": 4,
     "solo": 2,
     "unknown": 2,
 }
-ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 13, "L3": 7, "L5": 5}
-ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 28}
+ALL_REGISTERED_LEVEL_COUNTS = {"L1": 3, "L2": 13, "L3": 7, "L5": 7}
+ALL_REGISTERED_TOOL_PROFILE_COUNTS = {"mock_world": 30}
 ALL_REGISTERED_WORLD_PROFILE_COUNTS = {
     "budget_lite": 3,
     "couple_afternoon": 1,
-    "elder_afternoon": 1,
+    "elder_afternoon": 2,
     "family_afternoon": 16,
-    "friends_gathering": 2,
+    "friends_gathering": 3,
     "rainy_day_fallback": 3,
     "solo_afternoon": 2,
 }
 ALL_REGISTERED_FAILURE_MODE_COUNTS = {
     "none": 22,
     "queue_closed_and_budget_constraint": 1,
-    "route_and_dining_unavailable": 1,
+    "route_and_dining_unavailable": 2,
     "route_unavailable": 1,
     "table_unavailable_and_replan_required": 1,
     "ticket_sold_out_and_bad_weather": 1,
-    "ticket_sold_out_and_route_unavailable": 1,
+    "ticket_sold_out_and_route_unavailable": 2,
 }
 ALL_REGISTERED_TAG_COUNTS = {
     "addon_optional": 1,
@@ -342,17 +344,17 @@ ALL_REGISTERED_TAG_COUNTS = {
     "child_friendly": 16,
     "citywalk": 2,
     "clarification_turn": 1,
-    "composite_failure": 5,
+    "composite_failure": 7,
     "conversation_continuation": 2,
     "date_friendly": 1,
     "distractor_selection": 2,
-    "dining_unavailable": 1,
-    "elder_friendly": 1,
-    "failure_injected": 6,
+    "dining_unavailable": 2,
+    "elder_friendly": 2,
+    "failure_injected": 8,
     "fallback": 1,
     "fallback_selection": 1,
     "free_activity": 1,
-    "friends_group": 2,
+    "friends_group": 3,
     "indoor_activity": 7,
     "light_activity": 2,
     "light_meal": 12,
@@ -370,11 +372,11 @@ ALL_REGISTERED_TAG_COUNTS = {
     "rainy_day": 3,
     "replan_turn": 2,
     "robustness_case": 4,
-    "route_failure": 3,
+    "route_failure": 5,
     "sensitive_minimization": 1,
     "short_walk": 1,
     "stable_sorting": 1,
-    "ticket_sold_out": 2,
+    "ticket_sold_out": 3,
 }
 EXPECTED_TAXONOMY_BY_CASE = {
     "family_afternoon_v1": _taxonomy_payload(
@@ -482,6 +484,18 @@ EXPECTED_TAXONOMY_BY_CASE = {
         ],
         failure_mode="route_and_dining_unavailable",
     ),
+    "friends_route_and_dining_unavailable_v1": _taxonomy_payload(
+        scenario_bucket="friends",
+        level="L5",
+        tags=[
+            "composite_failure",
+            "dining_unavailable",
+            "failure_injected",
+            "friends_group",
+            "route_failure",
+        ],
+        failure_mode="route_and_dining_unavailable",
+    ),
     "rainy_day_ticket_sold_out_v1": _taxonomy_payload(
         scenario_bucket="mixed",
         level="L5",
@@ -500,6 +514,18 @@ EXPECTED_TAXONOMY_BY_CASE = {
         tags=[
             "child_friendly",
             "composite_failure",
+            "failure_injected",
+            "route_failure",
+            "ticket_sold_out",
+        ],
+        failure_mode="ticket_sold_out_and_route_unavailable",
+    ),
+    "elder_ticket_sold_out_and_route_unavailable_v1": _taxonomy_payload(
+        scenario_bucket="elder",
+        level="L5",
+        tags=[
+            "composite_failure",
+            "elder_friendly",
             "failure_injected",
             "route_failure",
             "ticket_sold_out",
@@ -589,6 +615,14 @@ def test_failure_fixtures_are_loadable_but_not_default() -> None:
     family_ticket_case = load_benchmark_case("family_ticket_sold_out_and_route_unavailable_v1")
     assert family_ticket_case.failure_profile == "ticket_sold_out_and_route_unavailable_v0"
     assert family_ticket_case.expected.min_injected_failure_count == 2
+
+    friends_composite_case = load_benchmark_case("friends_route_and_dining_unavailable_v1")
+    assert friends_composite_case.failure_profile == "route_and_dining_unavailable_v0"
+    assert friends_composite_case.expected.min_injected_failure_count == 3
+
+    elder_ticket_case = load_benchmark_case("elder_ticket_sold_out_and_route_unavailable_v1")
+    assert elder_ticket_case.failure_profile == "ticket_sold_out_and_route_unavailable_v0"
+    assert elder_ticket_case.expected.min_injected_failure_count == 2
 
     budget_queue_case = load_benchmark_case("budget_queue_closed_constraint_v1")
     assert budget_queue_case.failure_profile == "queue_closed_and_budget_constraint_v0"
@@ -799,7 +833,7 @@ def test_robustness_focused_suite_matrix_summary_counts_are_expected() -> None:
 def test_all_registered_case_matrix_summary_counts_are_expected() -> None:
     summary = build_case_matrix_summary(load_benchmark_suite("all_registered"))
 
-    assert summary.case_count == 28
+    assert summary.case_count == 30
     assert summary.scenario_bucket_counts == ALL_REGISTERED_SCENARIO_BUCKET_COUNTS
     assert summary.level_counts == ALL_REGISTERED_LEVEL_COUNTS
     assert summary.tool_profile_counts == ALL_REGISTERED_TOOL_PROFILE_COUNTS
@@ -2488,9 +2522,9 @@ def test_benchmark_summary_schema_includes_suite_and_outcome_rollup_fields() -> 
 def test_build_case_integrity_coverage_summary_returns_expected_counts_for_v2_integrity_suite() -> None:
     summary = build_case_integrity_coverage_summary(load_benchmark_suite("v2_integrity"))
 
-    assert summary.case_count == 18
+    assert summary.case_count == 20
     assert summary.memory_case_count == 6
-    assert summary.recovery_case_count == 6
+    assert summary.recovery_case_count == 8
     assert summary.continuation_case_count == 3
     assert summary.robustness_case_count == 4
     assert summary.l4_case_count == 1

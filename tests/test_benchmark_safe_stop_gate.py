@@ -12,12 +12,22 @@ import backend.app.benchmark.safe_stop_gate as safe_stop_gate
 
 PASSING_FAILURE_MODE_COUNTS = {
     "route_unavailable": 1,
-    "route_and_dining_unavailable": 1,
+    "route_and_dining_unavailable": 2,
     "ticket_sold_out_and_bad_weather": 1,
-    "ticket_sold_out_and_route_unavailable": 1,
+    "ticket_sold_out_and_route_unavailable": 2,
     "queue_closed_and_budget_constraint": 1,
     "table_unavailable_and_replan_required": 1,
 }
+PASSING_CASE_FAILURE_MODES = (
+    "route_unavailable",
+    "route_and_dining_unavailable",
+    "route_and_dining_unavailable",
+    "ticket_sold_out_and_bad_weather",
+    "ticket_sold_out_and_route_unavailable",
+    "ticket_sold_out_and_route_unavailable",
+    "queue_closed_and_budget_constraint",
+    "table_unavailable_and_replan_required",
+)
 
 
 def test_run_benchmark_safe_stop_gate_enriches_report_and_refreshes_latest_alias(
@@ -43,10 +53,10 @@ def test_run_benchmark_safe_stop_gate_enriches_report_and_refreshes_latest_alias
         result = safe_stop_gate.run_benchmark_safe_stop_gate(output_root=output_root, start_services=False)
 
         assert result.release_blocked is False
-        assert result.case_count == 6
-        assert result.zero_action_case_count == 6
-        assert result.bounded_case_count == 6
-        assert result.terminal_safe_stop_case_count == 6
+        assert result.case_count == 8
+        assert result.zero_action_case_count == 8
+        assert result.bounded_case_count == 8
+        assert result.terminal_safe_stop_case_count == 8
         assert result.multistep_recovery_case_count == 1
         assert result.failure_mode_counts == PASSING_FAILURE_MODE_COUNTS
 
@@ -54,7 +64,7 @@ def test_run_benchmark_safe_stop_gate_enriches_report_and_refreshes_latest_alias
         evaluation = payload["safe_stop_gate_evaluation"]
         assert evaluation["schema_version"] == "weekendpilot_safe_stop_gate_evaluation_v1"
         assert evaluation["release_blocked"] is False
-        assert evaluation["zero_action_case_count"] == 6
+        assert evaluation["zero_action_case_count"] == 8
         assert evaluation["multistep_recovery_case_count"] == 1
         assert evaluation["failure_mode_counts"] == PASSING_FAILURE_MODE_COUNTS
         assert latest_alias.exists()
@@ -107,8 +117,8 @@ def _write_verification_result(
         {
             "suite_id": "recovery_focused",
             "run_status": "passed",
-            "case_count": 6,
-            "passed_count": 6,
+            "case_count": 8,
+            "passed_count": 8,
             "failed_count": 0,
             "error_count": 0,
             "overall_score": 1.0,
@@ -120,13 +130,13 @@ def _write_verification_result(
 
 def _build_report_payload(*, multistep: bool = True) -> dict[str, object]:
     case_results = []
-    for failure_mode, _count in PASSING_FAILURE_MODE_COUNTS.items():
+    for index, failure_mode in enumerate(PASSING_CASE_FAILURE_MODES, start=1):
         recovery_actions = ["stop_safely"]
         if multistep and failure_mode == "table_unavailable_and_replan_required":
             recovery_actions = ["replace_candidate", "stop_safely"]
         case_results.append(
             {
-                "case_id": f"case-{failure_mode}",
+                "case_id": f"case-{index}-{failure_mode}",
                 "status": "passed",
                 "taxonomy": {
                     "suite": "locallife_bench_v1",
@@ -156,7 +166,7 @@ def _build_report_payload(*, multistep: bool = True) -> dict[str, object]:
         "schema_version": "weekendpilot_benchmark_run_v1",
         "run_status": "passed",
         "case_results": case_results,
-        "passed_count": 6,
+        "passed_count": 8,
         "failed_count": 0,
         "error_count": 0,
         "overall_score": 1.0,
@@ -165,8 +175,8 @@ def _build_report_payload(*, multistep: bool = True) -> dict[str, object]:
             "suite_id": "recovery_focused",
             "suite_title": "Recovery focused benchmark suite",
             "run_status": "passed",
-            "case_count": 6,
-            "passed_count": 6,
+            "case_count": 8,
+            "passed_count": 8,
             "failed_count": 0,
             "error_count": 0,
             "overall_score": 1.0,
