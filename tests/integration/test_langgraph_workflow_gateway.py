@@ -16,6 +16,7 @@ from backend.app.agents import (
     RecoveryDecision,
 )
 from backend.app.db.session import SessionLocal
+from backend.app.memory_control import MemoryUserControlService
 from backend.app.models.runtime import ActionLedger, AgentRun, MemoryItem, ToolEvent, User
 from backend.app.planning import (
     DeterministicIntentParser,
@@ -925,6 +926,56 @@ def test_workflow_loads_only_governable_memory_lifecycle_states(
     assert memory_policy["downgraded_expired_keys"] == ["activity_style"]
     assert [decision["memory_key"] for decision in memory_policy["memory_decisions"]] == ["activity_style"]
     assert [entry["key"] for entry in memory_policy["decision_log"]] == ["activity_style"]
+
+
+def test_workflow_memory_control_disable_keeps_controlled_row_out_of_query_shaping(
+    db_session: Session,
+    redis_runtime,
+    trace_path: Path,
+) -> None:
+    runner = _build_runner(db_session, redis_runtime, trace_path)
+    user = UserRepository(db_session).create(
+        external_id=None,
+        display_name="Workflow Memory Control Tester",
+    )
+    memory = MemoryItemRepository(db_session).create(
+        user_id=user.user_id,
+        memory_type="preference",
+        key="activity_style",
+        value_json={"preference": "indoor"},
+        text="test",
+        confidence=Decimal("1.0"),
+        source_run_id=None,
+        source_langsmith_trace_id=None,
+        expires_at=None,
+        status="active",
+    )
+    control_result = MemoryUserControlService(db_session).apply_action(
+        user.user_id,
+        memory.memory_id,
+        "disable",
+        "user_requested_control",
+    )
+    db_session.commit()
+
+    result = runner.run(
+        WeekendPilotWorkflowRequest(
+            user_input=USER_INPUT,
+            case_id="case-langgraph-memory-control",
+            auto_confirm=False,
+            existing_user_id=user.user_id,
+        )
+    )
+
+    assert result.run_id is not None
+    assert result.status == "awaiting_confirmation"
+    assert control_result.item.status == "disabled"
+    assert MemoryItemRepository(db_session).list_governable_for_user(user.user_id) == []
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    memory_policy = run.metadata_json["workflow"]["memory_policy"]
+    assert memory_policy["memory_decisions"] == []
+    assert memory_policy["decision_log"] == []
 
 
 def test_workflow_amap_preview_reaches_confirmation_without_write_actions(

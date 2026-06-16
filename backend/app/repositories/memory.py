@@ -27,6 +27,7 @@ class MemoryItemRepository:
         source_langsmith_trace_id: str | None,
         expires_at: datetime | None,
         status: str,
+        metadata_json: dict[str, Any] | None = None,
     ) -> MemoryItem:
         normalized_status = normalize_memory_status(status)
         memory_item = MemoryItem(
@@ -34,6 +35,7 @@ class MemoryItemRepository:
             memory_type=memory_type,
             key=key,
             value_json=value_json,
+            metadata_json=metadata_json or {},
             text=text,
             confidence=confidence,
             source_run_id=source_run_id,
@@ -68,18 +70,37 @@ class MemoryItemRepository:
         source_langsmith_trace_id: str | None,
         expires_at: datetime | None,
         status: str,
+        metadata_json: dict[str, Any] | None = None,
     ) -> MemoryItem | None:
         memory_item = self.get_by_id(memory_id)
         if memory_item is None:
             return None
 
         memory_item.value_json = value_json
+        memory_item.metadata_json = metadata_json or {}
         memory_item.text = text
         memory_item.confidence = confidence
         memory_item.source_run_id = source_run_id
         memory_item.source_langsmith_trace_id = source_langsmith_trace_id
         memory_item.expires_at = expires_at
         memory_item.status = normalize_memory_status(status)
+        self.session.flush()
+        self.session.refresh(memory_item)
+        return memory_item
+
+    def update_status_and_metadata(
+        self,
+        memory_id: UUID,
+        *,
+        status: str,
+        metadata_json: dict[str, Any],
+    ) -> MemoryItem | None:
+        memory_item = self.get_by_id(memory_id)
+        if memory_item is None:
+            return None
+
+        memory_item.status = normalize_memory_status(status)
+        memory_item.metadata_json = metadata_json
         self.session.flush()
         self.session.refresh(memory_item)
         return memory_item
@@ -92,6 +113,14 @@ class MemoryItemRepository:
                 MemoryItem.status == "active",
                 or_(MemoryItem.expires_at.is_(None), MemoryItem.expires_at > func.now()),
             )
+            .order_by(MemoryItem.created_at, MemoryItem.memory_id)
+        )
+        return list(self.session.scalars(statement).all())
+
+    def list_for_user(self, user_id: UUID) -> list[MemoryItem]:
+        statement = (
+            select(MemoryItem)
+            .where(MemoryItem.user_id == user_id)
             .order_by(MemoryItem.created_at, MemoryItem.memory_id)
         )
         return list(self.session.scalars(statement).all())
