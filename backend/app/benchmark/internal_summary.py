@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError
 
 from backend.app.benchmark.release_gate import LATEST_REPORT_FILENAME, RELEASE_GATE_SUITE_ID
+from backend.app.benchmark.timing import BenchmarkTimingSummary
 from backend.app.benchmark.schemas import BenchmarkRunReport
 
 
@@ -33,6 +35,8 @@ class ReleaseGateBenchmarkSummary(BaseModel):
     error_count: int
     overall_score: float
     matrix_summary: ReleaseGateBenchmarkSummaryMatrix
+    benchmark_timing_summary_present: bool = False
+    benchmark_timing_summary: BenchmarkTimingSummary | None = None
     report_path: str
 
 
@@ -71,8 +75,10 @@ def load_latest_release_gate_summary(
             f"Latest {RELEASE_GATE_SUITE_ID} benchmark report could not be read."
         ) from exc
 
+    stripped_payload = _strip_timing_fields(payload)
+
     try:
-        report = BenchmarkRunReport.model_validate(payload)
+        report = BenchmarkRunReport.model_validate(stripped_payload)
     except ValidationError as exc:
         raise ReleaseGateBenchmarkSummaryInvalidError(
             f"Latest {RELEASE_GATE_SUITE_ID} benchmark report is invalid."
@@ -96,6 +102,8 @@ def load_latest_release_gate_summary(
             f"Latest {RELEASE_GATE_SUITE_ID} benchmark summary is missing matrix_summary."
         )
 
+    timing_present, timing_summary = _load_benchmark_timing_summary(payload)
+
     return ReleaseGateBenchmarkSummary(
         suite_id=summary.suite_id,
         suite_title=summary.suite_title,
@@ -111,5 +119,40 @@ def load_latest_release_gate_summary(
             failure_mode_counts=dict(summary.matrix_summary.failure_mode_counts),
             tag_counts=dict(summary.matrix_summary.tag_counts),
         ),
+        benchmark_timing_summary_present=timing_present,
+        benchmark_timing_summary=timing_summary,
         report_path=label,
     )
+
+
+def _strip_timing_fields(payload: dict[str, Any]) -> dict[str, Any]:
+    stripped_payload = dict(payload)
+    stripped_payload.pop("benchmark_timing_summary", None)
+
+    benchmark_summary = stripped_payload.get("benchmark_summary")
+    if isinstance(benchmark_summary, dict):
+        summary_payload = dict(benchmark_summary)
+        summary_payload.pop("benchmark_timing_summary", None)
+        stripped_payload["benchmark_summary"] = summary_payload
+
+    return stripped_payload
+
+
+def _load_benchmark_timing_summary(payload: dict[str, Any]) -> tuple[bool, BenchmarkTimingSummary | None]:
+    benchmark_summary = payload.get("benchmark_summary")
+    if isinstance(benchmark_summary, dict) and "benchmark_timing_summary" in benchmark_summary:
+        return _validate_timing_summary(benchmark_summary.get("benchmark_timing_summary"))
+
+    if "benchmark_timing_summary" in payload:
+        return _validate_timing_summary(payload.get("benchmark_timing_summary"))
+
+    return False, None
+
+
+def _validate_timing_summary(value: Any) -> tuple[bool, BenchmarkTimingSummary | None]:
+    if value is None:
+        return False, None
+    try:
+        return True, BenchmarkTimingSummary.model_validate(value)
+    except ValidationError:
+        return False, None
