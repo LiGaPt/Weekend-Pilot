@@ -120,6 +120,8 @@ def test_conversation_repositories_create_and_list_session_turns(db_session: Ses
         turn_type="user_request",
         content_text="Start planning",
         payload_json={},
+        trace_id="trace-user-request",
+        state_snapshot_json={"schema_version": "conversation_turn_state_snapshot_v0"},
     )
     second = turns.append(
         session_id=session_row.session_id,
@@ -137,6 +139,44 @@ def test_conversation_repositories_create_and_list_session_turns(db_session: Ses
     assert turns.get_by_id(first.turn_id) is first
     assert turns.list_for_session(session_row.session_id) == [first, second]
     assert turns.list_for_run(run.run_id) == [first, second]
+    assert first.trace_id == "trace-user-request"
+    assert first.state_snapshot_json == {"schema_version": "conversation_turn_state_snapshot_v0"}
+    assert second.trace_id is None
+    assert second.state_snapshot_json == {}
+
+
+def test_conversation_turn_repository_updates_snapshot_fields(db_session: Session) -> None:
+    user = create_user(db_session)
+    run = create_run(db_session, user.user_id)
+    session_row = ConversationSessionRepository(db_session).create(
+        user_id=user.user_id,
+        channel="web_demo",
+        status="active",
+        metadata_json={"source": "test"},
+    )
+    turns = ConversationTurnRepository(db_session)
+    turn = turns.append(
+        session_id=session_row.session_id,
+        run_id=run.run_id,
+        speaker_role="user",
+        turn_type="user_request",
+        content_text="Start planning",
+        payload_json={},
+    )
+
+    updated = turns.update_snapshot(
+        turn.turn_id,
+        trace_id="trace-updated",
+        state_snapshot_json={"schema_version": "conversation_turn_state_snapshot_v0", "run_status": "running"},
+    )
+
+    assert updated is not None
+    assert updated.trace_id == "trace-updated"
+    assert updated.state_snapshot_json == {
+        "schema_version": "conversation_turn_state_snapshot_v0",
+        "run_status": "running",
+    }
+    assert turns.update_snapshot(uuid4(), trace_id="trace-missing", state_snapshot_json={}) is None
 
 
 def test_memory_item_repository_creates_and_lists_active_memory(db_session: Session) -> None:

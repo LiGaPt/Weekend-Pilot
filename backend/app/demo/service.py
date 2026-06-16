@@ -18,6 +18,7 @@ from backend.app.demo.world_profile import resolve_mock_world_demo_profile
 from backend.app.execution import DeterministicExecutionWorkflow, ExecutionWorkflowError
 from backend.app.feedback import DeterministicFeedbackWriter, FeedbackWriterError
 from backend.app.demo.action_manifest import summarize_action_manifest
+from backend.app.demo.conversation_snapshots import build_conversation_turn_state_snapshot
 from backend.app.demo.streaming import (
     derive_stream_progress_summaries,
     encode_sse_event,
@@ -189,6 +190,7 @@ class DemoWorkflowService:
             result,
             plan_version=build_initial_plan_version_metadata(),
         )
+        self._refresh_run_turn_snapshots(result.run_id)
         self.session.commit()
         return self.build_summary(result.run_id)
 
@@ -296,6 +298,7 @@ class DemoWorkflowService:
                 result,
                 plan_version=build_initial_plan_version_metadata(),
             )
+            self._refresh_run_turn_snapshots(result.run_id)
             self.session.commit()
             summary = self.build_summary(result.run_id)
             event_index += 1
@@ -414,6 +417,7 @@ class DemoWorkflowService:
                 source_run_id=source_run.run_id,
             ),
         )
+        self._refresh_run_turn_snapshots(clarified_run.run_id)
         self.session.commit()
         return self.build_summary(clarified_run.run_id)
 
@@ -511,6 +515,7 @@ class DemoWorkflowService:
                 source_selected_plan_id=source_selected_plan_uuid,
             ),
         )
+        self._refresh_run_turn_snapshots(replan_run.run_id)
         self.session.commit()
         return self.build_summary(replan_run.run_id)
 
@@ -988,6 +993,20 @@ class DemoWorkflowService:
         demo["continuation_history"] = [*history, *steps]
         metadata["demo"] = demo
         runs.update_metadata_json(run_id, metadata)
+
+    def _refresh_run_turn_snapshots(self, run_id: UUID) -> None:
+        runs = AgentRunRepository(self.session)
+        run = self._load_run(runs, run_id)
+        summary = self.build_summary(run_id)
+        trace_id = self._trace_id(run)
+        snapshot = build_conversation_turn_state_snapshot(summary)
+        turn_repo = ConversationTurnRepository(self.session)
+        for turn in turn_repo.list_for_run(run_id):
+            turn_repo.update_snapshot(
+                turn.turn_id,
+                trace_id=trace_id,
+                state_snapshot_json=snapshot,
+            )
 
     def _plan_preview(self, plan: Plan) -> DemoPlanPreview:
         plan_json = self._plan_json(plan)

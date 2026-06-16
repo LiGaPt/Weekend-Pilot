@@ -397,6 +397,34 @@ def _assert_action_manifest_confirmed(plan: dict[str, object]) -> None:
         _assert_no_forbidden_keys(action["payload_preview"])
 
 
+def _assert_turn_snapshot(
+    turn: ConversationTurn,
+    *,
+    run_id: UUID,
+    run_status: str,
+    plan_version_label: str,
+    clarification_missing_fields: list[str],
+    selected_plan_id: str | None = None,
+    plan_count: int | None = None,
+) -> None:
+    assert turn.run_id == run_id
+    assert turn.trace_id is None or isinstance(turn.trace_id, str)
+    assert turn.state_snapshot_json["schema_version"] == "conversation_turn_state_snapshot_v0"
+    assert turn.state_snapshot_json["run_status"] == run_status
+    assert turn.state_snapshot_json["selected_plan_id"] == selected_plan_id
+    assert turn.state_snapshot_json["plan_version_label"] == plan_version_label
+    assert turn.state_snapshot_json["clarification_missing_fields"] == clarification_missing_fields
+    if plan_count is not None:
+        assert turn.state_snapshot_json["plan_count"] == plan_count
+    assert "session_id" not in turn.state_snapshot_json
+    assert "trace_id" not in turn.state_snapshot_json
+    assert "node_history" not in turn.state_snapshot_json
+    assert "prompt" not in turn.state_snapshot_json
+    progress = turn.state_snapshot_json["progress"]
+    assert progress["schema_version"] == "public_demo_progress_v1"
+    assert isinstance(progress["stage_history"], list)
+
+
 def _read_sse_events(response) -> list[tuple[str, dict[str, object]]]:
     events: list[tuple[str, dict[str, object]]] = []
     current_event: str | None = None
@@ -1194,6 +1222,24 @@ def test_demo_run_clarification_flow_reuses_session_and_keeps_version_v1(client)
             "missing_fields": ["scenario_or_participants", "time_window"],
             "run_status": "awaiting_clarification",
         }
+        _assert_turn_snapshot(
+            turns[0],
+            run_id=source_run.run_id,
+            run_status="awaiting_clarification",
+            plan_version_label="v1",
+            clarification_missing_fields=["scenario_or_participants", "time_window"],
+            selected_plan_id=None,
+            plan_count=0,
+        )
+        _assert_turn_snapshot(
+            turns[1],
+            run_id=source_run.run_id,
+            run_status="awaiting_clarification",
+            plan_version_label="v1",
+            clarification_missing_fields=["scenario_or_participants", "time_window"],
+            selected_plan_id=None,
+            plan_count=0,
+        )
         assert turns[2].run_id == clarified_run.run_id
         assert turns[2].payload_json == {
             "mode": "clarify",
@@ -1201,6 +1247,24 @@ def test_demo_run_clarification_flow_reuses_session_and_keeps_version_v1(client)
             "source_missing_fields": ["scenario_or_participants", "time_window"],
         }
         assert turns[3].run_id == clarified_run.run_id
+        _assert_turn_snapshot(
+            turns[2],
+            run_id=clarified_run.run_id,
+            run_status="awaiting_confirmation",
+            plan_version_label="v1",
+            clarification_missing_fields=[],
+            selected_plan_id=clarify_body["selected_plan_id"],
+            plan_count=len(clarify_body["plans"]),
+        )
+        _assert_turn_snapshot(
+            turns[3],
+            run_id=clarified_run.run_id,
+            run_status="awaiting_confirmation",
+            plan_version_label="v1",
+            clarification_missing_fields=[],
+            selected_plan_id=clarify_body["selected_plan_id"],
+            plan_count=len(clarify_body["plans"]),
+        )
         assert source_run.metadata_json["demo"]["plan_version"] == {
             "version_number": 1,
             "source_run_id": None,
@@ -1351,11 +1415,47 @@ def test_demo_run_recovery_clarification_flow_reuses_public_clarify_contract(
             "missing_fields": ["distance_flexibility"],
             "run_status": "awaiting_clarification",
         }
+        _assert_turn_snapshot(
+            turns[0],
+            run_id=source_run.run_id,
+            run_status="awaiting_clarification",
+            plan_version_label="v1",
+            clarification_missing_fields=["distance_flexibility"],
+            selected_plan_id=None,
+            plan_count=0,
+        )
+        _assert_turn_snapshot(
+            turns[1],
+            run_id=source_run.run_id,
+            run_status="awaiting_clarification",
+            plan_version_label="v1",
+            clarification_missing_fields=["distance_flexibility"],
+            selected_plan_id=None,
+            plan_count=0,
+        )
         assert turns[2].payload_json == {
             "mode": "clarify",
             "source_run_id": str(source_run.run_id),
             "source_missing_fields": ["distance_flexibility"],
         }
+        _assert_turn_snapshot(
+            turns[2],
+            run_id=clarified_run.run_id,
+            run_status="awaiting_confirmation",
+            plan_version_label="v1",
+            clarification_missing_fields=[],
+            selected_plan_id=clarify_body["selected_plan_id"],
+            plan_count=len(clarify_body["plans"]),
+        )
+        _assert_turn_snapshot(
+            turns[3],
+            run_id=clarified_run.run_id,
+            run_status="awaiting_confirmation",
+            plan_version_label="v1",
+            clarification_missing_fields=[],
+            selected_plan_id=clarify_body["selected_plan_id"],
+            plan_count=len(clarify_body["plans"]),
+        )
         assert source_run.metadata_json["workflow"]["clarification"] == {
             "policy_version": "recovery_clarification_v1",
             "missing_fields": ["distance_flexibility"],
@@ -1487,6 +1587,24 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
             "user_follow_up",
             "assistant_replan_options",
         ]
+        _assert_turn_snapshot(
+            turns[0],
+            run_id=source_run.run_id,
+            run_status="awaiting_confirmation",
+            plan_version_label="v1",
+            clarification_missing_fields=[],
+            selected_plan_id=source_body["selected_plan_id"],
+            plan_count=len(source_body["plans"]),
+        )
+        _assert_turn_snapshot(
+            turns[1],
+            run_id=source_run.run_id,
+            run_status="awaiting_confirmation",
+            plan_version_label="v1",
+            clarification_missing_fields=[],
+            selected_plan_id=source_body["selected_plan_id"],
+            plan_count=len(source_body["plans"]),
+        )
         assert turns[2].run_id == replan_run.run_id
         assert turns[2].payload_json == {
             "mode": "replan",
@@ -1502,6 +1620,24 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
             "plan_count": len(replan_body["plans"]),
             "run_status": "awaiting_confirmation",
         }
+        _assert_turn_snapshot(
+            turns[2],
+            run_id=replan_run.run_id,
+            run_status="awaiting_confirmation",
+            plan_version_label="v2",
+            clarification_missing_fields=[],
+            selected_plan_id=replan_body["selected_plan_id"],
+            plan_count=len(replan_body["plans"]),
+        )
+        _assert_turn_snapshot(
+            turns[3],
+            run_id=replan_run.run_id,
+            run_status="awaiting_confirmation",
+            plan_version_label="v2",
+            clarification_missing_fields=[],
+            selected_plan_id=replan_body["selected_plan_id"],
+            plan_count=len(replan_body["plans"]),
+        )
         assert turns[4].run_id == second_replan_run.run_id
         assert turns[4].payload_json == {
             "mode": "replan",
@@ -1517,6 +1653,24 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
             "plan_count": len(second_replan_body["plans"]),
             "run_status": "awaiting_confirmation",
         }
+        _assert_turn_snapshot(
+            turns[4],
+            run_id=second_replan_run.run_id,
+            run_status="awaiting_confirmation",
+            plan_version_label="v3",
+            clarification_missing_fields=[],
+            selected_plan_id=second_replan_body["selected_plan_id"],
+            plan_count=len(second_replan_body["plans"]),
+        )
+        _assert_turn_snapshot(
+            turns[5],
+            run_id=second_replan_run.run_id,
+            run_status="awaiting_confirmation",
+            plan_version_label="v3",
+            clarification_missing_fields=[],
+            selected_plan_id=second_replan_body["selected_plan_id"],
+            plan_count=len(second_replan_body["plans"]),
+        )
         assert "draft" not in turns[3].payload_json
         assert "plan_json" not in turns[3].payload_json
         assert "draft" not in turns[5].payload_json
