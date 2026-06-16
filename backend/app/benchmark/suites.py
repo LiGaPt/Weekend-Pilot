@@ -29,8 +29,10 @@ _EXPANDED_CASE_IDS = [
 _RECOVERY_FOCUSED_CASE_IDS = [
     "family_route_failure_v1",
     "family_route_and_dining_unavailable_v1",
+    "friends_route_and_dining_unavailable_v1",
     "rainy_day_ticket_sold_out_v1",
     "family_ticket_sold_out_and_route_unavailable_v1",
+    "elder_ticket_sold_out_and_route_unavailable_v1",
     "budget_queue_closed_constraint_v1",
     "family_table_unavailable_replan_required_v1",
 ]

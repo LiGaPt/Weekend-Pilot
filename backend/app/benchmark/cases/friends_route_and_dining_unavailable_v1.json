@@ -1,0 +1,47 @@
+{
+  "case_id": "friends_route_and_dining_unavailable_v1",
+  "title": "Friends gathering route and dining unavailable safe stop",
+  "user_input": "This afternoon I want to hang out with friends nearby for a few hours. Start with an outdoor walk and chatting, then find a casual dinner place that's good for sharing. Not too far.",
+  "agent_version": "agent-v1",
+  "prompt_version": "prompt-v1",
+  "tool_profile": "mock_world",
+  "world_profile": "friends_gathering",
+  "failure_profile": "route_and_dining_unavailable_v0",
+  "memory_items": [],
+  "expected": {
+    "required_tool_names": [
+      "search_poi",
+      "check_weather",
+      "get_poi_detail",
+      "check_opening_hours",
+      "check_queue",
+      "check_table_availability",
+      "check_ticket_availability",
+      "check_route"
+    ],
+    "min_tool_event_count": 8,
+    "min_action_count": 0,
+    "expected_workflow_status": "failed",
+    "expected_execution_status": null,
+    "expected_feedback_status": null,
+    "expected_error_type": "recovery_stopped",
+    "expected_recovery_action": "stop_safely",
+    "min_injected_failure_count": 3
+  },
+  "taxonomy": {
+    "suite": "locallife_bench_v1",
+    "scenario_bucket": "friends",
+    "level": "L5",
+    "tags": [
+      "composite_failure",
+      "dining_unavailable",
+      "failure_injected",
+      "friends_group",
+      "route_failure"
+    ],
+    "failure_mode": "route_and_dining_unavailable"
+  },
+  "metadata": {
+    "focus": "friends_route_and_dining_unavailable_safe_stop"
+  }
+}

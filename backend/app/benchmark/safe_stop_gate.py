@@ -28,12 +28,13 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_OUTPUT_ROOT = REPO_ROOT / "var" / "formal-benchmarks"
 EXPECTED_FAILURE_MODE_COUNTS = {
     "route_unavailable": 1,
-    "route_and_dining_unavailable": 1,
+    "route_and_dining_unavailable": 2,
     "ticket_sold_out_and_bad_weather": 1,
-    "ticket_sold_out_and_route_unavailable": 1,
+    "ticket_sold_out_and_route_unavailable": 2,
     "queue_closed_and_budget_constraint": 1,
     "table_unavailable_and_replan_required": 1,
 }
+EXPECTED_CASE_COUNT = 8
 
 
 class BenchmarkSafeStopGateError(RuntimeError):
@@ -98,10 +99,10 @@ def run_benchmark_safe_stop_gate(
         blocking_failures.append(f"Expected suite_id={SAFE_STOP_SUITE_ID!r}, got {suite_id!r}.")
     if run_status != "passed":
         blocking_failures.append(f"Expected run_status='passed', got {run_status!r}.")
-    if case_count != 6:
-        blocking_failures.append(f"Expected case_count=6, got {case_count}.")
-    if passed_count != 6:
-        blocking_failures.append(f"Expected passed_count=6, got {passed_count}.")
+    if case_count != EXPECTED_CASE_COUNT:
+        blocking_failures.append(f"Expected case_count={EXPECTED_CASE_COUNT}, got {case_count}.")
+    if passed_count != EXPECTED_CASE_COUNT:
+        blocking_failures.append(f"Expected passed_count={EXPECTED_CASE_COUNT}, got {passed_count}.")
     if failed_count != 0:
         blocking_failures.append(f"Expected failed_count=0, got {failed_count}.")
     if error_count != 0:
@@ -140,13 +141,18 @@ def run_benchmark_safe_stop_gate(
         if len(recovery_actions) > 1:
             multistep_recovery_case_count += 1
 
-    if zero_action_case_count != 6:
-        blocking_failures.append(f"Expected zero_action_case_count=6, got {zero_action_case_count}.")
-    if bounded_case_count != 6:
-        blocking_failures.append(f"Expected bounded_case_count=6, got {bounded_case_count}.")
-    if terminal_safe_stop_case_count != 6:
+    if zero_action_case_count != EXPECTED_CASE_COUNT:
         blocking_failures.append(
-            f"Expected terminal_safe_stop_case_count=6, got {terminal_safe_stop_case_count}."
+            f"Expected zero_action_case_count={EXPECTED_CASE_COUNT}, got {zero_action_case_count}."
+        )
+    if bounded_case_count != EXPECTED_CASE_COUNT:
+        blocking_failures.append(
+            f"Expected bounded_case_count={EXPECTED_CASE_COUNT}, got {bounded_case_count}."
+        )
+    if terminal_safe_stop_case_count != EXPECTED_CASE_COUNT:
+        blocking_failures.append(
+            "Expected terminal_safe_stop_case_count="
+            f"{EXPECTED_CASE_COUNT}, got {terminal_safe_stop_case_count}."
         )
 
     multistep_case = next(

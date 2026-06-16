@@ -13,9 +13,9 @@ from backend.app.benchmark.formal_verification import FormalVerificationResult
 
 PASSING_SCENARIO_BUCKET_COUNTS = {
     "couple": 1,
-    "elder": 1,
+    "elder": 2,
     "family": 16,
-    "friends": 2,
+    "friends": 3,
     "mixed": 4,
     "solo": 2,
     "unknown": 2,
@@ -23,20 +23,20 @@ PASSING_SCENARIO_BUCKET_COUNTS = {
 PASSING_WORLD_PROFILE_COUNTS = {
     "budget_lite": 3,
     "couple_afternoon": 1,
-    "elder_afternoon": 1,
+    "elder_afternoon": 2,
     "family_afternoon": 16,
-    "friends_gathering": 2,
+    "friends_gathering": 3,
     "rainy_day_fallback": 3,
     "solo_afternoon": 2,
 }
 PASSING_FAILURE_MODE_COUNTS = {
     "none": 22,
     "queue_closed_and_budget_constraint": 1,
-    "route_and_dining_unavailable": 1,
+    "route_and_dining_unavailable": 2,
     "route_unavailable": 1,
     "table_unavailable_and_replan_required": 1,
     "ticket_sold_out_and_bad_weather": 1,
-    "ticket_sold_out_and_route_unavailable": 1,
+    "ticket_sold_out_and_route_unavailable": 2,
 }
 PASSING_CONSTRAINT_TAG_CASE_COUNTS = {
     "budget_limited": 3,
@@ -129,8 +129,8 @@ def test_run_benchmark_coverage_gate_enriches_unique_report_and_refreshes_latest
         assert result.release_blocked is False
         assert result.blocking_failures == []
         assert result.run_status == "passed"
-        assert result.case_count == 28
-        assert result.passed_count == 28
+        assert result.case_count == 30
+        assert result.passed_count == 30
         assert result.failed_count == 0
         assert result.error_count == 0
         assert result.overall_score == 1.0
@@ -141,9 +141,9 @@ def test_run_benchmark_coverage_gate_enriches_unique_report_and_refreshes_latest
         assert result.world_profile_counts == PASSING_WORLD_PROFILE_COUNTS
         assert result.failure_mode_counts == PASSING_FAILURE_MODE_COUNTS
         assert result.constraint_tag_case_counts == PASSING_CONSTRAINT_TAG_CASE_COUNTS
-        assert result.share_checks["family_scenario_share"]["observed_ratio"] == 0.5714
-        assert result.share_checks["family_afternoon_world_profile_share"]["observed_ratio"] == 0.5714
-        assert result.share_checks["non_failure_share"]["observed_ratio"] == 0.7857
+        assert result.share_checks["family_scenario_share"]["observed_ratio"] == 0.5333
+        assert result.share_checks["family_afternoon_world_profile_share"]["observed_ratio"] == 0.5333
+        assert result.share_checks["non_failure_share"]["observed_ratio"] == 0.7333
         assert result.share_checks["family_scenario_share"]["status"] == "passed"
         assert result.share_checks["family_afternoon_world_profile_share"]["status"] == "passed"
         assert result.share_checks["non_failure_share"]["status"] == "passed"
@@ -156,7 +156,7 @@ def test_run_benchmark_coverage_gate_enriches_unique_report_and_refreshes_latest
         assert evaluation["suite_id"] == "all_registered"
         assert evaluation["release_blocked"] is False
         assert evaluation["blocking_failures"] == []
-        assert evaluation["coverage_thresholds"]["minimum_case_count"] == 28
+        assert evaluation["coverage_thresholds"]["minimum_case_count"] == 30
         assert evaluation["coverage_thresholds"]["scenario_bucket_minimums"] == EXPECTED_SCENARIO_MINIMUMS
         assert evaluation["coverage_thresholds"]["world_profile_minimums"] == EXPECTED_WORLD_PROFILE_MINIMUMS
         assert evaluation["coverage_thresholds"]["failure_mode_minimums"] == EXPECTED_FAILURE_MODE_MINIMUMS
@@ -164,7 +164,7 @@ def test_run_benchmark_coverage_gate_enriches_unique_report_and_refreshes_latest
         assert evaluation["coverage_thresholds"]["scenario_bucket_max_share"] == {"family": 0.6}
         assert evaluation["coverage_thresholds"]["world_profile_max_share"] == {"family_afternoon": 0.6}
         assert evaluation["coverage_thresholds"]["failure_mode_max_share"] == {"none": 0.9}
-        assert evaluation["observed_coverage"]["case_count"] == 28
+        assert evaluation["observed_coverage"]["case_count"] == 30
         assert evaluation["observed_coverage"]["scenario_bucket_counts"] == PASSING_SCENARIO_BUCKET_COUNTS
         assert evaluation["observed_coverage"]["world_profile_counts"] == PASSING_WORLD_PROFILE_COUNTS
         assert evaluation["observed_coverage"]["failure_mode_counts"] == PASSING_FAILURE_MODE_COUNTS
@@ -303,25 +303,24 @@ def test_run_benchmark_coverage_gate_blocks_when_non_failure_share_exceeds_cap(
 ) -> None:
     result = _run_gate_with_payload(
         monkeypatch,
-        case_count=28,
-        passed_count=28,
+        case_count=30,
+        passed_count=30,
         matrix_overrides={
             "scenario_bucket_counts": PASSING_SCENARIO_BUCKET_COUNTS,
             "world_profile_counts": PASSING_WORLD_PROFILE_COUNTS,
             "failure_mode_counts": {
-                "none": 26,
+                "none": 28,
                 "route_and_dining_unavailable": 1,
-                "route_unavailable": 0,
-                "ticket_sold_out_and_bad_weather": 0,
+                "route_unavailable": 1,
             },
-            "tool_profile_counts": {"mock_world": 28},
+            "tool_profile_counts": {"mock_world": 30},
         },
         constraint_tag_counts=PASSING_CONSTRAINT_TAG_CASE_COUNTS,
     )
 
     assert result.release_blocked is True
     assert result.share_checks["non_failure_share"]["status"] == "failed"
-    assert result.share_checks["non_failure_share"]["observed_ratio"] == 0.9286
+    assert result.share_checks["non_failure_share"]["observed_ratio"] == 0.9333
     assert any("non_failure_share" in failure for failure in result.blocking_failures)
 
 
@@ -449,7 +448,7 @@ def test_main_returns_non_zero_and_prints_blocking_failures(
         gate_id="coverage_gate_v1_5",
         suite_id="all_registered",
         release_blocked=True,
-        blocking_failures=["Expected case_count>=28, got 20."],
+        blocking_failures=["Expected case_count>=30, got 20."],
         run_status="passed",
         case_count=20,
         passed_count=20,
@@ -474,7 +473,7 @@ def test_main_returns_non_zero_and_prints_blocking_failures(
         assert exit_code == 1
         assert "Benchmark coverage gate failed." in captured.err
         assert "Gate: coverage_gate_v1_5" in captured.err
-        assert "Expected case_count>=28, got 20." in captured.err
+        assert "Expected case_count>=30, got 20." in captured.err
     finally:
         _cleanup_test_dir(output_root)
 
@@ -490,8 +489,8 @@ def test_main_prints_success_summary(
         release_blocked=False,
         blocking_failures=[],
         run_status="passed",
-        case_count=28,
-        passed_count=28,
+        case_count=30,
+        passed_count=30,
         failed_count=0,
         error_count=0,
         overall_score=1.0,
@@ -514,9 +513,9 @@ def test_main_prints_success_summary(
         assert "Benchmark coverage gate passed." in captured.out
         assert "Gate: coverage_gate_v1_5" in captured.out
         assert "Suite: all_registered" in captured.out
-        assert "family_scenario_share: 0.5714 <= 0.6 (passed)" in captured.out
-        assert "family_afternoon_world_profile_share: 0.5714 <= 0.6 (passed)" in captured.out
-        assert "non_failure_share: 0.7857 <= 0.9 (passed)" in captured.out
+        assert "family_scenario_share: 0.5333 <= 0.6 (passed)" in captured.out
+        assert "family_afternoon_world_profile_share: 0.5333 <= 0.6 (passed)" in captured.out
+        assert "non_failure_share: 0.7333 <= 0.9 (passed)" in captured.out
     finally:
         _cleanup_test_dir(output_root)
 
@@ -524,8 +523,8 @@ def test_main_prints_success_summary(
 def _run_gate_with_payload(
     monkeypatch: pytest.MonkeyPatch,
     *,
-    case_count: int = 28,
-    passed_count: int = 28,
+    case_count: int = 30,
+    passed_count: int = 30,
     matrix_overrides: dict[str, object] | None = None,
     constraint_tag_counts: dict[str, int] | None = None,
     include_matrix_summary: bool = True,
@@ -597,8 +596,8 @@ def _write_formal_result(
 
 def _build_report_payload(
     *,
-    case_count: int = 28,
-    passed_count: int = 28,
+    case_count: int = 30,
+    passed_count: int = 30,
     matrix_overrides: dict[str, object] | None = None,
     constraint_tag_counts: dict[str, int] | None = None,
     include_matrix_summary: bool = True,
@@ -674,17 +673,17 @@ def _bucket_stats_map(counts: dict[str, int]) -> dict[str, dict[str, object]]:
 def _expected_share_checks() -> dict[str, dict[str, object]]:
     return {
         "family_scenario_share": {
-            "observed_ratio": 0.5714,
+            "observed_ratio": 0.5333,
             "max_ratio": 0.6,
             "status": "passed",
         },
         "family_afternoon_world_profile_share": {
-            "observed_ratio": 0.5714,
+            "observed_ratio": 0.5333,
             "max_ratio": 0.6,
             "status": "passed",
         },
         "non_failure_share": {
-            "observed_ratio": 0.7857,
+            "observed_ratio": 0.7333,
             "max_ratio": 0.9,
             "status": "passed",
         },
