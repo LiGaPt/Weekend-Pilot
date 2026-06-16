@@ -14,10 +14,10 @@
 当前可口播的 canonical evidence：
 
 - `release_gate_v1`：`15/15 passed`，`overall_score=1.0`
-- `coverage_gate_v1_5`：`28/28 passed`，`overall_score=1.0`
-- `v2_integrity_gate`：`18/18 passed`，`release_blocked=false`
+- `coverage_gate_v1_5`：`30/30 passed`，`overall_score=1.0`
+- `v2_integrity_gate`：`20/20 passed`，`release_blocked=false`
 - `v2_integrity_passk`：`Success@1=1.0`，`Pass@4=1.0`，`Pass^4=1.0`
-- `all_registered`：`28/28 passed`，`overall_score=1.0`
+- `all_registered`：`30/30 passed`，`overall_score=1.0`
 - `family_route_failure_v1` recovery review：`passed`，路线失败时安全停止且零写动作
 
 录制前固定运行：
