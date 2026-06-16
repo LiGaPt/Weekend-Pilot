@@ -183,11 +183,13 @@ class ConversationTurn(Base):
         nullable=True,
         index=True,
     )
+    trace_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     turn_index: Mapped[int] = mapped_column(Integer, nullable=False)
     speaker_role: Mapped[str] = mapped_column(String(32), nullable=False)
     turn_type: Mapped[str] = mapped_column(String(64), nullable=False)
     content_text: Mapped[str] = mapped_column(Text, nullable=False)
     payload_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    state_snapshot_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

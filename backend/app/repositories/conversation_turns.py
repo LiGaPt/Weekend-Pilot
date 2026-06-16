@@ -19,6 +19,8 @@ class ConversationTurnRepository:
         turn_type: str,
         content_text: str,
         payload_json: dict[str, Any],
+        trace_id: str | None = None,
+        state_snapshot_json: dict[str, Any] | None = None,
     ) -> ConversationTurn:
         turn_index = int(
             self.session.scalar(
@@ -31,11 +33,13 @@ class ConversationTurnRepository:
         conversation_turn = ConversationTurn(
             session_id=session_id,
             run_id=run_id,
+            trace_id=trace_id,
             turn_index=turn_index,
             speaker_role=speaker_role,
             turn_type=turn_type,
             content_text=content_text,
             payload_json=payload_json,
+            state_snapshot_json=state_snapshot_json or {},
         )
         self.session.add(conversation_turn)
         self.session.flush()
@@ -60,3 +64,18 @@ class ConversationTurnRepository:
             .order_by(ConversationTurn.turn_index, ConversationTurn.turn_id)
         )
         return list(self.session.scalars(statement).all())
+
+    def update_snapshot(
+        self,
+        turn_id: UUID,
+        trace_id: str | None,
+        state_snapshot_json: dict[str, Any] | None,
+    ) -> ConversationTurn | None:
+        conversation_turn = self.get_by_id(turn_id)
+        if conversation_turn is None:
+            return None
+        conversation_turn.trace_id = trace_id
+        conversation_turn.state_snapshot_json = state_snapshot_json or {}
+        self.session.flush()
+        self.session.refresh(conversation_turn)
+        return conversation_turn

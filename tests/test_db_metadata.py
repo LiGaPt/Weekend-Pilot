@@ -55,11 +55,13 @@ EXPECTED_COLUMNS = {
         "turn_id",
         "session_id",
         "run_id",
+        "trace_id",
         "turn_index",
         "speaker_role",
         "turn_type",
         "content_text",
         "payload_json",
+        "state_snapshot_json",
         "created_at",
     },
     "memory_items": {
@@ -175,3 +177,13 @@ def test_representative_foreign_keys_are_defined() -> None:
     }
 
     assert EXPECTED_FOREIGN_KEYS <= foreign_keys
+
+
+def test_conversation_turn_trace_id_is_indexed() -> None:
+    table = Base.metadata.tables["conversation_turns"]
+    indexed_columns = {
+        tuple(column.name for column in index.columns)
+        for index in table.indexes
+    }
+
+    assert ("trace_id",) in indexed_columns
