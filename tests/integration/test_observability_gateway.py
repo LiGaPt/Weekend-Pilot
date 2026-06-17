@@ -540,11 +540,17 @@ def test_system_integrity_summary_route_returns_ready_summary(
     payload = response.json()
     assert payload["status"] == "ready"
     assert payload["benchmark_summary"]["release_blocked"] is False
+    assert payload["formal_verification_summary"]["status"] == "ready"
+    assert payload["formal_verification_summary"]["case_count"] == 30
+    assert payload["safe_stop_summary"]["status"] == "ready"
+    assert payload["safe_stop_summary"]["gate_id"] == "safe_stop_gate_v1"
+    assert payload["safe_stop_summary"]["case_count"] == 8
     assert payload["stability_summary"]["pass_pow_4"] == 1.0
     assert payload["memory_governance_summary"]["memory_case_count"] == 2
     assert payload["recovery_replay_summary"]["passed_check_count"] == 3
     assert payload["redaction_summary"]["internal_only"] is True
     assert any(item["evidence_id"] == "v2_integrity_gate" for item in payload["evidence_paths"])
+    assert any(item["evidence_id"] == "safe_stop_gate_v1" for item in payload["evidence_paths"])
 
 
 def test_system_integrity_summary_route_returns_degraded_summary_when_stability_missing(
@@ -764,6 +770,7 @@ def _build_release_gate_summary_report() -> dict:
 def _write_integrity_summary_files(root: Path, *, include_stability: bool = True) -> None:
     _write_json(root / "var/formal-benchmarks/latest-v2_integrity_gate-run-report.json", _build_v2_gate_report())
     _write_json(root / "var/formal-benchmarks/latest-all_registered-run-report.json", _build_all_registered_report())
+    _write_json(root / "var/formal-benchmarks/latest-safe_stop_gate_v1-run-report.json", _build_safe_stop_report())
     if include_stability:
         _write_json(
             root / "var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json",
@@ -785,7 +792,7 @@ def _build_v2_gate_report() -> dict:
         "schema_version": "weekendpilot_benchmark_run_v1",
         "run_status": "passed",
         "case_results": [],
-        "passed_count": 18,
+        "passed_count": 20,
         "failed_count": 0,
         "error_count": 0,
         "overall_score": 1.0,
@@ -794,16 +801,16 @@ def _build_v2_gate_report() -> dict:
             "suite_id": "v2_integrity",
             "suite_title": "V2 integrity",
             "run_status": "passed",
-            "case_count": 18,
-            "passed_count": 18,
+            "case_count": 20,
+            "passed_count": 20,
             "failed_count": 0,
             "error_count": 0,
             "overall_score": 1.0,
             "benchmark_timing_summary": {
                 "schema_version": "benchmark_timing_summary_v1",
-                "case_count": 18,
+                "case_count": 20,
                 "overall_total_duration_ms": {
-                    "sample_count": 18,
+                    "sample_count": 20,
                     "min_ms": 320,
                     "p50_ms": 390,
                     "p95_ms": 424,
@@ -823,7 +830,7 @@ def _build_v2_gate_report() -> dict:
             "coverage_thresholds": {},
             "observed_coverage": {
                 "integrity_coverage_summary": {
-                    "case_count": 18,
+                    "case_count": 20,
                     "memory_case_count": 6,
                     "recovery_case_count": 6,
                     "continuation_case_count": 2,
@@ -900,7 +907,7 @@ def _build_all_registered_report() -> dict:
                 ],
             },
         ],
-        "passed_count": 2,
+        "passed_count": 30,
         "failed_count": 0,
         "error_count": 0,
         "overall_score": 1.0,
@@ -909,11 +916,41 @@ def _build_all_registered_report() -> dict:
             "suite_id": "all_registered",
             "suite_title": "All registered",
             "run_status": "passed",
-            "case_count": 2,
-            "passed_count": 2,
+            "case_count": 30,
+            "passed_count": 30,
             "failed_count": 0,
             "error_count": 0,
             "overall_score": 1.0,
+        },
+    }
+
+
+def _build_safe_stop_report() -> dict:
+    return {
+        "schema_version": "weekendpilot_benchmark_run_v1",
+        "run_status": "passed",
+        "case_results": [],
+        "passed_count": 8,
+        "failed_count": 0,
+        "error_count": 0,
+        "overall_score": 1.0,
+        "benchmark_summary": {
+            "schema_version": "weekendpilot_benchmark_summary_v1",
+            "suite_id": "recovery_focused",
+            "suite_title": "Safe stop gate",
+            "run_status": "passed",
+            "case_count": 8,
+            "passed_count": 8,
+            "failed_count": 0,
+            "error_count": 0,
+            "overall_score": 1.0,
+        },
+        "safe_stop_gate_evaluation": {
+            "schema_version": "weekendpilot_safe_stop_gate_evaluation_v1",
+            "gate_id": "safe_stop_gate_v1",
+            "suite_id": "recovery_focused",
+            "release_blocked": False,
+            "blocking_failures": [],
         },
     }
 

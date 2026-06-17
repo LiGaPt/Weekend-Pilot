@@ -1,8 +1,8 @@
 # Recording Checklist
 
-这份清单用于正式开录前逐项核对，避免视频里出现环境等待、错误页面或证据缺失。
+这份清单用于正式录屏前逐项核对，避免视频里出现环境等待、错误页面或证据缺失。
 
-本次录制口径收敛为 `V2 Integrity Edition`。`V1.5 baseline` 只作为已完成基线背景保留；当前聚焦 benchmark 完整性、memory governance、observability 与 recovery 可审计性。AMap 是 API-only read-only preview，不进入 customer UI 主链，不参与正式 benchmark。
+本次录制口径聚焦 `V2 Integrity Edition`。`V1.5 baseline` 只作为已完成基线背景保留；当前主线是 benchmark 完整性、memory governance、observability 与 recovery 可审计性。AMap 仍是 API-only read-only preview，不进入 customer UI 主链，也不参与正式 benchmark。
 
 ## 服务启动
 
@@ -49,18 +49,18 @@ python scripts/demo_amap_preview.py
 - `5173` 可打开。
 - 六个 scenario chips 可见：`亲子`、`朋友`、`单人`、`情侣`、`雨天`、`预算`。
 - `亲子 happy path` 可到 `awaiting_confirmation`。
-- 可展开 `时间线`、`活动与餐厅`、`路线与可执行性`、`确认前动作`。
+- 可展开 `时间线`、`活动与餐饮`、`路线与可执行性`、`确认前动作`。
 - `运行信息` 可展开并复制 `Run ID`。
 - 点击 `确认当前方案` 后能展示 `执行结果`、`复制安排消息`、`执行时间线`。
 - 模糊请求可进入 clarification，并可通过 `提交补充` 回到待确认方案。
 - replan 可生成新 `run_id` 和 `v2`。
-- decline 可进入拒绝态，并不触发写动作。
+- decline 可进入拒绝态，并且不触发写动作。
 
 ## 内部页检查
 
 - `5174` 可打开。
 - `Benchmark Summary` hero 首屏可见。
-- `System Integrity Summary` 首屏可见，并能展示 `v2_integrity`、`Pass@k`、memory、recovery 与 evidence paths。
+- `System Integrity Summary` 首屏可见，并能展示 `v2_integrity`、`Pass@k`、`Formal Verification`、`Safe Stop Gate`、`Memory Governance`、`Recovery Replay`、`Evidence Paths`。
 - 可粘贴公开 run 的 `run_id` 并点击 `Load Run`。
 - `Trace Summary` 可加载。
 - `Tool Events` 或 `Action Ledger` 至少一个有可讲解内容。
@@ -77,11 +77,12 @@ python scripts/demo_amap_preview.py
   - `formal_verification_all_registered`
   - `recovery_review_family_route_failure_v1`
 - `release_gate_v1` 当前口径：`15/15 passed`，`overall_score=1.0`。
-- `coverage_gate_v1_5` 当前口径：`28/28 passed`，`overall_score=1.0`。
-- `v2_integrity_gate` 当前口径：`18/18 passed`，`release_blocked=false`。
+- `coverage_gate_v1_5` 当前口径：`30/30 passed`，`overall_score=1.0`。
+- `v2_integrity_gate` 当前口径：`20/20 passed`，`release_blocked=false`。
 - `v2_integrity_passk` 当前口径：`Success@1=1.0`，`Pass@4=1.0`，`Pass^4=1.0`。
-- `all_registered` 当前口径：`28/28 passed`，`overall_score=1.0`。
-- recovery review 当前口径：失败路径安全停止，零写动作，replay 与源报告一致。
+- `all_registered` 当前口径：`30/30 passed`，`overall_score=1.0`。
+- `safe_stop_gate_v1` 当前口径：`8/8 passed`，`release_blocked=false`。
+- recovery review 当前口径：失败路径安全停止、零写动作、replay 与源报告一致。
 
 ## 最终验收
 

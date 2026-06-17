@@ -210,8 +210,8 @@ const systemIntegritySummary: SystemIntegritySummary = {
     gate_id: "v2_integrity_gate",
     run_status: "passed",
     release_blocked: false,
-    case_count: 18,
-    passed_count: 18,
+    case_count: 20,
+    passed_count: 20,
     failed_count: 0,
     error_count: 0,
     overall_score: 1,
@@ -243,6 +243,17 @@ const systemIntegritySummary: SystemIntegritySummary = {
     has_required_window: true,
     latest_report_path: "var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json",
   },
+  formal_verification_summary: {
+    status: "ready",
+    reason: null,
+    source_suite_id: "all_registered",
+    case_count: 30,
+    passed_count: 30,
+    failed_count: 0,
+    error_count: 0,
+    overall_score: 1,
+    latest_report_path: "var/formal-benchmarks/latest-all_registered-run-report.json",
+  },
   memory_governance_summary: {
     status: "ready",
     reason: null,
@@ -255,6 +266,20 @@ const systemIntegritySummary: SystemIntegritySummary = {
     case_ids: ["family_memory_override_v1", "family_memory_advisory_fill_v1"],
     failing_case_ids: [],
     latest_report_path: "var/formal-benchmarks/latest-all_registered-run-report.json",
+  },
+  safe_stop_summary: {
+    status: "ready",
+    reason: null,
+    gate_id: "safe_stop_gate_v1",
+    suite_id: "recovery_focused",
+    run_status: "passed",
+    release_blocked: false,
+    case_count: 8,
+    passed_count: 8,
+    failed_count: 0,
+    error_count: 0,
+    overall_score: 1,
+    latest_report_path: "var/formal-benchmarks/latest-safe_stop_gate_v1-run-report.json",
   },
   recovery_replay_summary: {
     status: "ready",
@@ -300,6 +325,13 @@ const systemIntegritySummary: SystemIntegritySummary = {
       required_for_summary: true,
       status: "ready",
     },
+    {
+      evidence_id: "safe_stop_gate_v1",
+      path: "var/formal-benchmarks/latest-safe_stop_gate_v1-run-report.json",
+      exists: true,
+      required_for_summary: true,
+      status: "ready",
+    },
   ],
 };
 
@@ -327,10 +359,13 @@ describe("ObservabilityPage", () => {
     expect(screen.getByText("var/formal-benchmarks/latest-release_gate_v1-run-report.json")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy latest alias" })).toBeInTheDocument();
     expect(screen.getByText("Pass@k")).toBeInTheDocument();
+    expect(screen.getByText("Formal Verification")).toBeInTheDocument();
+    expect(screen.getByText("Safe Stop Gate")).toBeInTheDocument();
     expect(screen.getByText("Memory Governance")).toBeInTheDocument();
     expect(screen.getByText("Recovery Replay")).toBeInTheDocument();
     expect(screen.getByText("Evidence Paths")).toBeInTheDocument();
     expect(screen.getByText("var/formal-benchmarks/latest-v2_integrity_gate-run-report.json")).toBeInTheDocument();
+    expect(screen.getByText("var/formal-benchmarks/latest-safe_stop_gate_v1-run-report.json")).toBeInTheDocument();
   });
 
   it("shows a neutral fallback when release-gate timing summary is unavailable", async () => {
