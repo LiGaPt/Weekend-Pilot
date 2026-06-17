@@ -10,9 +10,11 @@ from backend.app.benchmark.schemas import BenchmarkRunReport, BenchmarkStability
 from backend.app.observability.schemas import (
     SystemIntegrityBenchmarkSummary,
     SystemIntegrityEvidencePathSummary,
+    SystemIntegrityFormalVerificationSummary,
     SystemIntegrityMemoryGovernanceSummary,
     SystemIntegrityRecoveryReplaySummary,
     SystemIntegrityRedactionSummary,
+    SystemIntegritySafeStopSummary,
     SystemIntegrityStabilitySummary,
     SystemIntegritySummary,
     SystemIntegrityTimingSummary,
@@ -25,12 +27,14 @@ EVIDENCE_PATHS: dict[str, Path] = {
     "coverage_gate_v1_5": Path("var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json"),
     "v2_integrity_gate": Path("var/formal-benchmarks/latest-v2_integrity_gate-run-report.json"),
     "formal_verification_all_registered": Path("var/formal-benchmarks/latest-all_registered-run-report.json"),
+    "safe_stop_gate_v1": Path("var/formal-benchmarks/latest-safe_stop_gate_v1-run-report.json"),
     "v2_integrity_passk": Path("var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json"),
     "recovery_review_family_route_failure_v1": Path("var/recovery-reviews/latest-family_route_failure_v1-review.json"),
 }
 REQUIRED_EVIDENCE_IDS = {
     "v2_integrity_gate",
     "formal_verification_all_registered",
+    "safe_stop_gate_v1",
     "recovery_review_family_route_failure_v1",
 }
 OPTIONAL_EVIDENCE_IDS = {
@@ -54,13 +58,17 @@ FORBIDDEN_KEY_MARKERS = [
 def load_system_integrity_summary() -> SystemIntegritySummary:
     benchmark_summary = _load_benchmark_summary()
     stability_summary = _load_stability_summary()
+    formal_verification_summary = _load_formal_verification_summary()
     memory_summary = _load_memory_governance_summary()
+    safe_stop_summary = _load_safe_stop_summary()
     recovery_summary = _load_recovery_replay_summary()
     timing_summary = _build_timing_summary(benchmark_summary, stability_summary)
     evidence_paths = _build_evidence_paths(
         benchmark_summary=benchmark_summary,
         stability_summary=stability_summary,
+        formal_verification_summary=formal_verification_summary,
         memory_summary=memory_summary,
+        safe_stop_summary=safe_stop_summary,
         recovery_summary=recovery_summary,
     )
 
@@ -68,12 +76,16 @@ def load_system_integrity_summary() -> SystemIntegritySummary:
         status=_derive_top_level_status(
             benchmark_summary=benchmark_summary,
             stability_summary=stability_summary,
+            formal_verification_summary=formal_verification_summary,
             memory_summary=memory_summary,
+            safe_stop_summary=safe_stop_summary,
             recovery_summary=recovery_summary,
         ),
         benchmark_summary=benchmark_summary,
         stability_summary=stability_summary,
+        formal_verification_summary=formal_verification_summary,
         memory_governance_summary=memory_summary,
+        safe_stop_summary=safe_stop_summary,
         recovery_replay_summary=recovery_summary,
         timing_summary=timing_summary,
         redaction_summary=SystemIntegrityRedactionSummary(
@@ -225,6 +237,92 @@ def _load_memory_governance_summary() -> SystemIntegrityMemoryGovernanceSummary:
     )
 
 
+def _load_formal_verification_summary() -> SystemIntegrityFormalVerificationSummary:
+    evidence_id = "formal_verification_all_registered"
+    payload = _read_json(evidence_id)
+    if payload["status"] != "ready":
+        return SystemIntegrityFormalVerificationSummary(
+            status=payload["status"],
+            reason=payload["reason"],
+            latest_report_path=_display_path(_path_for(evidence_id)),
+        )
+
+    try:
+        report = BenchmarkRunReport.model_validate(payload["payload"])
+    except ValidationError:
+        return SystemIntegrityFormalVerificationSummary(
+            status="invalid",
+            reason="Latest all_registered report is invalid.",
+            latest_report_path=_display_path(_path_for(evidence_id)),
+        )
+
+    summary = report.benchmark_summary
+    if summary is None:
+        return SystemIntegrityFormalVerificationSummary(
+            status="invalid",
+            reason="Latest all_registered report is missing benchmark_summary.",
+            latest_report_path=_display_path(_path_for(evidence_id)),
+        )
+
+    return SystemIntegrityFormalVerificationSummary(
+        status="ready",
+        source_suite_id=summary.suite_id,
+        case_count=summary.case_count,
+        passed_count=summary.passed_count,
+        failed_count=summary.failed_count,
+        error_count=summary.error_count,
+        overall_score=summary.overall_score,
+        latest_report_path=_display_path(_path_for(evidence_id)),
+    )
+
+
+def _load_safe_stop_summary() -> SystemIntegritySafeStopSummary:
+    evidence_id = "safe_stop_gate_v1"
+    payload = _read_json(evidence_id)
+    if payload["status"] != "ready":
+        return SystemIntegritySafeStopSummary(
+            status=payload["status"],
+            reason=payload["reason"],
+            latest_report_path=_display_path(_path_for(evidence_id)),
+        )
+
+    try:
+        report = BenchmarkRunReport.model_validate(payload["payload"])
+    except ValidationError:
+        return SystemIntegritySafeStopSummary(
+            status="invalid",
+            reason="Latest safe_stop_gate_v1 report is invalid.",
+            latest_report_path=_display_path(_path_for(evidence_id)),
+        )
+
+    evaluation = payload["payload"].get("safe_stop_gate_evaluation")
+    if not isinstance(evaluation, dict):
+        return SystemIntegritySafeStopSummary(
+            status="invalid",
+            reason="Latest safe_stop_gate_v1 report is missing safe_stop_gate_evaluation.",
+            latest_report_path=_display_path(_path_for(evidence_id)),
+        )
+
+    summary = report.benchmark_summary
+    return SystemIntegritySafeStopSummary(
+        status="ready",
+        gate_id=evaluation.get("gate_id") if isinstance(evaluation.get("gate_id"), str) else None,
+        suite_id=(
+            evaluation.get("suite_id")
+            if isinstance(evaluation.get("suite_id"), str)
+            else summary.suite_id if summary is not None else None
+        ),
+        run_status=report.run_status,
+        release_blocked=evaluation.get("release_blocked") if isinstance(evaluation.get("release_blocked"), bool) else None,
+        case_count=summary.case_count if summary is not None else 0,
+        passed_count=summary.passed_count if summary is not None else 0,
+        failed_count=summary.failed_count if summary is not None else 0,
+        error_count=summary.error_count if summary is not None else 0,
+        overall_score=summary.overall_score if summary is not None else None,
+        latest_report_path=_display_path(_path_for(evidence_id)),
+    )
+
+
 def _load_recovery_replay_summary() -> SystemIntegrityRecoveryReplaySummary:
     evidence_id = "recovery_review_family_route_failure_v1"
     payload = _read_json(evidence_id)
@@ -300,12 +398,15 @@ def _build_evidence_paths(
     *,
     benchmark_summary: SystemIntegrityBenchmarkSummary,
     stability_summary: SystemIntegrityStabilitySummary,
+    formal_verification_summary: SystemIntegrityFormalVerificationSummary,
     memory_summary: SystemIntegrityMemoryGovernanceSummary,
+    safe_stop_summary: SystemIntegritySafeStopSummary,
     recovery_summary: SystemIntegrityRecoveryReplaySummary,
 ) -> list[SystemIntegrityEvidencePathSummary]:
     section_status_by_id = {
         "v2_integrity_gate": benchmark_summary.status,
-        "formal_verification_all_registered": memory_summary.status,
+        "formal_verification_all_registered": formal_verification_summary.status,
+        "safe_stop_gate_v1": safe_stop_summary.status,
         "v2_integrity_passk": stability_summary.status,
         "recovery_review_family_route_failure_v1": recovery_summary.status,
         "release_gate_v1": "ready" if _path_for("release_gate_v1").exists() else "missing",
@@ -327,12 +428,15 @@ def _derive_top_level_status(
     *,
     benchmark_summary: SystemIntegrityBenchmarkSummary,
     stability_summary: SystemIntegrityStabilitySummary,
+    formal_verification_summary: SystemIntegrityFormalVerificationSummary,
     memory_summary: SystemIntegrityMemoryGovernanceSummary,
+    safe_stop_summary: SystemIntegritySafeStopSummary,
     recovery_summary: SystemIntegrityRecoveryReplaySummary,
 ) -> str:
     required_sections = [
         benchmark_summary.status,
-        memory_summary.status,
+        formal_verification_summary.status,
+        safe_stop_summary.status,
         recovery_summary.status,
     ]
     optional_sections = [stability_summary.status]

@@ -29,6 +29,10 @@ def test_load_system_integrity_summary_returns_ready_summary(
         _build_stability_report(),
     )
     _write_json(
+        summary_root / "var/formal-benchmarks/latest-safe_stop_gate_v1-run-report.json",
+        _build_safe_stop_report(),
+    )
+    _write_json(
         summary_root / "var/recovery-reviews/latest-family_route_failure_v1-review.json",
         _build_recovery_review(),
     )
@@ -41,6 +45,15 @@ def test_load_system_integrity_summary_returns_ready_summary(
     assert summary.benchmark_summary.release_blocked is False
     assert summary.stability_summary.status == "ready"
     assert summary.stability_summary.pass_pow_4 == 1.0
+    assert summary.formal_verification_summary.status == "ready"
+    assert summary.formal_verification_summary.case_count == 30
+    assert summary.formal_verification_summary.passed_count == 30
+    assert summary.safe_stop_summary.status == "ready"
+    assert summary.safe_stop_summary.gate_id == "safe_stop_gate_v1"
+    assert summary.safe_stop_summary.suite_id == "recovery_focused"
+    assert summary.safe_stop_summary.case_count == 8
+    assert summary.safe_stop_summary.passed_count == 8
+    assert summary.safe_stop_summary.release_blocked is False
     assert summary.memory_governance_summary.status == "ready"
     assert summary.memory_governance_summary.memory_case_count == 2
     assert summary.memory_governance_summary.all_memory_cases_passed is True
@@ -65,6 +78,10 @@ def test_load_system_integrity_summary_degrades_when_v2_gate_is_missing(
         _build_stability_report(),
     )
     _write_json(
+        summary_root / "var/formal-benchmarks/latest-safe_stop_gate_v1-run-report.json",
+        _build_safe_stop_report(),
+    )
+    _write_json(
         summary_root / "var/recovery-reviews/latest-family_route_failure_v1-review.json",
         _build_recovery_review(),
     )
@@ -80,6 +97,37 @@ def test_load_system_integrity_summary_degrades_when_v2_gate_is_missing(
     assert v2_gate_path.required_for_summary is True
 
 
+def test_load_system_integrity_summary_degrades_when_safe_stop_gate_is_missing(
+    summary_root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_json(
+        summary_root / "var/formal-benchmarks/latest-v2_integrity_gate-run-report.json",
+        _build_v2_gate_report(),
+    )
+    _write_json(
+        summary_root / "var/formal-benchmarks/latest-all_registered-run-report.json",
+        _build_all_registered_report(),
+    )
+    _write_json(
+        summary_root / "var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json",
+        _build_stability_report(),
+    )
+    _write_json(
+        summary_root / "var/recovery-reviews/latest-family_route_failure_v1-review.json",
+        _build_recovery_review(),
+    )
+    _patch_evidence_paths(monkeypatch, summary_root)
+
+    summary = load_system_integrity_summary()
+
+    assert summary.status == "missing_evidence"
+    assert summary.safe_stop_summary.status == "missing"
+    safe_stop_path = next(item for item in summary.evidence_paths if item.evidence_id == "safe_stop_gate_v1")
+    assert safe_stop_path.exists is False
+    assert safe_stop_path.required_for_summary is True
+
+
 def test_load_system_integrity_summary_marks_invalid_stability_report(
     summary_root: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -91,6 +139,10 @@ def test_load_system_integrity_summary_marks_invalid_stability_report(
     _write_json(
         summary_root / "var/formal-benchmarks/latest-all_registered-run-report.json",
         _build_all_registered_report(),
+    )
+    _write_json(
+        summary_root / "var/formal-benchmarks/latest-safe_stop_gate_v1-run-report.json",
+        _build_safe_stop_report(),
     )
     _write_json(
         summary_root / "var/recovery-reviews/latest-family_route_failure_v1-review.json",
@@ -105,6 +157,37 @@ def test_load_system_integrity_summary_marks_invalid_stability_report(
 
     assert summary.status == "invalid_evidence"
     assert summary.stability_summary.status == "invalid"
+
+
+def test_load_system_integrity_summary_marks_invalid_safe_stop_report(
+    summary_root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_json(
+        summary_root / "var/formal-benchmarks/latest-v2_integrity_gate-run-report.json",
+        _build_v2_gate_report(),
+    )
+    _write_json(
+        summary_root / "var/formal-benchmarks/latest-all_registered-run-report.json",
+        _build_all_registered_report(),
+    )
+    _write_json(
+        summary_root / "var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json",
+        _build_stability_report(),
+    )
+    _write_json(
+        summary_root / "var/recovery-reviews/latest-family_route_failure_v1-review.json",
+        _build_recovery_review(),
+    )
+    bad_path = summary_root / "var/formal-benchmarks/latest-safe_stop_gate_v1-run-report.json"
+    bad_path.parent.mkdir(parents=True, exist_ok=True)
+    bad_path.write_text('{"schema_version":"broken"}', encoding="utf-8")
+    _patch_evidence_paths(monkeypatch, summary_root)
+
+    summary = load_system_integrity_summary()
+
+    assert summary.status == "invalid_evidence"
+    assert summary.safe_stop_summary.status == "invalid"
 
 
 def test_load_system_integrity_summary_collects_failing_memory_case_ids(
@@ -124,6 +207,10 @@ def test_load_system_integrity_summary_collects_failing_memory_case_ids(
     _write_json(
         summary_root / "var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json",
         _build_stability_report(),
+    )
+    _write_json(
+        summary_root / "var/formal-benchmarks/latest-safe_stop_gate_v1-run-report.json",
+        _build_safe_stop_report(),
     )
     _write_json(
         summary_root / "var/recovery-reviews/latest-family_route_failure_v1-review.json",
@@ -176,7 +263,7 @@ def _build_v2_gate_report() -> dict:
         "schema_version": "weekendpilot_benchmark_run_v1",
         "run_status": "passed",
         "case_results": [],
-        "passed_count": 18,
+        "passed_count": 20,
         "failed_count": 0,
         "error_count": 0,
         "overall_score": 1.0,
@@ -185,16 +272,16 @@ def _build_v2_gate_report() -> dict:
             "suite_id": "v2_integrity",
             "suite_title": "V2 integrity",
             "run_status": "passed",
-            "case_count": 18,
-            "passed_count": 18,
+            "case_count": 20,
+            "passed_count": 20,
             "failed_count": 0,
             "error_count": 0,
             "overall_score": 1.0,
             "benchmark_timing_summary": {
                 "schema_version": "benchmark_timing_summary_v1",
-                "case_count": 18,
+                "case_count": 20,
                 "overall_total_duration_ms": {
-                    "sample_count": 18,
+                    "sample_count": 20,
                     "min_ms": 320,
                     "p50_ms": 390,
                     "p95_ms": 424,
@@ -214,7 +301,7 @@ def _build_v2_gate_report() -> dict:
             "coverage_thresholds": {},
             "observed_coverage": {
                 "integrity_coverage_summary": {
-                    "case_count": 18,
+                    "case_count": 20,
                     "memory_case_count": 6,
                     "recovery_case_count": 6,
                     "continuation_case_count": 2,
@@ -308,7 +395,7 @@ def _build_all_registered_report() -> dict:
                 ],
             },
         ],
-        "passed_count": 3,
+        "passed_count": 30,
         "failed_count": 0,
         "error_count": 0,
         "overall_score": 1.0,
@@ -317,11 +404,41 @@ def _build_all_registered_report() -> dict:
             "suite_id": "all_registered",
             "suite_title": "All registered",
             "run_status": "passed",
-            "case_count": 3,
-            "passed_count": 3,
+            "case_count": 30,
+            "passed_count": 30,
             "failed_count": 0,
             "error_count": 0,
             "overall_score": 1.0,
+        },
+    }
+
+
+def _build_safe_stop_report() -> dict:
+    return {
+        "schema_version": "weekendpilot_benchmark_run_v1",
+        "run_status": "passed",
+        "case_results": [],
+        "passed_count": 8,
+        "failed_count": 0,
+        "error_count": 0,
+        "overall_score": 1.0,
+        "benchmark_summary": {
+            "schema_version": "weekendpilot_benchmark_summary_v1",
+            "suite_id": "recovery_focused",
+            "suite_title": "Safe stop gate",
+            "run_status": "passed",
+            "case_count": 8,
+            "passed_count": 8,
+            "failed_count": 0,
+            "error_count": 0,
+            "overall_score": 1.0,
+        },
+        "safe_stop_gate_evaluation": {
+            "schema_version": "weekendpilot_safe_stop_gate_evaluation_v1",
+            "gate_id": "safe_stop_gate_v1",
+            "suite_id": "recovery_focused",
+            "release_blocked": False,
+            "blocking_failures": [],
         },
     }
 

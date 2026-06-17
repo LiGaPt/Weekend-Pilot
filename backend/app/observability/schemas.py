@@ -230,6 +230,18 @@ class SystemIntegrityMemoryGovernanceSummary(BaseModel):
     latest_report_path: str | None = None
 
 
+class SystemIntegrityFormalVerificationSummary(BaseModel):
+    status: IntegritySectionStatus
+    reason: str | None = None
+    source_suite_id: str | None = None
+    case_count: int = 0
+    passed_count: int = 0
+    failed_count: int = 0
+    error_count: int = 0
+    overall_score: float | None = None
+    latest_report_path: str | None = None
+
+
 class SystemIntegrityRecoveryReplaySummary(BaseModel):
     status: IntegritySectionStatus
     reason: str | None = None
@@ -244,6 +256,21 @@ class SystemIntegrityRecoveryReplaySummary(BaseModel):
     recovery_actions: list[str] = Field(default_factory=list)
     attempt_count: int | None = None
     max_attempts: int | None = None
+
+
+class SystemIntegritySafeStopSummary(BaseModel):
+    status: IntegritySectionStatus
+    reason: str | None = None
+    gate_id: str | None = None
+    suite_id: str | None = None
+    run_status: str | None = None
+    release_blocked: bool | None = None
+    case_count: int = 0
+    passed_count: int = 0
+    failed_count: int = 0
+    error_count: int = 0
+    overall_score: float | None = None
+    latest_report_path: str | None = None
 
 
 class SystemIntegrityTimingSummary(BaseModel):
@@ -267,7 +294,9 @@ class SystemIntegritySummary(BaseModel):
     status: SystemIntegrityStatus
     benchmark_summary: SystemIntegrityBenchmarkSummary
     stability_summary: SystemIntegrityStabilitySummary
+    formal_verification_summary: SystemIntegrityFormalVerificationSummary
     memory_governance_summary: SystemIntegrityMemoryGovernanceSummary
+    safe_stop_summary: SystemIntegritySafeStopSummary
     recovery_replay_summary: SystemIntegrityRecoveryReplaySummary
     timing_summary: SystemIntegrityTimingSummary
     redaction_summary: SystemIntegrityRedactionSummary

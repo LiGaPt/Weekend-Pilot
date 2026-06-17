@@ -214,6 +214,33 @@ export type SystemIntegrityMemoryGovernanceSummary = {
   latest_report_path: string | null;
 };
 
+export type SystemIntegrityFormalVerificationSummary = {
+  status: IntegritySectionStatus;
+  reason: string | null;
+  source_suite_id: string | null;
+  case_count: number | null;
+  passed_count: number | null;
+  failed_count: number | null;
+  error_count: number | null;
+  overall_score: number | null;
+  latest_report_path: string | null;
+};
+
+export type SystemIntegritySafeStopSummary = {
+  status: IntegritySectionStatus;
+  reason: string | null;
+  gate_id: string | null;
+  suite_id: string | null;
+  run_status: string | null;
+  release_blocked: boolean | null;
+  case_count: number | null;
+  passed_count: number | null;
+  failed_count: number | null;
+  error_count: number | null;
+  overall_score: number | null;
+  latest_report_path: string | null;
+};
+
 export type SystemIntegrityRecoveryReplaySummary = {
   status: IntegritySectionStatus;
   reason: string | null;
@@ -251,7 +278,9 @@ export type SystemIntegritySummary = {
   status: SystemIntegrityStatus;
   benchmark_summary: SystemIntegrityBenchmarkSummary;
   stability_summary: SystemIntegrityStabilitySummary;
+  formal_verification_summary: SystemIntegrityFormalVerificationSummary;
   memory_governance_summary: SystemIntegrityMemoryGovernanceSummary;
+  safe_stop_summary: SystemIntegritySafeStopSummary;
   recovery_replay_summary: SystemIntegrityRecoveryReplaySummary;
   timing_summary: SystemIntegrityTimingSummary;
   redaction_summary: SystemIntegrityRedactionSummary;

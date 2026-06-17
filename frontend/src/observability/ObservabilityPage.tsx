@@ -486,6 +486,25 @@ function SystemIntegritySummaryPanel({
 
             <section className="panel">
               <div className="section-heading">
+                <h3>Formal Verification</h3>
+              </div>
+              <dl className="metadata-list observability-list">
+                <MetaItem label="Status" value={summary.formal_verification_summary.status} />
+                <MetaItem label="Suite ID" value={summary.formal_verification_summary.source_suite_id} mono />
+                <MetaItem label="Case Count" value={stringOrNA(summary.formal_verification_summary.case_count)} />
+                <MetaItem label="Passed" value={stringOrNA(summary.formal_verification_summary.passed_count)} />
+                <MetaItem label="Failed" value={stringOrNA(summary.formal_verification_summary.failed_count)} />
+                <MetaItem label="Errors" value={stringOrNA(summary.formal_verification_summary.error_count)} />
+                <MetaItem
+                  label="Overall Score"
+                  value={stringifyMetric(summary.formal_verification_summary.overall_score)}
+                />
+                <MetaItem label="Reason" value={summary.formal_verification_summary.reason} />
+              </dl>
+            </section>
+
+            <section className="panel">
+              <div className="section-heading">
                 <h3>Memory Governance</h3>
               </div>
               <dl className="metadata-list observability-list">
@@ -507,6 +526,28 @@ function SystemIntegritySummaryPanel({
                   ))}
                 </ul>
               ) : null}
+            </section>
+
+            <section className="panel">
+              <div className="section-heading">
+                <h3>Safe Stop Gate</h3>
+              </div>
+              <dl className="metadata-list observability-list">
+                <MetaItem label="Status" value={summary.safe_stop_summary.status} />
+                <MetaItem label="Gate ID" value={summary.safe_stop_summary.gate_id} mono />
+                <MetaItem label="Suite ID" value={summary.safe_stop_summary.suite_id} mono />
+                <MetaItem label="Run Status" value={summary.safe_stop_summary.run_status} />
+                <MetaItem
+                  label="Release Blocked"
+                  value={booleanLabel(summary.safe_stop_summary.release_blocked)}
+                />
+                <MetaItem label="Case Count" value={stringOrNA(summary.safe_stop_summary.case_count)} />
+                <MetaItem label="Passed" value={stringOrNA(summary.safe_stop_summary.passed_count)} />
+                <MetaItem label="Failed" value={stringOrNA(summary.safe_stop_summary.failed_count)} />
+                <MetaItem label="Errors" value={stringOrNA(summary.safe_stop_summary.error_count)} />
+                <MetaItem label="Overall Score" value={stringifyMetric(summary.safe_stop_summary.overall_score)} />
+                <MetaItem label="Reason" value={summary.safe_stop_summary.reason} />
+              </dl>
             </section>
 
             <section className="panel">
