@@ -7,10 +7,10 @@
 | Alias | 证明什么 | 当前口径 | 演示方式 |
 | --- | --- | --- | --- |
 | `var/formal-benchmarks/latest-release_gate_v1-run-report.json` | 当前正式阻塞基线 | `15/15 passed`, `overall_score=1.0` | `5174` `Benchmark Summary` + evidence summary 脚本 |
-| `var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json` | 多样性 / 覆盖面 | `28/28 passed`, `overall_score=1.0` | evidence summary 脚本 |
-| `var/formal-benchmarks/latest-v2_integrity_gate-run-report.json` | 当前 V2 完整性 gate | `18/18 passed`, `release_blocked=false` | `5174` `System Integrity Summary` + evidence summary 脚本 |
+| `var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json` | 多样性 / 覆盖面 | `30/30 passed`, `overall_score=1.0` | evidence summary 脚本 |
+| `var/formal-benchmarks/latest-v2_integrity_gate-run-report.json` | 当前 V2 完整性 gate | `20/20 passed`, `release_blocked=false` | `5174` `System Integrity Summary` + evidence summary 脚本 |
 | `var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json` | 当前 V2 repeated-run stability | `Success@1=1.0`, `Pass@4=1.0`, `Pass^4=1.0` | `5174` `System Integrity Summary` + evidence summary 脚本 |
-| `var/formal-benchmarks/latest-all_registered-run-report.json` | 全量注册 case / formal verification | `28/28 passed`, `overall_score=1.0` | evidence summary 脚本 |
+| `var/formal-benchmarks/latest-all_registered-run-report.json` | 全量注册 case / formal verification | `30/30 passed`, `overall_score=1.0` | evidence summary 脚本 |
 | `var/recovery-reviews/latest-family_route_failure_v1-review.json` | 失败恢复链 | `passed`，路线失败时安全停止且零写动作 | evidence summary 脚本 + `5174` `Recovery Visualization` |
 
 ## 录制原则
