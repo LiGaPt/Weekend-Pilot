@@ -100,6 +100,23 @@ class InternalRecoveryPathSummary(BaseModel):
     replay_source: InternalRecoveryReplaySourceSummary | None = None
 
 
+InternalRecoveryReplayLinkStatus = Literal["matched", "missing", "invalid", "mismatch"]
+
+
+class InternalRecoveryReplayLinkSummary(BaseModel):
+    status: InternalRecoveryReplayLinkStatus
+    case_id: str
+    source_report_path: str
+    latest_review_path: str
+    review_artifact_path: str | None = None
+    replay_report_path: str | None = None
+    review_status: str | None = None
+    check_count: int | None = None
+    passed_check_count: int | None = None
+    failed_check_count: int | None = None
+    mismatch_reason: str | None = None
+
+
 class InternalRunSummaryStageTimingDigest(BaseModel):
     present: bool = False
     total_duration_ms: int | None = None
@@ -224,6 +241,7 @@ class InternalObservabilityRunSummary(BaseModel):
     observability_summary: InternalObservabilitySummary = Field(default_factory=InternalObservabilitySummary)
     benchmark_artifact_summary: InternalBenchmarkArtifactSummary | None = None
     recovery_path_summary: InternalRecoveryPathSummary | None = None
+    recovery_replay_link_summary: InternalRecoveryReplayLinkSummary | None = None
     run_summary: InternalStructuredRunSummary | None = None
 
 

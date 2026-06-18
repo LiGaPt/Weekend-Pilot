@@ -60,6 +60,22 @@ export type InternalRecoveryPathSummary = {
   replay_source: InternalRecoveryReplaySourceSummary | null;
 };
 
+export type InternalRecoveryReplayLinkStatus = "matched" | "missing" | "invalid" | "mismatch";
+
+export type InternalRecoveryReplayLinkSummary = {
+  status: InternalRecoveryReplayLinkStatus;
+  case_id: string;
+  source_report_path: string;
+  latest_review_path: string;
+  review_artifact_path: string | null;
+  replay_report_path: string | null;
+  review_status: string | null;
+  check_count: number | null;
+  passed_check_count: number | null;
+  failed_check_count: number | null;
+  mismatch_reason: string | null;
+};
+
 export type InternalObservabilitySummary = {
   trace_id: string | null;
   status: string | null;
@@ -377,5 +393,6 @@ export type InternalObservabilityRunSummary = {
   observability_summary: InternalObservabilitySummary;
   benchmark_artifact_summary: InternalBenchmarkArtifactSummary | null;
   recovery_path_summary: InternalRecoveryPathSummary | null;
+  recovery_replay_link_summary: InternalRecoveryReplayLinkSummary | null;
   run_summary: InternalStructuredRunSummary | null;
 };

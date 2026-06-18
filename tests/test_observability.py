@@ -7,6 +7,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.orm import Session
 
+import backend.app.observability.service as observability_service
 from backend.app.benchmark import load_benchmark_case
 from backend.app.db.session import SessionLocal
 from backend.app.models.runtime import ActionLedger, ToolEvent
@@ -52,6 +53,22 @@ def trace_path():
             directory.rmdir()
 
 
+@pytest.fixture()
+def recovery_review_alias_dir():
+    directory = Path("var/test-recovery-review-aliases") / str(uuid4())
+    directory.mkdir(parents=True, exist_ok=False)
+    try:
+        yield directory
+    finally:
+        for path in sorted(directory.rglob("*"), reverse=True):
+            if path.is_file():
+                path.unlink()
+            elif path.is_dir():
+                path.rmdir()
+        if directory.exists():
+            directory.rmdir()
+
+
 def _create_run(
     session: Session,
     *,
@@ -85,6 +102,46 @@ def _recorder(session: Session, buffer_path, langsmith=None) -> ObservabilityRec
         local_buffer=LocalTraceBuffer(buffer_path),
         langsmith=langsmith,
     )
+
+
+def _recovery_review_payload(
+    *,
+    case_id: str = "family_route_failure_v1",
+    source_report_path: str | None = "var/benchmarks/family_route_failure_v1.json",
+    replay_report_path: str | None = "var/recovery-reviews/recovery-review-123/replays/family_route_failure_v1.json",
+    run_directory: str = "var/recovery-reviews/recovery-review-123",
+    status: str = "passed",
+) -> dict:
+    return {
+        "schema_version": "weekendpilot_recovery_replay_review_v1",
+        "status": status,
+        "case_id": case_id,
+        "run_id": None,
+        "run_directory": run_directory,
+        "source_report_path": source_report_path,
+        "replay_report_path": replay_report_path,
+        "latest_review_path": f"var/recovery-reviews/latest-{case_id}-review.json",
+        "checks": [
+            {"name": "recovery_action", "passed": True, "detail": "ok"},
+            {"name": "replay_alignment", "passed": False, "detail": "mismatch"},
+        ],
+        "failure_chain_summary": None,
+        "replay_summary": {
+            "status": status,
+            "mismatch_count": 1,
+            "failure_chain_signature": ["route_unavailable"],
+        },
+        "recovery_review": {
+            "benchmark_report_path": source_report_path,
+            "attempt_count": 1,
+            "max_attempts": 2,
+            "recovery_actions": ["stop_safely"],
+            "replay_source": {
+                "case_id": case_id,
+                "benchmark_report_path": source_report_path,
+            },
+        },
+    }
 
 
 def test_context_builds_from_agent_run(db_session: Session, trace_path) -> None:
@@ -963,6 +1020,7 @@ def test_internal_observability_service_falls_back_to_workflow_memory_policy_sum
     assert summary.benchmark_artifact_summary.memory_policy_summary.ignored_count == 1
     assert summary.benchmark_artifact_summary.score_summaries == []
     assert summary.benchmark_artifact_summary.report_path is None
+    assert summary.recovery_replay_link_summary is None
 
 
 def test_internal_observability_service_returns_recovery_path_summary_when_present(
@@ -1033,6 +1091,222 @@ def test_internal_observability_service_returns_recovery_path_summary_when_prese
     assert summary.run_summary.recovery.terminal_status == "stopped"
     assert summary.run_summary.recovery.latest_error_type == "route_infeasible"
     assert summary.run_summary.recovery.replay_case_id == "family_route_failure_v1"
+
+
+def test_internal_observability_service_returns_matched_recovery_replay_link_summary(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    recovery_review_alias_dir: Path,
+) -> None:
+    alias_path = recovery_review_alias_dir / "latest-family_route_failure_v1-review.json"
+    alias_path.write_text(json.dumps(_recovery_review_payload()), encoding="utf-8")
+    monkeypatch.setattr(observability_service, "_latest_recovery_review_alias_path", lambda case_id: alias_path)
+
+    case = load_benchmark_case("family_route_failure_v1")
+    run = _create_run(
+        db_session,
+        metadata_json={
+            "workflow": {
+                "recovery": {
+                    "attempt_count": 1,
+                    "max_attempts": 1,
+                    "attempts": [
+                        {
+                            "attempt_index": 1,
+                            "source_node": "semantic_validator",
+                            "recovery_action": "stop_safely",
+                            "route_to": None,
+                            "error_type": "route_infeasible",
+                            "reason": "Recovery stopped after route failure.",
+                            "retry_budget_before": 0,
+                            "retry_budget_after": 0,
+                            "status": "stopped",
+                        }
+                    ],
+                }
+            },
+            "benchmark": {
+                "case_id": case.case_id,
+                "title": case.title,
+                "workflow_backed": True,
+                "taxonomy": case.taxonomy.model_dump(mode="json"),
+                "artifact_summary": {
+                    "schema_version": "weekendpilot_benchmark_artifact_summary_v1",
+                    "benchmark_status": "passed",
+                    "overall_score": 1.0,
+                    "workflow_status": "failed",
+                    "tool_event_count": 3,
+                    "action_count": 0,
+                    "failure_reasons": [],
+                    "score_summaries": [],
+                    "report_path": "var/benchmarks/family_route_failure_v1.json",
+                },
+            },
+        },
+    )
+
+    summary = InternalObservabilityService(db_session).get_run_summary(run.run_id)
+
+    assert summary.recovery_replay_link_summary is not None
+    assert summary.recovery_replay_link_summary.status == "matched"
+    assert summary.recovery_replay_link_summary.case_id == "family_route_failure_v1"
+    assert summary.recovery_replay_link_summary.source_report_path == "var/benchmarks/family_route_failure_v1.json"
+    assert summary.recovery_replay_link_summary.latest_review_path == alias_path.as_posix()
+    assert summary.recovery_replay_link_summary.review_artifact_path == (
+        "var/recovery-reviews/recovery-review-123/recovery-review.json"
+    )
+    assert summary.recovery_replay_link_summary.replay_report_path == (
+        "var/recovery-reviews/recovery-review-123/replays/family_route_failure_v1.json"
+    )
+    assert summary.recovery_replay_link_summary.review_status == "passed"
+    assert summary.recovery_replay_link_summary.check_count == 2
+    assert summary.recovery_replay_link_summary.passed_check_count == 1
+    assert summary.recovery_replay_link_summary.failed_check_count == 1
+    assert summary.recovery_replay_link_summary.mismatch_reason is None
+
+
+def test_internal_observability_service_returns_missing_recovery_replay_link_summary(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    recovery_review_alias_dir: Path,
+) -> None:
+    alias_path = recovery_review_alias_dir / "latest-family_route_failure_v1-review.json"
+    monkeypatch.setattr(observability_service, "_latest_recovery_review_alias_path", lambda case_id: alias_path)
+
+    case = load_benchmark_case("family_route_failure_v1")
+    run = _create_run(
+        db_session,
+        metadata_json={
+            "workflow": {"recovery": {"attempt_count": 0, "max_attempts": 1, "attempts": []}},
+            "benchmark": {
+                "case_id": case.case_id,
+                "title": case.title,
+                "workflow_backed": True,
+                "taxonomy": case.taxonomy.model_dump(mode="json"),
+                "artifact_summary": {
+                    "schema_version": "weekendpilot_benchmark_artifact_summary_v1",
+                    "benchmark_status": "failed",
+                    "overall_score": 0.0,
+                    "workflow_status": "failed",
+                    "tool_event_count": 1,
+                    "action_count": 0,
+                    "failure_reasons": ["route_unavailable"],
+                    "score_summaries": [],
+                    "report_path": "var/benchmarks/family_route_failure_v1.json",
+                },
+            },
+        },
+    )
+
+    summary = InternalObservabilityService(db_session).get_run_summary(run.run_id)
+
+    assert summary.recovery_replay_link_summary is not None
+    assert summary.recovery_replay_link_summary.status == "missing"
+    assert summary.recovery_replay_link_summary.latest_review_path == alias_path.as_posix()
+    assert summary.recovery_replay_link_summary.review_artifact_path is None
+    assert summary.recovery_replay_link_summary.replay_report_path is None
+    assert summary.recovery_replay_link_summary.review_status is None
+    assert summary.recovery_replay_link_summary.check_count is None
+    assert summary.recovery_replay_link_summary.mismatch_reason == "latest recovery review alias was not found"
+
+
+def test_internal_observability_service_returns_invalid_recovery_replay_link_summary(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    recovery_review_alias_dir: Path,
+) -> None:
+    alias_path = recovery_review_alias_dir / "latest-family_route_failure_v1-review.json"
+    alias_path.write_text("{invalid", encoding="utf-8")
+    monkeypatch.setattr(observability_service, "_latest_recovery_review_alias_path", lambda case_id: alias_path)
+
+    case = load_benchmark_case("family_route_failure_v1")
+    run = _create_run(
+        db_session,
+        metadata_json={
+            "workflow": {"recovery": {"attempt_count": 0, "max_attempts": 1, "attempts": []}},
+            "benchmark": {
+                "case_id": case.case_id,
+                "title": case.title,
+                "workflow_backed": True,
+                "taxonomy": case.taxonomy.model_dump(mode="json"),
+                "artifact_summary": {
+                    "schema_version": "weekendpilot_benchmark_artifact_summary_v1",
+                    "benchmark_status": "failed",
+                    "overall_score": 0.0,
+                    "workflow_status": "failed",
+                    "tool_event_count": 1,
+                    "action_count": 0,
+                    "failure_reasons": ["route_unavailable"],
+                    "score_summaries": [],
+                    "report_path": "var/benchmarks/family_route_failure_v1.json",
+                },
+            },
+        },
+    )
+
+    summary = InternalObservabilityService(db_session).get_run_summary(run.run_id)
+
+    assert summary.recovery_replay_link_summary is not None
+    assert summary.recovery_replay_link_summary.status == "invalid"
+    assert summary.recovery_replay_link_summary.latest_review_path == alias_path.as_posix()
+    assert summary.recovery_replay_link_summary.review_artifact_path is None
+    assert summary.recovery_replay_link_summary.replay_report_path is None
+    assert summary.recovery_replay_link_summary.mismatch_reason == (
+        "latest recovery review alias is unreadable or invalid"
+    )
+
+
+def test_internal_observability_service_returns_mismatched_recovery_replay_link_summary(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    recovery_review_alias_dir: Path,
+) -> None:
+    alias_path = recovery_review_alias_dir / "latest-family_route_failure_v1-review.json"
+    alias_path.write_text(
+        json.dumps(_recovery_review_payload(source_report_path="var/benchmarks/family_route_failure_old.json")),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(observability_service, "_latest_recovery_review_alias_path", lambda case_id: alias_path)
+
+    case = load_benchmark_case("family_route_failure_v1")
+    run = _create_run(
+        db_session,
+        metadata_json={
+            "workflow": {"recovery": {"attempt_count": 0, "max_attempts": 1, "attempts": []}},
+            "benchmark": {
+                "case_id": case.case_id,
+                "title": case.title,
+                "workflow_backed": True,
+                "taxonomy": case.taxonomy.model_dump(mode="json"),
+                "artifact_summary": {
+                    "schema_version": "weekendpilot_benchmark_artifact_summary_v1",
+                    "benchmark_status": "failed",
+                    "overall_score": 0.0,
+                    "workflow_status": "failed",
+                    "tool_event_count": 1,
+                    "action_count": 0,
+                    "failure_reasons": ["route_unavailable"],
+                    "score_summaries": [],
+                    "report_path": "var/benchmarks/family_route_failure_v1.json",
+                },
+            },
+        },
+    )
+
+    summary = InternalObservabilityService(db_session).get_run_summary(run.run_id)
+
+    assert summary.recovery_replay_link_summary is not None
+    assert summary.recovery_replay_link_summary.status == "mismatch"
+    assert summary.recovery_replay_link_summary.latest_review_path == alias_path.as_posix()
+    assert summary.recovery_replay_link_summary.review_artifact_path == (
+        "var/recovery-reviews/recovery-review-123/recovery-review.json"
+    )
+    assert summary.recovery_replay_link_summary.replay_report_path == (
+        "var/recovery-reviews/recovery-review-123/replays/family_route_failure_v1.json"
+    )
+    assert summary.recovery_replay_link_summary.mismatch_reason == (
+        "latest review source_report_path does not match the current benchmark artifact report_path"
+    )
 
 
 def test_internal_observability_service_skips_malformed_recovery_attempts(

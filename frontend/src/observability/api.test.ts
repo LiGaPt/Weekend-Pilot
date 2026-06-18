@@ -101,6 +101,7 @@ const summary: InternalObservabilityRunSummary = {
   },
   benchmark_artifact_summary: null,
   recovery_path_summary: null,
+  recovery_replay_link_summary: null,
   run_summary: {
     schema_version: "weekendpilot_internal_run_summary_v1",
     run_id: "run-1",
