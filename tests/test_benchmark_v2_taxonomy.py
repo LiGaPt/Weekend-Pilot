@@ -66,7 +66,7 @@ def test_all_registered_cases_resolve_non_null_v2_taxonomy() -> None:
 
     resolved = [resolve_benchmark_case_v2_taxonomy(case) for case in cases]
 
-    assert len(resolved) == 28
+    assert len(resolved) == 30
     assert all(isinstance(taxonomy, BenchmarkCaseV2Taxonomy) for taxonomy in resolved)
 
 
@@ -118,8 +118,10 @@ def test_build_case_v2_matrix_summary_returns_expected_counts_for_v2_integrity_m
         "family_memory_override_v1",
         "family_route_failure_v1",
         "family_route_and_dining_unavailable_v1",
+        "friends_route_and_dining_unavailable_v1",
         "rainy_day_ticket_sold_out_v1",
         "family_ticket_sold_out_and_route_unavailable_v1",
+        "elder_ticket_sold_out_and_route_unavailable_v1",
         "budget_queue_closed_constraint_v1",
         "family_table_unavailable_replan_required_v1",
         "family_memory_advisory_fill_v1",
@@ -139,36 +141,37 @@ def test_build_case_v2_matrix_summary_returns_expected_counts_for_v2_integrity_m
     summary = build_case_v2_matrix_summary(cases)
 
     assert isinstance(summary, BenchmarkCaseV2MatrixSummary)
-    assert summary.case_count == 18
+    assert summary.case_count == 20
     assert summary.scenario_bucket_counts == {
         "family": 12,
-        "friends": 1,
+        "elder": 1,
+        "friends": 2,
         "mixed": 3,
         "solo": 1,
         "unknown": 1,
     }
-    assert summary.level_counts == {"L2": 5, "L3": 6, "L4": 1, "L5": 6}
+    assert summary.level_counts == {"L2": 5, "L3": 6, "L4": 1, "L5": 8}
     assert summary.failure_mode_counts == {
         "none": 12,
         "queue_closed_and_budget_constraint": 1,
-        "route_and_dining_unavailable": 1,
+        "route_and_dining_unavailable": 2,
         "route_unavailable": 1,
         "table_unavailable_and_replan_required": 1,
         "ticket_sold_out_and_bad_weather": 1,
-        "ticket_sold_out_and_route_unavailable": 1,
+        "ticket_sold_out_and_route_unavailable": 2,
     }
     assert summary.memory_mode_counts == {
         "advisory_fill": 1,
         "candidate_not_auto_active": 1,
         "disabled_ignored": 1,
         "expired_advisory": 1,
-        "none": 12,
+        "none": 14,
         "override_guarded": 1,
         "sensitive_minimization": 1,
     }
     assert summary.conversation_mode_counts == {
         "clarification": 1,
         "replan_versioned": 2,
-        "single_turn": 15,
+        "single_turn": 17,
     }
-    assert summary.stability_required_counts == {"false": 6, "true": 12}
+    assert summary.stability_required_counts == {"false": 6, "true": 14}
