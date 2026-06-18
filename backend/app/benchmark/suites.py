@@ -2,6 +2,12 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from backend.app.benchmark.case_matrix import (
+    ORDERED_BENCHMARK_SUITE_IDS,
+    canonical_benchmark_case_matrix_suite_id,
+    get_benchmark_case_matrix_suite_case_ids,
+    get_benchmark_case_matrix_suite_ids_for_case,
+)
 from backend.app.benchmark.errors import BenchmarkHarnessError
 from backend.app.benchmark.matrix import (
     build_case_integrity_coverage_summary,
@@ -11,87 +17,7 @@ from backend.app.benchmark.matrix import (
 from backend.app.benchmark.schemas import BenchmarkCase, BenchmarkSuiteDescription, BenchmarkSuiteId
 
 
-_BASELINE_CASE_IDS = [
-    "family_afternoon_v1",
-    "family_indoor_light_meal_v1",
-    "family_outdoor_quick_dinner_v1",
-    "family_memory_override_v1",
-    "family_citywalk_addon_v1",
-    "solo_afternoon_v1",
-]
-_EXPANDED_CASE_IDS = [
-    "couple_afternoon_v1",
-    "friends_gathering_v1",
-    "rainy_day_fallback_v1",
-    "budget_lite_v1",
-    "elder_afternoon_v1",
-]
-_RECOVERY_FOCUSED_CASE_IDS = [
-    "family_route_failure_v1",
-    "family_route_and_dining_unavailable_v1",
-    "friends_route_and_dining_unavailable_v1",
-    "rainy_day_ticket_sold_out_v1",
-    "family_ticket_sold_out_and_route_unavailable_v1",
-    "elder_ticket_sold_out_and_route_unavailable_v1",
-    "budget_queue_closed_constraint_v1",
-    "family_table_unavailable_replan_required_v1",
-]
-_MEMORY_GOVERNANCE_CASE_IDS = [
-    "family_memory_override_v1",
-    "family_memory_advisory_fill_v1",
-    "family_memory_expired_advisory_v1",
-    "family_memory_disabled_ignored_v1",
-    "family_memory_candidate_not_auto_active_v1",
-    "family_memory_sensitive_minimization_v1",
-]
-_CONVERSATION_CONTINUATION_CASE_IDS = [
-    "solo_clarification_continuation_v1",
-    "family_replan_version_continuation_v1",
-]
-_ROBUSTNESS_FOCUSED_CASE_IDS = [
-    "family_distractor_selection_v1",
-    "friends_distractor_selection_v1",
-    "rainy_day_stable_sorting_v1",
-    "budget_indoor_fallback_v1",
-]
-_DEFAULT_CASE_IDS = [*_BASELINE_CASE_IDS, *_EXPANDED_CASE_IDS]
-_RELEASE_GATE_V1_CASE_IDS = [
-    *_BASELINE_CASE_IDS,
-    "couple_afternoon_v1",
-    "friends_gathering_v1",
-    "rainy_day_fallback_v1",
-    "budget_lite_v1",
-    "family_route_failure_v1",
-    "family_memory_advisory_fill_v1",
-    "family_memory_expired_advisory_v1",
-    *_CONVERSATION_CONTINUATION_CASE_IDS,
-]
-_ALL_REGISTERED_CASE_IDS = [
-    *_DEFAULT_CASE_IDS,
-    *_RECOVERY_FOCUSED_CASE_IDS,
-    *_MEMORY_GOVERNANCE_CASE_IDS[1:],
-    *_CONVERSATION_CONTINUATION_CASE_IDS,
-    *_ROBUSTNESS_FOCUSED_CASE_IDS,
-]
-_V2_INTEGRITY_CASE_IDS = [
-    "family_memory_override_v1",
-    *_RECOVERY_FOCUSED_CASE_IDS,
-    *_MEMORY_GOVERNANCE_CASE_IDS[1:],
-    *_CONVERSATION_CONTINUATION_CASE_IDS,
-    *_ROBUSTNESS_FOCUSED_CASE_IDS,
-]
-_ORDERED_SUITE_IDS: tuple[BenchmarkSuiteId, ...] = (
-    "baseline",
-    "expanded",
-    "recovery_focused",
-    "memory_governance",
-    "conversation_continuations",
-    "robustness_focused",
-    "default",
-    "release_gate_v1",
-    "v2_integrity",
-    "all_registered",
-)
+_ORDERED_SUITE_IDS: tuple[BenchmarkSuiteId, ...] = ORDERED_BENCHMARK_SUITE_IDS
 _SUITE_ALIASES: dict[str, BenchmarkSuiteId] = {
     "failures": "recovery_focused",
 }
@@ -99,52 +25,52 @@ _SUITE_DEFINITIONS: dict[BenchmarkSuiteId, dict[str, Any]] = {
     "baseline": {
         "title": "Baseline benchmark suite",
         "description": "Historical family-plus-solo non-failure benchmark baseline.",
-        "case_ids": _BASELINE_CASE_IDS,
+        "case_ids": list(get_benchmark_case_matrix_suite_case_ids("baseline")),
     },
     "expanded": {
         "title": "Expanded scenario benchmark suite",
         "description": "Expanded non-failure scenario pack covering couple, friends, rainy-day, budget, and elder scenarios.",
-        "case_ids": _EXPANDED_CASE_IDS,
+        "case_ids": list(get_benchmark_case_matrix_suite_case_ids("expanded")),
     },
     "recovery_focused": {
         "title": "Recovery focused benchmark suite",
         "description": "Recovery-focused benchmark cases kept outside the non-failure suites.",
-        "case_ids": _RECOVERY_FOCUSED_CASE_IDS,
+        "case_ids": list(get_benchmark_case_matrix_suite_case_ids("recovery_focused")),
     },
     "memory_governance": {
         "title": "Memory governance benchmark suite",
         "description": "Focused cases that prove memory helps when useful without overriding explicit user input.",
-        "case_ids": _MEMORY_GOVERNANCE_CASE_IDS,
+        "case_ids": list(get_benchmark_case_matrix_suite_case_ids("memory_governance")),
     },
     "conversation_continuations": {
         "title": "Conversation continuations benchmark suite",
         "description": "Mock World continuation cases that validate clarification and follow-up replan chains.",
-        "case_ids": _CONVERSATION_CONTINUATION_CASE_IDS,
+        "case_ids": list(get_benchmark_case_matrix_suite_case_ids("conversation_continuations")),
     },
     "robustness_focused": {
         "title": "Robustness focused benchmark suite",
         "description": "Focused Mock World cases that prove noisy candidate selection, fallback behavior, and stable search ordering.",
-        "case_ids": _ROBUSTNESS_FOCUSED_CASE_IDS,
+        "case_ids": list(get_benchmark_case_matrix_suite_case_ids("robustness_focused")),
     },
     "default": {
         "title": "Default benchmark suite",
         "description": "Current eleven-case non-failure benchmark suite used by repository examples.",
-        "case_ids": _DEFAULT_CASE_IDS,
+        "case_ids": list(get_benchmark_case_matrix_suite_case_ids("default")),
     },
     "release_gate_v1": {
         "title": "Benchmark release gate v1",
         "description": "Blocking LocalLife-Bench L1-L3 release suite for formal V1 benchmark sign-off.",
-        "case_ids": _RELEASE_GATE_V1_CASE_IDS,
+        "case_ids": list(get_benchmark_case_matrix_suite_case_ids("release_gate_v1")),
     },
     "v2_integrity": {
         "title": "V2 integrity benchmark suite",
         "description": "Additive V2 integrity suite covering memory, recovery, continuation, robustness, and composite integrity stress using the current Mock World inventory.",
-        "case_ids": _V2_INTEGRITY_CASE_IDS,
+        "case_ids": list(get_benchmark_case_matrix_suite_case_ids("v2_integrity")),
     },
     "all_registered": {
         "title": "All registered benchmark cases",
         "description": "Current default, recovery-focused, memory-governance, continuation, and robustness cases in canonical repository order.",
-        "case_ids": _ALL_REGISTERED_CASE_IDS,
+        "case_ids": list(get_benchmark_case_matrix_suite_case_ids("all_registered")),
     },
 }
 
@@ -179,12 +105,7 @@ def list_benchmark_suites() -> list[BenchmarkSuiteDescription]:
 
 
 def list_benchmark_suite_ids_for_case(case_id: str) -> list[BenchmarkSuiteId]:
-    matching_suite_ids: list[BenchmarkSuiteId] = []
-    for suite_id in _ORDERED_SUITE_IDS:
-        definition = _validated_suite_definition(suite_id)
-        if case_id in definition["case_ids"]:
-            matching_suite_ids.append(suite_id)
-    return matching_suite_ids
+    return list(get_benchmark_case_matrix_suite_ids_for_case(case_id))
 
 
 def load_default_benchmark_cases() -> list[BenchmarkCase]:
@@ -230,4 +151,4 @@ def canonical_benchmark_suite_id(suite_id: BenchmarkSuiteId | str) -> BenchmarkS
 
 
 def _canonical_suite_id(suite_id: str) -> str:
-    return _SUITE_ALIASES.get(suite_id, suite_id)
+    return canonical_benchmark_case_matrix_suite_id(_SUITE_ALIASES.get(suite_id, suite_id))
