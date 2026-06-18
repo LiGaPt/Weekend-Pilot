@@ -6,42 +6,12 @@ from json import JSONDecodeError
 
 from pydantic import ValidationError
 
+from backend.app.benchmark.case_matrix import get_registered_benchmark_case_ids
 from backend.app.benchmark.errors import BenchmarkHarnessError
 from backend.app.benchmark.schemas import BenchmarkCase
 
 
-_REGISTERED_CASE_IDS = (
-    "family_afternoon_v1",
-    "family_indoor_light_meal_v1",
-    "family_outdoor_quick_dinner_v1",
-    "family_memory_override_v1",
-    "family_citywalk_addon_v1",
-    "solo_afternoon_v1",
-    "couple_afternoon_v1",
-    "friends_gathering_v1",
-    "rainy_day_fallback_v1",
-    "budget_lite_v1",
-    "elder_afternoon_v1",
-    "family_route_failure_v1",
-    "family_route_and_dining_unavailable_v1",
-    "friends_route_and_dining_unavailable_v1",
-    "rainy_day_ticket_sold_out_v1",
-    "family_ticket_sold_out_and_route_unavailable_v1",
-    "elder_ticket_sold_out_and_route_unavailable_v1",
-    "budget_queue_closed_constraint_v1",
-    "family_table_unavailable_replan_required_v1",
-    "family_memory_advisory_fill_v1",
-    "family_memory_expired_advisory_v1",
-    "family_memory_disabled_ignored_v1",
-    "family_memory_candidate_not_auto_active_v1",
-    "family_memory_sensitive_minimization_v1",
-    "solo_clarification_continuation_v1",
-    "family_replan_version_continuation_v1",
-    "family_distractor_selection_v1",
-    "friends_distractor_selection_v1",
-    "rainy_day_stable_sorting_v1",
-    "budget_indoor_fallback_v1",
-)
+_REGISTERED_CASE_IDS = get_registered_benchmark_case_ids()
 
 
 def load_benchmark_case(case_id: str) -> BenchmarkCase:

@@ -1,4 +1,12 @@
 from backend.app.benchmark.errors import BenchmarkHarnessError
+from backend.app.benchmark.case_matrix import (
+    BenchmarkCaseMatrixManifest,
+    BenchmarkCaseMatrixRow,
+    build_benchmark_case_matrix_manifest,
+    get_benchmark_case_matrix_suite_case_ids,
+    get_registered_benchmark_case_ids,
+    list_benchmark_case_matrix_rows,
+)
 from backend.app.benchmark.fixtures import (
     load_benchmark_case,
     load_registered_benchmark_cases,
@@ -53,6 +61,8 @@ from backend.app.benchmark.suites import (
 
 __all__ = [
     "BenchmarkCase",
+    "BenchmarkCaseMatrixManifest",
+    "BenchmarkCaseMatrixRow",
     "BenchmarkCaseResult",
     "BenchmarkIntegrityCoverageSummary",
     "BenchmarkCaseV2MatrixSummary",
@@ -81,7 +91,11 @@ __all__ = [
     "BenchmarkStabilityPassKReport",
     "BenchmarkStabilityWindowSummary",
     "BenchmarkSuiteDescription",
+    "build_benchmark_case_matrix_manifest",
+    "get_benchmark_case_matrix_suite_case_ids",
+    "get_registered_benchmark_case_ids",
     "load_benchmark_case",
+    "list_benchmark_case_matrix_rows",
     "load_benchmark_suite",
     "load_default_benchmark_cases",
     "load_failure_benchmark_cases",
