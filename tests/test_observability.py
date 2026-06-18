@@ -562,6 +562,14 @@ def test_internal_observability_service_builds_sanitized_run_summary(db_session:
     assert summary.observability_summary.local_buffer_error == {"api_key": "[REDACTED]", "message": "buffer-failed"}
     assert summary.observability_summary.langsmith_error == "langsmith-down"
     assert summary.benchmark_artifact_summary is None
+    assert summary.selected_plan_review is not None
+    assert summary.selected_plan_review.plan_id == str(selected.plan_id)
+    assert summary.selected_plan_review.status == "selected"
+    assert summary.selected_plan_review.action_manifest == {
+        "source": "none",
+        "action_count": 0,
+        "actions": [],
+    }
     assert summary.run_summary is not None
     assert summary.run_summary.schema_version == "weekendpilot_internal_run_summary_v1"
     assert str(summary.run_summary.run_id) == str(run.run_id)

@@ -15,6 +15,7 @@ from backend.app.observability.schemas import (
     InternalActionLedgerSummary,
     InternalBenchmarkArtifactSummary,
     InternalBenchmarkScoreSummary,
+    InternalSelectedPlanReview,
     InternalStructuredRunSummary,
     InternalBenchmarkTaxonomySummary,
     InternalRecoveryAttemptSummary,
@@ -78,6 +79,7 @@ class InternalObservabilityService:
             observability_status=self._observability_status(metadata),
             agent_roles=self._agent_roles(metadata, canonical_summary),
             node_history=self._node_history(metadata),
+            selected_plan_review=self._selected_plan_review(selected_plan),
             preview_diagnostics=self._preview_diagnostics(run, canonical_summary, tool_events),
             tool_event_summaries=self._tool_event_summaries(tool_events),
             action_ledger_summaries=self._action_ledger_summaries(run.run_id),
@@ -280,6 +282,44 @@ class InternalObservabilityService:
             memory_policy_summary=self._memory_policy_summary(metadata, raw_artifact),
             score_summaries=_benchmark_score_summaries(_mapping_value(raw_artifact, "score_summaries")),
             report_path=_string_or_none(raw_artifact, "report_path"),
+        )
+
+    def _selected_plan_review(self, selected_plan: Plan | None) -> InternalSelectedPlanReview | None:
+        if selected_plan is None or not isinstance(selected_plan.plan_json, dict):
+            return None
+
+        plan_json = sanitize_trace_payload(deepcopy(selected_plan.plan_json))
+
+        def mapping(key: str) -> dict[str, Any] | None:
+            value = plan_json.get(key)
+            return value if isinstance(value, dict) else None
+
+        def rows(key: str) -> list[dict[str, Any]]:
+            value = plan_json.get(key)
+            if not isinstance(value, list):
+                return []
+            return [item for item in value if isinstance(item, dict)]
+
+        action_manifest = mapping("action_manifest")
+        if action_manifest is None:
+            proposed_actions = rows("proposed_actions")
+            action_manifest = {
+                "source": "proposed_actions" if proposed_actions else "none",
+                "action_count": len(proposed_actions),
+                "actions": proposed_actions,
+            }
+
+        return InternalSelectedPlanReview(
+            plan_id=str(selected_plan.plan_id),
+            status=selected_plan.status,
+            title=plan_json.get("title") if isinstance(plan_json.get("title"), str) else None,
+            summary=plan_json.get("summary") if isinstance(plan_json.get("summary"), str) else None,
+            activity=mapping("activity"),
+            dining=mapping("dining"),
+            timeline=rows("timeline"),
+            route=mapping("route"),
+            feasibility=mapping("feasibility"),
+            action_manifest=_drop_forbidden_preview_keys(_redact_identifier_keys(action_manifest)),
         )
 
     def _memory_policy_summary(

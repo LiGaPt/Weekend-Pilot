@@ -183,6 +183,19 @@ class InternalBenchmarkArtifactSummary(BaseModel):
     report_path: str | None = None
 
 
+class InternalSelectedPlanReview(BaseModel):
+    plan_id: str
+    status: str | None = None
+    title: str | None = None
+    summary: str | None = None
+    activity: dict[str, Any] | None = None
+    dining: dict[str, Any] | None = None
+    timeline: list[dict[str, Any]] = Field(default_factory=list)
+    route: dict[str, Any] | None = None
+    feasibility: dict[str, Any] | None = None
+    action_manifest: dict[str, Any] | None = None
+
+
 class InternalObservabilityRunSummary(BaseModel):
     schema_version: str = "weekendpilot_internal_observability_run_v1"
     run_id: UUID
@@ -203,6 +216,7 @@ class InternalObservabilityRunSummary(BaseModel):
     observability_status: str | None = None
     agent_roles: list[str] = Field(default_factory=list)
     node_history: list[str] = Field(default_factory=list)
+    selected_plan_review: InternalSelectedPlanReview | None = None
     preview_diagnostics: PreviewDiagnostics | None = None
     tool_event_summaries: list[InternalToolEventSummary] = Field(default_factory=list)
     action_ledger_summaries: list[InternalActionLedgerSummary] = Field(default_factory=list)

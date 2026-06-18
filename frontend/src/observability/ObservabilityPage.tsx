@@ -776,6 +776,8 @@ function ObservabilityResult({
         </div>
       </section>
 
+      <SelectedPlanReviewPanel review={result.selected_plan_review} />
+
       <div className="observability-secondary-grid">
         <section className="panel">
           <div className="section-heading">
@@ -921,6 +923,55 @@ function RunSummaryPanel({ summary }: { summary: InternalStructuredRunSummary | 
           {!recovery?.entered_recovery ? <p className="muted">Recovery digest indicates no bounded recovery for this run.</p> : null}
         </section>
       </div>
+    </section>
+  );
+}
+
+function SelectedPlanReviewPanel({
+  review,
+}: {
+  review: InternalObservabilityRunSummary["selected_plan_review"];
+}) {
+  return (
+    <section className="panel observability-review-section">
+      <div className="section-heading">
+        <h2>Selected Plan Review</h2>
+      </div>
+      {review ? (
+        <div className="observability-review-stack">
+          <section className="panel">
+            <dl className="metadata-list observability-list">
+              <MetaItem label="Plan ID" value={review.plan_id} mono />
+              <MetaItem label="Status" value={review.status} />
+              <MetaItem label="Title" value={review.title} />
+              <MetaItem label="Summary" value={review.summary} />
+            </dl>
+          </section>
+          <section className="panel">
+            <div className="section-heading">
+              <h3>Activity / Dining</h3>
+            </div>
+            <pre className="observability-json">{stringifyValue(review.activity)}</pre>
+            <pre className="observability-json">{stringifyValue(review.dining)}</pre>
+          </section>
+          <section className="panel">
+            <div className="section-heading">
+              <h3>Timeline / Route / Feasibility</h3>
+            </div>
+            <pre className="observability-json">{stringifyValue(review.timeline)}</pre>
+            <pre className="observability-json">{stringifyValue(review.route)}</pre>
+            <pre className="observability-json">{stringifyValue(review.feasibility)}</pre>
+          </section>
+          <section className="panel">
+            <div className="section-heading">
+              <h3>Action Manifest</h3>
+            </div>
+            <pre className="observability-json">{stringifyValue(review.action_manifest)}</pre>
+          </section>
+        </div>
+      ) : (
+        <p className="muted">No selected-plan review snapshot is available for this run.</p>
+      )}
     </section>
   );
 }

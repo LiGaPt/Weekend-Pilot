@@ -38,7 +38,7 @@ The customer page at `5173` is now chat-first:
 - the first screen shows one primary composer plus six fixed Mock World scenario chips: `亲子`, `朋友`, `单人`, `情侣`, `雨天`, and `预算`
 - user requests, system progress, clarification prompts, replans, and final execution feedback appear in one chronological conversation stream
 - once a run summary arrives, the transient system-progress row gives way to one persistent progress stepper with the current step highlighted and completed steps hidden behind a disclosure by default
-- the assistant shows a recommended plan summary first, then reveals timeline, activity/dining, route/feasibility, and confirmation-action details only when the reviewer expands them
+- the assistant shows a recommended plan summary first, keeps confirmation controls visible, and leaves detailed timeline / route / action-review content to the internal surface on `5174`
 - `run_id`, read path, visible plan version, and refresh now live behind a closed-by-default `运行信息` disclosure instead of a default-visible inspector
 
 The public page now keeps the customer start path on `Mock World` and exposes six fixed scenario chips that map to canonical prompts plus explicit `mock_world_profile` values. Those chips are start-only, they only fill the composer, and they do not auto-submit.
@@ -199,7 +199,7 @@ The repository now includes a separate internal observability review page for re
 - page: `http://127.0.0.1:5174/`
 - backend endpoint: `GET /internal/runs/{run_id}/observability`
 
-Paste a `run_id` from the public demo flow into the internal surface to inspect the internal workflow summary. The run workspace now starts with a compact `Run Summary` digest for workflow outcome, stage timing, tool-event rollup, and recovery state, then continues into the detailed timing, node history, agent roles, observability status, and benchmark artifact context for benchmark-backed runs. The customer-facing demo at `http://127.0.0.1:5173/` stays customer-safe and no longer renders those internal fields.
+Paste a `run_id` from the public demo flow into the internal surface to inspect the internal workflow summary. The run workspace now starts with a compact `Run Summary` digest for workflow outcome, stage timing, tool-event rollup, and recovery state, then continues into the detailed timing, node history, agent roles, observability status, benchmark artifact context, and the reviewer-facing `Selected Plan Review` section for benchmark-backed runs. The customer-facing demo at `http://127.0.0.1:5173/` stays customer-safe and no longer renders those internal fields.
 
 The internal review page now also shows sanitized tool-event and action-ledger detail panels, a real benchmark-artifact panel populated from persisted run metadata, and a real recovery-path panel populated from persisted bounded recovery metadata. For benchmark-backed recovery runs, the page also shows the persisted benchmark case report path as replay input context. Replay execution and replay report browsing remain separate tooling.
 

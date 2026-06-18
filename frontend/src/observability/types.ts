@@ -70,6 +70,19 @@ export type InternalObservabilitySummary = {
   langsmith_error: unknown;
 };
 
+export type InternalSelectedPlanReview = {
+  plan_id: string;
+  status: string | null;
+  title: string | null;
+  summary: string | null;
+  activity: Record<string, unknown> | null;
+  dining: Record<string, unknown> | null;
+  timeline: Record<string, unknown>[];
+  route: Record<string, unknown> | null;
+  feasibility: Record<string, unknown> | null;
+  action_manifest: Record<string, unknown> | null;
+};
+
 export type InternalBenchmarkTaxonomySummary = {
   suite: string;
   scenario_bucket: string;
@@ -357,6 +370,7 @@ export type InternalObservabilityRunSummary = {
   observability_status: string | null;
   agent_roles: string[];
   node_history: string[];
+  selected_plan_review: InternalSelectedPlanReview | null;
   tool_event_summaries: InternalToolEventSummary[];
   action_ledger_summaries: InternalActionLedgerSummary[];
   workflow_timing_summary: InternalWorkflowTimingSummary | null;
