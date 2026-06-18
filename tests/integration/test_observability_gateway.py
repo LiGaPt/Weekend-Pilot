@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+import backend.app.observability.service as observability_service
 from backend.app.benchmark import BenchmarkHarness, load_benchmark_case
 from backend.app.benchmark import internal_summary as internal_benchmark_summary
 from backend.app.confirmation import HumanConfirmationService
@@ -122,6 +123,22 @@ def release_gate_summary_dir():
 @pytest.fixture()
 def integrity_summary_dir():
     directory = Path("var/test-system-integrity-summary-gateway") / str(uuid4())
+    directory.mkdir(parents=True, exist_ok=False)
+    try:
+        yield directory
+    finally:
+        for path in sorted(directory.rglob("*"), reverse=True):
+            if path.is_file():
+                path.unlink()
+            elif path.is_dir():
+                path.rmdir()
+        if directory.exists():
+            directory.rmdir()
+
+
+@pytest.fixture()
+def recovery_review_alias_dir():
+    directory = Path("var/test-recovery-review-aliases-gateway") / str(uuid4())
     directory.mkdir(parents=True, exist_ok=False)
     try:
         yield directory
@@ -1153,6 +1170,17 @@ def _build_recovery_review() -> dict:
     }
 
 
+def _write_recovery_review_alias(path: Path, *, source_report_path: str, replay_report_path: str, case_id: str) -> None:
+    payload = _build_recovery_review()
+    payload["case_id"] = case_id
+    payload["source_report_path"] = source_report_path
+    payload["replay_report_path"] = replay_report_path
+    payload["latest_review_path"] = path.as_posix()
+    payload["recovery_review"]["benchmark_report_path"] = source_report_path
+    payload["recovery_review"]["replay_source"]["benchmark_report_path"] = source_report_path
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
 def test_internal_observability_route_returns_recovery_path_summary_for_recovery_run(
     db_session: Session,
     redis_runtime,
@@ -1201,6 +1229,105 @@ def test_internal_observability_route_returns_recovery_path_summary_for_recovery
     assert "action_id" not in serialized
     assert "tool_event_id" not in serialized
     assert "idempotency_key" not in serialized
+
+
+def test_internal_observability_route_returns_recovery_replay_link_summary_for_matching_alias(
+    db_session: Session,
+    redis_runtime,
+    observability_client: TestClient,
+    benchmark_paths,
+    monkeypatch: pytest.MonkeyPatch,
+    recovery_review_alias_dir: Path,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    report_dir, trace_file = benchmark_paths
+    case = load_benchmark_case("family_route_failure_v1")
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_file,
+    )
+
+    result = harness.run_case(case)
+    assert result.run_id is not None
+    alias_path = recovery_review_alias_dir / "latest-family_route_failure_v1-review.json"
+    _write_recovery_review_alias(
+        alias_path,
+        source_report_path=result.report_path,
+        replay_report_path="var/recovery-reviews/recovery-review-123/replays/family_route_failure_v1.json",
+        case_id=case.case_id,
+    )
+    monkeypatch.setattr(observability_service, "_latest_recovery_review_alias_path", lambda current_case_id: alias_path)
+    db_session.commit()
+
+    response = observability_client.get(f"/internal/runs/{result.run_id}/observability")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["recovery_replay_link_summary"] == {
+        "status": "matched",
+        "case_id": "family_route_failure_v1",
+        "source_report_path": result.report_path,
+        "latest_review_path": alias_path.as_posix(),
+        "review_artifact_path": "var/recovery-reviews/recovery-review-123/recovery-review.json",
+        "replay_report_path": "var/recovery-reviews/recovery-review-123/replays/family_route_failure_v1.json",
+        "review_status": "passed",
+        "check_count": 3,
+        "passed_check_count": 3,
+        "failed_check_count": 0,
+        "mismatch_reason": None,
+    }
+    serialized = json.dumps(payload, sort_keys=True)
+    assert "api_key" not in serialized
+    assert "token" not in serialized
+    assert "action_id" not in serialized
+    assert "tool_event_id" not in serialized
+
+
+def test_internal_observability_route_returns_missing_recovery_replay_link_summary_without_failing(
+    db_session: Session,
+    redis_runtime,
+    observability_client: TestClient,
+    benchmark_paths,
+    monkeypatch: pytest.MonkeyPatch,
+    recovery_review_alias_dir: Path,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    report_dir, trace_file = benchmark_paths
+    case = load_benchmark_case("family_route_failure_v1")
+    harness = BenchmarkHarness(
+        db_session,
+        cache,
+        rate_limiter,
+        report_dir=report_dir,
+        trace_buffer_path=trace_file,
+    )
+
+    result = harness.run_case(case)
+    assert result.run_id is not None
+    alias_path = recovery_review_alias_dir / "latest-family_route_failure_v1-review.json"
+    monkeypatch.setattr(observability_service, "_latest_recovery_review_alias_path", lambda current_case_id: alias_path)
+    db_session.commit()
+
+    response = observability_client.get(f"/internal/runs/{result.run_id}/observability")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["recovery_replay_link_summary"] == {
+        "status": "missing",
+        "case_id": "family_route_failure_v1",
+        "source_report_path": result.report_path,
+        "latest_review_path": alias_path.as_posix(),
+        "review_artifact_path": None,
+        "replay_report_path": None,
+        "review_status": None,
+        "check_count": None,
+        "passed_check_count": None,
+        "failed_check_count": None,
+        "mismatch_reason": "latest recovery review alias was not found",
+    }
 
 
 def test_internal_observability_route_returns_degraded_run_summary_without_timing_or_recovery(

@@ -190,6 +190,19 @@ const summary: InternalObservabilityRunSummary = {
       benchmark_report_path: "var/benchmarks/family_route_failure_v1.json",
     },
   },
+  recovery_replay_link_summary: {
+    status: "matched",
+    case_id: "family_route_failure_v1",
+    source_report_path: "var/benchmarks/family_route_failure_v1.json",
+    latest_review_path: "var/recovery-reviews/latest-family_route_failure_v1-review.json",
+    review_artifact_path: "var/recovery-reviews/recovery-review-123/recovery-review.json",
+    replay_report_path: "var/recovery-reviews/recovery-review-123/replays/family_route_failure_v1-replay.json",
+    review_status: "passed",
+    check_count: 3,
+    passed_check_count: 3,
+    failed_check_count: 0,
+    mismatch_reason: null,
+  },
   run_summary: {
     schema_version: "weekendpilot_internal_run_summary_v1",
     run_id: "run-1",
@@ -535,7 +548,7 @@ describe("ObservabilityPage", () => {
     expect(screen.getByText("Tool Event Rollup")).toBeInTheDocument();
     expect(screen.getByText("Recovery Digest")).toBeInTheDocument();
     expect(screen.getByText("Latest Tool")).toBeInTheDocument();
-    expect(screen.getAllByText("family_route_failure_v1")).toHaveLength(1);
+    expect(screen.getAllByText("family_route_failure_v1").length).toBeGreaterThanOrEqual(2);
     expect(await screen.findByRole("heading", { name: "Trace Summary" })).toBeInTheDocument();
     expect(await screen.findAllByText("trace-1")).toHaveLength(2);
     expect(screen.getByText("Slowest Stage")).toBeInTheDocument();
@@ -563,12 +576,17 @@ describe("ObservabilityPage", () => {
     expect(screen.getByText("light_activity")).toBeInTheDocument();
     expect(screen.getByText("Workflow reached the expected path.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Recovery Visualization" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Replay Review Link" })).toBeInTheDocument();
     expect(screen.getByText("Latest Attempt")).toBeInTheDocument();
     expect(screen.getAllByText("stop_safely")).toHaveLength(4);
     expect(screen.getByText("Recovery stopped after route failure.")).toBeInTheDocument();
-    expect(screen.getByText("family_route_failure_v1")).toBeInTheDocument();
-    expect(screen.getByText("var/benchmarks/family_route_failure_v1.json")).toBeInTheDocument();
+    expect(screen.getAllByText("family_route_failure_v1")).toHaveLength(2);
+    expect(screen.getAllByText("var/benchmarks/family_route_failure_v1.json")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Copy replay report path" })).toBeInTheDocument();
+    expect(screen.getAllByText("var/recovery-reviews/latest-family_route_failure_v1-review.json")).toHaveLength(2);
+    expect(screen.getByText("var/recovery-reviews/recovery-review-123/recovery-review.json")).toBeInTheDocument();
+    expect(screen.getByText("var/recovery-reviews/recovery-review-123/replays/family_route_failure_v1-replay.json")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy latest review alias" })).toBeInTheDocument();
   });
 
   it("copies the latest alias path and shows success feedback", async () => {
@@ -718,6 +736,7 @@ describe("ObservabilityPage", () => {
     vi.mocked(getObservabilityRun).mockResolvedValue({
       ...summary,
       recovery_path_summary: null,
+      recovery_replay_link_summary: null,
       run_summary: {
         ...summary.run_summary!,
         recovery: {
@@ -740,6 +759,23 @@ describe("ObservabilityPage", () => {
     expect(await screen.findByText("This run did not enter bounded recovery.")).toBeInTheDocument();
   });
 
+  it("shows a readable replay-link fallback when recovery exists but no link summary is available", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getObservabilityRun).mockResolvedValue({
+      ...summary,
+      recovery_replay_link_summary: null,
+    });
+    render(<ObservabilityPage />);
+
+    await user.type(screen.getByRole("textbox", { name: "Run ID" }), "run-1");
+    await user.click(screen.getByRole("button", { name: "Load Run" }));
+
+    expect(await screen.findByRole("heading", { name: "Recovery Visualization" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Replay Review Link" })).toBeInTheDocument();
+    expect(screen.getByText("No replay review link is available for this run.")).toBeInTheDocument();
+    expect(screen.getByText("Recovery stopped after route failure.")).toBeInTheDocument();
+  });
+
   it("shows a partial recovery state when no valid recovery attempts are available", async () => {
     const user = userEvent.setup();
     vi.mocked(getObservabilityRun).mockResolvedValue({
@@ -750,6 +786,17 @@ describe("ObservabilityPage", () => {
         attempts: [],
         replay_source: null,
       },
+      recovery_replay_link_summary: {
+        ...summary.recovery_replay_link_summary!,
+        status: "missing",
+        review_artifact_path: null,
+        replay_report_path: null,
+        review_status: null,
+        check_count: null,
+        passed_check_count: null,
+        failed_check_count: null,
+        mismatch_reason: "latest recovery review alias was not found",
+      },
     });
     render(<ObservabilityPage />);
 
@@ -759,6 +806,7 @@ describe("ObservabilityPage", () => {
     expect(
       await screen.findByText("Recovery metadata exists for this run, but no valid recovery attempts are available."),
     ).toBeInTheDocument();
+    expect(await screen.findByText("latest recovery review alias was not found")).toBeInTheDocument();
   });
 
   it("renders not found errors from the backend", async () => {

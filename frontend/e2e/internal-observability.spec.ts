@@ -332,6 +332,19 @@ const observabilityRun = {
       benchmark_report_path: "var/benchmarks/family_route_failure_v1.json",
     },
   },
+  recovery_replay_link_summary: {
+    status: "matched",
+    case_id: "family_route_failure_v1",
+    source_report_path: "var/benchmarks/family_route_failure_v1.json",
+    latest_review_path: "var/recovery-reviews/latest-family_route_failure_v1-review.json",
+    review_artifact_path: "var/recovery-reviews/recovery-review-123/recovery-review.json",
+    replay_report_path: "var/recovery-reviews/recovery-review-123/replays/family_route_failure_v1-replay.json",
+    review_status: "passed",
+    check_count: 3,
+    passed_check_count: 3,
+    failed_check_count: 0,
+    mismatch_reason: null,
+  },
   run_summary: {
     schema_version: "weekendpilot_internal_run_summary_v1",
     run_id: "run-1",
@@ -453,7 +466,14 @@ test.describe("internal observability surface", () => {
     await expect(page.getByRole("heading", { name: "Trace Summary" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Copy run report path" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Recovery Visualization" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Replay Review Link" })).toBeVisible();
     await expect(page.getByText("Recovery stopped after route failure.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Copy replay report path" })).toBeVisible();
+    await expect(page.getByText("var/recovery-reviews/latest-family_route_failure_v1-review.json")).toHaveCount(2);
+    await expect(page.getByText("var/recovery-reviews/recovery-review-123/recovery-review.json")).toBeVisible();
+    await expect(
+      page.getByText("var/recovery-reviews/recovery-review-123/replays/family_route_failure_v1-replay.json"),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copy latest review alias" })).toBeVisible();
   });
 });

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import json
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -19,6 +21,7 @@ from backend.app.observability.schemas import (
     InternalStructuredRunSummary,
     InternalBenchmarkTaxonomySummary,
     InternalRecoveryAttemptSummary,
+    InternalRecoveryReplayLinkSummary,
     InternalRecoveryPathSummary,
     InternalRecoveryReplaySourceSummary,
     InternalObservabilityRunSummary,
@@ -37,6 +40,9 @@ from backend.app.repositories import (
     ToolEventRepository,
 )
 from backend.app.workflow.timing import WorkflowTimingSummary
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+RECOVERY_REVIEW_FILENAME = "recovery-review.json"
 
 
 class InternalObservabilityRunNotFoundError(LookupError):
@@ -58,7 +64,12 @@ class InternalObservabilityService:
         canonical_summary = load_run_summary(metadata)
         tool_events = ToolEventRepository(self.session).list_for_run(run_id)
         workflow_timing_summary = self._workflow_timing_summary(metadata, canonical_summary)
+        benchmark_artifact_summary = self._benchmark_artifact_summary(metadata)
         recovery_path_summary = self._recovery_path_summary(metadata)
+        recovery_replay_link_summary = self._recovery_replay_link_summary(
+            benchmark_artifact_summary=benchmark_artifact_summary,
+            recovery_path_summary=recovery_path_summary,
+        )
 
         return InternalObservabilityRunSummary(
             run_id=run.run_id,
@@ -85,8 +96,9 @@ class InternalObservabilityService:
             action_ledger_summaries=self._action_ledger_summaries(run.run_id),
             workflow_timing_summary=workflow_timing_summary,
             observability_summary=self._observability_summary(metadata),
-            benchmark_artifact_summary=self._benchmark_artifact_summary(metadata),
+            benchmark_artifact_summary=benchmark_artifact_summary,
             recovery_path_summary=recovery_path_summary,
+            recovery_replay_link_summary=recovery_replay_link_summary,
             run_summary=self._structured_run_summary(
                 run=run,
                 selected_plan=selected_plan,
@@ -369,6 +381,72 @@ class InternalObservabilityService:
             max_attempts=max_attempts,
             attempts=attempts,
             replay_source=_recovery_replay_source(metadata),
+        )
+
+    def _recovery_replay_link_summary(
+        self,
+        *,
+        benchmark_artifact_summary: InternalBenchmarkArtifactSummary | None,
+        recovery_path_summary: InternalRecoveryPathSummary | None,
+    ) -> InternalRecoveryReplayLinkSummary | None:
+        if (
+            benchmark_artifact_summary is None
+            or recovery_path_summary is None
+            or benchmark_artifact_summary.report_path is None
+        ):
+            return None
+
+        case_id = benchmark_artifact_summary.case_id
+        source_report_path = benchmark_artifact_summary.report_path
+        latest_review_path = _latest_recovery_review_alias_path(case_id)
+        latest_review_label = _relative_path_label(latest_review_path)
+
+        if not latest_review_path.exists():
+            return InternalRecoveryReplayLinkSummary(
+                status="missing",
+                case_id=case_id,
+                source_report_path=source_report_path,
+                latest_review_path=latest_review_label,
+                mismatch_reason="latest recovery review alias was not found",
+            )
+
+        try:
+            from backend.app.benchmark.schemas import RecoveryReplayReviewResult
+
+            payload = json.loads(latest_review_path.read_text(encoding="utf-8"))
+            review = RecoveryReplayReviewResult.model_validate(payload)
+        except (OSError, json.JSONDecodeError, ValidationError):
+            return InternalRecoveryReplayLinkSummary(
+                status="invalid",
+                case_id=case_id,
+                source_report_path=source_report_path,
+                latest_review_path=latest_review_label,
+                mismatch_reason="latest recovery review alias is unreadable or invalid",
+            )
+
+        check_count = len(review.checks)
+        passed_check_count = sum(1 for check in review.checks if check.passed)
+        failed_check_count = check_count - passed_check_count
+        review_artifact_path = _review_artifact_path(review.run_directory)
+
+        mismatch_reason: str | None = None
+        if review.case_id != case_id:
+            mismatch_reason = "latest review case_id does not match the current benchmark case_id"
+        elif review.source_report_path != source_report_path:
+            mismatch_reason = "latest review source_report_path does not match the current benchmark artifact report_path"
+
+        return InternalRecoveryReplayLinkSummary(
+            status="matched" if mismatch_reason is None else "mismatch",
+            case_id=case_id,
+            source_report_path=source_report_path,
+            latest_review_path=latest_review_label,
+            review_artifact_path=review_artifact_path,
+            replay_report_path=review.replay_report_path,
+            review_status=review.status,
+            check_count=check_count,
+            passed_check_count=passed_check_count,
+            failed_check_count=failed_check_count,
+            mismatch_reason=mismatch_reason,
         )
 
     def _execution_status(
@@ -683,3 +761,18 @@ def _non_negative_int_or_default(value: Any, default: int) -> int:
     if isinstance(value, int):
         return max(value, 0)
     return max(default, 0)
+
+
+def _latest_recovery_review_alias_path(case_id: str) -> Path:
+    return REPO_ROOT / "var" / "recovery-reviews" / f"latest-{case_id}-review.json"
+
+
+def _review_artifact_path(run_directory: str) -> str:
+    return (Path(run_directory) / RECOVERY_REVIEW_FILENAME).as_posix()
+
+
+def _relative_path_label(path: Path) -> str:
+    try:
+        return path.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return path.as_posix()

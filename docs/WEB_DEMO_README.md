@@ -201,7 +201,7 @@ The repository now includes a separate internal observability review page for re
 
 Paste a `run_id` from the public demo flow into the internal surface to inspect the internal workflow summary. The run workspace now starts with a compact `Run Summary` digest for workflow outcome, stage timing, tool-event rollup, and recovery state, then continues into the detailed timing, node history, agent roles, observability status, benchmark artifact context, and the reviewer-facing `Selected Plan Review` section for benchmark-backed runs. The customer-facing demo at `http://127.0.0.1:5173/` stays customer-safe and no longer renders those internal fields.
 
-The internal review page now also shows sanitized tool-event and action-ledger detail panels, a real benchmark-artifact panel populated from persisted run metadata, and a real recovery-path panel populated from persisted bounded recovery metadata. For benchmark-backed recovery runs, the page also shows the persisted benchmark case report path as replay input context. Replay execution and replay report browsing remain separate tooling.
+The internal review page now also shows sanitized tool-event and action-ledger detail panels, a real benchmark-artifact panel populated from persisted run metadata, and a real recovery-path panel populated from persisted bounded recovery metadata. For benchmark-backed recovery runs, the page also shows the persisted benchmark case report path as replay input context, plus a `Replay Review Link` block that links the current run to the latest recovery review alias, the concrete `recovery-review.json` artifact path, and the replay report path when they still match. Replay execution and replay report browsing remain separate tooling.
 
 For the canonical reviewer closure flow, run `python scripts/run_recovery_replay_review.py` from the repo root. It emits the source benchmark `run_id` and the written source benchmark report path for `family_route_failure_v1`, and those two values can be cross-checked directly against this internal observability surface to confirm that `benchmark_artifact_summary.report_path` and `recovery_path_summary.replay_source.benchmark_report_path` both point to the same source report.
 
@@ -220,6 +220,7 @@ Reviewer scan order on `5174` should now be:
 5. Load a specific `run_id`.
 6. Start with the compact `Run Summary` digest for workflow outcome, stage timing, tool rollup, and recovery state.
 7. Inspect `Trace Summary`, then `Benchmark Artifacts`, then `Recovery Visualization`.
+8. If the run entered recovery, use `Replay Review Link` to copy the latest alias, source report, review artifact, and replay report paths before leaving `5174`.
 
 ## Richer Web UI V1 Reviewer Flow
 
@@ -233,7 +234,7 @@ For the V1 richer UI closure, use `docs/RICHER_WEB_UI_V1_CHECKLIST.md` as the ca
 6. Confirm the page exposes the canonical latest alias `var/formal-benchmarks/latest-release_gate_v1-run-report.json`, the integrity evidence paths, and direct copy actions for those paths.
 7. Load the copied `run_id` and verify the page starts with `Run Summary`.
 8. Review `Trace Summary` and `Benchmark Artifacts`, making sure the current run report path is distinct from the canonical latest release-gate alias path.
-9. Run `python scripts/run_recovery_replay_review.py`, then load the emitted recovery `run_id` and verify `Recovery Visualization`, including the replay report copy action.
+9. Run `python scripts/run_recovery_replay_review.py`, then load the emitted recovery `run_id` and verify `Recovery Visualization`, including the `Replay Review Link` block and replay report copy action.
 
 ## Manual Demo Flow
 

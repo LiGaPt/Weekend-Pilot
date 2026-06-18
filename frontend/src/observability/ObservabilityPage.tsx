@@ -7,6 +7,7 @@ import type {
   InternalBenchmarkTimingSummary,
   InternalObservabilityRunSummary,
   InternalRecoveryPathSummary,
+  InternalRecoveryReplayLinkSummary,
   InternalReleaseGateBenchmarkSummary,
   InternalStructuredRunSummary,
   InternalToolEventSummary,
@@ -821,8 +822,9 @@ function ObservabilityResult({
         />
         <RecoveryPathPanel
           summary={result.recovery_path_summary}
+          replayLinkSummary={result.recovery_replay_link_summary}
           onCopyPath={onCopyPath}
-          copyFeedback={copyFeedbackForKey("replay-report-path")}
+          copyFeedbackForKey={copyFeedbackForKey}
         />
       </div>
     </div>
@@ -1158,12 +1160,14 @@ function BenchmarkArtifactsPanel({
 
 function RecoveryPathPanel({
   summary,
+  replayLinkSummary,
   onCopyPath,
-  copyFeedback,
+  copyFeedbackForKey,
 }: {
   summary: InternalRecoveryPathSummary | null;
+  replayLinkSummary: InternalRecoveryReplayLinkSummary | null;
   onCopyPath: (copyKey: string, path: string) => Promise<void>;
-  copyFeedback: string | null;
+  copyFeedbackForKey: (copyKey: string) => string | null;
 }) {
   const latestAttempt = getLatestRecoveryAttempt(summary);
 
@@ -1234,10 +1238,87 @@ function RecoveryPathPanel({
                 copyLabel="Copy replay report path"
                 copyKey="replay-report-path"
                 onCopyPath={onCopyPath}
-                copyFeedback={copyFeedback}
+                copyFeedback={copyFeedbackForKey("replay-report-path")}
               />
             </section>
           ) : null}
+
+          <RecoveryReplayLinkSection
+            summary={replayLinkSummary}
+            onCopyPath={onCopyPath}
+            copyFeedbackForKey={copyFeedbackForKey}
+          />
+        </>
+      )}
+    </section>
+  );
+}
+
+function RecoveryReplayLinkSection({
+  summary,
+  onCopyPath,
+  copyFeedbackForKey,
+}: {
+  summary: InternalRecoveryReplayLinkSummary | null;
+  onCopyPath: (copyKey: string, path: string) => Promise<void>;
+  copyFeedbackForKey: (copyKey: string) => string | null;
+}) {
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <h3>Replay Review Link</h3>
+      </div>
+      {summary === null ? (
+        <p className="muted">No replay review link is available for this run.</p>
+      ) : (
+        <>
+          <div className="observability-metric-grid">
+            <MetricCard label="Link Status" value={summary.status} />
+            <MetricCard label="Review Status" value={summary.review_status ?? "N/A"} />
+            <MetricCard label="Passed Checks" value={stringOrNA(summary.passed_check_count)} />
+            <MetricCard label="Failed Checks" value={stringOrNA(summary.failed_check_count)} />
+          </div>
+
+          <dl className="metadata-list observability-list">
+            <MetaItem label="Case ID" value={summary.case_id} mono />
+            <MetaItem label="Check Count" value={stringOrNA(summary.check_count)} />
+            <MetaItem label="Reason" value={summary.mismatch_reason} />
+          </dl>
+
+          <div className="observability-path-stack">
+            <PathField
+              label="Latest Review Alias"
+              path={summary.latest_review_path}
+              copyLabel="Copy latest review alias"
+              copyKey="recovery-review-latest-alias"
+              onCopyPath={onCopyPath}
+              copyFeedback={copyFeedbackForKey("recovery-review-latest-alias")}
+            />
+            <PathField
+              label="Review Artifact Path"
+              path={summary.review_artifact_path}
+              copyLabel="Copy review artifact path"
+              copyKey="recovery-review-artifact-path"
+              onCopyPath={onCopyPath}
+              copyFeedback={copyFeedbackForKey("recovery-review-artifact-path")}
+            />
+            <PathField
+              label="Replay Report Path"
+              path={summary.replay_report_path}
+              copyLabel="Copy linked replay path"
+              copyKey="recovery-review-replay-report-path"
+              onCopyPath={onCopyPath}
+              copyFeedback={copyFeedbackForKey("recovery-review-replay-report-path")}
+            />
+            <PathField
+              label="Source Report Path"
+              path={summary.source_report_path}
+              copyLabel="Copy source report path"
+              copyKey="recovery-review-source-report-path"
+              onCopyPath={onCopyPath}
+              copyFeedback={copyFeedbackForKey("recovery-review-source-report-path")}
+            />
+          </div>
         </>
       )}
     </section>
