@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { startInternalObservabilityServers } from "./support/internal-observability-servers";
+
+let cleanupManagedServers: (() => Promise<void>) | null = null;
 
 const benchmarkSummary = {
   schema_version: "weekendpilot_internal_benchmark_summary_v1",
@@ -277,6 +280,19 @@ const observabilityRun = {
 };
 
 test.describe("internal observability surface", () => {
+  test.beforeAll(async () => {
+    if (process.env.PW_E2E_EXTERNAL_SERVERS === "1") {
+      return;
+    }
+
+    cleanupManagedServers = await startInternalObservabilityServers();
+  });
+
+  test.afterAll(async () => {
+    await cleanupManagedServers?.();
+    cleanupManagedServers = null;
+  });
+
   test.beforeEach(({}, testInfo) => {
     test.skip(testInfo.project.name !== "desktop-chromium", "Internal surface smoke runs once on desktop.");
   });
