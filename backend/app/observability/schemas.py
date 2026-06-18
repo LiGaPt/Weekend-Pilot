@@ -100,6 +100,56 @@ class InternalRecoveryPathSummary(BaseModel):
     replay_source: InternalRecoveryReplaySourceSummary | None = None
 
 
+class InternalRunSummaryStageTimingDigest(BaseModel):
+    present: bool = False
+    total_duration_ms: int | None = None
+    stage_count: int | None = None
+    slowest_stage_name: str | None = None
+    slowest_stage_duration_ms: int | None = None
+
+
+class InternalRunSummaryLatestToolEvent(BaseModel):
+    tool_name: str
+    tool_type: str
+    provider: str
+    status: str
+    latency_ms: int | None = None
+    created_at: datetime
+
+
+class InternalRunSummaryToolEventDigest(BaseModel):
+    total_count: int = 0
+    read_count: int = 0
+    write_count: int = 0
+    status_counts: dict[str, int] = Field(default_factory=dict)
+    provider_counts: dict[str, int] = Field(default_factory=dict)
+    latest_event: InternalRunSummaryLatestToolEvent | None = None
+
+
+class InternalRunSummaryRecoveryDigest(BaseModel):
+    entered_recovery: bool = False
+    attempt_count: int = 0
+    max_attempts: int = 0
+    terminal_action: str | None = None
+    terminal_status: str | None = None
+    latest_error_type: str | None = None
+    replay_case_id: str | None = None
+
+
+class InternalStructuredRunSummary(BaseModel):
+    schema_version: str = "weekendpilot_internal_run_summary_v1"
+    run_id: UUID
+    trace_id: str | None = None
+    workflow_status: str
+    selected_plan_id: str | None = None
+    plan_status: str | None = None
+    execution_status: str | None = None
+    feedback_status: str | None = None
+    stage_timing: InternalRunSummaryStageTimingDigest = Field(default_factory=InternalRunSummaryStageTimingDigest)
+    tool_events: InternalRunSummaryToolEventDigest = Field(default_factory=InternalRunSummaryToolEventDigest)
+    recovery: InternalRunSummaryRecoveryDigest = Field(default_factory=InternalRunSummaryRecoveryDigest)
+
+
 class InternalBenchmarkTaxonomySummary(BaseModel):
     suite: str
     scenario_bucket: str
@@ -160,6 +210,7 @@ class InternalObservabilityRunSummary(BaseModel):
     observability_summary: InternalObservabilitySummary = Field(default_factory=InternalObservabilitySummary)
     benchmark_artifact_summary: InternalBenchmarkArtifactSummary | None = None
     recovery_path_summary: InternalRecoveryPathSummary | None = None
+    run_summary: InternalStructuredRunSummary | None = None
 
 
 IntegritySectionStatus = Literal["ready", "missing", "invalid", "partial"]

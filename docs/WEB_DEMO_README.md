@@ -199,7 +199,7 @@ The repository now includes a separate internal observability review page for re
 - page: `http://127.0.0.1:5174/`
 - backend endpoint: `GET /internal/runs/{run_id}/observability`
 
-Paste a `run_id` from the public demo flow into the internal surface to inspect the internal workflow summary, including timing, node history, agent roles, observability status, and benchmark artifact context for benchmark-backed runs. The customer-facing demo at `http://127.0.0.1:5173/` stays customer-safe and no longer renders those internal fields.
+Paste a `run_id` from the public demo flow into the internal surface to inspect the internal workflow summary. The run workspace now starts with a compact `Run Summary` digest for workflow outcome, stage timing, tool-event rollup, and recovery state, then continues into the detailed timing, node history, agent roles, observability status, and benchmark artifact context for benchmark-backed runs. The customer-facing demo at `http://127.0.0.1:5173/` stays customer-safe and no longer renders those internal fields.
 
 The internal review page now also shows sanitized tool-event and action-ledger detail panels, a real benchmark-artifact panel populated from persisted run metadata, and a real recovery-path panel populated from persisted bounded recovery metadata. For benchmark-backed recovery runs, the page also shows the persisted benchmark case report path as replay input context. Replay execution and replay report browsing remain separate tooling.
 
@@ -218,7 +218,8 @@ Reviewer scan order on `5174` should now be:
 3. Scan `System Integrity Summary` for `v2_integrity`, `Pass@k`, memory, recovery, and the latest evidence paths.
 4. Copy the canonical latest alias or integrity evidence paths directly from the page when you need to cite report locations.
 5. Load a specific `run_id`.
-6. Inspect `Trace Summary`, then `Benchmark Artifacts`, then `Recovery Visualization`.
+6. Start with the compact `Run Summary` digest for workflow outcome, stage timing, tool rollup, and recovery state.
+7. Inspect `Trace Summary`, then `Benchmark Artifacts`, then `Recovery Visualization`.
 
 ## Richer Web UI V1 Reviewer Flow
 
@@ -230,8 +231,8 @@ For the V1 richer UI closure, use `docs/RICHER_WEB_UI_V1_CHECKLIST.md` as the ca
 4. On `5174`, verify the release-gate hero in `Benchmark Summary` before loading any run.
 5. Confirm `System Integrity Summary` is visible before any run is loaded.
 6. Confirm the page exposes the canonical latest alias `var/formal-benchmarks/latest-release_gate_v1-run-report.json`, the integrity evidence paths, and direct copy actions for those paths.
-7. Load the copied `run_id` and verify `Trace Summary`.
-8. Review `Benchmark Artifacts`, making sure the current run report path is distinct from the canonical latest release-gate alias path.
+7. Load the copied `run_id` and verify the page starts with `Run Summary`.
+8. Review `Trace Summary` and `Benchmark Artifacts`, making sure the current run report path is distinct from the canonical latest release-gate alias path.
 9. Run `python scripts/run_recovery_replay_review.py`, then load the emitted recovery `run_id` and verify `Recovery Visualization`, including the replay report copy action.
 
 ## Manual Demo Flow
@@ -389,11 +390,13 @@ Use a mobile viewport around 390px wide. Start a run and confirm the main contro
 5. Confirm the benchmark panel shows suite counts, overall score, and matrix counts from the latest release-gate alias.
 6. Confirm the integrity panel shows `v2_integrity`, `Pass@k`, memory governance, recovery replay, and copyable evidence paths.
 7. Paste a customer-demo `run_id` and click `Load Run`.
-8. Confirm the page shows `Trace Summary`.
-9. Confirm `Trace Summary` includes run identity, trace identity, workflow timing, and observability status.
-10. Run `python scripts/run_recovery_replay_review.py`.
-11. Paste the emitted recovery review `run_id`.
-12. Confirm the page shows `Recovery Visualization` with attempt count, max attempts, per-attempt details, and replay source.
+8. Confirm the page shows `Run Summary`.
+9. Confirm the digest includes workflow outcome, stage timing, tool rollup, and recovery state before the detailed panels.
+10. Confirm the page also shows `Trace Summary`.
+11. Confirm `Trace Summary` includes run identity, trace identity, workflow timing, and observability status.
+12. Run `python scripts/run_recovery_replay_review.py`.
+13. Paste the emitted recovery review `run_id`.
+14. Confirm the page shows `Recovery Visualization` with attempt count, max attempts, per-attempt details, and replay source.
 
 ## Automated Checks
 

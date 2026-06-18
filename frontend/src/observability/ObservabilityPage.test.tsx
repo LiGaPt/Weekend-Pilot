@@ -135,7 +135,48 @@ const summary: InternalObservabilityRunSummary = {
       benchmark_report_path: "var/benchmarks/family_route_failure_v1.json",
     },
   },
-};
+  run_summary: {
+    schema_version: "weekendpilot_internal_run_summary_v1",
+    run_id: "run-1",
+    trace_id: "trace-1",
+    workflow_status: "completed",
+    selected_plan_id: "plan-1",
+    plan_status: "selected",
+    execution_status: "succeeded",
+    feedback_status: "completed",
+    stage_timing: {
+      present: true,
+      total_duration_ms: 42,
+      stage_count: 2,
+      slowest_stage_name: "execute_searches",
+      slowest_stage_duration_ms: 37,
+    },
+    tool_events: {
+      total_count: 4,
+      read_count: 4,
+      write_count: 0,
+      status_counts: { completed: 4 },
+      provider_counts: { mock_world: 4 },
+      latest_event: {
+        tool_name: "search_poi",
+        tool_type: "read",
+        provider: "mock_world",
+        status: "completed",
+        latency_ms: 12,
+        created_at: "2026-05-19T13:01:40+08:00",
+      },
+    },
+    recovery: {
+      entered_recovery: true,
+      attempt_count: 1,
+      max_attempts: 1,
+      terminal_action: "stop_safely",
+      terminal_status: "stopped",
+      latest_error_type: "route_infeasible",
+      replay_case_id: "family_route_failure_v1",
+    },
+  },
+} as InternalObservabilityRunSummary;
 
 const benchmarkArtifactSummary = summary.benchmark_artifact_summary!;
 const releaseGateSummary: InternalReleaseGateBenchmarkSummary = {
@@ -434,13 +475,19 @@ describe("ObservabilityPage", () => {
     await user.type(screen.getByRole("textbox", { name: "Run ID" }), "run-1");
     await user.click(screen.getByRole("button", { name: "Load Run" }));
 
+    expect(await screen.findByRole("heading", { name: "Run Summary" })).toBeInTheDocument();
+    expect(screen.getByText("Workflow Outcome")).toBeInTheDocument();
+    expect(screen.getByText("Tool Event Rollup")).toBeInTheDocument();
+    expect(screen.getByText("Recovery Digest")).toBeInTheDocument();
+    expect(screen.getByText("Latest Tool")).toBeInTheDocument();
+    expect(screen.getAllByText("family_route_failure_v1")).toHaveLength(1);
     expect(await screen.findByRole("heading", { name: "Trace Summary" })).toBeInTheDocument();
     expect(await screen.findAllByText("trace-1")).toHaveLength(2);
     expect(screen.getByText("Slowest Stage")).toBeInTheDocument();
     expect(screen.getAllByText("execute_searches")).toHaveLength(2);
     expect(screen.getByText("supervisor")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Tool Events" })).toBeInTheDocument();
-    expect(screen.getByText("search_poi")).toBeInTheDocument();
+    expect(screen.getAllByText("search_poi")).toHaveLength(2);
     expect(screen.getByText("green-table")).toBeInTheDocument();
     expect(screen.getByText(/\"query\":\"museum\"/)).toBeInTheDocument();
     expect(screen.getByText(/\"plan_id\":\"\[REDACTED\]\"/)).toBeInTheDocument();
@@ -456,7 +503,7 @@ describe("ObservabilityPage", () => {
     expect(screen.getByText("Workflow reached the expected path.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Recovery Visualization" })).toBeInTheDocument();
     expect(screen.getByText("Latest Attempt")).toBeInTheDocument();
-    expect(screen.getAllByText("stop_safely")).toHaveLength(3);
+    expect(screen.getAllByText("stop_safely")).toHaveLength(4);
     expect(screen.getByText("Recovery stopped after route failure.")).toBeInTheDocument();
     expect(screen.getByText("family_route_failure_v1")).toBeInTheDocument();
     expect(screen.getByText("var/benchmarks/family_route_failure_v1.json")).toBeInTheDocument();
@@ -532,12 +579,23 @@ describe("ObservabilityPage", () => {
     vi.mocked(getObservabilityRun).mockResolvedValue({
       ...summary,
       workflow_timing_summary: null,
+      run_summary: {
+        ...summary.run_summary!,
+        stage_timing: {
+          present: false,
+          total_duration_ms: null,
+          stage_count: null,
+          slowest_stage_name: null,
+          slowest_stage_duration_ms: null,
+        },
+      },
     });
     render(<ObservabilityPage />);
 
     await user.type(screen.getByRole("textbox", { name: "Run ID" }), "run-1");
     await user.click(screen.getByRole("button", { name: "Load Run" }));
 
+    expect(await screen.findByText("Stage timing summary is unavailable for this run.")).toBeInTheDocument();
     expect(await screen.findByText("No workflow timing summary is available for this run yet.")).toBeInTheDocument();
   });
 
@@ -585,12 +643,25 @@ describe("ObservabilityPage", () => {
     vi.mocked(getObservabilityRun).mockResolvedValue({
       ...summary,
       recovery_path_summary: null,
+      run_summary: {
+        ...summary.run_summary!,
+        recovery: {
+          entered_recovery: false,
+          attempt_count: 0,
+          max_attempts: 0,
+          terminal_action: null,
+          terminal_status: null,
+          latest_error_type: null,
+          replay_case_id: null,
+        },
+      },
     });
     render(<ObservabilityPage />);
 
     await user.type(screen.getByRole("textbox", { name: "Run ID" }), "run-1");
     await user.click(screen.getByRole("button", { name: "Load Run" }));
 
+    expect(await screen.findByText("This run did not enter bounded recovery.")).toBeInTheDocument();
     expect(await screen.findByText("This run did not enter bounded recovery.")).toBeInTheDocument();
   });
 

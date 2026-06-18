@@ -277,6 +277,47 @@ const observabilityRun = {
       benchmark_report_path: "var/benchmarks/family_route_failure_v1.json",
     },
   },
+  run_summary: {
+    schema_version: "weekendpilot_internal_run_summary_v1",
+    run_id: "run-1",
+    trace_id: "trace-1",
+    workflow_status: "completed",
+    selected_plan_id: "plan-1",
+    plan_status: "selected",
+    execution_status: "succeeded",
+    feedback_status: "completed",
+    stage_timing: {
+      present: true,
+      total_duration_ms: 42,
+      stage_count: 2,
+      slowest_stage_name: "execute_searches",
+      slowest_stage_duration_ms: 37,
+    },
+    tool_events: {
+      total_count: 4,
+      read_count: 4,
+      write_count: 0,
+      status_counts: { completed: 4 },
+      provider_counts: { mock_world: 4 },
+      latest_event: {
+        tool_name: "search_poi",
+        tool_type: "read",
+        provider: "mock_world",
+        status: "completed",
+        latency_ms: 12,
+        created_at: "2026-05-19T13:01:40+08:00",
+      },
+    },
+    recovery: {
+      entered_recovery: true,
+      attempt_count: 1,
+      max_attempts: 1,
+      terminal_action: "stop_safely",
+      terminal_status: "stopped",
+      latest_error_type: "route_infeasible",
+      replay_case_id: "family_route_failure_v1",
+    },
+  },
 };
 
 test.describe("internal observability surface", () => {
@@ -344,6 +385,11 @@ test.describe("internal observability surface", () => {
     await page.getByRole("textbox", { name: "Run ID" }).fill("run-1");
     await page.getByRole("button", { name: "Load Run" }).click();
 
+    await expect(page.getByRole("heading", { name: "Run Summary" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Workflow Outcome" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tool Event Rollup" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Recovery Digest" })).toBeVisible();
+    await expect(page.getByText("Digest: execute_searches")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Trace Summary" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Copy run report path" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Recovery Visualization" })).toBeVisible();

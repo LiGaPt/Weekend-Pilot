@@ -8,6 +8,7 @@ import type {
   InternalObservabilityRunSummary,
   InternalRecoveryPathSummary,
   InternalReleaseGateBenchmarkSummary,
+  InternalStructuredRunSummary,
   InternalToolEventSummary,
   InternalWorkflowTimingSummary,
   SystemIntegrityEvidencePathSummary,
@@ -665,9 +666,12 @@ function ObservabilityResult({
   const timing = result.workflow_timing_summary;
   const slowestStage = getSlowestStage(timing);
   const longestStageDuration = slowestStage?.total_duration_ms ?? 0;
+  const runSummary = result.run_summary;
 
   return (
     <div className="workspace observability-workspace">
+      <RunSummaryPanel summary={runSummary} />
+
       <section className="observability-review-section">
         <div className="section-heading">
           <h2>Trace Summary</h2>
@@ -820,6 +824,104 @@ function ObservabilityResult({
         />
       </div>
     </div>
+  );
+}
+
+function RunSummaryPanel({ summary }: { summary: InternalStructuredRunSummary | null }) {
+  const stageTiming = summary?.stage_timing ?? null;
+  const toolEvents = summary?.tool_events ?? null;
+  const recovery = summary?.recovery ?? null;
+  const latestTool = toolEvents?.latest_event ?? null;
+
+  return (
+    <section className="observability-review-section">
+      <div className="section-heading">
+        <h2>Run Summary</h2>
+      </div>
+      <p className="muted reviewer-note">
+        Compact structured digest of workflow outcome, stage timing, tool activity, and recovery state for this run.
+      </p>
+
+      <div className="observability-summary-grid">
+        <section className="panel">
+          <div className="section-heading">
+            <h3>Workflow Outcome</h3>
+          </div>
+          <dl className="metadata-list observability-list">
+            <MetaItem label="Run ID" value={summary?.run_id ?? null} mono />
+            <MetaItem label="Trace ID" value={summary?.trace_id ? `Digest: ${summary.trace_id}` : null} mono />
+            <MetaItem label="Workflow Status" value={summary?.workflow_status ?? null} />
+            <MetaItem label="Selected Plan" value={summary?.selected_plan_id ?? null} mono />
+            <MetaItem label="Plan Status" value={summary?.plan_status ?? null} />
+            <MetaItem label="Execution Status" value={summary?.execution_status ?? null} />
+            <MetaItem label="Feedback Status" value={summary?.feedback_status ?? null} />
+          </dl>
+        </section>
+
+        <section className="panel">
+          <div className="section-heading">
+            <h3>Stage Timing</h3>
+          </div>
+          {stageTiming?.present ? (
+            <div className="observability-metric-grid observability-timing-grid">
+              <MetricCard label="Total Duration" value={formatDurationMs(stageTiming.total_duration_ms)} />
+              <MetricCard label="Stage Count" value={stringOrNA(stageTiming.stage_count)} />
+              <MetricCard
+                label="Slowest Stage Digest"
+                value={stageTiming.slowest_stage_name ? `Digest: ${stageTiming.slowest_stage_name}` : "N/A"}
+                detail={stageTiming.slowest_stage_duration_ms === null ? null : formatDurationMs(stageTiming.slowest_stage_duration_ms)}
+                mono={stageTiming.slowest_stage_name !== null}
+              />
+            </div>
+          ) : (
+            <p className="muted">Stage timing summary is unavailable for this run.</p>
+          )}
+        </section>
+
+        <section className="panel">
+          <div className="section-heading">
+            <h3>Tool Event Rollup</h3>
+          </div>
+          <div className="observability-metric-grid observability-tool-rollup-grid">
+            <MetricCard label="Total Events" value={String(toolEvents?.total_count ?? 0)} />
+            <MetricCard label="Read Events" value={String(toolEvents?.read_count ?? 0)} />
+            <MetricCard label="Write Events" value={String(toolEvents?.write_count ?? 0)} />
+            <MetricCard label="Providers" value={String(Object.keys(toolEvents?.provider_counts ?? {}).length)} />
+          </div>
+          <dl className="metadata-list observability-list">
+            <MetaItem label="Latest Tool" value={latestTool?.tool_name ?? null} />
+            <MetaItem label="Latest Type" value={latestTool?.tool_type ?? null} />
+            <MetaItem label="Latest Provider" value={latestTool?.provider ?? null} />
+            <MetaItem label="Latest Status" value={latestTool?.status ?? null} />
+            <MetaItem
+              label="Latest Latency"
+              value={latestTool?.latency_ms === null || latestTool === null ? null : formatDurationMs(latestTool.latency_ms)}
+            />
+            <MetaItem label="Latest Created At" value={latestTool?.created_at ?? null} />
+          </dl>
+        </section>
+
+        <section className="panel">
+          <div className="section-heading">
+            <h3>Recovery Digest</h3>
+          </div>
+          <dl className="metadata-list observability-list">
+            <MetaItem label="Entered Recovery" value={recovery ? String(recovery.entered_recovery) : null} />
+            <MetaItem label="Attempt Count" value={recovery ? String(recovery.attempt_count) : null} />
+            <MetaItem label="Max Attempts" value={recovery ? String(recovery.max_attempts) : null} />
+            <MetaItem label="Terminal Action" value={recovery?.terminal_action ?? null} />
+            <MetaItem label="Terminal Status" value={recovery?.terminal_status ?? null} />
+            <MetaItem label="Latest Error Type" value={recovery?.latest_error_type ?? null} />
+            <MetaItem
+              label="Replay Case ID"
+              value={recovery?.replay_case_id ? `Digest: ${recovery.replay_case_id}` : null}
+              mono
+            />
+          </dl>
+          {!recovery?.entered_recovery ? <p className="muted">Recovery digest indicates no bounded recovery for this run.</p> : null}
+        </section>
+      </div>
+    </section>
   );
 }
 

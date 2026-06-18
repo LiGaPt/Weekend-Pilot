@@ -562,6 +562,31 @@ def test_internal_observability_service_builds_sanitized_run_summary(db_session:
     assert summary.observability_summary.local_buffer_error == {"api_key": "[REDACTED]", "message": "buffer-failed"}
     assert summary.observability_summary.langsmith_error == "langsmith-down"
     assert summary.benchmark_artifact_summary is None
+    assert summary.run_summary is not None
+    assert summary.run_summary.schema_version == "weekendpilot_internal_run_summary_v1"
+    assert str(summary.run_summary.run_id) == str(run.run_id)
+    assert summary.run_summary.trace_id == "trace-demo"
+    assert summary.run_summary.workflow_status == "completed"
+    assert summary.run_summary.execution_status == "succeeded"
+    assert summary.run_summary.feedback_status == "completed"
+    assert summary.run_summary.selected_plan_id == str(selected.plan_id)
+    assert summary.run_summary.plan_status == "selected"
+    assert summary.run_summary.stage_timing.present is True
+    assert summary.run_summary.stage_timing.total_duration_ms == 42
+    assert summary.run_summary.stage_timing.stage_count == 2
+    assert summary.run_summary.stage_timing.slowest_stage_name == "execute_searches"
+    assert summary.run_summary.stage_timing.slowest_stage_duration_ms == 37
+    assert summary.run_summary.tool_events.total_count == 1
+    assert summary.run_summary.tool_events.read_count == 1
+    assert summary.run_summary.tool_events.write_count == 0
+    assert summary.run_summary.tool_events.status_counts == {"completed": 1}
+    assert summary.run_summary.tool_events.provider_counts == {"mock_world": 1}
+    assert summary.run_summary.tool_events.latest_event is not None
+    assert summary.run_summary.tool_events.latest_event.tool_name == "search_poi"
+    assert summary.run_summary.tool_events.latest_event.provider == "mock_world"
+    assert summary.run_summary.recovery.entered_recovery is False
+    assert summary.run_summary.recovery.attempt_count == 0
+    assert summary.run_summary.recovery.max_attempts == 0
 
 
 def test_internal_observability_service_handles_missing_optional_metadata(db_session: Session) -> None:
@@ -587,6 +612,14 @@ def test_internal_observability_service_handles_missing_optional_metadata(db_ses
     assert summary.observability_summary.langsmith_error is None
     assert summary.benchmark_artifact_summary is None
     assert summary.recovery_path_summary is None
+    assert summary.run_summary is not None
+    assert summary.run_summary.trace_id is None
+    assert summary.run_summary.stage_timing.present is False
+    assert summary.run_summary.stage_timing.total_duration_ms is None
+    assert summary.run_summary.tool_events.total_count == 0
+    assert summary.run_summary.tool_events.latest_event is None
+    assert summary.run_summary.recovery.entered_recovery is False
+    assert summary.run_summary.recovery.terminal_action is None
 
 
 def test_load_run_summary_returns_none_for_malformed_stored_summary() -> None:
@@ -719,6 +752,19 @@ def test_internal_observability_service_prefers_canonical_summary_when_present(d
     assert summary.observability_summary.trace_id == "trace-observability"
     assert summary.preview_diagnostics is not None
     assert summary.preview_diagnostics.provider_event_count == 9
+    assert summary.run_summary is not None
+    assert summary.run_summary.trace_id == "trace-from-summary"
+    assert summary.run_summary.execution_status == "summary-executed"
+    assert summary.run_summary.feedback_status == "summary-feedback"
+    assert summary.run_summary.selected_plan_id == run.metadata_json["summary"]["selected_plan_id"]
+    assert summary.run_summary.plan_status == "selected"
+    assert summary.run_summary.stage_timing.present is True
+    assert summary.run_summary.stage_timing.total_duration_ms == 99
+    assert summary.run_summary.tool_events.total_count == 1
+    assert summary.run_summary.tool_events.read_count == 1
+    assert summary.run_summary.tool_events.write_count == 0
+    assert summary.run_summary.tool_events.provider_counts == {"mock_world": 1}
+    assert summary.run_summary.recovery.entered_recovery is False
 
 
 def test_internal_observability_service_recomputes_missing_preview_diagnostics_for_amap_runs(
@@ -971,6 +1017,14 @@ def test_internal_observability_service_returns_recovery_path_summary_when_prese
         summary.recovery_path_summary.replay_source.benchmark_report_path
         == "var/benchmarks/family_route_failure_v1.json"
     )
+    assert summary.run_summary is not None
+    assert summary.run_summary.recovery.entered_recovery is True
+    assert summary.run_summary.recovery.attempt_count == 1
+    assert summary.run_summary.recovery.max_attempts == 1
+    assert summary.run_summary.recovery.terminal_action == "stop_safely"
+    assert summary.run_summary.recovery.terminal_status == "stopped"
+    assert summary.run_summary.recovery.latest_error_type == "route_infeasible"
+    assert summary.run_summary.recovery.replay_case_id == "family_route_failure_v1"
 
 
 def test_internal_observability_service_skips_malformed_recovery_attempts(
