@@ -15,13 +15,18 @@ from backend.app.observability.schemas import (
     InternalActionLedgerSummary,
     InternalBenchmarkArtifactSummary,
     InternalBenchmarkScoreSummary,
+    InternalStructuredRunSummary,
     InternalBenchmarkTaxonomySummary,
     InternalRecoveryAttemptSummary,
     InternalRecoveryPathSummary,
     InternalRecoveryReplaySourceSummary,
     InternalObservabilityRunSummary,
     InternalObservabilitySummary,
+    InternalRunSummaryLatestToolEvent,
+    InternalRunSummaryRecoveryDigest,
+    InternalRunSummaryStageTimingDigest,
     InternalToolEventSummary,
+    InternalRunSummaryToolEventDigest,
 )
 from backend.app.observability.summary import RunSummary, build_preview_diagnostics, load_run_summary
 from backend.app.repositories import (
@@ -51,6 +56,8 @@ class InternalObservabilityService:
         metadata = self._metadata(run)
         canonical_summary = load_run_summary(metadata)
         tool_events = ToolEventRepository(self.session).list_for_run(run_id)
+        workflow_timing_summary = self._workflow_timing_summary(metadata, canonical_summary)
+        recovery_path_summary = self._recovery_path_summary(metadata)
 
         return InternalObservabilityRunSummary(
             run_id=run.run_id,
@@ -74,10 +81,19 @@ class InternalObservabilityService:
             preview_diagnostics=self._preview_diagnostics(run, canonical_summary, tool_events),
             tool_event_summaries=self._tool_event_summaries(tool_events),
             action_ledger_summaries=self._action_ledger_summaries(run.run_id),
-            workflow_timing_summary=self._workflow_timing_summary(metadata, canonical_summary),
+            workflow_timing_summary=workflow_timing_summary,
             observability_summary=self._observability_summary(metadata),
             benchmark_artifact_summary=self._benchmark_artifact_summary(metadata),
-            recovery_path_summary=self._recovery_path_summary(metadata),
+            recovery_path_summary=recovery_path_summary,
+            run_summary=self._structured_run_summary(
+                run=run,
+                selected_plan=selected_plan,
+                metadata=metadata,
+                canonical_summary=canonical_summary,
+                workflow_timing_summary=workflow_timing_summary,
+                tool_events=tool_events,
+                recovery_path_summary=recovery_path_summary,
+            ),
         )
 
     def _metadata(self, run: AgentRun) -> dict[str, Any]:
@@ -368,6 +384,116 @@ class InternalObservabilityService:
         if canonical_summary is not None and canonical_summary.preview_diagnostics is not None:
             return canonical_summary.preview_diagnostics
         return build_preview_diagnostics(run, tool_events)
+
+    def _structured_run_summary(
+        self,
+        *,
+        run: AgentRun,
+        selected_plan: Plan | None,
+        metadata: dict[str, Any],
+        canonical_summary: RunSummary | None,
+        workflow_timing_summary: WorkflowTimingSummary | None,
+        tool_events: list[ToolEvent],
+        recovery_path_summary: InternalRecoveryPathSummary | None,
+    ) -> InternalStructuredRunSummary:
+        selected_plan_id = (
+            canonical_summary.selected_plan_id
+            if canonical_summary is not None
+            else (str(selected_plan.plan_id) if selected_plan is not None else None)
+        )
+        plan_status = canonical_summary.plan_status if canonical_summary is not None else (selected_plan.status if selected_plan else None)
+        execution_status = self._execution_status(self._plan_json(selected_plan), canonical_summary)
+        feedback_status = self._feedback_status(self._plan_json(selected_plan), canonical_summary)
+
+        return InternalStructuredRunSummary(
+            run_id=run.run_id,
+            trace_id=self._trace_id(metadata, canonical_summary),
+            workflow_status=run.status,
+            selected_plan_id=selected_plan_id,
+            plan_status=plan_status,
+            execution_status=execution_status,
+            feedback_status=feedback_status,
+            stage_timing=self._stage_timing_digest(workflow_timing_summary),
+            tool_events=self._tool_event_digest(tool_events),
+            recovery=self._recovery_digest(recovery_path_summary),
+        )
+
+    def _stage_timing_digest(
+        self,
+        workflow_timing_summary: WorkflowTimingSummary | None,
+    ) -> InternalRunSummaryStageTimingDigest:
+        if workflow_timing_summary is None:
+            return InternalRunSummaryStageTimingDigest(present=False)
+
+        slowest_stage = max(
+            workflow_timing_summary.stages,
+            key=lambda stage: stage.total_duration_ms,
+            default=None,
+        )
+        return InternalRunSummaryStageTimingDigest(
+            present=True,
+            total_duration_ms=workflow_timing_summary.total_duration_ms,
+            stage_count=workflow_timing_summary.stage_count,
+            slowest_stage_name=slowest_stage.node_name if slowest_stage is not None else None,
+            slowest_stage_duration_ms=slowest_stage.total_duration_ms if slowest_stage is not None else None,
+        )
+
+    def _tool_event_digest(self, tool_events: list[ToolEvent]) -> InternalRunSummaryToolEventDigest:
+        status_counts: dict[str, int] = {}
+        provider_counts: dict[str, int] = {}
+        read_count = 0
+        write_count = 0
+
+        for event in tool_events:
+            status_counts[event.status] = status_counts.get(event.status, 0) + 1
+            provider_counts[event.provider] = provider_counts.get(event.provider, 0) + 1
+            if event.tool_type == "read":
+                read_count += 1
+            else:
+                write_count += 1
+
+        latest_event = tool_events[-1] if tool_events else None
+        return InternalRunSummaryToolEventDigest(
+            total_count=len(tool_events),
+            read_count=read_count,
+            write_count=write_count,
+            status_counts=status_counts,
+            provider_counts=provider_counts,
+            latest_event=(
+                InternalRunSummaryLatestToolEvent(
+                    tool_name=latest_event.tool_name,
+                    tool_type=latest_event.tool_type,
+                    provider=latest_event.provider,
+                    status=latest_event.status,
+                    latency_ms=latest_event.latency_ms,
+                    created_at=latest_event.created_at,
+                )
+                if latest_event is not None
+                else None
+            ),
+        )
+
+    def _recovery_digest(
+        self,
+        recovery_path_summary: InternalRecoveryPathSummary | None,
+    ) -> InternalRunSummaryRecoveryDigest:
+        if recovery_path_summary is None or recovery_path_summary.attempt_count == 0 or not recovery_path_summary.attempts:
+            return InternalRunSummaryRecoveryDigest()
+
+        latest_attempt = max(recovery_path_summary.attempts, key=lambda attempt: attempt.attempt_index)
+        return InternalRunSummaryRecoveryDigest(
+            entered_recovery=True,
+            attempt_count=recovery_path_summary.attempt_count,
+            max_attempts=recovery_path_summary.max_attempts,
+            terminal_action=latest_attempt.recovery_action,
+            terminal_status=latest_attempt.status,
+            latest_error_type=latest_attempt.error_type,
+            replay_case_id=(
+                recovery_path_summary.replay_source.case_id
+                if recovery_path_summary.replay_source is not None
+                else None
+            ),
+        )
 
 
 def _preview_payload(value: Any) -> dict[str, Any] | None:

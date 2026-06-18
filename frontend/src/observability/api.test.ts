@@ -46,7 +46,48 @@ const summary: InternalObservabilityRunSummary = {
   },
   benchmark_artifact_summary: null,
   recovery_path_summary: null,
-};
+  run_summary: {
+    schema_version: "weekendpilot_internal_run_summary_v1",
+    run_id: "run-1",
+    trace_id: "trace-1",
+    workflow_status: "completed",
+    selected_plan_id: "plan-1",
+    plan_status: "selected",
+    execution_status: "succeeded",
+    feedback_status: "completed",
+    stage_timing: {
+      present: true,
+      total_duration_ms: 42,
+      stage_count: 1,
+      slowest_stage_name: "initialize",
+      slowest_stage_duration_ms: 42,
+    },
+    tool_events: {
+      total_count: 4,
+      read_count: 4,
+      write_count: 0,
+      status_counts: { completed: 4 },
+      provider_counts: { mock_world: 4 },
+      latest_event: {
+        tool_name: "search_poi",
+        tool_type: "read",
+        provider: "mock_world",
+        status: "completed",
+        latency_ms: 12,
+        created_at: "2026-05-19T13:01:40+08:00",
+      },
+    },
+    recovery: {
+      entered_recovery: false,
+      attempt_count: 0,
+      max_attempts: 0,
+      terminal_action: null,
+      terminal_status: null,
+      latest_error_type: null,
+      replay_case_id: null,
+    },
+  },
+} as InternalObservabilityRunSummary;
 
 const integritySummary: SystemIntegritySummary = {
   schema_version: "weekendpilot_system_integrity_summary_v1",
@@ -232,9 +273,11 @@ describe("internal observability API client", () => {
   });
 
   it("calls the internal observability endpoint with the run ID", async () => {
-    await getObservabilityRun("run-1");
+    const result = await getObservabilityRun("run-1");
 
     expect(fetch).toHaveBeenCalledWith("http://127.0.0.1:8000/internal/runs/run-1/observability");
+    expect(result.run_summary?.stage_timing.slowest_stage_name).toBe("initialize");
+    expect(result.run_summary?.tool_events.total_count).toBe(4);
   });
 
   it("calls the system integrity summary endpoint", async () => {

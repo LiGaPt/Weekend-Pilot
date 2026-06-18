@@ -397,6 +397,47 @@ def test_internal_observability_route_returns_sanitized_run_summary(
         "token": "[REDACTED]",
         "message": "none",
     }
+    assert payload["run_summary"] == {
+        "schema_version": "weekendpilot_internal_run_summary_v1",
+        "run_id": str(run.run_id),
+        "trace_id": "trace-demo",
+        "workflow_status": "running",
+        "selected_plan_id": None,
+        "plan_status": None,
+        "execution_status": None,
+        "feedback_status": None,
+        "stage_timing": {
+            "present": True,
+            "total_duration_ms": 25,
+            "stage_count": 1,
+            "slowest_stage_name": "initialize",
+            "slowest_stage_duration_ms": 25,
+        },
+        "tool_events": {
+            "total_count": 1,
+            "read_count": 1,
+            "write_count": 0,
+            "status_counts": {"completed": 1},
+            "provider_counts": {"mock_world": 1},
+            "latest_event": {
+                "tool_name": "search_poi",
+                "tool_type": "read",
+                "provider": "mock_world",
+                "status": "completed",
+                "latency_ms": 10,
+                "created_at": payload["run_summary"]["tool_events"]["latest_event"]["created_at"],
+            },
+        },
+        "recovery": {
+            "entered_recovery": False,
+            "attempt_count": 0,
+            "max_attempts": 0,
+            "terminal_action": None,
+            "terminal_status": None,
+            "latest_error_type": None,
+            "replay_case_id": None,
+        },
+    }
     assert payload["preview_diagnostics"] is None
     serialized = json.dumps(payload, sort_keys=True)
     assert "idempotency_key" not in serialized
@@ -1024,7 +1065,63 @@ def test_internal_observability_route_returns_recovery_path_summary_for_recovery
         "case_id": "family_route_failure_v1",
         "benchmark_report_path": result.report_path,
     }
+    assert payload["run_summary"]["recovery"] == {
+        "entered_recovery": True,
+        "attempt_count": 1,
+        "max_attempts": 2,
+        "terminal_action": "stop_safely",
+        "terminal_status": "stopped",
+        "latest_error_type": "draft_exists",
+        "replay_case_id": "family_route_failure_v1",
+    }
     serialized = json.dumps(payload, sort_keys=True)
     assert "action_id" not in serialized
     assert "tool_event_id" not in serialized
     assert "idempotency_key" not in serialized
+
+
+def test_internal_observability_route_returns_degraded_run_summary_without_timing_or_recovery(
+    db_session: Session,
+    observability_client: TestClient,
+) -> None:
+    run = _create_run(db_session)
+    db_session.commit()
+
+    response = observability_client.get(f"/internal/runs/{run.run_id}/observability")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["run_summary"] == {
+        "schema_version": "weekendpilot_internal_run_summary_v1",
+        "run_id": str(run.run_id),
+        "trace_id": None,
+        "workflow_status": "running",
+        "selected_plan_id": None,
+        "plan_status": None,
+        "execution_status": None,
+        "feedback_status": None,
+        "stage_timing": {
+            "present": False,
+            "total_duration_ms": None,
+            "stage_count": None,
+            "slowest_stage_name": None,
+            "slowest_stage_duration_ms": None,
+        },
+        "tool_events": {
+            "total_count": 0,
+            "read_count": 0,
+            "write_count": 0,
+            "status_counts": {},
+            "provider_counts": {},
+            "latest_event": None,
+        },
+        "recovery": {
+            "entered_recovery": False,
+            "attempt_count": 0,
+            "max_attempts": 0,
+            "terminal_action": None,
+            "terminal_status": None,
+            "latest_error_type": None,
+            "replay_case_id": None,
+        },
+    }

@@ -273,6 +273,56 @@ export type SystemIntegrityRedactionSummary = {
   forbidden_key_markers: string[];
 };
 
+export type InternalRunSummaryStageTimingDigest = {
+  present: boolean;
+  total_duration_ms: number | null;
+  stage_count: number | null;
+  slowest_stage_name: string | null;
+  slowest_stage_duration_ms: number | null;
+};
+
+export type InternalRunSummaryLatestToolEvent = {
+  tool_name: string;
+  tool_type: string;
+  provider: string;
+  status: string;
+  latency_ms: number | null;
+  created_at: string;
+};
+
+export type InternalRunSummaryToolEventDigest = {
+  total_count: number;
+  read_count: number;
+  write_count: number;
+  status_counts: Record<string, number>;
+  provider_counts: Record<string, number>;
+  latest_event: InternalRunSummaryLatestToolEvent | null;
+};
+
+export type InternalRunSummaryRecoveryDigest = {
+  entered_recovery: boolean;
+  attempt_count: number;
+  max_attempts: number;
+  terminal_action: string | null;
+  terminal_status: string | null;
+  latest_error_type: string | null;
+  replay_case_id: string | null;
+};
+
+export type InternalStructuredRunSummary = {
+  schema_version: string;
+  run_id: string;
+  trace_id: string | null;
+  workflow_status: string;
+  selected_plan_id: string | null;
+  plan_status: string | null;
+  execution_status: string | null;
+  feedback_status: string | null;
+  stage_timing: InternalRunSummaryStageTimingDigest;
+  tool_events: InternalRunSummaryToolEventDigest;
+  recovery: InternalRunSummaryRecoveryDigest;
+};
+
 export type SystemIntegritySummary = {
   schema_version: string;
   status: SystemIntegrityStatus;
@@ -313,4 +363,5 @@ export type InternalObservabilityRunSummary = {
   observability_summary: InternalObservabilitySummary;
   benchmark_artifact_summary: InternalBenchmarkArtifactSummary | null;
   recovery_path_summary: InternalRecoveryPathSummary | null;
+  run_summary: InternalStructuredRunSummary | null;
 };
