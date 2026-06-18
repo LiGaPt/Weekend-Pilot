@@ -211,12 +211,6 @@ function PlanCard({
           </div>
         ) : null}
 
-        <div className="detail-disclosure-stack">
-          {item.sections.map((section) => (
-            <PlanSectionDisclosure key={section.id} section={section} plan={item.plan} />
-          ))}
-        </div>
-
         {isActive ? <RunInfoDisclosure info={item.hiddenRunInfo} /> : null}
 
         {item.readOnlyPreview ? (
@@ -327,7 +321,6 @@ function RunInfoDisclosure({ info }: { info: HiddenRunInfo }) {
 }
 
 function ResultCard({ item }: { item: AssistantResultCardItem }) {
-  const [timelineOpen, setTimelineOpen] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState<"success" | "error" | null>(null);
 
   const handleCopy = async () => {
@@ -370,41 +363,6 @@ function ResultCard({ item }: { item: AssistantResultCardItem }) {
         ) : null}
         {item.message ? <p>{item.message}</p> : null}
 
-        <DisclosureBlock
-          title="执行时间线"
-          isOpen={timelineOpen}
-          onToggle={() => setTimelineOpen((current) => !current)}
-          testId="execution-timeline-toggle"
-        >
-          <section data-testid="execution-timeline">
-            {item.executionWindow.startedAt || item.executionWindow.finishedAt ? (
-              <dl className="compact-list execution-window-list">
-                <div>
-                  <dt>开始</dt>
-                  <dd>{display(item.executionWindow.startedAt)}</dd>
-                </div>
-                <div>
-                  <dt>结束</dt>
-                  <dd>{display(item.executionWindow.finishedAt)}</dd>
-                </div>
-              </dl>
-            ) : null}
-            {item.executionTimeline.length ? (
-              <ol className="execution-timeline-list">
-                {item.executionTimeline.map((step) => (
-                  <li key={`${step.executionOrder}-${step.actionRef ?? step.targetId ?? step.label}`}>
-                    <span className="requirement">第 {step.executionOrder} 步</span>
-                    <span className="action-type">{step.label}</span>
-                    <span>{step.targetId || "暂无目标"}</span>
-                    <span className="muted">{step.statusLabel}</span>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="muted">已生成执行结果，但当前没有可展示的执行动作。</p>
-            )}
-          </section>
-        </DisclosureBlock>
 
         <FeedbackList title="已完成动作" items={item.completedActions} />
         <FeedbackList title="失败动作" items={item.failedActions} />

@@ -370,9 +370,11 @@ test.describe("desktop web demo", () => {
 
     const progressCard = await expandLatestCompletedSteps(page);
     await expect(progressCard.getByTestId("progress-completed-list")).toContainText("\u5df2\u627e\u5230");
-
-    await page.getByRole("button", { name: "\u65f6\u95f4\u7ebf" }).last().click();
-    await expect(page.locator(".timeline-list li").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "\u65f6\u95f4\u7ebf" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "\u6d3b\u52a8\u4e0e\u9910\u5385" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "\u8def\u7ebf\u4e0e\u53ef\u6267\u884c\u6027" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "\u786e\u8ba4\u524d\u52a8\u4f5c" })).toHaveCount(0);
+    await expect(page.locator(".timeline-list li")).toHaveCount(0);
 
     await page.getByTestId("confirm-button").click();
 
@@ -385,8 +387,8 @@ test.describe("desktop web demo", () => {
     await expect(resultCard.getByTestId("final-arrangement-message")).toContainText("出发");
     await expect(resultCard.getByTestId("final-arrangement-copy-button")).toBeVisible();
 
-    await page.getByTestId("execution-timeline-toggle").click();
-    await expect(page.getByTestId("execution-timeline")).toBeVisible();
+    await expect(page.getByTestId("execution-timeline-toggle")).toHaveCount(0);
+    await expect(page.getByTestId("execution-timeline")).toHaveCount(0);
     await expect(page.getByTestId("confirm-button")).toHaveCount(0);
   });
 
@@ -432,12 +434,12 @@ test.describe("desktop web demo", () => {
     await startPresentableDemoRun(page, friendsGroupPrompt, friendsGroupPrompt);
 
     await expect(page.getByTestId("confirm-button")).toBeVisible();
-    await page.getByRole("button", { name: "\u6d3b\u52a8\u4e0e\u9910\u5385" }).last().click();
-    await expect(page.locator("body")).toContainText("\u9002\u5408\u670b\u53cb\u805a\u4f1a");
+    await expect(page.locator("body")).toContainText("苏河边草坪聚会点 + 庭院分享餐吧");
     await expect(page.locator("body")).not.toContainText("group_friendly");
     await expect(page.locator("body")).not.toContainText("Patio Queue House");
     await expect(page.locator("body")).not.toContainText("Quiet Bistro Corner");
-    await page.getByRole("button", { name: "\u8def\u7ebf\u4e0e\u53ef\u6267\u884c\u6027" }).last().click();
+    await expect(page.getByRole("button", { name: "\u6d3b\u52a8\u4e0e\u9910\u5385" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "\u8def\u7ebf\u4e0e\u53ef\u6267\u884c\u6027" })).toHaveCount(0);
     await expect(page.locator("body")).not.toContainText("A usable outdoor link");
     await expect(page.locator("body")).not.toContainText("A valid route to the quieter dinner fallback");
 
@@ -446,21 +448,20 @@ test.describe("desktop web demo", () => {
     await expect(page.getByTestId("assistant-result-card")).toBeVisible({ timeout: 60_000 });
   });
 
-  test("order addon path shows preview, confirms, and keeps readable add-on labels", async ({ page }) => {
+  test("order addon path keeps action preview and execution detail hidden on the customer page", async ({ page }) => {
     await startPresentableDemoRun(page, explicitAddonPrompt, explicitAddonPrompt);
 
-    await page.getByRole("button", { name: "\u786e\u8ba4\u524d\u52a8\u4f5c" }).last().click();
-    await expect(page.locator("body")).toContainText("\u52a0\u8d2d");
-    await expect(page.locator("body")).toContainText("\u5c0f\u6c34\u5206\u8865\u7ed9\u7ad9");
+    await expect(page.getByRole("button", { name: "确认前动作" })).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText("加购");
+    await expect(page.locator("body")).not.toContainText("小水分补给站");
     await expect(page.locator("body")).not.toContainText("addon_drinks_001");
 
     await page.getByTestId("confirm-button").click();
 
     const resultCard = page.getByTestId("assistant-result-card").last();
     await expect(resultCard).toBeVisible({ timeout: 60_000 });
-    await page.getByTestId("execution-timeline-toggle").click();
-    await expect(page.getByTestId("execution-timeline")).toContainText("\u52a0\u8d2d");
-    await expect(page.getByTestId("execution-timeline")).toContainText("\u5c0f\u6c34\u5206\u8865\u7ed9\u7ad9");
+    await expect(page.getByTestId("execution-timeline-toggle")).toHaveCount(0);
+    await expect(page.getByTestId("execution-timeline")).toHaveCount(0);
   });
 
   test("scenario preset selector sends the explicit mock world profile", async ({ page }) => {
@@ -604,7 +605,9 @@ test.describe("desktop web demo", () => {
     await startPresentableDemoRun(page, explicitHappyPathPrompt, explicitHappyPathClarificationReply);
 
     await expect(page.getByTestId("run-id")).toHaveCount(0);
-    await expect(page.getByTestId("run-info-toggle")).toHaveCount(0);
+    await expect(page.getByTestId("run-info-toggle")).toHaveCount(1);
+    await expect(page.getByTestId("run-info-toggle")).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByTestId("run-id-value")).toHaveCount(0);
     await expectNoForbiddenVisibleText(page);
   });
 });
@@ -621,7 +624,7 @@ test.describe("mobile web demo", () => {
     if (stage === "confirmation") {
       await expectLatestProgressStepperCollapsed(page);
       await expect(page.getByTestId("replan-panel")).toBeVisible();
-      await expect(page.getByRole("button", { name: "\u65f6\u95f4\u7ebf" }).last()).toBeVisible();
+      await expect(page.getByRole("button", { name: "\u65f6\u95f4\u7ebf" })).toHaveCount(0);
     } else {
       await expectLatestProgressStepperCollapsed(page);
       await expect(page.getByTestId("clarification-card")).toBeVisible();

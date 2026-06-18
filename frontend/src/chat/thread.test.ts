@@ -326,7 +326,7 @@ describe("projectConversationThread", () => {
 
     const planCard = items.find((item) => item.kind === "assistant_plan_card");
     expect(planCard).toBeDefined();
-    expect(planCard?.sections.every((section) => section.collapsedByDefault)).toBe(true);
+    expect(planCard?.sections).toEqual([]);
     expect(planCard?.hiddenRunInfo.collapsedByDefault).toBe(true);
     expect(planCard?.visibleBadges).toEqual(["v1", "\u7b49\u5f85\u786e\u8ba4"]);
   });
@@ -361,8 +361,7 @@ describe("projectConversationThread", () => {
     expect(resultIndex).toBeGreaterThan(progressIndex);
 
     const resultCard = items.find((item) => item.kind === "assistant_result_card");
-    expect(resultCard?.timelineCollapsedByDefault).toBe(true);
-    expect(resultCard?.executionTimeline.map((step) => step.executionOrder)).toEqual([1, 2]);
+    expect(resultCard?.executionTimeline).toEqual([]);
     expect(resultCard?.headline).toBe("安排已完成");
     expect(resultCard?.finalArrangementMessage).toBe("搞定了，下午 2 点出发，先去亲子科学中心，再到轻食餐桌；订座和后续消息都已安排好");
     expect(resultCard?.message).toBe("订座和后续消息都已完成。");

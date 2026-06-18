@@ -336,8 +336,7 @@ describe("ConversationThread", () => {
     expect(screen.getByText("已复制")).toBeInTheDocument();
   });
 
-  it("localizes demo fallback names and hides internal action target ids", async () => {
-    const user = userEvent.setup();
+  it("localizes demo fallback names and keeps reviewer detail controls hidden", () => {
     const items = projectConversationThread({
       entries: [{ id: "run-localization", kind: "run", run: runWithEnglishDemoData }],
       activeRunId: "run-localization",
@@ -357,27 +356,18 @@ describe("ConversationThread", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "徐汇亲子科学馆 + 花园家庭轻食餐室" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "滨江亲子阅读馆 + 绿碗家庭轻食" })).toBeInTheDocument();
+    expect(screen.getAllByRole("tab")).toHaveLength(2);
+    expect(screen.getByRole("tab", { selected: true })).toBeInTheDocument();
+    expect(screen.getByTestId("confirm-button")).toBeInTheDocument();
+    expect(screen.getByTestId("decline-button")).toBeInTheDocument();
+    expect(screen.getByTestId("replan-panel")).toBeInTheDocument();
     expect(screen.queryByText(/Garden Supper Room|Riverside Reading Hall/)).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "路线与可执行性" }));
-    expect(screen.getByText("博物馆到花园轻食餐厅的步行路线稍长，但仍可用于备选家庭晚餐。")).toBeInTheDocument();
     expect(screen.queryByText(/museum-to-garden-dining|fallback family dinner/)).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "确认前动作" }));
-    const ticketAction = screen.getByText("订票").closest("li");
-    const reservationAction = screen.getByText("订座").closest("li");
-    if (!ticketAction || !reservationAction) {
-      throw new Error("Expected pre-confirmation action rows to render.");
-    }
-    expect(within(ticketAction).getByText("徐汇亲子科学馆")).toBeInTheDocument();
-    expect(within(reservationAction).getByText("花园家庭轻食餐室")).toBeInTheDocument();
     expect(screen.queryByText(/activity_museum_001|restaurant_garden_001/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/book_ticket|reserve_restaurant|proposed_actions/)).not.toBeInTheDocument();
   });
 
-  it("renders order_addon with readable labels in the pre-confirmation action list", async () => {
-    const user = userEvent.setup();
+  it("keeps order_addon preview details hidden on the customer plan card", () => {
     const items = projectConversationThread({
       entries: [{ id: "run-addon", kind: "run", run: runWithAddonActionManifest }],
       activeRunId: "run-addon",
@@ -397,10 +387,10 @@ describe("ConversationThread", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "\u786e\u8ba4\u524d\u52a8\u4f5c" }));
-    expect(screen.getByText("\u52a0\u8d2d")).toBeInTheDocument();
-    expect(screen.getByText("\u5c0f\u6c34\u5206\u8865\u7ed9\u7ad9")).toBeInTheDocument();
+    expect(screen.queryByText(/order_addon/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Confirm to place the add-on order\./)).not.toBeInTheDocument();
     expect(screen.queryByText("addon_drinks_001")).not.toBeInTheDocument();
+    expect(screen.queryByText(/water/i)).not.toBeInTheDocument();
   });
 
   it("renders the final arrangement message and copies it successfully", async () => {
@@ -651,8 +641,7 @@ describe("ConversationThread", () => {
       translatedRoute: "这条路线可用，但比首选公园到便当店的步行更长。",
       translatedTag: "预算有限",
     },
-  ])("localizes reviewer-visible fallback text for $name scenario", async ({ run, translatedName, rawText, translatedRoute, translatedTag }) => {
-    const user = userEvent.setup();
+  ])("localizes visible customer-facing fallback text for $name scenario", ({ run, translatedName, rawText, translatedRoute, translatedTag }) => {
     const items = projectConversationThread({
       entries: [{ id: run.run_id, kind: "run", run }],
       activeRunId: run.run_id,
@@ -673,15 +662,12 @@ describe("ConversationThread", () => {
     );
 
     expect(screen.getByRole("heading", { name: new RegExp(translatedName) })).toBeInTheDocument();
+    expect(screen.getByTestId("confirm-button")).toBeInTheDocument();
+    expect(screen.getByTestId("decline-button")).toBeInTheDocument();
     expect(screen.queryByText(rawText)).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "路线与可执行性" }));
-    expect(screen.getByText(translatedRoute)).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "活动与餐厅" }));
-    expect(document.body.textContent).toContain(translatedTag);
-
-    await user.click(screen.getByRole("button", { name: "确认前动作" }));
+    expect(screen.queryByText(translatedRoute)).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(translatedTag);
     expect(screen.queryByText(/activity_|restaurant_/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/reserve_restaurant|proposed_actions/)).not.toBeInTheDocument();
   });
 });

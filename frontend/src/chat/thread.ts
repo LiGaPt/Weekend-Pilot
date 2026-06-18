@@ -453,32 +453,7 @@ function buildPlanCardItem(
     versionLabel: run.plan_version.version_label,
     visibleBadges: [run.plan_version.version_label, statusLabel(run.status) || run.status],
     alternativePlans: planOptions,
-    sections: [
-      {
-        id: "timeline",
-        title: "时间线",
-        collapsedByDefault: true,
-        hasContent: Boolean(plan.timeline?.length),
-      },
-      {
-        id: "activity_dining",
-        title: "活动与餐厅",
-        collapsedByDefault: true,
-        hasContent: Boolean(plan.activity || plan.dining),
-      },
-      {
-        id: "route_feasibility",
-        title: "路线与可执行性",
-        collapsedByDefault: true,
-        hasContent: Boolean(plan.route || plan.feasibility),
-      },
-      {
-        id: "pre_confirmation_actions",
-        title: "确认前动作",
-        collapsedByDefault: true,
-        hasContent: Boolean(plan.action_manifest.actions.length),
-      },
-    ],
+    sections: [],
     readOnlyPreview: isReadOnlyPreview,
     canConfirm,
     canDecline,
@@ -510,7 +485,7 @@ function buildResultCardItem(run: DemoRunSummary, plan: DemoPlanPreview): Assist
       (isDeclined ? "已在执行前放弃当前方案。" : null),
     finalArrangementMessage: userFacingText(feedback?.final_arrangement_message) || null,
     outcomeLabel,
-    executionTimeline,
+    executionTimeline: [],
     timelineCollapsedByDefault: true,
     executionWindow: {
       startedAt: plan.execution?.started_at ?? null,

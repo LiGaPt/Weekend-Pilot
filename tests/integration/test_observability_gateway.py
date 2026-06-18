@@ -397,6 +397,7 @@ def test_internal_observability_route_returns_sanitized_run_summary(
         "token": "[REDACTED]",
         "message": "none",
     }
+    assert payload["selected_plan_review"] is None
     assert payload["run_summary"] == {
         "schema_version": "weekendpilot_internal_run_summary_v1",
         "run_id": str(run.run_id),
@@ -443,6 +444,128 @@ def test_internal_observability_route_returns_sanitized_run_summary(
     assert "idempotency_key" not in serialized
     assert "tool_event_id" not in serialized
     assert "action_id" not in serialized
+
+
+def test_internal_observability_route_returns_selected_plan_review(
+    db_session: Session,
+    observability_client: TestClient,
+) -> None:
+    run = _create_run(db_session)
+    selected = PlanRepository(db_session).create(
+        run_id=run.run_id,
+        status="selected",
+        selected=True,
+        plan_json={
+            "title": "Family Afternoon Plan",
+            "summary": "Indoor activity first, then a lighter dinner nearby.",
+            "activity": {
+                "name": "Family Science Center",
+                "category": "activity",
+                "address": "100 Science Road",
+            },
+            "dining": {
+                "name": "Light Table",
+                "category": "dining",
+                "address": "8 Dinner Street",
+            },
+            "timeline": [
+                {
+                    "sequence": 1,
+                    "title": "Indoor activity",
+                    "start_label": "14:00",
+                    "end_label": "16:00",
+                    "duration_minutes": 120,
+                }
+            ],
+            "route": {
+                "mode": "driving",
+                "distance_meters": 3200,
+                "duration_minutes": 18,
+                "summary": "A short drive keeps the afternoon easy.",
+            },
+            "feasibility": {
+                "is_feasible": True,
+                "reasons": ["Fits the requested afternoon window."],
+                "warnings": [],
+                "total_duration_minutes": 270,
+                "route_duration_minutes": 18,
+                "queue_wait_minutes": 5,
+            },
+            "action_manifest": {
+                "source": "proposed_actions",
+                "action_count": 1,
+                "actions": [
+                    {
+                        "action_ref": "draft_1_action_1",
+                        "execution_order": 1,
+                        "action_type": "reserve_restaurant",
+                        "target_id": "restaurant_light_001",
+                        "payload_preview": {"party_size": 3},
+                        "reason": "Lock dinner seating after confirmation.",
+                    }
+                ],
+            },
+        },
+    )
+    db_session.commit()
+
+    response = observability_client.get(f"/internal/runs/{run.run_id}/observability")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["selected_plan_review"] == {
+        "plan_id": str(selected.plan_id),
+        "status": "selected",
+        "title": "Family Afternoon Plan",
+        "summary": "Indoor activity first, then a lighter dinner nearby.",
+        "activity": {
+            "name": "Family Science Center",
+            "category": "activity",
+            "address": "100 Science Road",
+        },
+        "dining": {
+            "name": "Light Table",
+            "category": "dining",
+            "address": "8 Dinner Street",
+        },
+        "timeline": [
+            {
+                "sequence": 1,
+                "title": "Indoor activity",
+                "start_label": "14:00",
+                "end_label": "16:00",
+                "duration_minutes": 120,
+            }
+        ],
+        "route": {
+            "mode": "driving",
+            "distance_meters": 3200,
+            "duration_minutes": 18,
+            "summary": "A short drive keeps the afternoon easy.",
+        },
+        "feasibility": {
+            "is_feasible": True,
+            "reasons": ["Fits the requested afternoon window."],
+            "warnings": [],
+            "total_duration_minutes": 270,
+            "route_duration_minutes": 18,
+            "queue_wait_minutes": 5,
+        },
+        "action_manifest": {
+            "source": "proposed_actions",
+            "action_count": 1,
+            "actions": [
+                {
+                    "action_ref": "draft_1_action_1",
+                    "execution_order": 1,
+                    "action_type": "reserve_restaurant",
+                    "target_id": "[REDACTED]",
+                    "payload_preview": {"party_size": 3},
+                    "reason": "Lock dinner seating after confirmation.",
+                }
+            ],
+        },
+    }
 
 
 def test_internal_observability_route_returns_404_for_missing_run(

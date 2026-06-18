@@ -27,6 +27,61 @@ const summary: InternalObservabilityRunSummary = {
   observability_status: "completed",
   agent_roles: ["supervisor", "discovery"],
   node_history: ["initialize", "wait_confirmation"],
+  selected_plan_review: {
+    plan_id: "plan-1",
+    status: "selected",
+    title: "Family Afternoon Plan",
+    summary: "Indoor activity first, then a lighter dinner nearby.",
+    activity: {
+      name: "Family Science Center",
+      category: "activity",
+      address: "100 Science Road",
+      tags: ["child_friendly", "indoor"],
+    },
+    dining: {
+      name: "Light Table",
+      category: "dining",
+      address: "8 Dinner Street",
+      tags: ["lighter_options"],
+    },
+    timeline: [
+      {
+        sequence: 1,
+        title: "Indoor activity",
+        start_label: "14:00",
+        end_label: "16:00",
+        duration_minutes: 120,
+      },
+    ],
+    route: {
+      mode: "driving",
+      distance_meters: 3200,
+      duration_minutes: 18,
+      summary: "A short drive keeps the afternoon easy.",
+    },
+    feasibility: {
+      is_feasible: true,
+      reasons: ["Fits the requested afternoon window."],
+      warnings: [],
+      total_duration_minutes: 270,
+      route_duration_minutes: 18,
+      queue_wait_minutes: 5,
+    },
+    action_manifest: {
+      source: "proposed_actions",
+      action_count: 1,
+      actions: [
+        {
+          action_ref: "draft_1_action_1",
+          execution_order: 1,
+          action_type: "reserve_restaurant",
+          target_id: "restaurant_light_001",
+          payload_preview: { party_size: 3 },
+          reason: "Lock dinner seating after confirmation.",
+        },
+      ],
+    },
+  },
   tool_event_summaries: [],
   action_ledger_summaries: [],
   workflow_timing_summary: {
@@ -278,6 +333,7 @@ describe("internal observability API client", () => {
     expect(fetch).toHaveBeenCalledWith("http://127.0.0.1:8000/internal/runs/run-1/observability");
     expect(result.run_summary?.stage_timing.slowest_stage_name).toBe("initialize");
     expect(result.run_summary?.tool_events.total_count).toBe(4);
+    expect(result.selected_plan_review?.action_manifest?.actions).toHaveLength(1);
   });
 
   it("calls the system integrity summary endpoint", async () => {

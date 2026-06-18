@@ -538,26 +538,20 @@ describe("App", () => {
     expect(screen.getByText("\u5df2\u627e\u5230 5 \u4e2a\u9910\u5385")).toBeInTheDocument();
   });
 
-  it("keeps plan details collapsed until expanded", async () => {
+  it("keeps reviewer detail controls off the customer plan card", async () => {
     const user = userEvent.setup();
     render(<App />);
 
     await user.type(screen.getByTestId("main-composer-input"), "Plan a family afternoon");
     await user.click(screen.getByTestId("start-button"));
 
-    const planHeading = await screen.findByRole("heading", { name: "亲子下午方案" });
-    const planCard = planHeading.closest(".thread-bubble");
-    expect(planCard).not.toBeNull();
-    const disclosureButtons = (planCard as HTMLElement).querySelectorAll<HTMLButtonElement>(".detail-disclosure-toggle");
-    expect(disclosureButtons.length).toBeGreaterThanOrEqual(4);
-
-    expect(screen.queryByText("室内亲子活动")).not.toBeInTheDocument();
-    await user.click(disclosureButtons[0]);
-    expect(screen.getByText("室内亲子活动")).toBeInTheDocument();
-
+    await screen.findByTestId("replan-panel");
     expect(screen.queryByText("green-table")).not.toBeInTheDocument();
-    await user.click(disclosureButtons[3]);
-    expect(screen.getByText("轻食餐桌")).toBeInTheDocument();
+    expect(screen.queryByText("Indoor activity")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "时间线" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "活动与餐厅" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "路线与可执行性" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "确认前动作" })).not.toBeInTheDocument();
   });
 
   it("renders the clarification flow with a progress card above the clarification card", async () => {
@@ -641,12 +635,8 @@ describe("App", () => {
     const resultCard = await screen.findByTestId("assistant-result-card");
     expectThreadOrder(progressCard.closest("article"), resultCard.closest("article"));
     expect(screen.getByText("安排已完成")).toBeInTheDocument();
+    expect(screen.queryByTestId("execution-timeline-toggle")).not.toBeInTheDocument();
     expect(screen.queryByTestId("execution-timeline")).not.toBeInTheDocument();
-
-    await user.click(screen.getByTestId("execution-timeline-toggle"));
-    const timeline = await screen.findByTestId("execution-timeline");
-    expect(within(timeline).getByText("2026-05-26T14:00:00+08:00")).toBeInTheDocument();
-    expect(within(timeline).getByText("轻食餐桌")).toBeInTheDocument();
   });
 
   it("shows a localized error banner when the streamed start fails", async () => {
