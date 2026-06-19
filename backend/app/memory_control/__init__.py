@@ -4,6 +4,10 @@ from backend.app.memory_control.schemas import (
     MemoryControlListResponse,
     MemoryControlMutationResponse,
     MemoryControlRequest,
+    MemoryCreateRequest,
+    MemoryDeleteRequest,
+    MemoryDetailResponse,
+    MemoryUpdateRequest,
     MemoryUserControlAction,
 )
 from backend.app.memory_control.service import MemoryUserControlService, MemoryUserControlServiceError
@@ -14,6 +18,10 @@ __all__ = [
     "MemoryControlListResponse",
     "MemoryControlMutationResponse",
     "MemoryControlRequest",
+    "MemoryCreateRequest",
+    "MemoryDeleteRequest",
+    "MemoryDetailResponse",
+    "MemoryUpdateRequest",
     "MemoryUserControlAction",
     "MemoryUserControlService",
     "MemoryUserControlServiceError",

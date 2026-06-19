@@ -68,7 +68,7 @@ def _seed_memory(
 def test_memory_user_control_action_contract_is_strict() -> None:
     from backend.app.memory_control.schemas import MemoryUserControlAction
 
-    assert MemoryUserControlAction.__args__ == ("disable", "suppress")
+    assert MemoryUserControlAction.__args__ == ("activate", "disable", "suppress", "expire", "mark_candidate")
 
 
 def test_memory_user_control_list_includes_all_lifecycle_states(db_session) -> None:
@@ -131,14 +131,15 @@ def test_memory_user_control_applies_status_and_appends_governance_event(
     control_events = response.item.metadata_json["governance"]["control_events"]
     assert len(control_events) == 1
     assert control_events[0] == {
-        "schema_version": "memory_user_control_v0",
+        "schema_version": "memory_crud_governance_v0",
         "action": action,
         "from_status": "active",
         "to_status": target_status,
         "actor": "user",
-        "source": "internal_memory_api_v0",
+        "source": "internal_memory_api_v1",
         "reason": "user_requested_control",
         "acted_at": control_events[0]["acted_at"],
+        "changed_fields": ["status"],
     }
 
 

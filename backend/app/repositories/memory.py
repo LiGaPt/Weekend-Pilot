@@ -51,6 +51,13 @@ class MemoryItemRepository:
     def get_by_id(self, memory_id: UUID) -> MemoryItem | None:
         return self.session.get(MemoryItem, memory_id)
 
+    def get_for_user(self, user_id: UUID, memory_id: UUID) -> MemoryItem | None:
+        statement = select(MemoryItem).where(
+            MemoryItem.user_id == user_id,
+            MemoryItem.memory_id == memory_id,
+        )
+        return self.session.scalar(statement)
+
     def get_by_user_memory_key(self, user_id: UUID, memory_type: str, key: str) -> MemoryItem | None:
         statement = select(MemoryItem).where(
             MemoryItem.user_id == user_id,
