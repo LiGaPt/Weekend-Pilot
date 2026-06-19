@@ -16,7 +16,7 @@ from backend.app.agents import (
     RecoveryDecision,
 )
 from backend.app.db.session import SessionLocal
-from backend.app.memory_control import MemoryUserControlService
+from backend.app.memory_control import MemoryCreateRequest, MemoryUserControlService
 from backend.app.models.runtime import ActionLedger, AgentRun, MemoryItem, ToolEvent, User
 from backend.app.planning import (
     DeterministicIntentParser,
@@ -971,6 +971,100 @@ def test_workflow_memory_control_disable_keeps_controlled_row_out_of_query_shapi
     assert result.status == "awaiting_confirmation"
     assert control_result.item.status == "disabled"
     assert MemoryItemRepository(db_session).list_governable_for_user(user.user_id) == []
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    memory_policy = run.metadata_json["workflow"]["memory_policy"]
+    assert memory_policy["memory_decisions"] == []
+    assert memory_policy["decision_log"] == []
+
+
+def test_workflow_created_active_memory_shapes_later_query_planning(
+    db_session: Session,
+    redis_runtime,
+    trace_path: Path,
+) -> None:
+    runner = _build_runner(db_session, redis_runtime, trace_path)
+    user = UserRepository(db_session).create(
+        external_id=None,
+        display_name="Workflow Active Memory Creator",
+    )
+    create_result = MemoryUserControlService(db_session).create_item(
+        user.user_id,
+        MemoryCreateRequest(
+            memory_type="preference",
+            key="spouse_lighter_meals",
+            value_json={"preference": "lighter_options"},
+            text="lighter options",
+            confidence=Decimal("0.9000"),
+            status="active",
+            expires_at=None,
+            source_run_id=None,
+            source_langsmith_trace_id="trace-created-active",
+            reason="manual_memory_seed",
+        ),
+    )
+    db_session.commit()
+
+    result = runner.run(
+        WeekendPilotWorkflowRequest(
+            user_input="This afternoon please arrange a nearby outing for my partner and our 5-year-old for a few hours, then dinner afterward.",
+            case_id="case-langgraph-created-active-memory",
+            auto_confirm=False,
+            existing_user_id=user.user_id,
+        )
+    )
+
+    assert result.status == "awaiting_confirmation"
+    assert create_result.item.status == "active"
+    assert result.run_id is not None
+    run = db_session.get(AgentRun, result.run_id)
+    assert run is not None
+    memory_policy = run.metadata_json["workflow"]["memory_policy"]
+    assert memory_policy["applied_memory_keys"] == ["spouse_lighter_meals"]
+    assert [decision["memory_key"] for decision in memory_policy["memory_decisions"]] == ["spouse_lighter_meals"]
+    assert [entry["key"] for entry in memory_policy["decision_log"]] == ["spouse_lighter_meals"]
+
+
+def test_workflow_created_candidate_memory_stays_out_of_query_shaping(
+    db_session: Session,
+    redis_runtime,
+    trace_path: Path,
+) -> None:
+    runner = _build_runner(db_session, redis_runtime, trace_path)
+    user = UserRepository(db_session).create(
+        external_id=None,
+        display_name="Workflow Candidate Memory Creator",
+    )
+    create_result = MemoryUserControlService(db_session).create_item(
+        user.user_id,
+        MemoryCreateRequest(
+            memory_type="preference",
+            key="activity_style",
+            value_json={"preference": "indoor"},
+            text="indoor",
+            confidence=Decimal("0.9000"),
+            status="candidate",
+            expires_at=None,
+            source_run_id=None,
+            source_langsmith_trace_id="trace-created-candidate",
+            reason="manual_memory_seed",
+        ),
+    )
+    db_session.commit()
+
+    result = runner.run(
+        WeekendPilotWorkflowRequest(
+            user_input="This afternoon please arrange a nearby outing for my partner and our 5-year-old for a few hours, then dinner afterward.",
+            case_id="case-langgraph-created-candidate-memory",
+            auto_confirm=False,
+            existing_user_id=user.user_id,
+        )
+    )
+
+    assert result.status == "awaiting_confirmation"
+    assert create_result.item.status == "candidate"
+    assert MemoryItemRepository(db_session).list_governable_for_user(user.user_id) == []
+    assert result.run_id is not None
     run = db_session.get(AgentRun, result.run_id)
     assert run is not None
     memory_policy = run.metadata_json["workflow"]["memory_policy"]
