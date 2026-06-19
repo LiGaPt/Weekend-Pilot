@@ -11,6 +11,7 @@ from backend.app.memory_control.schemas import (
     MemoryUserControlAction,
 )
 from backend.app.memory_control.service import MemoryUserControlService, MemoryUserControlServiceError
+from backend.app.memory_governance_audit import MemoryGovernanceAudit
 
 __all__ = [
     "MemoryControlEvent",
@@ -23,6 +24,7 @@ __all__ = [
     "MemoryDetailResponse",
     "MemoryUpdateRequest",
     "MemoryUserControlAction",
+    "MemoryGovernanceAudit",
     "MemoryUserControlService",
     "MemoryUserControlServiceError",
 ]

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -16,6 +15,10 @@ from backend.app.memory_control.schemas import (
     MemoryDetailResponse,
     MemoryUpdateRequest,
     MemoryUserControlAction,
+)
+from backend.app.memory_governance_audit import (
+    classify_memory_governance_audit,
+    normalize_supported_preference_value,
 )
 from backend.app.memory_lifecycle import normalize_memory_status, resolve_memory_lifecycle_state
 from backend.app.repositories import MemoryItemRepository
@@ -41,6 +44,7 @@ _CREATE_CHANGED_FIELDS = [
     "source_run_id",
     "source_langsmith_trace_id",
 ]
+_CANONICAL_VALUE_JSON_KEYS = {"preference"}
 
 
 class MemoryUserControlServiceError(Exception):
@@ -73,7 +77,7 @@ class MemoryUserControlService:
         user_id: UUID,
         request: MemoryCreateRequest,
     ) -> MemoryControlMutationResponse:
-        self._validate_memory_payload(
+        normalized_value = self._validate_memory_payload(
             memory_type=request.memory_type,
             key=request.key,
             value_json=request.value_json,
@@ -93,12 +97,20 @@ class MemoryUserControlService:
             reason=request.reason,
             changed_fields=_CREATE_CHANGED_FIELDS,
         )
+        self._append_minimization_event(
+            metadata_json=metadata_json,
+            action="create",
+            reason=request.reason,
+            normalized_value=normalized_value,
+            dropped_text=bool(request.text),
+            dropped_value_keys=self._dropped_value_keys(request.value_json),
+        )
         created = self.repository.create(
             user_id=user_id,
             memory_type=request.memory_type,
             key=request.key,
-            value_json=request.value_json,
-            text=request.text,
+            value_json=self._canonical_value_json(normalized_value),
+            text=None,
             confidence=request.confidence,
             source_run_id=request.source_run_id,
             source_langsmith_trace_id=request.source_langsmith_trace_id,
@@ -122,16 +134,17 @@ class MemoryUserControlService:
         if row is None:
             raise MemoryUserControlServiceError(404, "Memory item was not found.")
 
-        self._validate_memory_payload(
+        normalized_value = self._validate_memory_payload(
             memory_type=row.memory_type,
             key=row.key,
             value_json=request.value_json,
             text=request.text,
         )
+        canonical_value_json = self._canonical_value_json(normalized_value)
         changed_fields: list[str] = []
-        if row.value_json != request.value_json:
+        if row.value_json != canonical_value_json:
             changed_fields.append("value_json")
-        if row.text != request.text:
+        if row.text is not None:
             changed_fields.append("text")
         if row.confidence != request.confidence:
             changed_fields.append("confidence")
@@ -154,10 +167,18 @@ class MemoryUserControlService:
             reason=request.reason,
             changed_fields=changed_fields,
         )
+        self._append_minimization_event(
+            metadata_json=metadata_json,
+            action="update",
+            reason=request.reason,
+            normalized_value=normalized_value,
+            dropped_text=bool(request.text),
+            dropped_value_keys=self._dropped_value_keys(request.value_json),
+        )
         updated = self.repository.update(
             memory_id,
-            value_json=request.value_json,
-            text=request.text,
+            value_json=canonical_value_json,
+            text=None,
             confidence=request.confidence,
             source_run_id=row.source_run_id,
             source_langsmith_trace_id=row.source_langsmith_trace_id,
@@ -225,6 +246,7 @@ class MemoryUserControlService:
         return self.apply_action(user_id, memory_id, "suppress", reason)
 
     def _serialize_item(self, row) -> MemoryControlItemSummary:
+        lifecycle_state = resolve_memory_lifecycle_state(row.status, row.expires_at)
         return MemoryControlItemSummary(
             memory_id=row.memory_id,
             memory_type=row.memory_type,
@@ -233,7 +255,7 @@ class MemoryUserControlService:
             text=row.text,
             confidence=row.confidence,
             status=row.status,
-            lifecycle_state=resolve_memory_lifecycle_state(row.status, row.expires_at),
+            lifecycle_state=lifecycle_state,
             expires_at=row.expires_at,
             last_used_at=row.last_used_at,
             source_run_id=row.source_run_id,
@@ -241,23 +263,35 @@ class MemoryUserControlService:
             created_at=row.created_at,
             updated_at=row.updated_at,
             metadata_json=row.metadata_json if isinstance(row.metadata_json, dict) else {},
+            governance_audit=classify_memory_governance_audit(
+                memory_type=row.memory_type,
+                key=row.key,
+                value_json=row.value_json,
+                text=row.text,
+                confidence=row.confidence,
+                status=row.status,
+                expires_at=row.expires_at,
+                lifecycle_state=lifecycle_state,
+            ),
         )
 
     def _rebuild_metadata(self, metadata_json: Any) -> dict[str, Any]:
         if not isinstance(metadata_json, dict):
-            return {"governance": {"control_events": []}}
+            return {"governance": {"control_events": [], "minimization_events": []}}
 
         rebuilt = dict(metadata_json)
         governance = rebuilt.get("governance")
         if not isinstance(governance, dict):
-            rebuilt["governance"] = {"control_events": []}
+            rebuilt["governance"] = {"control_events": [], "minimization_events": []}
             return rebuilt
 
-        control_events = governance.get("control_events")
-        if not isinstance(control_events, list):
+        if not isinstance(governance.get("control_events"), list):
             governance = dict(governance)
             governance["control_events"] = []
-            rebuilt["governance"] = governance
+        if not isinstance(governance.get("minimization_events"), list):
+            governance = dict(governance)
+            governance["minimization_events"] = []
+        rebuilt["governance"] = governance
         return rebuilt
 
     def _append_governance_event(
@@ -282,6 +316,32 @@ class MemoryUserControlService:
         )
         control_events.append(event.model_dump(mode="json"))
 
+    def _append_minimization_event(
+        self,
+        *,
+        metadata_json: dict[str, Any],
+        action: str,
+        reason: str | None,
+        normalized_value: str,
+        dropped_text: bool,
+        dropped_value_keys: list[str],
+    ) -> None:
+        governance = metadata_json.setdefault("governance", {})
+        minimization_events = governance.setdefault("minimization_events", [])
+        minimization_events.append(
+            {
+                "schema_version": "memory_audit_minimization_v0",
+                "action": action,
+                "actor": "user",
+                "source": "internal_memory_api_v1",
+                "reason": reason,
+                "normalized_value": normalized_value,
+                "dropped_text": dropped_text,
+                "dropped_value_keys": dropped_value_keys,
+                "acted_at": datetime.now(UTC).isoformat(),
+            }
+        )
+
     def _validate_memory_payload(
         self,
         *,
@@ -295,39 +355,18 @@ class MemoryUserControlService:
         if key not in _SUPPORTED_MEMORY_KEYS:
             raise MemoryUserControlServiceError(400, f"Unsupported memory key: {key!r}")
 
-        value_preference = value_json.get("preference") if isinstance(value_json, dict) else None
-        normalized_from_value = self._normalize_memory_value(key, value_preference)
-        normalized_from_text = self._normalize_memory_value(key, text)
-        if normalized_from_value and normalized_from_text and normalized_from_value != normalized_from_text:
-            raise MemoryUserControlServiceError(400, "Memory value_json and text normalize to conflicting values.")
-
-        normalized = normalized_from_value or normalized_from_text
+        try:
+            normalized = normalize_supported_preference_value(key=key, value_json=value_json, text=text)
+        except ValueError as exc:
+            raise MemoryUserControlServiceError(400, str(exc)) from exc
         if normalized is None:
             raise MemoryUserControlServiceError(400, "Unsupported memory value for this key.")
         return normalized
 
-    def _normalize_memory_value(self, key: str, value: Any) -> str | None:
-        if not isinstance(value, str):
-            return None
-        normalized = value.strip().lower()
-        if not normalized:
-            return None
-        if key == "activity_style":
-            if "citywalk" in normalized or "city walk" in normalized or "城市漫步" in normalized:
-                return "citywalk"
-            if "indoor" in normalized or "室内" in normalized or "inside" in normalized:
-                return "indoor"
-            if "outdoor" in normalized or "outside" in normalized or "户外" in normalized or "室外" in normalized:
-                return "outdoor"
-            return None
-        if key == "spouse_lighter_meals":
-            if (
-                "lighter_options" in normalized
-                or "lighter" in normalized
-                or "light food" in normalized
-                or "light meals" in normalized
-                or "清淡" in normalized
-            ):
-                return "lighter_options"
-            return None
-        return None
+    def _canonical_value_json(self, normalized_value: str) -> dict[str, str]:
+        return {"preference": normalized_value}
+
+    def _dropped_value_keys(self, value_json: dict[str, Any]) -> list[str]:
+        if not isinstance(value_json, dict):
+            return []
+        return sorted(key for key in value_json if key not in _CANONICAL_VALUE_JSON_KEYS)

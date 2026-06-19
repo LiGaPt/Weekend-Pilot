@@ -180,6 +180,7 @@ def test_memory_query_policy_applies_expired_high_confidence_activity_as_advisor
     assert effective_intent.activity_preferences == ["indoor"]
     assert summary.applied_memory_keys == ["activity_style"]
     assert summary.advisory_memory_keys == ["activity_style"]
+    assert summary.downgraded_low_confidence_keys == []
     assert summary.downgraded_expired_keys == ["activity_style"]
     assert summary.memory_decisions[0].expired is True
     assert summary.memory_decisions[0].tier == "advisory"
@@ -220,6 +221,7 @@ def test_memory_query_policy_prefers_explicit_lifecycle_state_for_expired_memory
 
     assert effective_intent.activity_preferences == ["indoor"]
     assert summary.advisory_memory_keys == ["activity_style"]
+    assert summary.downgraded_low_confidence_keys == []
     assert summary.downgraded_expired_keys == ["activity_style"]
     assert summary.memory_decisions[0].expired is True
     assert summary.memory_decisions[0].outcome == "applied_advisory"

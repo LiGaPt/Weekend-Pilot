@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from backend.app.memory_governance_audit import MemoryGovernanceAudit
+
 
 MemoryUserControlAction = Literal["activate", "disable", "suppress", "expire", "mark_candidate"]
 MemoryMutationOperation = Literal["create", "update", "activate", "disable", "suppress", "expire", "mark_candidate"]
@@ -40,6 +42,7 @@ class MemoryControlItemSummary(BaseModel):
     created_at: datetime
     updated_at: datetime
     metadata_json: dict[str, Any] = Field(default_factory=dict)
+    governance_audit: MemoryGovernanceAudit
 
 
 class MemoryDetailResponse(MemoryControlItemSummary):

@@ -97,11 +97,16 @@ def test_memory_create_and_detail_routes_return_created_item(memory_client: Test
     assert create_response.status_code == 200
     payload = create_response.json()
     assert payload["operation"] == "create"
+    assert payload["item"]["value_json"] == {"preference": "indoor"}
+    assert payload["item"]["text"] is None
+    assert payload["item"]["governance_audit"]["audit_status"] == "trusted"
     memory_id = payload["item"]["memory_id"]
 
     detail_response = memory_client.get(f"/internal/users/{user.user_id}/memory/{memory_id}")
     assert detail_response.status_code == 200
-    assert detail_response.json()["memory_id"] == memory_id
+    detail_payload = detail_response.json()
+    assert detail_payload["memory_id"] == memory_id
+    assert detail_payload["governance_audit"]["normalized_value"] == "indoor"
 
 
 def test_memory_update_route_updates_mutable_fields(memory_client: TestClient, db_session: Session) -> None:
@@ -124,7 +129,9 @@ def test_memory_update_route_updates_mutable_fields(memory_client: TestClient, d
     payload = response.json()
     assert payload["operation"] == "update"
     assert payload["item"]["value_json"] == {"preference": "outdoor"}
-    assert payload["item"]["text"] == "outdoor"
+    assert payload["item"]["text"] is None
+    assert payload["item"]["governance_audit"]["audit_status"] == "advisory"
+    assert payload["item"]["metadata_json"]["governance"]["minimization_events"][0]["action"] == "update"
 
 
 def test_memory_delete_route_logically_suppresses_row(memory_client: TestClient, db_session: Session) -> None:
@@ -210,3 +217,16 @@ def test_memory_create_route_rejects_invalid_payload(memory_client: TestClient, 
     )
 
     assert response.status_code in {400, 422}
+
+
+def test_memory_detail_route_reports_non_governable_candidate_audit(memory_client: TestClient, db_session: Session) -> None:
+    user, run = _create_user_and_run(db_session)
+    memory = _seed_memory(db_session, user_id=user.user_id, run_id=run.run_id, status="candidate")
+    db_session.commit()
+
+    response = memory_client.get(f"/internal/users/{user.user_id}/memory/{memory.memory_id}")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["governance_audit"]["audit_status"] == "not_governable"
+    assert payload["governance_audit"]["audit_reason"] == "non_governable_lifecycle"
