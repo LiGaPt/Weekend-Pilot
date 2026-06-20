@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, Field
 
+from backend.app.memory_governance_audit import (
+    MEMORY_POLICY_VERSION,
+    classify_memory_governance_audit,
+    memory_dimension,
+    parse_confidence,
+)
 from backend.app.planning.schemas import IntentParseSignals, LocalLifeIntent
 
 
@@ -13,15 +18,8 @@ if TYPE_CHECKING:
     from backend.app.workflow.state import WorkflowMemoryRecord
 
 
-_MEMORY_POLICY_VERSION = "memory_query_policy_v1"
-_TRUSTED_CONFIDENCE_THRESHOLD = Decimal("0.8000")
-_ADVISORY_CONFIDENCE_THRESHOLD = Decimal("0.5000")
 _ACTIVITY_DIMENSION = "activity_preferences"
 _DINING_DIMENSION = "dining_preferences"
-_SUPPORTED_MEMORY_DIMENSIONS = {
-    "activity_style": _ACTIVITY_DIMENSION,
-    "spouse_lighter_meals": _DINING_DIMENSION,
-}
 MemoryGovernanceDimension = Literal["activity_preferences", "dining_preferences"]
 MemoryGovernanceTier = Literal["trusted", "advisory", "weak"]
 MemoryGovernanceWinnerSource = Literal["user_input", "memory", "none"]
@@ -70,7 +68,7 @@ class MemoryDecisionLogEntry(BaseModel):
 
 
 class MemoryPolicyAuditSummary(BaseModel):
-    policy_version: str = _MEMORY_POLICY_VERSION
+    policy_version: str = MEMORY_POLICY_VERSION
     considered_count: int = 0
     used_count: int = 0
     ignored_count: int = 0
@@ -82,7 +80,7 @@ class MemoryPolicyAuditSummary(BaseModel):
 
 
 class MemoryQueryPolicySummary(BaseModel):
-    policy_version: str = _MEMORY_POLICY_VERSION
+    policy_version: str = MEMORY_POLICY_VERSION
     applied_memory_keys: list[str] = Field(default_factory=list)
     advisory_memory_keys: list[str] = Field(default_factory=list)
     downgraded_low_confidence_keys: list[str] = Field(default_factory=list)
@@ -102,7 +100,6 @@ def apply_memory_query_policy(
     signals: IntentParseSignals,
     active_memories: list[WorkflowMemoryRecord],
 ) -> tuple[LocalLifeIntent, MemoryQueryPolicySummary]:
-    now = datetime.now(UTC)
     effective_activity_preferences = list(intent.activity_preferences)
     effective_dining_preferences = list(intent.dining_preferences)
     applied_memory_keys: list[str] = []
@@ -120,7 +117,7 @@ def apply_memory_query_policy(
             continue
 
         key = memory.key
-        dimension = _memory_dimension(key)
+        dimension = memory_dimension(key)
         if dimension is None:
             _append_unique(unsupported_memory_keys, key)
             memory_decisions.append(
@@ -137,13 +134,23 @@ def apply_memory_query_policy(
             decision_log.append(_build_decision_log_entry(memory=memory, decision=decision))
             continue
 
-        normalized_value = _normalize_memory_value(memory)
-        confidence = _parse_confidence(memory.confidence)
-        expired = _memory_is_expired(memory, now)
-        tier = _memory_tier(confidence, expired)
+        audit = classify_memory_governance_audit(
+            memory_type=memory.memory_type,
+            key=memory.key,
+            value_json=memory.value_json,
+            text=memory.text,
+            confidence=memory.confidence,
+            status=memory.status,
+            expires_at=memory.expires_at,
+            lifecycle_state=getattr(memory, "lifecycle_state", None),
+        )
+        normalized_value = audit.normalized_value
+        confidence = parse_confidence(memory.confidence)
+        expired = audit.expired
+        tier: MemoryGovernanceTier = audit.tier or "weak"
         confidence_text = _string_or_none(memory.confidence)
 
-        if confidence is None or confidence < _TRUSTED_CONFIDENCE_THRESHOLD:
+        if confidence is None or (not expired and tier != "trusted"):
             _append_unique(downgraded_low_confidence_keys, key)
         if expired:
             _append_unique(downgraded_expired_keys, key)
@@ -326,100 +333,10 @@ def _build_policy_summary(decision_log: list[MemoryDecisionLogEntry]) -> MemoryP
     return summary
 
 
-def _memory_dimension(key: str) -> MemoryGovernanceDimension | None:
-    return _SUPPORTED_MEMORY_DIMENSIONS.get(key)
-
-
-def _normalize_memory_value(memory: "WorkflowMemoryRecord") -> str | None:
-    if memory.key == "activity_style":
-        normalized = _normalize_activity_style(memory.value_json.get("preference"))
-        if normalized is None:
-            normalized = _normalize_activity_style(memory.text)
-        return normalized
-    if memory.key == "spouse_lighter_meals":
-        normalized = _normalize_lighter_meals(memory.value_json.get("preference"))
-        if normalized is None:
-            normalized = _normalize_lighter_meals(memory.text)
-        return normalized
-    return None
-
-
 def _is_user_override_dimension(dimension: MemoryGovernanceDimension, signals: IntentParseSignals) -> bool:
     if dimension == _ACTIVITY_DIMENSION:
         return signals.activity_preferences
     return signals.dining_preferences
-
-
-def _memory_tier(confidence: Decimal | None, expired: bool) -> MemoryGovernanceTier:
-    if confidence is None:
-        return "weak"
-    if not expired and confidence >= _TRUSTED_CONFIDENCE_THRESHOLD:
-        return "trusted"
-    if not expired and confidence >= _ADVISORY_CONFIDENCE_THRESHOLD:
-        return "advisory"
-    if expired and confidence >= _TRUSTED_CONFIDENCE_THRESHOLD:
-        return "advisory"
-    return "weak"
-
-
-def _is_expired(value: Any, now: datetime) -> bool:
-    if not isinstance(value, str) or not value:
-        return False
-    try:
-        expires_at = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return True
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=UTC)
-    return expires_at <= now
-
-
-def _memory_is_expired(memory: "WorkflowMemoryRecord", now: datetime) -> bool:
-    lifecycle_state = getattr(memory, "lifecycle_state", None)
-    if lifecycle_state == "expired":
-        return True
-    if lifecycle_state == "active":
-        return False
-    return _is_expired(memory.expires_at, now)
-
-
-def _normalize_activity_style(value: Any) -> str | None:
-    normalized = _normalize_text(value)
-    if normalized is None:
-        return None
-    for style, fragments in (
-        ("citywalk", ("citywalk", "city walk", "城市漫步")),
-        ("indoor", ("indoor", "inside", "室内")),
-        ("outdoor", ("outdoor", "outside", "户外", "室外")),
-    ):
-        if any(fragment in normalized for fragment in fragments):
-            return style
-    return None
-
-
-def _normalize_lighter_meals(value: Any) -> str | None:
-    normalized = _normalize_text(value)
-    if normalized is None:
-        return None
-    if any(fragment in normalized for fragment in ("lighter", "light food", "light meals", "清淡")):
-        return "lighter_options"
-    return None
-
-
-def _normalize_text(value: Any) -> str | None:
-    if not isinstance(value, str):
-        return None
-    normalized = value.strip().lower()
-    return normalized or None
-
-
-def _parse_confidence(value: Any) -> Decimal | None:
-    if value is None:
-        return None
-    try:
-        return Decimal(str(value))
-    except (InvalidOperation, ValueError):
-        return None
 
 
 def _append_unique(values: list[str], value: str) -> None:

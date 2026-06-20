@@ -96,8 +96,12 @@ def test_memory_create_persists_supported_row_and_governance_event(db_session) -
     assert response.item.memory_type == "preference"
     assert response.item.key == "activity_style"
     assert response.item.status == "active"
+    assert response.item.value_json == {"preference": "indoor"}
+    assert response.item.text is None
     assert response.item.source_run_id == run.run_id
     assert response.item.source_langsmith_trace_id == "trace-memory-create"
+    assert response.item.governance_audit.audit_status == "trusted"
+    assert response.item.governance_audit.normalized_value == "indoor"
     control_events = response.item.metadata_json["governance"]["control_events"]
     assert control_events[0]["schema_version"] == "memory_crud_governance_v0"
     assert control_events[0]["action"] == "create"
@@ -114,6 +118,12 @@ def test_memory_create_persists_supported_row_and_governance_event(db_session) -
         "source_run_id",
         "source_langsmith_trace_id",
     ]
+    minimization_events = response.item.metadata_json["governance"]["minimization_events"]
+    assert minimization_events[0]["schema_version"] == "memory_audit_minimization_v0"
+    assert minimization_events[0]["action"] == "create"
+    assert minimization_events[0]["normalized_value"] == "indoor"
+    assert minimization_events[0]["dropped_text"] is True
+    assert minimization_events[0]["dropped_value_keys"] == []
 
 
 def test_memory_create_rejects_duplicate_user_memory_key(db_session) -> None:
@@ -187,9 +197,40 @@ def test_memory_get_and_update_item_preserve_identity_and_provenance(db_session)
     assert response.item.source_run_id == run.run_id
     assert response.item.source_langsmith_trace_id == "trace-1"
     assert response.item.status == "active"
+    assert response.item.value_json == {"preference": "outdoor"}
+    assert response.item.text is None
+    assert response.item.governance_audit.audit_status == "advisory"
+    assert response.item.governance_audit.audit_reason == "low_confidence_downgraded_to_advisory"
     event = response.item.metadata_json["governance"]["control_events"][0]
     assert event["action"] == "update"
     assert sorted(event["changed_fields"]) == ["confidence", "expires_at", "text", "value_json"]
+    minimization_event = response.item.metadata_json["governance"]["minimization_events"][0]
+    assert minimization_event["action"] == "update"
+    assert minimization_event["normalized_value"] == "outdoor"
+    assert minimization_event["dropped_text"] is True
+    assert minimization_event["dropped_value_keys"] == []
+
+
+def test_memory_update_drops_extra_value_json_keys_and_tracks_them(db_session) -> None:
+    user, run = _create_user_and_run(db_session)
+    memory = _seed_memory(db_session, user_id=user.user_id, run_id=run.run_id)
+
+    response = MemoryUserControlService(db_session).update_item(
+        user.user_id,
+        memory.memory_id,
+        MemoryUpdateRequest(
+            value_json={"preference": "outdoor", "address": "hidden", "note": "drop"},
+            text="outdoor",
+            confidence=Decimal("0.9000"),
+            expires_at=None,
+            reason="minimize_manual_memory",
+        ),
+    )
+
+    assert response.item.value_json == {"preference": "outdoor"}
+    assert response.item.text is None
+    minimization_event = response.item.metadata_json["governance"]["minimization_events"][0]
+    assert minimization_event["dropped_value_keys"] == ["address", "note"]
 
 
 @pytest.mark.parametrize(
