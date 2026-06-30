@@ -210,7 +210,7 @@ class ToolGateway:
                 action_id=None,
             )
 
-        existing_action = self._action_ledger.get_by_idempotency_key(request.idempotency_key)
+        existing_action = self._action_ledger.get_replayable_by_idempotency_key(request.idempotency_key)
         if existing_action is not None:
             return self._record_result(
                 request=request,

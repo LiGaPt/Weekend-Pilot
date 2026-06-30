@@ -19,6 +19,7 @@ ExecutionActionStatus = Literal[
     "blocked",
     "rate_limited",
     "idempotent_replay",
+    "skipped_due_to_prior_failure",
 ]
 
 
@@ -33,6 +34,8 @@ class ExecutionActionResult(BaseModel):
     tool_event_id: UUID | None = None
     response_json: dict[str, Any] | None = None
     error_json: dict[str, Any] | None = None
+    replayed_from_ledger: bool = False
+    skipped_due_to_prior_failure: bool = False
 
 
 class ExecutionWorkflowResult(BaseModel):
@@ -44,3 +47,6 @@ class ExecutionWorkflowResult(BaseModel):
     succeeded_count: int
     failed_count: int
     workflow_version: str
+    rollback_status: str
+    rollback_reason: str
+    rollback_candidate_action_refs: list[str] = Field(default_factory=list)
