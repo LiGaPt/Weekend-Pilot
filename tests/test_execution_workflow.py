@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.session import SessionLocal
 from backend.app.execution import DeterministicExecutionWorkflow, ExecutionWorkflowError
+from backend.app.repositories import ActionLedgerRepository
 from backend.app.repositories import AgentRunRepository, PlanRepository, UserRepository
 from backend.app.tool_gateway import ToolGatewayResult
 
@@ -43,6 +44,33 @@ class FakeGateway:
             action_id=uuid4() if is_success else None,
             idempotency_key=request.idempotency_key,
         )
+
+
+def _execution_summary(
+    *,
+    status: str,
+    plan_status: str,
+    action_results: list[dict],
+    succeeded_count: int,
+    failed_count: int,
+    rollback_status: str = "not_needed",
+    rollback_reason: str = "all_actions_succeeded",
+    rollback_candidate_action_refs: list[str] | None = None,
+) -> dict:
+    return {
+        "schema_version": "execution_workflow_v1",
+        "workflow_version": "deterministic_execution_workflow_v1",
+        "status": status,
+        "plan_status": plan_status,
+        "started_at": "2026-06-30T10:00:00+00:00",
+        "finished_at": "2026-06-30T10:00:01+00:00",
+        "succeeded_count": succeeded_count,
+        "failed_count": failed_count,
+        "rollback_status": rollback_status,
+        "rollback_reason": rollback_reason,
+        "rollback_candidate_action_refs": [] if rollback_candidate_action_refs is None else rollback_candidate_action_refs,
+        "action_results": action_results,
+    }
 
 
 def _create_run(session: Session):
@@ -218,9 +246,10 @@ def test_idempotent_replay_counts_as_success(db_session: Session) -> None:
     assert result.succeeded_count == 2
     assert result.failed_count == 0
     assert {item.status for item in result.action_results} == {"idempotent_replay"}
+    assert all(item.replayed_from_ledger is False for item in result.action_results)
 
 
-def test_mixed_failures_continue_and_update_partial_status(db_session: Session) -> None:
+def test_mixed_failures_stop_after_first_failure_and_update_partial_status(db_session: Session) -> None:
     plan = _create_confirmed_plan(db_session)
     gateway = FakeGateway(statuses=["failed", "succeeded"])
 
@@ -229,13 +258,160 @@ def test_mixed_failures_continue_and_update_partial_status(db_session: Session) 
         plan.plan_id,
     )
 
-    assert len(gateway.requests) == 2
+    assert len(gateway.requests) == 1
+    assert result.status == "failed"
+    assert result.plan_status == "execution_failed"
+    assert result.succeeded_count == 0
+    assert result.failed_count == 1
+    assert [item.status for item in result.action_results] == ["failed", "skipped_due_to_prior_failure"]
+    assert PlanRepository(db_session).get_by_id(plan.plan_id).status == "execution_failed"
+
+
+def test_execution_stops_after_first_failure_and_marks_remaining_as_skipped(db_session: Session) -> None:
+    run = _create_run(db_session)
+    plan = _create_confirmed_plan(
+        db_session,
+        run_id=run.run_id,
+        actions=[
+            _confirmed_action(
+                action_ref="draft_1_action_1",
+                execution_order=1,
+                tool_name="book_ticket",
+                target_id="activity_1",
+                idempotency_key=f"confirm:{run.run_id}:draft_1_action_1",
+            ),
+            _confirmed_action(
+                action_ref="draft_1_action_2",
+                execution_order=2,
+                tool_name="reserve_restaurant",
+                target_id="dining_1",
+                idempotency_key=f"confirm:{run.run_id}:draft_1_action_2",
+            ),
+            _confirmed_action(
+                action_ref="draft_1_action_3",
+                execution_order=3,
+                tool_name="send_message",
+                target_id="group_1",
+                idempotency_key=f"confirm:{run.run_id}:draft_1_action_3",
+            ),
+        ],
+    )
+    gateway = FakeGateway(statuses=["succeeded", "failed", "succeeded"])
+
+    result = DeterministicExecutionWorkflow(PlanRepository(db_session), gateway).execute_confirmed_plan(
+        plan.run_id,
+        plan.plan_id,
+    )
+
+    assert [request.tool_name for request in gateway.requests] == ["book_ticket", "reserve_restaurant"]
     assert result.status == "partially_succeeded"
     assert result.plan_status == "partially_executed"
     assert result.succeeded_count == 1
     assert result.failed_count == 1
-    assert [item.status for item in result.action_results] == ["failed", "succeeded"]
-    assert PlanRepository(db_session).get_by_id(plan.plan_id).status == "partially_executed"
+    assert [item.status for item in result.action_results] == [
+        "succeeded",
+        "failed",
+        "skipped_due_to_prior_failure",
+    ]
+    assert result.action_results[2].skipped_due_to_prior_failure is True
+    assert result.rollback_status == "not_attempted"
+    assert result.rollback_reason == "compensation_tools_not_available"
+    assert result.rollback_candidate_action_refs == ["draft_1_action_1"]
+
+
+def test_existing_terminal_execution_summary_replays_without_gateway_calls(db_session: Session) -> None:
+    run = _create_run(db_session)
+    action = _confirmed_action(
+        action_ref="draft_1_action_1",
+        execution_order=1,
+        idempotency_key=f"confirm:{run.run_id}:draft_1_action_1",
+    )
+    plan = _create_confirmed_plan(
+        db_session,
+        run_id=run.run_id,
+        status="executed",
+        plan_json={
+            **_confirmed_plan_json(run.run_id, actions=[action]),
+            "execution": _execution_summary(
+                status="succeeded",
+                plan_status="executed",
+                succeeded_count=1,
+                failed_count=0,
+                action_results=[
+                    {
+                        "action_ref": "draft_1_action_1",
+                        "execution_order": 1,
+                        "tool_name": "book_ticket",
+                        "target_id": "activity_museum_001",
+                        "idempotency_key": action["idempotency_key"],
+                        "status": "succeeded",
+                        "replayed_from_ledger": True,
+                        "skipped_due_to_prior_failure": False,
+                    }
+                ],
+            ),
+        },
+    )
+    gateway = FakeGateway()
+
+    result = DeterministicExecutionWorkflow(PlanRepository(db_session), gateway).execute_confirmed_plan(
+        plan.run_id,
+        plan.plan_id,
+    )
+
+    assert gateway.requests == []
+    assert result.status == "succeeded"
+    assert result.plan_status == "executed"
+    assert result.action_results[0].replayed_from_ledger is True
+    assert result.rollback_status == "not_needed"
+
+
+def test_rebuilds_execution_from_existing_ledger_and_only_runs_missing_actions(db_session: Session) -> None:
+    run = _create_run(db_session)
+    first = _confirmed_action(
+        action_ref="draft_1_action_1",
+        execution_order=1,
+        tool_name="book_ticket",
+        target_id="activity_1",
+        idempotency_key=f"confirm:{run.run_id}:draft_1_action_1",
+        payload={"poi_id": "activity_1", "quantity": 3},
+    )
+    second = _confirmed_action(
+        action_ref="draft_1_action_2",
+        execution_order=2,
+        tool_name="reserve_restaurant",
+        target_id="dining_1",
+        idempotency_key=f"confirm:{run.run_id}:draft_1_action_2",
+        payload={"restaurant_id": "dining_1", "party_size": 3},
+    )
+    plan = _create_confirmed_plan(
+        db_session,
+        run_id=run.run_id,
+        actions=[first, second],
+    )
+    ledger = ActionLedgerRepository(db_session)
+    existing = ledger.create(
+        run_id=run.run_id,
+        action_type="book_ticket",
+        target_id="activity_1",
+        idempotency_key=first["idempotency_key"],
+        status="succeeded",
+        request_json={"source": "test"},
+        response_json={"ok": True, "ticket": "t1"},
+    )
+    gateway = FakeGateway(statuses=["succeeded"])
+
+    result = DeterministicExecutionWorkflow(PlanRepository(db_session), gateway).execute_confirmed_plan(
+        plan.run_id,
+        plan.plan_id,
+    )
+
+    assert len(gateway.requests) == 1
+    assert gateway.requests[0].tool_name == "reserve_restaurant"
+    assert [item.status for item in result.action_results] == ["succeeded", "succeeded"]
+    assert result.action_results[0].replayed_from_ledger is True
+    assert result.action_results[0].action_id == existing.action_id
+    assert result.action_results[1].replayed_from_ledger is False
 
 
 @pytest.mark.parametrize("status", ["failed", "blocked", "rate_limited"])
@@ -251,7 +427,7 @@ def test_all_failed_statuses_update_execution_failed(db_session: Session, status
     assert result.status == "failed"
     assert result.plan_status == "execution_failed"
     assert result.succeeded_count == 0
-    assert result.failed_count == 2
+    assert result.failed_count == 1
     assert PlanRepository(db_session).get_by_id(plan.plan_id).status == "execution_failed"
 
 
@@ -269,6 +445,7 @@ def test_no_confirmed_actions_updates_execution_skipped(db_session: Session) -> 
     assert result.action_results == []
     assert gateway.requests == []
     assert PlanRepository(db_session).get_by_id(plan.plan_id).status == "execution_skipped"
+    assert result.rollback_status == "not_needed"
 
 
 def test_rejects_missing_wrong_run_unselected_declined_and_unconfirmed_plans(db_session: Session) -> None:

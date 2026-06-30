@@ -44,6 +44,9 @@ class ActionLedgerRepository:
         statement = select(ActionLedger).where(ActionLedger.idempotency_key == idempotency_key)
         return self.session.scalar(statement)
 
+    def get_replayable_by_idempotency_key(self, idempotency_key: str) -> ActionLedger | None:
+        return self.get_by_idempotency_key(idempotency_key)
+
     def list_for_run(self, run_id: UUID) -> list[ActionLedger]:
         statement = (
             select(ActionLedger)
@@ -51,6 +54,13 @@ class ActionLedgerRepository:
             .order_by(ActionLedger.created_at, ActionLedger.action_id)
         )
         return list(self.session.scalars(statement).all())
+
+    def list_for_run_by_idempotency_key(self, run_id: UUID) -> dict[str, ActionLedger]:
+        statement = select(ActionLedger).where(ActionLedger.run_id == run_id)
+        return {
+            action.idempotency_key: action
+            for action in self.session.scalars(statement).all()
+        }
 
     def update_status(
         self,

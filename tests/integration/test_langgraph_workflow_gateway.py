@@ -290,6 +290,54 @@ def test_workflow_auto_confirm_executes_feedback_and_observability(
     _assert_timing_artifacts(result, run, trace_path)
 
 
+def test_execution_workflow_reentry_with_existing_terminal_plan_does_not_duplicate_ledger_rows(
+    db_session: Session,
+    redis_runtime,
+    trace_path: Path,
+) -> None:
+    runner = _build_runner(db_session, redis_runtime, trace_path)
+
+    result = runner.run(
+        WeekendPilotWorkflowRequest(
+            user_input=USER_INPUT,
+            external_user_id=f"workflow-confirmed-reentry-{uuid4()}",
+            display_name="Workflow Confirmed Reentry Tester",
+            case_id="case-langgraph-confirmed-reentry",
+            auto_confirm=True,
+        )
+    )
+
+    assert result.status == "completed"
+    assert result.run_id is not None
+    assert result.selected_plan_id is not None
+
+    action_count_before = _action_count(db_session, result.run_id)
+    plan = PlanRepository(db_session).get_selected_for_run(result.run_id)
+    assert plan is not None
+
+    from backend.app.execution import DeterministicExecutionWorkflow
+    from backend.app.tool_gateway import ToolGateway
+    from backend.app.tool_gateway import build_default_registry
+    from backend.app.repositories import ToolEventRepository, ActionLedgerRepository
+
+    cache, rate_limiter = redis_runtime
+    workflow = DeterministicExecutionWorkflow(
+        PlanRepository(db_session),
+        ToolGateway(
+            registry=build_default_registry(default_provider="mock_world"),
+            tool_events=ToolEventRepository(db_session),
+            action_ledger=ActionLedgerRepository(db_session),
+            cache=cache,
+            rate_limiter=rate_limiter,
+        ),
+    )
+
+    replay = workflow.execute_confirmed_plan(result.run_id, plan.plan_id)
+
+    assert replay.status in {"succeeded", "partially_succeeded", "failed", "skipped"}
+    assert _action_count(db_session, result.run_id) == action_count_before
+
+
 def test_workflow_auto_confirm_persists_candidate_memory_without_loading_it_as_governable(
     db_session: Session,
     redis_runtime,

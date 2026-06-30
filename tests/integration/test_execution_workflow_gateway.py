@@ -170,9 +170,10 @@ def test_execution_workflow_runs_confirmed_mock_world_actions_and_replays(
     replay = workflow.execute_confirmed_plan(run.run_id, selected.plan_id)
 
     assert replay.status == "succeeded"
-    assert {item.status for item in replay.action_results} == {"idempotent_replay"}
+    assert {item.status for item in replay.action_results} == {"succeeded"}
+    assert all(item.replayed_from_ledger is False for item in replay.action_results)
     assert _count_rows(db_session, ActionLedger, run.run_id) == action_ledger_count_after_first
-    assert _count_rows(db_session, ToolEvent, run.run_id) == tool_event_count_after_first + confirmed_action_count
+    assert _count_rows(db_session, ToolEvent, run.run_id) == tool_event_count_after_first
 
 
 def test_execution_workflow_executes_order_addon_and_replays_idempotently(
@@ -223,4 +224,57 @@ def test_execution_workflow_executes_order_addon_and_replays_idempotently(
     replay = workflow.execute_confirmed_plan(run.run_id, selected.plan_id)
     replay_addon_results = [item for item in replay.action_results if item.tool_name == "order_addon"]
     assert len(replay_addon_results) == 1
-    assert replay_addon_results[0].status == "idempotent_replay"
+    assert replay_addon_results[0].status == "succeeded"
+    assert replay_addon_results[0].replayed_from_ledger is False
+
+
+def test_execution_workflow_rebuilds_missing_summary_from_existing_ledger_without_duplicate_write_calls(
+    db_session: Session,
+    redis_runtime,
+) -> None:
+    cache, rate_limiter = redis_runtime
+    run = _create_run(db_session)
+    gateway = _build_gateway(db_session, cache, rate_limiter)
+    intent = DeterministicIntentParser().parse(
+        "This afternoon I want to go out with my wife and child for a few hours. "
+        "Not too far. My child is 5, and my wife is trying to eat lighter."
+    )
+    query_plan = DeterministicQueryPlanner().build(intent, provider_profile="mock_world")
+    collection = QueryPlanExecutor(gateway).execute_initial_calls(query_plan, run.run_id)
+    enrichment = CandidateEnricher(gateway).enrich(query_plan, collection)
+    drafts = DeterministicItineraryGenerator().generate(query_plan, enrichment)
+    review = FinalReviewGate().review(
+        query_plan,
+        enrichment,
+        drafts,
+        pre_confirmation_action_count=_count_rows(db_session, ActionLedger, run.run_id),
+    )
+    persistence = ReviewedPlanPersistenceService(PlanRepository(db_session))
+    persisted = persistence.persist_reviewed_drafts(review, drafts)
+    selected = persistence.select_plan(run.run_id, persisted.persisted_plans[0].plan_id)
+    confirmation = HumanConfirmationService(PlanRepository(db_session)).confirm_plan(
+        run.run_id,
+        selected.plan_id,
+        confirmed_by="user",
+        source="integration-test",
+    )
+    workflow = DeterministicExecutionWorkflow(PlanRepository(db_session), gateway)
+    first = workflow.execute_confirmed_plan(run.run_id, selected.plan_id)
+    assert first.status == "succeeded"
+
+    row = PlanRepository(db_session).get_by_id(selected.plan_id)
+    assert row is not None
+    plan_json = dict(row.plan_json)
+    plan_json.pop("execution", None)
+    updated = PlanRepository(db_session).update_status_and_plan_json(selected.plan_id, "confirmed", plan_json)
+    assert updated is not None
+
+    action_ledger_count_before = _count_rows(db_session, ActionLedger, run.run_id)
+    tool_event_count_before = _count_rows(db_session, ToolEvent, run.run_id)
+
+    rebuilt = workflow.execute_confirmed_plan(run.run_id, selected.plan_id)
+
+    assert rebuilt.status == "succeeded"
+    assert all(item.replayed_from_ledger is True for item in rebuilt.action_results)
+    assert _count_rows(db_session, ActionLedger, run.run_id) == action_ledger_count_before
+    assert _count_rows(db_session, ToolEvent, run.run_id) == tool_event_count_before
