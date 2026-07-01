@@ -14,6 +14,8 @@ Run the following commands from the repository root when you need to refresh evi
 | --- | --- | --- |
 | V1 blocking release gate | `python scripts/run_benchmark_release_gate.py` | `var/formal-benchmarks/latest-release_gate_v1-run-report.json` |
 | V1.5 coverage gate | `python scripts/run_benchmark_coverage_gate.py` | `var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json` |
+| V2 integrity gate | `python scripts/run_benchmark_v2_integrity_gate.py` | `var/formal-benchmarks/latest-v2_integrity_gate-run-report.json` |
+| V2 repeated-run stability | `python scripts/run_benchmark_stability_passk.py --suite v2_integrity --runs 4` | `var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json` |
 | Full registered formal verification | `python scripts/run_formal_verification.py` | `var/formal-benchmarks/latest-all_registered-run-report.json` |
 | Recovery replay review | `python scripts/run_recovery_replay_review.py` | `var/recovery-reviews/latest-family_route_failure_v1-review.json` |
 
@@ -46,4 +48,4 @@ This document is the reviewer-facing evidence package reference and ownership ma
 
 ## Verification
 
-Run `python scripts/verify_review_evidence.py` before submission to validate the official docs and the four current latest aliases together.
+Run `python scripts/verify_review_evidence.py` before submission to validate the official docs and the current six canonical evidence aliases together.
