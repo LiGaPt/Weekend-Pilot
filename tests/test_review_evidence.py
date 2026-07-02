@@ -275,6 +275,8 @@ def _write_repo_fixture(
     commands = [
         "python scripts/run_benchmark_release_gate.py",
         "python scripts/run_benchmark_coverage_gate.py",
+        "python scripts/run_benchmark_v2_integrity_gate.py",
+        "python scripts/run_benchmark_stability_passk.py --suite v2_integrity --runs 4",
         "python scripts/run_formal_verification.py",
         "python scripts/run_recovery_replay_review.py",
     ]
@@ -291,6 +293,8 @@ def _write_repo_fixture(
         "",
         "- `var/formal-benchmarks/latest-release_gate_v1-run-report.json`",
         "- `var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json`",
+        "- `var/formal-benchmarks/latest-v2_integrity_gate-run-report.json`",
+        "- `var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json`",
         "- `var/formal-benchmarks/latest-all_registered-run-report.json`",
         "- `var/recovery-reviews/latest-family_route_failure_v1-review.json`",
         "",
@@ -302,7 +306,7 @@ def _write_repo_fixture(
         "",
         "## Verification",
         "",
-        "- Run `python scripts/verify_review_evidence.py` before submission.",
+        "- Run `python scripts/verify_review_evidence.py` before submission to validate the official docs and the current six canonical evidence aliases together.",
     ]
     (repo_root / "docs" / "V1_5_REVIEW_EVIDENCE.md").write_text("\n".join(v15_lines) + "\n", encoding="utf-8")
 
@@ -312,6 +316,8 @@ def _write_repo_fixture(
         "正式评审请以 `docs/V1_5_REVIEW_EVIDENCE.md` 为 reviewer 入口。",
         "- `var/formal-benchmarks/latest-release_gate_v1-run-report.json`",
         "- `var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json`",
+        "- `var/formal-benchmarks/latest-v2_integrity_gate-run-report.json`",
+        "- `var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json`",
         "- `var/formal-benchmarks/latest-all_registered-run-report.json`",
         "- `var/recovery-reviews/latest-family_route_failure_v1-review.json`",
         "- `docs/artifacts/` 不是 benchmark 或 recovery evidence 的 source of truth；正式引用应始终指向 `var/` 下的 canonical latest aliases。",

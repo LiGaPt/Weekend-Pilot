@@ -37,20 +37,27 @@ README_REQUIRED_SNIPPETS = (
 V1_5_REQUIRED_SNIPPETS = (
     "python scripts/run_benchmark_release_gate.py",
     "python scripts/run_benchmark_coverage_gate.py",
+    "python scripts/run_benchmark_v2_integrity_gate.py",
+    "python scripts/run_benchmark_stability_passk.py --suite v2_integrity --runs 4",
     "python scripts/run_formal_verification.py",
     "python scripts/run_recovery_replay_review.py",
     "var/formal-benchmarks/latest-release_gate_v1-run-report.json",
     "var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json",
+    "var/formal-benchmarks/latest-v2_integrity_gate-run-report.json",
+    "var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json",
     "var/formal-benchmarks/latest-all_registered-run-report.json",
     "var/recovery-reviews/latest-family_route_failure_v1-review.json",
     "`docs/artifacts/` is not the source of truth for benchmark or recovery evidence.",
     "Canonical generated evidence stays under `var/`.",
+    "current six canonical evidence aliases together",
     "python scripts/verify_review_evidence.py",
 )
 SUBMISSION_REQUIRED_SNIPPETS = (
     "docs/V1_5_REVIEW_EVIDENCE.md",
     "var/formal-benchmarks/latest-release_gate_v1-run-report.json",
     "var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json",
+    "var/formal-benchmarks/latest-v2_integrity_gate-run-report.json",
+    "var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json",
     "var/formal-benchmarks/latest-all_registered-run-report.json",
     "var/recovery-reviews/latest-family_route_failure_v1-review.json",
 )
