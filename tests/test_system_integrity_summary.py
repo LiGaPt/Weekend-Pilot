@@ -128,6 +128,71 @@ def test_load_system_integrity_summary_degrades_when_safe_stop_gate_is_missing(
     assert safe_stop_path.required_for_summary is True
 
 
+def test_load_system_integrity_summary_safe_stop_summary_uses_latest_alias_payload(
+    summary_root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    safe_stop_report = _build_safe_stop_report()
+    safe_stop_report["run_status"] = "failed"
+    safe_stop_report["passed_count"] = 7
+    safe_stop_report["failed_count"] = 1
+    safe_stop_report["error_count"] = 0
+    safe_stop_report["overall_score"] = 0.875
+    safe_stop_report["benchmark_summary"].update(
+        {
+            "suite_id": "recovery_focused",
+            "run_status": "failed",
+            "case_count": 9,
+            "passed_count": 7,
+            "failed_count": 1,
+            "error_count": 0,
+            "overall_score": 0.875,
+        }
+    )
+    safe_stop_report["safe_stop_gate_evaluation"].update(
+        {
+            "gate_id": "safe_stop_gate_v1_distinctive",
+            "suite_id": "safe_stop_evaluation_distinctive",
+            "release_blocked": True,
+            "blocking_failures": ["distinctive failure"],
+        }
+    )
+    _write_json(
+        summary_root / "var/formal-benchmarks/latest-v2_integrity_gate-run-report.json",
+        _build_v2_gate_report(),
+    )
+    _write_json(
+        summary_root / "var/formal-benchmarks/latest-all_registered-run-report.json",
+        _build_all_registered_report(),
+    )
+    _write_json(
+        summary_root / "var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json",
+        _build_stability_report(),
+    )
+    _write_json(
+        summary_root / "var/formal-benchmarks/latest-safe_stop_gate_v1-run-report.json",
+        safe_stop_report,
+    )
+    _write_json(
+        summary_root / "var/recovery-reviews/latest-family_route_failure_v1-review.json",
+        _build_recovery_review(),
+    )
+    _patch_evidence_paths(monkeypatch, summary_root)
+
+    summary = load_system_integrity_summary()
+
+    assert summary.safe_stop_summary.status == "ready"
+    assert summary.safe_stop_summary.gate_id == "safe_stop_gate_v1_distinctive"
+    assert summary.safe_stop_summary.suite_id == "safe_stop_evaluation_distinctive"
+    assert summary.safe_stop_summary.run_status == "failed"
+    assert summary.safe_stop_summary.release_blocked is True
+    assert summary.safe_stop_summary.case_count == 9
+    assert summary.safe_stop_summary.passed_count == 7
+    assert summary.safe_stop_summary.failed_count == 1
+    assert summary.safe_stop_summary.error_count == 0
+    assert summary.safe_stop_summary.overall_score == 0.875
+
+
 def test_load_system_integrity_summary_marks_invalid_stability_report(
     summary_root: Path,
     monkeypatch: pytest.MonkeyPatch,

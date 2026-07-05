@@ -132,6 +132,16 @@ def run_benchmark_safe_stop_gate(
         else:
             blocking_failures.append(f"Case {case_id} did not end with a bounded recovery chain.")
 
+        injected_effects = list(getattr(failure_chain_summary, "injected_effects", []) or [])
+        if not injected_effects:
+            blocking_failures.append(f"Case {case_id} is missing failure reason evidence.")
+
+        if getattr(failure_chain_summary, "terminal_workflow_status", None) != "failed":
+            blocking_failures.append(f"Case {case_id} terminal_workflow_status was not 'failed'.")
+
+        if int(getattr(failure_chain_summary, "attempt_count", 0) or 0) < 1:
+            blocking_failures.append(f"Case {case_id} is missing recovery attempt evidence.")
+
         recovery_actions = list(getattr(failure_chain_summary, "recovery_actions", []) or [])
         if recovery_actions and recovery_actions[-1] == "stop_safely":
             terminal_safe_stop_case_count += 1
