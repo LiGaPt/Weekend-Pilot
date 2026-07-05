@@ -146,11 +146,14 @@ def test_memory_user_control_applies_status_and_appends_governance_event(
 @pytest.mark.parametrize(
     ("action", "starting_status"),
     [
+        ("activate", "active"),
         ("disable", "disabled"),
         ("suppress", "ignored"),
+        ("expire", "expired"),
+        ("mark_candidate", "candidate"),
     ],
 )
-def test_memory_user_control_is_idempotent_for_matching_target_status(
+def test_memory_user_control_lifecycle_actions_are_idempotent_for_matching_target_status(
     db_session,
     action: str,
     starting_status: str,
