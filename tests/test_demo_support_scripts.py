@@ -296,6 +296,41 @@ def test_web_demo_readme_covers_submission_recording_workflow() -> None:
     assert "benchmark" in runbook_text
 
 
+def test_task129_offline_delivery_boundary_is_documented() -> None:
+    paths = [
+        REPO_ROOT / "README.md",
+        REPO_ROOT / "docs" / "WEB_DEMO_README.md",
+        REPO_ROOT / "docs" / "submission" / "OVERVIEW.md",
+        REPO_ROOT / "docs" / "submission" / "DEMO_SCRIPT.md",
+        REPO_ROOT / "docs" / "submission" / "EVIDENCE_MAP.md",
+        REPO_ROOT / "docs" / "submission" / "FUNCTION_COVERAGE_MAP.md",
+        REPO_ROOT / "docs" / "submission" / "RECORDING_CHECKLIST.md",
+    ]
+
+    for path in paths:
+        text = path.read_text(encoding="utf-8")
+        assert "Mock World" in text, path
+        assert "offline/local" in text, path
+        assert "does not connect to real-world write services" in text, path
+        assert "does not depend on true MCP integration" in text, path
+        assert "read-only preview" in text, path
+
+
+def test_task129_submission_docs_pin_review_order_and_evidence_command() -> None:
+    docs = [
+        REPO_ROOT / "docs" / "WEB_DEMO_README.md",
+        REPO_ROOT / "docs" / "submission" / "OVERVIEW.md",
+        REPO_ROOT / "docs" / "submission" / "DEMO_SCRIPT.md",
+        REPO_ROOT / "docs" / "submission" / "EVIDENCE_MAP.md",
+        REPO_ROOT / "docs" / "submission" / "RECORDING_CHECKLIST.md",
+    ]
+
+    for path in docs:
+        text = path.read_text(encoding="utf-8")
+        assert "5173 -> 5174" in text, path
+        assert "python scripts/show_submission_evidence.py" in text, path
+
+
 def test_readme_covers_project_status_startup_benchmark_and_tests() -> None:
     readme_text = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     roadmap_asset = REPO_ROOT / "docs" / "assets" / "readme-current-version-roadmap.svg"

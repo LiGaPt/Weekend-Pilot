@@ -1,5 +1,11 @@
 # Function Coverage Map
 
+## Task 129 Formal Boundary
+
+This coverage map is for the `V2 Integrity Edition` offline/local `Mock World` submission. Capabilities must be demonstrated through one of four allowed surfaces: `5173 live`, `5174 live`, `python scripts/show_submission_evidence.py`, or optional `python scripts/demo_amap_preview.py`.
+
+The formal main chain does not connect to real-world write services and does not depend on true MCP integration. `AMap` is optional API/script-only `read-only preview`; it is not the customer UI main chain and not benchmark evidence.
+
 当前功能覆盖表对应本次 `V2 Integrity Edition` 提交。`V1.5 baseline` 只作为已完成基线背景保留；当前聚焦 benchmark 完整性、memory governance、observability 与 recovery 可审计性。AMap 仍是 API-only read-only preview，不进入 customer UI 主链，不参与正式 benchmark。
 
 | 功能 | 视频里如何展示 |

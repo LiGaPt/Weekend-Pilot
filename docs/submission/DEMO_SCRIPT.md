@@ -181,3 +181,16 @@ python scripts/demo_amap_preview.py
 - 主评审口径是 `Mock World` 稳定复现；AMap 只是可选只读预览。
 - 不现场重跑耗时 benchmark，只展示当前 canonical latest evidence。
 - 录制时按现有功能执行，不需要临时修改业务代码。
+## 3-minute judge path
+
+Use this short path when review time is limited. The submission boundary is `Mock World`: offline/local, deterministic, and closed-loop. It does not connect to real-world write services and does not depend on true MCP integration. `AMap` is optional API/script-only `read-only preview`.
+
+1. `0:00-0:25` Open with the delivery boundary: `V2 Integrity Edition`, formal path is `Mock World`, `AMap` is optional read-only preview.
+2. `0:25-1:20` Open `5173`, start one Mock World public scenario, and show the plan reaching the human confirmation boundary.
+3. `1:20-1:45` Confirm or decline to show that write-like actions only happen after explicit human choice and remain local/simulated.
+4. `1:45-2:30` Switch to `5174`, show `Benchmark Summary`, `System Integrity Summary`, and optionally load the copied `run_id`.
+5. `2:30-3:00` Run `python scripts/show_submission_evidence.py` and point to the six `[OK]` canonical evidence aliases.
+
+## Optional extended review path
+
+Use the longer script below when the reviewer wants clarification, replan/versioning, decline, recovery visualization, or optional `python scripts/demo_amap_preview.py` coverage. Keep the browser order fixed as `5173 -> 5174`.
