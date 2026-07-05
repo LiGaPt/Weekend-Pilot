@@ -1284,6 +1284,176 @@ def test_demo_run_clarification_flow_reuses_session_and_keeps_version_v1(client)
         db.close()
 
 
+def test_conversation_clarify_replan_manifest_confirm_closure(client) -> None:
+    test_client, case_ids, external_user_ids = client
+    payload = _start_payload(case_ids, external_user_ids)
+    payload["user_input"] = VAGUE_USER_INPUT
+    payload["mock_world_profile"] = "solo_afternoon"
+
+    start_response = test_client.post("/demo/runs", json=payload)
+
+    assert start_response.status_code == 200
+    start_body = start_response.json()
+    _assert_no_forbidden_keys(start_body)
+    _assert_public_run_redaction(start_body)
+    assert start_body["status"] == "awaiting_clarification"
+    assert start_body["plans"] == []
+    assert start_body["selected_plan_id"] is None
+    assert start_body["action_count"] == 0
+    assert start_body["clarification"] is not None
+    _assert_plan_version(
+        start_body,
+        version_number=1,
+        source_run_id=None,
+        source_selected_plan_id=None,
+    )
+    source_run_id = UUID(start_body["run_id"])
+
+    clarify_response = test_client.post(
+        f"/demo/runs/{source_run_id}/clarify",
+        json={
+            "user_input": "This afternoon I want a nearby solo outing for a few hours.",
+            "selected_plan_index": 0,
+        },
+    )
+
+    assert clarify_response.status_code == 200
+    clarify_body = clarify_response.json()
+    _assert_no_forbidden_keys(clarify_body)
+    _assert_public_run_redaction(clarify_body)
+    assert clarify_body["status"] == "awaiting_confirmation"
+    assert clarify_body["selected_plan_id"] is not None
+    assert len(clarify_body["plans"]) >= 2, "closure regression requires a non-default source plan"
+    _assert_plan_version(
+        clarify_body,
+        version_number=1,
+        source_run_id=str(source_run_id),
+        source_selected_plan_id=None,
+    )
+    clarified_run_id = UUID(clarify_body["run_id"])
+    source_plan_index = 1
+    source_plan_id = clarify_body["plans"][source_plan_index]["plan_id"]
+
+    db = SessionLocal()
+    try:
+        assert _count_actions(db, source_run_id) == 0
+        assert _count_actions(db, clarified_run_id) == 0
+        assert _count_write_tool_events(db, source_run_id) == 0
+        assert _count_write_tool_events(db, clarified_run_id) == 0
+    finally:
+        db.close()
+
+    replan_response = test_client.post(
+        f"/demo/runs/{clarified_run_id}/replan",
+        json={
+            "user_input": "Keep it nearby, but make it indoor this time.",
+            "selected_plan_index": source_plan_index,
+        },
+    )
+
+    assert replan_response.status_code == 200
+    replan_body = replan_response.json()
+    _assert_no_forbidden_keys(replan_body)
+    _assert_public_run_redaction(replan_body)
+    assert replan_body["status"] == "awaiting_confirmation"
+    assert replan_body["selected_plan_id"] is not None
+    _assert_plan_version(
+        replan_body,
+        version_number=2,
+        source_run_id=str(clarified_run_id),
+        source_selected_plan_id=source_plan_id,
+    )
+    replan_run_id = UUID(replan_body["run_id"])
+    selected_replan_plan = next(plan for plan in replan_body["plans"] if plan["selected"])
+    _assert_action_manifest_preview(selected_replan_plan)
+    manifest = selected_replan_plan["action_manifest"]
+    assert manifest["source"] == "proposed_actions"
+    assert manifest["action_count"] >= 1
+    assert len(manifest["actions"]) >= 1
+    for action in manifest["actions"]:
+        assert action["execution_order"] is not None
+        assert action["action_type"]
+        assert action["target_id"]
+
+    db = SessionLocal()
+    try:
+        assert _count_actions(db, source_run_id) == 0
+        assert _count_actions(db, clarified_run_id) == 0
+        assert _count_actions(db, replan_run_id) == 0
+        assert _count_write_tool_events(db, source_run_id) == 0
+        assert _count_write_tool_events(db, clarified_run_id) == 0
+        assert _count_write_tool_events(db, replan_run_id) == 0
+    finally:
+        db.close()
+
+    confirm_response = test_client.post(
+        f"/demo/runs/{replan_run_id}/confirm",
+        json={"confirmed_by": "conversation-closure-test"},
+    )
+
+    assert confirm_response.status_code == 200
+    confirm_body = confirm_response.json()
+    _assert_no_forbidden_keys(confirm_body)
+    _assert_public_run_redaction(confirm_body)
+    assert confirm_body["run_id"] == str(replan_run_id)
+    assert confirm_body["status"] == "completed"
+    assert confirm_body["execution_status"] == "succeeded"
+    assert confirm_body["feedback_status"] == "completed"
+    assert confirm_body["action_count"] > 0
+    _assert_plan_version(
+        confirm_body,
+        version_number=2,
+        source_run_id=str(clarified_run_id),
+        source_selected_plan_id=source_plan_id,
+    )
+    selected_confirmed_plan = next(plan for plan in confirm_body["plans"] if plan["selected"])
+    _assert_action_manifest_confirmed(selected_confirmed_plan)
+
+    db = SessionLocal()
+    try:
+        source_run = _load_run(db, source_run_id)
+        clarified_run = _load_run(db, clarified_run_id)
+        replan_run = _load_run(db, replan_run_id)
+        assert source_run.status == "awaiting_clarification"
+        assert clarified_run.status == "awaiting_confirmation"
+        assert replan_run.status == "completed"
+        assert _count_actions(db, source_run_id) == 0
+        assert _count_actions(db, clarified_run_id) == 0
+        assert _count_actions(db, replan_run_id) == confirm_body["action_count"]
+        assert replan_run.metadata_json["demo"]["plan_version"] == {
+            "version_number": 2,
+            "source_run_id": str(clarified_run_id),
+            "source_selected_plan_id": source_plan_id,
+        }
+    finally:
+        db.close()
+
+    for run_id, expected_status, expected_version in [
+        (source_run_id, "awaiting_clarification", 1),
+        (clarified_run_id, "awaiting_confirmation", 1),
+        (replan_run_id, "completed", 2),
+    ]:
+        readback_response = test_client.get(f"/demo/runs/{run_id}")
+        assert readback_response.status_code == 200
+        readback_body = readback_response.json()
+        _assert_no_forbidden_keys(readback_body)
+        _assert_public_run_redaction(readback_body)
+        assert readback_body["status"] == expected_status
+        assert readback_body["plan_version"]["version_label"] == f"v{expected_version}"
+        for private_key in {
+            "session_id",
+            "conversation",
+            "tool_events",
+            "tool_event_count",
+            "node_history",
+            "trace",
+            "trace_id",
+            "agent_roles",
+            "observability_status",
+        }:
+            assert private_key not in readback_body
+
+
 def test_demo_run_recovery_clarification_flow_reuses_public_clarify_contract(
     client,
     monkeypatch: pytest.MonkeyPatch,
@@ -1477,6 +1647,9 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
     source_body = start_response.json()
     source_run_id = UUID(source_body["run_id"])
     source_selected_plan_id = source_body["selected_plan_id"]
+    source_selected_plan_index = next(
+        index for index, plan in enumerate(source_body["plans"]) if plan["plan_id"] == source_selected_plan_id
+    )
     _assert_plan_version(
         source_body,
         version_number=1,
@@ -1493,7 +1666,7 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
         f"/demo/runs/{source_run_id}/replan",
         json={
             "user_input": "Keep it nearby, but make dinner lighter and stay flexible.",
-            "selected_plan_index": 0,
+            "selected_plan_index": source_selected_plan_index,
         },
     )
 
@@ -1523,7 +1696,9 @@ def test_demo_run_replan_reuses_session_and_returns_new_run(client) -> None:
         f"/demo/runs/{replan_body['run_id']}/replan",
         json={
             "user_input": "Keep it nearby again, but reduce walking even more.",
-            "selected_plan_index": 0,
+            "selected_plan_index": next(
+                index for index, plan in enumerate(replan_body["plans"]) if plan["plan_id"] == replan_body["selected_plan_id"]
+            ),
         },
     )
 

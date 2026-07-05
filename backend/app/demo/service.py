@@ -436,7 +436,13 @@ class DemoWorkflowService:
             raise DemoServiceError(409, "Source run user is unavailable for replanning.")
 
         plans = PlanRepository(self.session)
-        source_selected_plan = plans.get_selected_for_run(source_run.run_id)
+        source_plan_rows = plans.list_for_run(source_run.run_id)
+        if request.selected_plan_index >= len(source_plan_rows):
+            raise DemoServiceError(409, "Selected source plan index is unavailable for replanning.")
+        source_selected_plan = plans.select_for_run(
+            source_run.run_id,
+            source_plan_rows[request.selected_plan_index].plan_id,
+        )
         source_selected_plan_uuid = source_selected_plan.plan_id if source_selected_plan is not None else None
         source_selected_plan_id = str(source_selected_plan_uuid) if source_selected_plan_uuid is not None else None
         merged_intent = build_follow_up_intent(
