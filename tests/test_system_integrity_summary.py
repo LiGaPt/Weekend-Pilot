@@ -43,6 +43,15 @@ def test_load_system_integrity_summary_returns_ready_summary(
     assert summary.status == "ready"
     assert summary.benchmark_summary.status == "ready"
     assert summary.benchmark_summary.release_blocked is False
+    assert summary.benchmark_summary.memory_mode_counts == {
+        "advisory_fill": 1,
+        "candidate_not_auto_active": 1,
+        "disabled_ignored": 1,
+        "expired_advisory": 1,
+        "none": 14,
+        "override_guarded": 1,
+        "sensitive_minimization": 1,
+    }
     assert summary.stability_summary.status == "ready"
     assert summary.stability_summary.pass_pow_4 == 1.0
     assert summary.formal_verification_summary.status == "ready"
@@ -55,8 +64,16 @@ def test_load_system_integrity_summary_returns_ready_summary(
     assert summary.safe_stop_summary.passed_count == 8
     assert summary.safe_stop_summary.release_blocked is False
     assert summary.memory_governance_summary.status == "ready"
-    assert summary.memory_governance_summary.memory_case_count == 2
+    assert summary.memory_governance_summary.memory_case_count == 6
     assert summary.memory_governance_summary.all_memory_cases_passed is True
+    assert summary.memory_governance_summary.case_ids == [
+        "family_memory_override_v1",
+        "family_memory_advisory_fill_v1",
+        "family_memory_expired_advisory_v1",
+        "family_memory_disabled_ignored_v1",
+        "family_memory_candidate_not_auto_active_v1",
+        "family_memory_sensitive_minimization_v1",
+    ]
     assert summary.recovery_replay_summary.status == "ready"
     assert summary.recovery_replay_summary.passed_check_count == 3
     assert summary.timing_summary.status == "ready"
@@ -285,8 +302,8 @@ def test_load_system_integrity_summary_collects_failing_memory_case_ids(
 
     summary = load_system_integrity_summary()
 
-    assert summary.memory_governance_summary.memory_case_count == 2
-    assert summary.memory_governance_summary.passed_case_count == 1
+    assert summary.memory_governance_summary.memory_case_count == 6
+    assert summary.memory_governance_summary.passed_case_count == 5
     assert summary.memory_governance_summary.failed_case_count == 1
     assert summary.memory_governance_summary.all_memory_cases_passed is False
     assert summary.memory_governance_summary.failing_case_ids == ["family_memory_advisory_fill_v1"]
@@ -373,7 +390,15 @@ def _build_v2_gate_report() -> dict:
                     "robustness_case_count": 4,
                     "l4_case_count": 2,
                 },
-                "memory_mode_counts": {"none": 12, "override_guarded": 1},
+                "memory_mode_counts": {
+                    "advisory_fill": 1,
+                    "candidate_not_auto_active": 1,
+                    "disabled_ignored": 1,
+                    "expired_advisory": 1,
+                    "none": 14,
+                    "override_guarded": 1,
+                    "sensitive_minimization": 1,
+                },
                 "conversation_mode_counts": {"single_turn": 15, "replan_versioned": 2, "clarification": 1},
                 "failure_mode_counts": {"none": 12, "route_unavailable": 1},
             },
@@ -408,40 +433,12 @@ def _build_all_registered_report() -> dict:
         "schema_version": "weekendpilot_benchmark_run_v1",
         "run_status": "passed",
         "case_results": [
-            {
-                "schema_version": "weekendpilot_benchmark_case_result_v1",
-                "case_id": "family_memory_override_v1",
-                "status": "passed",
-                "overall_score": 1.0,
-                "tool_event_count": 5,
-                "action_count": 0,
-                "scores": [
-                    {
-                        "name": "memory_governance",
-                        "score": 1.0,
-                        "passed": True,
-                        "reason": "ok",
-                        "details": {},
-                    }
-                ],
-            },
-            {
-                "schema_version": "weekendpilot_benchmark_case_result_v1",
-                "case_id": "family_memory_advisory_fill_v1",
-                "status": "passed",
-                "overall_score": 1.0,
-                "tool_event_count": 5,
-                "action_count": 0,
-                "scores": [
-                    {
-                        "name": "memory_governance",
-                        "score": 1.0,
-                        "passed": True,
-                        "reason": "ok",
-                        "details": {},
-                    }
-                ],
-            },
+            _build_memory_case_result("family_memory_override_v1"),
+            _build_memory_case_result("family_memory_advisory_fill_v1"),
+            _build_memory_case_result("family_memory_expired_advisory_v1"),
+            _build_memory_case_result("family_memory_disabled_ignored_v1"),
+            _build_memory_case_result("family_memory_candidate_not_auto_active_v1"),
+            _build_memory_case_result("family_memory_sensitive_minimization_v1"),
             {
                 "schema_version": "weekendpilot_benchmark_case_result_v1",
                 "case_id": "solo_afternoon_v1",
@@ -475,6 +472,26 @@ def _build_all_registered_report() -> dict:
             "error_count": 0,
             "overall_score": 1.0,
         },
+    }
+
+
+def _build_memory_case_result(case_id: str, *, status: str = "passed") -> dict:
+    return {
+        "schema_version": "weekendpilot_benchmark_case_result_v1",
+        "case_id": case_id,
+        "status": status,
+        "overall_score": 1.0 if status == "passed" else 0.0,
+        "tool_event_count": 5,
+        "action_count": 0,
+        "scores": [
+            {
+                "name": "memory_governance",
+                "score": 1.0 if status == "passed" else 0.0,
+                "passed": status == "passed",
+                "reason": "ok" if status == "passed" else "memory governance failed",
+                "details": {},
+            }
+        ],
     }
 
 

@@ -2,210 +2,207 @@
 
 ## Overview
 
-WeekendPilot already ships one narrow but releasable memory-governance slice for V1. That slice is not full memory lifecycle management. It is a deterministic, read-only query-shaping policy that decides when stored preference memory may influence planning and when it must be suppressed.
+WeekendPilot's current memory capability is a local governance loop, not a raw preference store. It combines query-shaping policy, internal CRUD controls, lifecycle state, sensitive-data minimization, row-level audit metadata, workflow audit summaries, and benchmark evidence.
 
-The current implementation is already benchmark-backed:
+The current delivery surface is intentionally local:
 
-- runtime policy version: `memory_query_policy_v1`
-- focused suite: `memory_governance`
-- blocking release suite: `release_gate_v1`
-- broader supporting suite: `all_registered`
+- It uses repository-owned PostgreSQL rows and Mock World benchmark cases.
+- It does not depend on real user profiles, external accounts, third-party identity, vector databases, embeddings, or real personalization services.
+- It does not expose a user-facing memory-management UI.
+- It keeps the governable memory domain narrow so behavior remains deterministic and auditable.
 
-This runbook is the canonical release-facing description of that slice. Use it to answer:
+Use this runbook to verify what the memory governance closure proves, which commands refresh evidence, and which capabilities remain out of scope.
 
-1. what the V1 memory slice actually does
-2. which benchmark evidence proves it
-3. what remains future work
+## Current Scope Boundary
 
-## V1 Scope Boundary
+Current governed memory is intentionally narrow:
 
-The current V1 memory-governance slice is intentionally narrow.
-
-- It is read-only. It does not write, edit, delete, or merge memory.
-- It only governs workflow query shaping before planning.
-- It only considers memory rows where `memory_type == "preference"`.
-- It only projects two supported keys:
+- Supported `memory_type`: `preference`
+- Supported keys:
   - `activity_style` -> `activity_preferences`
   - `spouse_lighter_meals` -> `dining_preferences`
-- It only emits these normalized values:
+- Supported normalized values:
   - `activity_style -> citywalk | indoor | outdoor`
   - `spouse_lighter_meals -> lighter_options`
-- It persists a compact audit summary at `agent_runs.metadata_json["workflow"]["memory_policy"]`.
-- It keeps the persisted summary sanitized. The governed summary does not expose raw memory text or raw `value_json`.
+- Runtime policy version: `memory_query_policy_v1`
+- Focused benchmark suite: `memory_governance`
+- Blocking/system evidence suites:
+  - `release_gate_v1`
+  - `v2_integrity`
+  - `all_registered`
 
-The current V1 slice is explicitly not:
+The current governance surface includes:
 
-- memory CRUD
-- user-facing memory review or editing
-- retention policy redesign
-- sensitive-data minimization beyond the existing compact audit summary
-- broader projected keys or broader memory types
+- query-time policy that applies, downgrades, suppresses, or ignores memory
+- internal list/detail/create/update/control/delete routes
+- lifecycle states `active`, `expired`, `disabled`, `ignored`, and `candidate`
+- logical delete as suppression to `ignored`
+- additive governance control events
+- additive minimization events
+- additive `governance_audit` preview on internal memory responses
+- sanitized run-level memory policy summaries under `agent_runs.metadata_json["workflow"]["memory_policy"]`
+
+The current governance surface does not include:
+
+- public memory-management UI
+- auth or permission modeling
+- hard physical deletion
+- broad retention-policy redesign
+- external account/profile sync
+- vector DB or embedding-backed memory
+- new memory types or projected keys
 
 ## Rule Matrix
 
-| Rule | Runtime Contract | Evidence Level | Evidence Surface | Persisted Evidence Fields |
-| --- | --- | --- | --- | --- |
-| Explicit user-input override | If the user explicitly supplies `activity_preferences` or `dining_preferences`, that dimension keeps `winner_source = "user_input"` and conflicting memory is suppressed. | Benchmark-backed | `family_memory_override_v1`; `tests/test_memory_query_policy.py::test_memory_query_policy_explicit_user_override_beats_memory_for_both_dimensions`; `tests/integration/test_benchmark_harness_gateway.py::test_benchmark_harness_records_memory_policy_for_override_case` | `run_summary.workflow.memory_policy.dimension_outcomes[*].winner_source`; `run_summary.workflow.memory_policy.memory_decisions[*].outcome`; `scores[*].name == "memory_governance"` |
-| Advisory memory fill for vague requests | If the user is vague and a supported memory has confidence `0.5000 <= confidence < 0.8000` and is not expired, that memory is `advisory` and may fill the matching dimension. | Benchmark-backed | `family_memory_advisory_fill_v1`; `tests/test_memory_query_policy.py::test_memory_query_policy_applies_advisory_dining_preference_when_user_is_vague`; `tests/integration/test_benchmark_harness_gateway.py::test_benchmark_harness_records_memory_policy_for_advisory_fill_case` | `run_summary.workflow.memory_policy.advisory_memory_keys`; `dimension_outcomes[*].winner_tier`; `memory_decisions[*].outcome`; `scores[*].details.observed_dimension_tiers` |
-| Expired high-confidence downgrade | If a supported memory is expired but confidence is still `>= 0.8000`, the memory is downgraded to `advisory` instead of disappearing before evaluation. It may still apply when the user is vague. | Benchmark-backed | `family_memory_expired_advisory_v1`; `tests/test_memory_query_policy.py::test_memory_query_policy_applies_expired_high_confidence_activity_as_advisory`; `tests/integration/test_benchmark_harness_gateway.py::test_benchmark_harness_records_memory_policy_for_expired_advisory_case` | `run_summary.workflow.memory_policy.downgraded_expired_keys`; `dimension_outcomes[*].winner_tier`; `memory_decisions[*].expired`; `scores[*].details.observed_dimension_tiers` |
-| Supported-key boundary | Only `activity_style` and `spouse_lighter_meals` may influence intent. Other preference keys stay visible for audit but must not change the effective intent. | Unit-test-backed | `backend/app/planning/memory_query_policy.py`; `tests/test_memory_query_policy.py::test_memory_query_policy_records_unsupported_keys_and_sanitizes_summary` | `run_summary.workflow.memory_policy.unsupported_memory_keys`; `memory_decisions[*].outcome == "unsupported_key"` |
-| Weak / unsupported suppression | Malformed confidence, confidence `< 0.5000`, or expired memory below `0.8000` is `weak` and cannot mutate intent. Unrecognized supported values also cannot mutate intent. | Unit-test-backed | `backend/app/planning/memory_query_policy.py`; `tests/test_memory_query_policy.py::test_memory_query_policy_suppresses_weak_memory_without_mutating_intent`; `tests/test_memory_query_policy.py::test_memory_query_policy_records_unsupported_keys_and_sanitizes_summary` | `run_summary.workflow.memory_policy.downgraded_low_confidence_keys`; `memory_decisions[*].tier == "weak"`; `memory_decisions[*].outcome in {"suppressed_weak_signal", "unrecognized_value", "unsupported_key"}` |
+| Rule | Runtime Contract | Evidence Surface |
+| --- | --- | --- |
+| Explicit user input wins | If the user explicitly supplies `activity_preferences` or `dining_preferences`, conflicting memory is suppressed with `winner_source = "user_input"`. | `family_memory_override_v1`; `tests/test_memory_query_policy.py`; `memory_governance` score |
+| Advisory memory can fill vague requests | Supported memory with advisory confidence may fill a missing dimension when user input is vague. | `family_memory_advisory_fill_v1`; `tests/test_memory_query_policy.py`; run-level `advisory_memory_keys` |
+| Expired high-confidence memory is downgraded | Expired high-confidence supported memory is downgraded to advisory rather than treated as primary. | `family_memory_expired_advisory_v1`; `downgraded_expired_keys`; `governance_audit.audit_reason` |
+| Disabled and ignored memory are excluded | Disabled/ignored rows remain visible to internal read surfaces but do not enter active planning. | `family_memory_disabled_ignored_v1`; `tests/integration/test_langgraph_workflow_gateway.py -k memory` |
+| Candidate memory is not auto-active | Feedback-generated candidate memory is not promoted into active planning during the same run. | `family_memory_candidate_not_auto_active_v1`; candidate lifecycle tests |
+| Sensitive details are minimized | Feedback candidates and internal CRUD-supported preferences store normalized structured values and avoid raw sensitive text. | `family_memory_sensitive_minimization_v1`; `tests/test_feedback_memory_candidates.py`; minimization events |
+| CRUD and lifecycle are audited | Create/update/control/delete operations preserve provenance and append governance/minimization events when applied. | `tests/test_memory_crud_governance.py`; `tests/test_memory_user_control.py`; internal memory API tests |
+
+## Internal Governance API
+
+The current internal backend surface is:
+
+- `GET /internal/users/{user_id}/memory`
+- `GET /internal/users/{user_id}/memory/{memory_id}`
+- `POST /internal/users/{user_id}/memory`
+- `PATCH /internal/users/{user_id}/memory/{memory_id}`
+- `POST /internal/users/{user_id}/memory/{memory_id}/control`
+- `DELETE /internal/users/{user_id}/memory/{memory_id}`
+
+Supported lifecycle control actions:
+
+- `activate -> active`
+- `disable -> disabled`
+- `suppress -> ignored`
+- `expire -> expired`
+- `mark_candidate -> candidate`
+
+Delete is logical suppression. It sets the row to `ignored` and does not physically remove the row.
+
+Each returned memory item includes durable row fields plus `governance_audit`, which previews how the current read-memory policy would classify the row. This preview is derived from current row state and does not store raw free-form sensitive text.
+
+## Audit and Minimization Fields
+
+Row-level audit metadata lives under `memory_items.metadata_json["governance"]`.
+
+Control events are appended for applied create/update/control/delete lifecycle operations:
+
+```json
+{
+  "schema_version": "memory_crud_governance_v0",
+  "action": "disable",
+  "from_status": "active",
+  "to_status": "disabled",
+  "actor": "user",
+  "source": "internal_memory_api_v1",
+  "reason": "user_requested_control",
+  "acted_at": "2026-07-05T12:00:00+00:00",
+  "changed_fields": ["status"]
+}
+```
+
+Minimization events are appended for create and applied update when supported preference memory is canonicalized:
+
+```json
+{
+  "schema_version": "memory_audit_minimization_v0",
+  "action": "create",
+  "actor": "user",
+  "source": "internal_memory_api_v1",
+  "reason": "manual_memory_seed",
+  "normalized_value": "indoor",
+  "dropped_text": true,
+  "dropped_value_keys": ["address", "note"],
+  "acted_at": "2026-07-05T12:00:00+00:00"
+}
+```
+
+Run-level policy evidence remains compact and sanitized:
+
+- `policy_version`
+- applied/advisory/downgraded/unsupported memory keys
+- dimension outcomes
+- memory decisions
+- decision log
+- policy summary counts
+
+It does not expose raw memory text, raw `value_json`, provider secrets, prompts, or debug payloads.
 
 ## Benchmark Evidence
 
-Use these three benchmark cases as the canonical benchmark-backed proof points for the V1 memory slice.
+The focused `memory_governance` suite currently covers six memory cases:
 
-### 1. `family_memory_override_v1`
+1. `family_memory_override_v1`
+2. `family_memory_advisory_fill_v1`
+3. `family_memory_expired_advisory_v1`
+4. `family_memory_disabled_ignored_v1`
+5. `family_memory_candidate_not_auto_active_v1`
+6. `family_memory_sensitive_minimization_v1`
 
-This case proves that explicit user input beats stored memory.
+These cases are also represented in broader delivery evidence:
 
-- expected policy version: `memory_query_policy_v1`
-- expected dimension sources:
-  - `activity_preferences -> user_input`
-  - `dining_preferences -> user_input`
-- expected dimension tiers: none
-- expected memory outcomes:
-  - `activity_style -> suppressed_user_override`
-  - `spouse_lighter_meals -> suppressed_user_override`
+- `all_registered` verifies the full registered case inventory and currently includes all memory governance cases.
+- `v2_integrity` verifies V2 memory-mode coverage, including override, advisory, expired, disabled/ignored, candidate-not-active, and sensitive-minimization modes.
+- `release_gate_v1` keeps the blocking baseline memory checks for override, advisory, and expired downgrade.
+- `System Integrity Summary` exposes memory-governance status from canonical `all_registered` evidence.
 
-Inspect:
-
-- `case_results[*].run_summary.workflow.memory_policy.dimension_outcomes`
-- `case_results[*].run_summary.workflow.memory_policy.memory_decisions`
-- `case_results[*].scores[*]` where `name == "memory_governance"`
-
-### 2. `family_memory_advisory_fill_v1`
-
-This case proves that an advisory dining preference can help when the user stays vague.
-
-- expected policy version: `memory_query_policy_v1`
-- expected dimension sources:
-  - `dining_preferences -> memory`
-- expected dimension tiers:
-  - `dining_preferences -> advisory`
-- expected memory outcomes:
-  - `spouse_lighter_meals -> applied_advisory`
-
-Inspect:
-
-- `case_results[*].run_summary.workflow.memory_policy.advisory_memory_keys`
-- `case_results[*].run_summary.workflow.memory_policy.dimension_outcomes`
-- `case_results[*].run_summary.workflow.memory_policy.memory_decisions`
-- `case_results[*].scores[*]` where `name == "memory_governance"`
-
-### 3. `family_memory_expired_advisory_v1`
-
-This case proves that expired high-confidence activity memory is downgraded to advisory but remains visible and usable.
-
-- expected policy version: `memory_query_policy_v1`
-- expected dimension sources:
-  - `activity_preferences -> memory`
-- expected dimension tiers:
-  - `activity_preferences -> advisory`
-- expected memory outcomes:
-  - `activity_style -> applied_advisory`
-
-Inspect:
-
-- `case_results[*].run_summary.workflow.memory_policy.downgraded_expired_keys`
-- `case_results[*].run_summary.workflow.memory_policy.dimension_outcomes`
-- `case_results[*].run_summary.workflow.memory_policy.memory_decisions`
-- `case_results[*].scores[*]` where `name == "memory_governance"`
-
-### Suite and tag interpretation
-
-All three cases are already inside the blocking `release_gate_v1` suite.
-
-The memory-related release-gate tag counts are intentionally:
-
-- `memory_override == 1`
-- `memory_advisory == 1`
-- `memory_expired == 1`
-- `memory_governance == 2`
-
-`memory_governance` is `2`, not `3`, because:
-
-- `family_memory_override_v1` is tagged `memory_override`
-- `family_memory_advisory_fill_v1` is tagged `memory_governance`
-- `family_memory_expired_advisory_v1` is tagged `memory_governance`
-
-## Release Acceptance
-
-### Canonical evidence inputs
-
-Treat these files as the canonical generated evidence inputs for this slice:
+Canonical generated evidence aliases:
 
 - `var/formal-benchmarks/latest-release_gate_v1-run-report.json`
+- `var/formal-benchmarks/latest-v2_integrity_gate-run-report.json`
 - `var/formal-benchmarks/latest-all_registered-run-report.json`
 
-Do not treat `docs/artifacts/` as the source of truth for release decisions in this task.
+Do not treat `docs/artifacts/` as the source of truth.
 
-### Blocking release acceptance
+## Verification Commands
 
-The blocking V1 memory-governance acceptance boundary is the existing `release_gate_v1` suite.
+Run focused memory regression tests:
 
-Current expected release-gate summary:
+```bash
+python -m pytest tests/test_memory_governance_audit.py tests/test_memory_query_policy.py tests/test_memory_user_control.py tests/test_memory_crud_governance.py tests/test_feedback_memory_candidates.py tests/test_benchmark_suites.py -q
+```
 
-- `suite_id == "release_gate_v1"`
-- `case_count == 15`
-- `passed_count == 15`
-- `failed_count == 0`
-- `error_count == 0`
-- `overall_score == 1.0`
-- `level_counts == {"L1": 3, "L2": 8, "L3": 4}`
-- `tag_counts.memory_override == 1`
-- `tag_counts.memory_advisory == 1`
-- `tag_counts.memory_expired == 1`
-- `tag_counts.memory_governance == 2`
+Run focused memory integration tests:
 
-Run:
+```bash
+python -m pytest tests/integration/test_memory_api_gateway.py tests/integration/test_memory_crud_api_gateway.py tests/integration/test_langgraph_workflow_gateway.py -k "memory" -q
+```
+
+Run reviewer/evidence checks:
+
+```bash
+python -m pytest tests/test_review_evidence.py tests/test_demo_support_scripts.py -q
+python scripts/show_submission_evidence.py
+```
+
+Refresh evidence only when needed:
 
 ```bash
 python scripts/run_benchmark_release_gate.py
-```
-
-Release is blocked if those values drift.
-
-### Broader supporting evidence
-
-`all_registered` is broader supporting evidence, not the blocking V1 bar.
-
-Current expected formal-verification summary:
-
-- `suite_id == "all_registered"`
-- `case_count == 17`
-- `passed_count == 17`
-- `failed_count == 0`
-- `error_count == 0`
-- `overall_score == 1.0`
-- `tag_counts.memory_override == 1`
-- `tag_counts.memory_advisory == 1`
-- `tag_counts.memory_expired == 1`
-- `tag_counts.memory_governance == 2`
-
-Run:
-
-```bash
+python scripts/run_benchmark_v2_integrity_gate.py
 python scripts/run_formal_verification.py
 ```
 
-This broader suite intentionally includes the two current `L5` composite chaos cases that stay outside the blocking V1 release gate.
+Generated `var/` artifacts should remain unstaged unless a task explicitly says otherwise.
 
-### Practical release checklist
+## Practical Review Checklist
 
-1. Run `python scripts/run_benchmark_release_gate.py`.
-2. Confirm `var/formal-benchmarks/latest-release_gate_v1-run-report.json` refreshed and still matches the counts above.
-3. Confirm all three memory benchmark cases still show `memory_query_policy_v1` and the expected memory-governance outcomes.
-4. Optionally run `python scripts/run_formal_verification.py` and confirm `latest-all_registered-run-report.json` still matches the broader counts above.
-5. Confirm no secrets, `var/`, or unrelated local artifacts are staged.
+- Confirm explicit user input suppresses conflicting memory.
+- Confirm advisory memory only fills vague requests.
+- Confirm expired high-confidence memory is downgraded to advisory.
+- Confirm disabled, ignored, and candidate rows are excluded from active planning.
+- Confirm supported preference CRUD stores canonical minimized `value_json` and `text = null`.
+- Confirm governance control events and minimization events are durable and additive.
+- Confirm sensitive strings such as addresses, phone numbers, tokens, secrets, prompts, and debug traces do not enter active planning summaries.
+- Confirm `System Integrity Summary` and `show_submission_evidence.py` can point reviewers to canonical evidence.
+- Confirm no `.env`, API key, token, secret, generated `var/`, virtualenv, `node_modules`, frontend build, or Playwright artifact is staged.
 
 ## Open Follow-ups
 
-The current V1 slice is intentionally incomplete. These are still future work:
-
-- memory CRUD and user-facing review/edit flows
-- stronger sensitive-data minimization and retention controls
-- broader supported memory keys or memory types
-- user-controllable expiration, suppression, or deletion actions
-
-Those follow-ups belong to broader M5 memory-governance work, not to the current read-memory V1 slice.
+Future work may add a public memory-management UI, stronger retention policy, broader memory types, or account-linked personalization. Those are intentionally outside the current local governance closure.
