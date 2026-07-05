@@ -67,6 +67,11 @@ def test_run_benchmark_safe_stop_gate_enriches_report_and_refreshes_latest_alias
         assert evaluation["zero_action_case_count"] == 8
         assert evaluation["multistep_recovery_case_count"] == 1
         assert evaluation["failure_mode_counts"] == PASSING_FAILURE_MODE_COUNTS
+        for case_result in payload["case_results"]:
+            failure_chain = case_result["failure_chain_summary"]
+            assert failure_chain["injected_effects"]
+            assert failure_chain["attempt_count"] >= 1
+            assert failure_chain["terminal_workflow_status"] == "failed"
         assert latest_alias.exists()
         assert latest_alias.read_bytes() == suite_report_path.read_bytes()
     finally:
@@ -103,6 +108,42 @@ def test_run_benchmark_safe_stop_gate_blocks_when_multistep_chain_is_missing(
         _cleanup_test_dir(output_root)
 
 
+def test_run_benchmark_safe_stop_gate_blocks_missing_failure_and_terminal_status_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_root = _make_test_dir()
+    fixed_uuid = UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+    run_directory = output_root / f"safe-stop-gate-{fixed_uuid}"
+    suite_report_path = run_directory / "suite-recovery_focused-run-report.json"
+    latest_alias = output_root / "latest-safe_stop_gate_v1-run-report.json"
+    latest_alias.write_text('{"status":"keep"}', encoding="utf-8")
+
+    monkeypatch.setattr(
+        safe_stop_gate,
+        "run_safe_stop_verification",
+        lambda **kwargs: _write_verification_result(
+            run_directory=run_directory,
+            suite_report_path=suite_report_path,
+            payload=_build_report_payload(
+                include_injected_effects=False,
+                terminal_workflow_status="completed",
+                attempt_count=0,
+            ),
+        ),
+    )
+
+    try:
+        result = safe_stop_gate.run_benchmark_safe_stop_gate(output_root=output_root, start_services=False)
+
+        assert result.release_blocked is True
+        assert any("missing failure reason evidence" in failure for failure in result.blocking_failures)
+        assert any("terminal_workflow_status was not 'failed'" in failure for failure in result.blocking_failures)
+        assert any("missing recovery attempt evidence" in failure for failure in result.blocking_failures)
+        assert latest_alias.read_text(encoding="utf-8") == '{"status":"keep"}'
+    finally:
+        _cleanup_test_dir(output_root)
+
+
 def _write_verification_result(
     *,
     run_directory: Path,
@@ -128,12 +169,19 @@ def _write_verification_result(
     )()
 
 
-def _build_report_payload(*, multistep: bool = True) -> dict[str, object]:
+def _build_report_payload(
+    *,
+    multistep: bool = True,
+    include_injected_effects: bool = True,
+    terminal_workflow_status: str = "failed",
+    attempt_count: int | None = None,
+) -> dict[str, object]:
     case_results = []
     for index, failure_mode in enumerate(PASSING_CASE_FAILURE_MODES, start=1):
         recovery_actions = ["stop_safely"]
         if multistep and failure_mode == "table_unavailable_and_replan_required":
             recovery_actions = ["replace_candidate", "stop_safely"]
+        injected_effects = [f"tool:{failure_mode}:failed"] if include_injected_effects else []
         case_results.append(
             {
                 "case_id": f"case-{index}-{failure_mode}",
@@ -152,12 +200,12 @@ def _build_report_payload(*, multistep: bool = True) -> dict[str, object]:
                 "workflow_status": "failed",
                 "failure_chain_summary": {
                     "profile_id": f"{failure_mode}_v0",
-                    "injected_effects": [f"tool:{failure_mode}:failed"],
+                    "injected_effects": injected_effects,
                     "recovery_actions": recovery_actions,
-                    "attempt_count": len(recovery_actions),
+                    "attempt_count": len(recovery_actions) if attempt_count is None else attempt_count,
                     "max_attempts": 2,
                     "bounded": True,
-                    "terminal_workflow_status": "failed",
+                    "terminal_workflow_status": terminal_workflow_status,
                 },
             }
         )
