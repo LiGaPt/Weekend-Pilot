@@ -1,5 +1,13 @@
 # WeekendPilot
 
+## Delivery Boundary (Task 129)
+
+Current formal delivery is an offline/local `Mock World` closed loop. The official public demo, formal benchmark suites, canonical evidence aliases, and submission recording path all use deterministic Mock World data so the reviewer can reproduce planning, confirmation, execution simulation, recovery, and observability without external services.
+
+This submission does not connect to real-world write services and does not depend on true MCP integration. No real booking, queue, ticket, order, or message provider is invoked by the formal customer path; post-confirmation actions are simulated through the local Action Ledger boundary.
+
+`AMap` remains an optional API/script-only `read-only preview`. It can demonstrate read-side provider guardrails when configured locally, but it is not part of the `5173` customer UI main chain, not part of formal benchmark scoring, and not required for the `V2 Integrity Edition` submission.
+
 WeekendPilot 是一个面向 `2-6` 小时本地生活场景的规划、确认与执行系统。当前交付版本以 `Mock World` 作为默认数据面，以 `benchmark`、`observability` 和 `recovery review` 作为可审计交付基础，目标是支持稳定演示、稳定评审和稳定初步交付。
 
 ## 当前版本摘要

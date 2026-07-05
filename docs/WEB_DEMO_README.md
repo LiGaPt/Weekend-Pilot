@@ -8,6 +8,25 @@ For hackathon submission and recording, use [docs/submission/OVERVIEW.md](./subm
 
 Current version scope: `V1.5 baseline / V2 Integrity candidate`. The next `V2 Integrity Edition` work should focus on benchmark completeness, memory governance, observability, and recovery auditability; AMap remains an API-only read-only preview outside the customer UI main path and outside formal benchmark runs.
 
+## 3-minute review path (5173 -> 5174)
+
+Use this as the shortest judge path for the current `V2 Integrity Edition` submission. The formal delivery boundary is `Mock World`: it is an offline/local closed loop for public demo, benchmark evidence, recovery evidence, and reviewer audit. The current submission does not depend on true MCP integration and does not connect to real-world write services.
+
+1. Open `http://127.0.0.1:5173/`.
+2. Start one public `Mock World` scenario, preferably the family happy path.
+3. Show that the public page reaches `awaiting_confirmation`, then show the confirmation boundary and execution result.
+4. Copy or expose the `run_id` from the public `运行信息` disclosure.
+5. Switch to `http://127.0.0.1:5174/`.
+6. Show `Benchmark Summary`, then `System Integrity Summary`, then optionally paste the `run_id` into `Load Run`.
+7. Show `Trace Summary`, `Tool Events` or `Action Ledger`, and `Benchmark Artifacts`.
+8. Run `python scripts/show_submission_evidence.py` from the repo root and point to the six `[OK]` canonical evidence aliases.
+
+Responsibility split:
+
+- `5173` is the public customer path: planning, clarification, replan, confirm/decline, and execution simulation with internal trace details hidden.
+- `5174` is the internal reviewer path: benchmark summary, system integrity, run audit, trace/tool/action evidence, benchmark artifacts, and recovery visualization.
+- `AMap` is optional API/script-only read-only preview via `python scripts/demo_amap_preview.py`; it is not a customer UI main-chain dependency and not formal benchmark evidence.
+
 ## Submission / Recording Quick Start
 
 Before recording, warm up the public happy path once and keep the browser tab order fixed as `5173 -> 5174`.

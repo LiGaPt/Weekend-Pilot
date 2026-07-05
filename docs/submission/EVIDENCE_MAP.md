@@ -1,5 +1,11 @@
 # Evidence Map
 
+## Task 129 Evidence Boundary
+
+Canonical evidence for this submission is generated from the offline/local `Mock World` closed loop. The formal evidence map does not depend on true MCP integration, does not connect to real-world write services, and does not treat `AMap` as benchmark evidence.
+
+Reviewer sequence: use `5173 -> 5174`, then run `python scripts/show_submission_evidence.py`. `5173` proves the public customer path and human confirmation boundary. `5174` proves benchmark, system integrity, run audit, trace/tool/action evidence, artifacts, and recovery visualization. Optional `AMap` remains API/script-only `read-only preview`.
+
 当前 evidence map 对应本次 `V2 Integrity Edition` 提交。`V1.5 baseline` 仅作为已完成基线背景保留；当前证据重点是 benchmark 完整性、memory governance、observability 与 recovery 可审计性。AMap 只作为 API-only read-only preview，不进入 customer UI 主链，不参与正式 benchmark。
 
 ## Canonical Latest Aliases

@@ -1,5 +1,11 @@
 # WeekendPilot Submission Overview
 
+## Task 129 Delivery Boundary
+
+Current formal submission is the `V2 Integrity Edition` offline/local `Mock World` closed loop. The official reviewer path uses `Mock World` for `5173` public demo, formal benchmark suites, canonical evidence aliases, recovery review, and `5174` internal observability. This submission does not connect to real-world write services and does not depend on true MCP integration.
+
+The required review order is `5173 -> 5174`: first show the public customer flow and human confirmation boundary, then switch to the internal reviewer surface for `Benchmark Summary`, `System Integrity Summary`, run audit details, and canonical evidence. `AMap` remains optional API/script-only `read-only preview`; it is not part of the customer UI main chain and not part of formal benchmark scoring.
+
 本次提交的目标不是继续扩功能，而是把现有能力收束成一套可以稳定演示、稳定录制、稳定提交的 `V2 Integrity Edition`。`V1.5 baseline` 保留为已完成基线背景；当前正式口径聚焦 benchmark 完整性、memory governance、observability 与 recovery 可审计性。建议视频时长控制在 `8-10 分钟`，主线展示 `5173` 公开用户流，证据展示放在 `5174` 内部评审页和终端脚本。
 
 真实地图 provider 在当前提交中不是主线。AMap 继续只是 API/script-only 的 `read-only preview`，不进入 customer UI 主链，也不参与正式 benchmark。

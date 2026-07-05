@@ -1,5 +1,15 @@
 # Recording Checklist
 
+## Task 129 Boundary Checks
+
+- Current formal submission is `V2 Integrity Edition` on the offline/local `Mock World` closed loop.
+- Browser order must be `5173 -> 5174`.
+- `5173` is the public customer path; `5174` is the internal reviewer/audit path.
+- Current formal delivery does not connect to real-world write services and does not depend on true MCP integration.
+- `AMap` is optional API/script-only `read-only preview`; skip it when `AMAP_MAPS_API_KEY` is unavailable.
+- Do not show `.env`, API keys, tokens, secrets, service startup logs, generated caches, or local runtime dumps.
+- Before recording, run `python scripts/demo_preflight.py` and `python scripts/show_submission_evidence.py`.
+
 这份清单用于正式录屏前逐项核对，避免视频里出现环境等待、错误页面或证据缺失。
 
 本次录制口径聚焦 `V2 Integrity Edition`。`V1.5 baseline` 只作为已完成基线背景保留；当前主线是 benchmark 完整性、memory governance、observability 与 recovery 可审计性。AMap 仍是 API-only read-only preview，不进入 customer UI 主链，也不参与正式 benchmark。
