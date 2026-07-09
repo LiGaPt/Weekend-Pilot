@@ -1,221 +1,274 @@
 # WeekendPilot
 
-## Delivery Boundary (Task 129)
+WeekendPilot 是一个面向周末本地生活场景的规划、确认与执行系统。用户输入一句自然语言需求后，系统会完成需求理解、候选搜索、可行性检查、方案生成、人工确认、模拟执行和审计记录。
 
-Current formal delivery is an offline/local `Mock World` closed loop. The official public demo, formal benchmark suites, canonical evidence aliases, and submission recording path all use deterministic Mock World data so the reviewer can reproduce planning, confirmation, execution simulation, recovery, and observability without external services.
+当前交付口径是 `V2 Integrity Edition`：正式演示、benchmark、recovery review 和 reviewer 证据都基于 `offline/local`、离线、本地、确定性的 `Mock World` 闭环。This submission does not connect to real-world write services and does not depend on true MCP integration. 默认主链不连接真实写服务，不依赖真实地图密钥，也不依赖真实 MCP 集成。当前正式评审重点是 benchmark 完整性、memory governance、observability 与 recovery 可审计性。
 
-This submission does not connect to real-world write services and does not depend on true MCP integration. No real booking, queue, ticket, order, or message provider is invoked by the formal customer path; post-confirmation actions are simulated through the local Action Ledger boundary.
+## 核心能力
 
-`AMap` remains an optional API/script-only `read-only preview`. It can demonstrate read-side provider guardrails when configured locally, but it is not part of the `5173` customer UI main chain, not part of formal benchmark scoring, and not required for the `V2 Integrity Edition` submission.
+- **公开演示主链**：`planning`、`clarification`、`replan`、`confirm / decline`、`execution result`
+- **人工确认边界**：确认前只允许读工具，确认后才模拟写动作并写入 Action Ledger
+- **Mock World 数据面**：覆盖亲子、朋友、单人、情侣、雨天、预算等本地生活场景
+- **Memory governance**：覆盖长期记忆启用、禁用、过期、覆盖、敏感信息最小化和用户可控治理
+- **内部评审台**：展示 benchmark、system integrity、run audit、trace、tool events、action ledger、recovery visualization
+- **可审计 benchmark**：包含 release gate、coverage gate、V2 integrity gate、Pass@k stability、formal verification、recovery review
+- **可选 AMap 预览**：只作为 API/script-only read-only preview，不进入默认客户 UI 主链，也不参与正式 benchmark
 
-WeekendPilot 是一个面向 `2-6` 小时本地生活场景的规划、确认与执行系统。当前交付版本以 `Mock World` 作为默认数据面，以 `benchmark`、`observability` 和 `recovery review` 作为可审计交付基础，目标是支持稳定演示、稳定评审和稳定初步交付。
-
-## 当前版本摘要
-
-| 维度 | 当前状态 |
-| --- | --- |
-| 版本口径 | 当前提交口径收敛为 `V2 Integrity Edition`；`V1.5 baseline` 作为已完成基线背景保留，当前主打 benchmark 完整性、memory governance、observability 与 recovery 可审计性 |
-| 公开主链 | `5173` 公开 demo 已收束为可演示的主链：`planning`、`clarification`、`replan`、`confirm / decline`、`execution`，只保留用户可见的结果与确认信息 |
-| 技术支撑 | `5174` 内部评审页提供 `Benchmark Summary`、`System Integrity Summary`、`Run Summary`、`Selected Plan Review`、`Trace Summary`、`Benchmark Artifacts` 与 `Recovery Visualization`，其中 `Recovery Visualization` 现在会直接链接到最新 `recovery replay review` alias / artifact / replay report，`Benchmark Summary` 会展示 suite 级 timing percentile 与 stage 分布 |
-| 交付边界 | `Mock World`、`benchmark`、`recovery review` 与 `AMap read-only preview` 都已纳入当前版本的说明和验证边界 |
-
-## 当前版本技术路线图
+## 当前版本路线图
 
 ![WeekendPilot current version roadmap](docs/assets/readme-current-version-roadmap.svg)
 
-这张图可以按“公开主链 -> 系统分层 -> 数据与证据支撑”三层来读。
-
-## 项目完成情况
-
-项目已经收敛到“可初步交付、可稳定演示、可审计评审”的状态，当前完成内容如下：
-
-- 公开 demo 主链已经可用：`happy path`、`clarification`、`replan`、`decline`、`action manifest`、`execution result`
-- 公开交互页已经固定为 `http://127.0.0.1:5173/`，关键 reviewer-facing 文案为中文
-- 内部评审页已经固定为 `http://127.0.0.1:5174/`，可展示 `Benchmark Summary`、`System Integrity Summary`、`Run Summary`、`Selected Plan Review`、`Trace Summary`、`Benchmark Artifacts`、`Recovery Visualization`，并在 `Recovery Visualization` 中直接复制最新 replay review alias、review artifact、source report 与 replay report path；`Benchmark Summary` 中展示 suite 级 `p50 / p95 / p99 / max` 与 stage timing percentile
-- `AMap` 已接入为 `API-only` 的 `read-only preview`，可规划和查看候选，但确认后写动作会被 `409` 阻断
-- 公开 API / 内部 API 已稳定保留：
-  - `POST /demo/runs`
-  - `POST /demo/runs/stream`
-  - `POST /demo/runs/{run_id}/clarify`
-  - `POST /demo/runs/{run_id}/replan`
-  - `POST /demo/runs/{run_id}/confirm`
-  - `POST /demo/runs/{run_id}/decline`
-  - `GET /internal/runs/{run_id}/observability`
-  - `GET /internal/benchmarks/release-gate-v1/summary`
-- 评审辅助材料已经补齐：
-  - `docs/WEB_DEMO_README.md`
-  - `docs/V1_5_REVIEW_EVIDENCE.md`
-  - `docs/submission/FUNCTION_COVERAGE_MAP.md`
-  - `docs/submission/EVIDENCE_MAP.md`
-
-当前默认边界：
-
-- `AMap` 不进入 customer UI 主链，只通过脚本和 API 演示
-- `benchmark` 默认使用 `Mock World`，不依赖外部地图或真实写接口
-- `AMap` 仍是 `API-only read-only preview`，不参与正式 benchmark，也不作为 `V2 Integrity Edition` 的主交付依赖
-- 可选 `LLM-backed preview` 不是本次提交主路径
+这张图概括了公开主链、系统分层、Mock World 数据面、benchmark evidence 和内部评审链路。
 
 ## Mock World
 
-`Mock World` 是 WeekendPilot 当前用于公开 demo、正式 benchmark 和大部分自动化验证的确定性的默认数据面。
+`Mock World` 是当前正式演示、benchmark、recovery review 和 reviewer evidence 的默认数据面。它提供确定性的本地生活候选、可用性检查、路线检查和模拟写动作，使规划、确认、执行模拟、失败恢复与审计证据都能在本地稳定复现。
 
-- 它不依赖外部地图或真实写接口，因此适合稳定复现规划、确认、执行与失败恢复链路
-- 它覆盖了六个公开 scenario：`亲子`、`朋友`、`单人`、`情侣`、`雨天`、`预算`
-- 这些公开 scenario 背后映射到已注册 world profile，例如 `family_afternoon`、`friends_gathering`、`solo_afternoon`、`couple_afternoon`、`rainy_day_fallback`、`budget_lite`
-- 它不是只包含“最终会被选中的标准答案点位”，而是故意放入额外候选、`distractor`、不可用候选和部分 route 不可行组合，用来验证筛选、fallback、排序稳定性和安全停机
-- `release_gate_v1`、`coverage_gate_v1_5` 和 `all_registered` 当前都固定在 `Mock World`
-- `AMap` 只作为 `API-only` 的 `read-only preview`，不参与正式 benchmark，也不进入默认评审主链
+当前公开场景包括 `亲子`、`朋友`、`单人`、`情侣`、`雨天` 和 `预算`。这些场景映射到已注册 world profile，并包含额外候选、`distractor`、不可用候选和失败注入组合，用来验证筛选、fallback、排序稳定性、确认边界和安全停机。
 
-选择 `Mock World` 的原因不是“模拟一切”，而是把当前作品评审重点放在产品闭环与工程可审计性上：规划逻辑、确认边界、执行链路、版本演化、失败恢复、evidence 产出，都能在本地稳定复现。
+`AMap` 仍然只是可选 API/script-only read-only preview；它不进入 `5173` customer UI 主链，不参与正式 benchmark，也不是 `V2 Integrity Edition` 的交付依赖。
 
-## 启动方式
+## 技术栈
 
-### 1. 首次初始化
+| 层级 | 技术 |
+| --- | --- |
+| Backend | Python 3.11+、FastAPI、LangGraph、SQLAlchemy、Alembic、Pydantic Settings |
+| Runtime | PostgreSQL、Redis、Docker Compose |
+| Frontend | React 19、Vite 7、TypeScript、Vitest、Playwright |
+| Observability | 本地 JSONL trace、PostgreSQL run metadata、可选 LangSmith |
+| Benchmark | LocalLife-Bench harness、Mock World fixtures、failure injection、recovery replay |
+
+## 项目结构
+
+```text
+backend/                  # FastAPI、工作流、工具网关、规划、benchmark、providers
+frontend/                 # React/Vite 客户演示页和内部评审页
+tests/                    # 后端单元测试与集成测试
+alembic/                  # PostgreSQL 迁移
+scripts/                  # demo、preflight、benchmark、evidence 脚本
+docs/                     # 设计文档、提交材料、spec、plan、报告
+docker-compose.yml        # 本地 PostgreSQL / Redis
+pyproject.toml            # Python 包和测试配置
+```
+
+当前仓库规模概览：
+
+- `backend/`：349 个文件
+- `frontend/src/`：24 个文件
+- `tests/`：186 个测试文件
+- `backend/app/benchmark/cases/`：30 个 benchmark case
+- `docs/specs/` 与 `docs/plans/`：各 129 个任务文档
+
+## 本地启动
+
+以下命令均假设你已经位于项目根目录。不要把个人电脑上的绝对路径写进文档或脚本；不同开发者只需要进入自己克隆出来的仓库目录即可。
+
+### 1. 克隆并进入项目
+
+```bash
+git clone <your-repo-url>
+cd <repo-directory>
+```
+
+如果你已经在仓库根目录，可以直接从下一步开始。
+
+### 2. 准备 Python 环境
+
+Windows PowerShell：
 
 ```powershell
-cd E:\ai项目\面试准备\hackathon
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
-npm --prefix frontend install
 ```
 
-可选本地环境变量：
+macOS / Linux：
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
+```
+
+### 3. 准备环境变量
+
+复制示例文件：
+
+```bash
+cp .env.example .env
+```
+
+Windows PowerShell 也可以使用：
+
+```powershell
+Copy-Item .env.example .env
+```
+
+默认 `Mock World` 演示、benchmark 和测试不需要真实 API key。只有在你要演示 AMap 只读预览时，才需要在 `.env` 中配置：
 
 ```text
 AMAP_MAPS_API_KEY=your-local-key
 ```
 
-只有在你要演示 `AMap read-only preview` 时才需要这个 key。
+不要提交 `.env`、API key、token 或 secret。
 
-### 2. 启动后端与基础依赖
+### 4. 启动基础服务并迁移数据库
 
-```powershell
+```bash
 docker compose up -d postgres redis
 python -m alembic upgrade head
+```
+
+### 5. 启动后端 API
+
+```bash
 uvicorn backend.app.main:app --reload
 ```
 
-### 3. 启动两个前端页面
+后端默认地址：
 
-公开 demo 页：
+```text
+http://127.0.0.1:8000
+```
 
-```powershell
+健康检查：
+
+```text
+http://127.0.0.1:8000/health
+```
+
+### 6. 启动前端
+
+安装前端依赖：
+
+```bash
+npm --prefix frontend install
+```
+
+启动公开客户演示页：
+
+```bash
 npm --prefix frontend run dev
 ```
 
-内部评审页：
+启动内部评审页：
 
-```powershell
+```bash
 npm --prefix frontend run dev:internal
 ```
 
-### 4. 打开地址
+访问地址：
 
-- API 健康检查：`http://127.0.0.1:8000/health`
-- 公开 demo 页：`http://127.0.0.1:5173/`
+- 公开演示页：`http://127.0.0.1:5173/`
 - 内部评审页：`http://127.0.0.1:5174/`
 
-### 5. 正式启动前检查
+前端默认调用 `http://127.0.0.1:8000`。如需覆盖，创建 `frontend/.env`：
 
-```powershell
-python scripts/demo_preflight.py
+```text
+VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
+## 推荐演示路径
 
-## Benchmark 覆盖
+1. 打开 `http://127.0.0.1:5173/`
+2. 选择一个 Mock World 场景，例如 `亲子`
+3. 提交需求，等待系统进入 `awaiting_confirmation`
+4. 展示方案、确认前动作和人工确认边界
+5. 点击确认，展示模拟执行结果
+6. 复制或查看 `run_id`
+7. 打开 `http://127.0.0.1:5174/`
+8. 查看 `Benchmark Summary`、`System Integrity Summary`
+9. 粘贴 `run_id`，审计 `Run Summary`、`Trace Summary`、`Tool Events`、`Action Ledger`、`Recovery Visualization`
 
-当前仓库的 `benchmark` 与 evidence 体系分成六个主要入口：
+正式提交或录制前建议运行：
 
-| 入口 | 包含内容 | 当前 canonical evidence |
+```bash
+python scripts/demo_preflight.py
+python scripts/show_submission_evidence.py
+```
+
+如果要展示 AMap 只读预览：
+
+```bash
+python scripts/demo_amap_preview.py
+```
+
+## 关键 API
+
+公开 demo API：
+
+- `POST /demo/runs`
+- `POST /demo/runs/stream`
+- `GET /demo/runs/{run_id}`
+- `POST /demo/runs/{run_id}/clarify`
+- `POST /demo/runs/{run_id}/replan`
+- `POST /demo/runs/{run_id}/confirm`
+- `POST /demo/runs/{run_id}/decline`
+
+内部评审 API：
+
+- `GET /internal/runs/{run_id}/observability`
+- `GET /internal/benchmarks/release-gate-v1/summary`
+- `GET /internal/system/integrity-summary`
+
+## Benchmark 与 evidence
+
+当前正式证据口径：
+
+| 入口 | 证明内容 | Canonical alias |
 | --- | --- | --- |
-| `release_gate_v1` | 阻塞式主基线，覆盖 `15` 个 `L1-L3` `Mock World` case，验证主产品路径、确认边界、执行链路与 1 个路由失败 case | `var/formal-benchmarks/latest-release_gate_v1-run-report.json` |
-| `coverage_gate_v1_5` | 基于 `all_registered` 的覆盖率 / 多样性 gate，验证场景广度、tag 覆盖、failure mode 覆盖 | `var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json` |
-| `v2_integrity_gate` | V2 Integrity Edition 的当前阻塞 gate，汇总完整性矩阵、memory mode、conversation mode 与 failure mode 覆盖 | `var/formal-benchmarks/latest-v2_integrity_gate-run-report.json` |
-| `v2_integrity_passk` | V2 Integrity Edition 的重复运行稳定性指标，覆盖 `Success@1`、`Pass@4`、`Pass^4` | `var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json` |
-| `all_registered` | 全量 `30` 个已注册 case 的 `formal verification`，覆盖 `clarification`、`replan/versioning`、`memory governance`、`robustness`、`recovery-related` case | `var/formal-benchmarks/latest-all_registered-run-report.json` |
-| `family_route_failure_v1` | 固定失败恢复审查链，验证 benchmark failure path、replay 一致性、observability 链接一致性 | `var/recovery-reviews/latest-family_route_failure_v1-review.json` |
-| `safe_stop_gate_v1` | 聚焦 `recovery_focused` 的安全停机 gate，验证 8 个组合失败 case 都以零写动作、bounded chain、terminal `stop_safely` 收束 | `var/formal-benchmarks/latest-safe_stop_gate_v1-run-report.json` |
+| `release_gate_v1` | 主产品路径、确认边界、执行链路、基础失败恢复 | `var/formal-benchmarks/latest-release_gate_v1-run-report.json` |
+| `coverage_gate_v1_5` | 场景广度、tag 覆盖、failure mode 覆盖 | `var/formal-benchmarks/latest-coverage_gate_v1_5-run-report.json` |
+| `v2_integrity_gate` | V2 完整性 gate | `var/formal-benchmarks/latest-v2_integrity_gate-run-report.json` |
+| `v2_integrity_passk` | repeated-run stability | `var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json` |
+| `all_registered` | 全量 30 个注册 case formal verification | `var/formal-benchmarks/latest-all_registered-run-report.json` |
+| `family_route_failure_v1` | 固定失败恢复审查链 | `var/recovery-reviews/latest-family_route_failure_v1-review.json` |
 
-按能力看，当前 `benchmark` 已覆盖：
+当前 canonical latest evidence 摘要：
 
-- 场景广度：亲子、朋友、单人、情侣、雨天、预算、老人等
-- 多轮对话：`clarification`、`replan`、`versioning`
-- 执行边界：确认前只读、确认后写动作
-- 记忆治理：`memory governance`
-- 稳健性：噪声候选、fallback、排序稳定性
-- 失败恢复：`route_unavailable` 与 `recovery replay review`
+- `release_gate_v1`：`15/15` passed，`overall_score=1.0`
+- `coverage_gate_v1_5`：`30/30` passed，`overall_score=1.0`
+- `v2_integrity_gate`：`20/20` passed，`release_blocked=false`
+- `v2_integrity_passk`：`Success@1=1.0`，`Pass@4=1.0`，`Pass^4=1.0`
+- `all_registered`：`30/30` passed，`overall_score=1.0`
+- `family_route_failure_v1` recovery review：`3/3` checks passed
 
-### 当前 benchmark 状态
-
-以下信息来自当前 canonical latest evidence，用于说明“现在这份项目”已经跑到了什么程度。
-
-| 检查项 | 当前状态 | 关键细节 |
-| --- | --- | --- |
-| `release_gate_v1` | `passed`，`15/15` 通过，`overall_score=1.0` | `Mock World` 全量通过，层级分布为 `L1=3, L2=8, L3=4`；failure mode 为 `none=14`、`route_unavailable=1`；当前关键时延为 `p50=390ms`、`p95=424ms`、`max=424ms` |
-| `coverage_gate_v1_5` | `passed`，`30/30` 通过，`overall_score=1.0` | 场景桶分布为 `couple=1`、`elder=2`、`family=16`、`friends=3`、`mixed=4`、`solo=2`、`unknown=2`；world profile 分布为 `budget_lite=3`、`couple_afternoon=1`、`elder_afternoon=2`、`family_afternoon=16`、`friends_gathering=3`、`rainy_day_fallback=3`、`solo_afternoon=2` |
-| `v2_integrity_gate` | `passed`，`20/20` 通过，`release_blocked=false` | `5174` 的 `System Integrity Summary` 与 evidence summary 脚本都以它作为当前 V2 完整性 gate 入口 |
-| `v2_integrity_passk` | `passed`，`Success@1=1.0`，`Pass@4=1.0`，`Pass^4=1.0` | 当前 canonical stability alias 为 `var/formal-benchmarks/stability/latest-v2_integrity-passk-v0-report.json`，用于说明 repeated-run stability |
-| `all_registered` | `passed`，`30/30` 通过，`overall_score=1.0` | 代表性 tag 覆盖包括 `conversation_continuation=2`、`memory_governance=5`、`robustness_case=4`、`elder_friendly=2`、`friends_group=3`、`rainy_day=3`，并新增组合失败覆盖与 `safe_stop_gate_v1` |
-| `family_route_failure_v1` | `recovery review passed`，`3/3` 检查通过 | 当前失败注入链为 `check_route:route_infeasible:failed`，恢复动作是 `stop_safely`，终态为 `terminal_workflow_status=failed`，说明系统走的是“安全停机而非错误执行” |
-
-如果你只想快速查看当前 evidence 状态，直接运行：
+快速查看 evidence：
 
 ```bash
 python scripts/show_submission_evidence.py
 ```
 
-如果你需要刷新 evidence，使用这些命令：
+刷新主要 evidence：
 
 ```bash
 python scripts/run_benchmark_release_gate.py
 python scripts/run_benchmark_coverage_gate.py
+python scripts/run_benchmark_v2_integrity_gate.py
+python scripts/run_benchmark_stability_passk.py
 python scripts/run_formal_verification.py
 python scripts/run_recovery_replay_review.py
 ```
 
-`python scripts/run_recovery_replay_review.py` 仍然默认跑 reviewer-facing 的 canonical case `family_route_failure_v1`，并刷新 `var/recovery-reviews/latest-family_route_failure_v1-review.json`。
+## 测试与验证
 
-如果你需要做工程侧的泛化 recovery replay 验证，而不是替换 canonical reviewer 口径，可以额外使用：
-
-```bash
-python scripts/run_recovery_replay_review.py --case-id family_route_and_dining_unavailable_v1
-python scripts/run_recovery_replay_review.py --suite-id recovery_focused
-```
-
-## 测试结果
-
-以下结果基于本地核对，属于当前 README 所引用的最新验证记录。
-
-### 1. 当前 benchmark / evidence 状态
-
-| 检查项 | 结果 |
-| --- | --- |
-| `release_gate_v1` | `passed`，`15/15` 通过，`failed=0`，`error=0`，`overall_score=1.0` |
-| `coverage_gate_v1_5` | `passed`，`30/30` 通过，`failed=0`，`error=0`，`overall_score=1.0` |
-| `v2_integrity_gate` | `passed`，`20/20` 通过，`failed=0`，`error=0`，`release_blocked=false` |
-| `v2_integrity_passk` | `passed`，`executed_run_count=4`，`Success@1=1.0`，`Pass@4=1.0`，`Pass^4=1.0` |
-| `all_registered` | `passed`，`30/30` 通过，`failed=0`，`error=0`，`overall_score=1.0` |
-| `safe_stop_gate_v1` | `passed`，`8/8` 通过，`failed=0`，`error=0`，全部 recovery case 都是零写动作安全停机 |
-| `family_route_failure_v1` recovery review | `passed`，`3/3` 检查通过 |
-
-对应检查命令：
-
-```bash
-python scripts/show_submission_evidence.py
-```
-
-### 2. 已核对的聚焦测试
-
-后端 / 文档 / evidence 聚焦测试：
+后端聚焦测试：
 
 ```bash
 python -m pytest tests/test_demo_support_scripts.py tests/test_review_evidence.py -q
 ```
 
-当前结果：
+后端核心工作流测试：
 
-- `23 passed`
+```bash
+python -m pytest tests/test_langgraph_workflow.py tests/test_benchmark_harness.py tests/test_llm_agents.py -q
+```
+
+前端单元测试：
+
+```bash
+npm --prefix frontend run test -- --run
+```
 
 前端聚焦单元测试：
 
@@ -223,17 +276,57 @@ python -m pytest tests/test_demo_support_scripts.py tests/test_review_evidence.p
 npm --prefix frontend test -- --run src/chat/ConversationThread.test.tsx src/App.test.tsx
 ```
 
-当前结果：
+前端构建：
 
-- `2` 个测试文件通过
-- `24 passed`
+```bash
+npm --prefix frontend run build
+```
 
-若你需要完整 runbook，请看 [docs/WEB_DEMO_README.md](docs/WEB_DEMO_README.md)。
+浏览器 E2E 测试需要先准备 PostgreSQL、Redis、Alembic 迁移，并安装 Playwright Chromium：
+
+```bash
+npm --prefix frontend run e2e:install
+npm --prefix frontend run e2e
+```
+
+当前 README 对应的聚焦验证记录：
+
+- `python -m pytest tests/test_demo_support_scripts.py tests/test_review_evidence.py -q`：`23 passed`
+- `npm --prefix frontend test -- --run src/chat/ConversationThread.test.tsx src/App.test.tsx`：`24 passed`
+
+## 配置说明
+
+主要环境变量见 `.env.example`：
+
+- `DATABASE_URL`：PostgreSQL 连接串
+- `REDIS_URL`：Redis 连接串
+- `LLM_ENABLED`：是否启用可选 LLM-backed agent
+- `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL_ID`：可选 LLM provider 配置
+- `LANGSMITH_TRACING` / `LANGSMITH_API_KEY`：可选 LangSmith tracing
+- `LOCAL_TRACE_BUFFER_PATH`：本地 trace JSONL 路径
+- `AMAP_MAPS_API_KEY`：可选 AMap 只读预览 key
+
+默认 Mock World 路径不需要 LLM、LangSmith、AMap 或 Baidu key。
 
 ## 详细文档
 
-- 架构设计：[docs/COMPETITION_DESIGN_DOCUMENT.md](docs/COMPETITION_DESIGN_DOCUMENT.md)
-- Web demo 运行手册：[docs/WEB_DEMO_README.md](docs/WEB_DEMO_README.md)
-- 提交与录制总览：[docs/submission/OVERVIEW.md](docs/submission/OVERVIEW.md)
-- reviewer evidence 入口：[docs/V1_5_REVIEW_EVIDENCE.md](docs/V1_5_REVIEW_EVIDENCE.md)
-- 提交前可运行：`python scripts/verify_review_evidence.py`
+- 项目评估报告：[docs/PROJECT_ASSESSMENT_REPORT.md](docs/PROJECT_ASSESSMENT_REPORT.md)
+- 技术报告：[docs/TECHNICAL_REPORT.md](docs/TECHNICAL_REPORT.md)
+- 竞赛设计文档：[docs/COMPETITION_DESIGN_DOCUMENT.md](docs/COMPETITION_DESIGN_DOCUMENT.md)
+- Web demo runbook：[docs/WEB_DEMO_README.md](docs/WEB_DEMO_README.md)
+- Reviewer evidence 入口：[docs/V1_5_REVIEW_EVIDENCE.md](docs/V1_5_REVIEW_EVIDENCE.md)
+- 提交总览：[docs/submission/OVERVIEW.md](docs/submission/OVERVIEW.md)
+- 功能覆盖：[docs/submission/FUNCTION_COVERAGE_MAP.md](docs/submission/FUNCTION_COVERAGE_MAP.md)
+- Evidence map：[docs/submission/EVIDENCE_MAP.md](docs/submission/EVIDENCE_MAP.md)
+
+## 不应提交的内容
+
+- `.env`、`frontend/.env`
+- API keys、tokens、secrets、credentials
+- `node_modules/`
+- `frontend/dist/`
+- `frontend/playwright-report/`
+- `frontend/test-results/`
+- `frontend/blob-report/`
+- screenshots、videos、traces 等临时测试产物
+- `var/` 下的本地运行产物，除非某次提交明确要求刷新 canonical evidence
